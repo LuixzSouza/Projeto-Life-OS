@@ -1,0 +1,177 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// --- MÓDULO FINANCEIRO ---
+
+model Account {
+  id          String        @id @default(uuid())
+  name        String        // Ex: "Nubank", "Cofre"
+  type        String        // "CORRENTE", "INVESTIMENTO", "DINHEIRO"
+  balance     Decimal       @default(0.00) // Saldo atual
+  color       String?       @default("#000000") // Para UI (ex: Roxo do Nubank)
+  transactions Transaction[]
+  
+  // Rastreio
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  description String   // Ex: "Almoço", "Salário"
+  amount      Decimal  // Valor (positivo ou negativo)
+  type        String   // "INCOME" (Entrada) ou "EXPENSE" (Saída)
+  date        DateTime @default(now())
+  category    String   // Ex: "Alimentação", "Transporte"
+  
+  // Relacionamentos
+  accountId   String
+  account     Account  @relation(fields: [accountId], references: [id])
+}
+
+// --- MÓDULO ESTUDOS ---
+
+model StudySubject {
+  id        String   @id @default(uuid())
+  title     String   // Ex: "Next.js", "Inglês"
+  category  String   // Ex: "Programação", "Idiomas"
+  color     String   @default("blue") // blue, red, green...
+  sessions  StudySession[]
+  createdAt DateTime @default(now())
+}
+
+model StudySession {
+  id              String       @id @default(uuid())
+  durationMinutes Int          // Tempo total em minutos
+  notes           String?      @db.Text
+  date            DateTime     @default(now())
+  
+  subjectId       String
+  subject         StudySubject @relation(fields: [subjectId], references: [id])
+}
+
+// --- MÓDULO PROJETOS & TAREFAS ---
+
+model Project {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  status      String   @default("ACTIVE") // ACTIVE, COMPLETED, ARCHIVED
+  createdAt   DateTime @default(now())
+  
+  tasks       Task[]
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  title       String
+  isDone      Boolean  @default(false)
+  dueDate     DateTime?
+  
+  // Relacionamento opcional (pode ser tarefa sem projeto)
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id])
+  
+  createdAt   DateTime @default(now())
+}
+
+// --- MÓDULO SAÚDE ---
+
+model Workout {
+  id        String   @id @default(uuid())
+  title     String   // Ex: "Treino A - Peito e Tríceps"
+  type      String   // "GYM", "CARDIO", "SPORT"
+  duration  Int      // Minutos
+  intensity String   // "LOW", "MEDIUM", "HIGH"
+  notes     String?  @db.Text // Detalhes (cargas, repetições em texto livre por enquanto)
+  date      DateTime @default(now())
+}
+
+model HealthMetric {
+  id    String   @id @default(uuid())
+  type  String   // "WEIGHT" (Peso), "WATER" (Água), "SLEEP" (Sono)
+  value Float    // O valor (ex: 80.5 kg, 2000 ml)
+  date  DateTime @default(now())
+}
+
+// --- MÓDULO AGENDA ---
+
+model Event {
+  id          String   @id @default(uuid())
+  title       String
+  startTime   DateTime // Data e Hora de início
+  endTime     DateTime? // Opcional (se for só lembrete pontual)
+  isAllDay    Boolean  @default(false)
+  description String?
+  category    String   @default("general") // work, personal, important
+  createdAt   DateTime @default(now())
+}
+
+// --- MÓDULO CONFIGURAÇÕES ---
+
+model Settings {
+  id          String   @id @default(uuid())
+  theme       String   @default("system") // light, dark, system
+  accentColor String   @default("zinc")   // zinc, blue, green, orange
+  language    String   @default("pt-BR")
+  
+  // Vínculo (Singleton: Geralmente 1 settings por user)
+  // Como é single user offline, não precisamos complicar com User relation agora,
+  // mas vamos deixar preparado caso você queira login no futuro.
+  updatedAt   DateTime @updatedAt
+}
+
+// --- MÓDULO CMS ---
+
+model ManagedSite {
+  id        String   @id @default(uuid())
+  name      String   // Ex: "Landing Page Advogado"
+  url       String?  // Ex: "https://advogado.com"
+  apiKey    String   @unique @default(uuid()) // A chave para o site externo acessar
+  createdAt DateTime @default(now())
+  
+  pages     SitePage[]
+}
+
+model SitePage {
+  id          String      @id @default(uuid())
+  slug        String      // Ex: "home", "sobre", "contato"
+  content     String      @db.Text // JSON stringificado
+  
+  siteId      String
+  site        ManagedSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  
+  updatedAt   DateTime    @updatedAt
+}
+
+// --- MÓDULO IA ---
+
+model AiChat {
+  id        String      @id @default(uuid())
+  title     String      @default("Nova Conversa")
+  createdAt DateTime    @default(now())
+  messages  AiMessage[]
+}
+
+model AiMessage {
+  id        String   @id @default(uuid())
+  role      String   // "user" ou "assistant"
+  content   String   @db.Text
+  chatId    String
+  chat      AiChat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
