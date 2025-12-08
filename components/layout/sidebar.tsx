@@ -14,6 +14,7 @@ import {
   BrainCircuit
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@radix-ui/react-avatar";
 
 const sidebarItems = [
   { label: "Visão Geral", icon: LayoutDashboard, href: "/" },
@@ -27,7 +28,15 @@ const sidebarItems = [
   { label: "Configurações", icon: Settings, href: "/settings" },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+    user?: {
+        name: string;
+        avatarUrl?: string | null;
+        bio?: string | null;
+    } | null;
+}
+
+export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname();
 
   return (
@@ -67,12 +76,17 @@ export function Sidebar() {
       </nav>
 
       {/* Footer da Sidebar (Opcional: Status do Usuário) */}
-      <div className="border-t p-4">
+       <div className="border-t p-4">
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-full bg-zinc-200 dark:bg-zinc-800" />
-          <div className="text-sm">
-            <p className="font-medium">Luiz Antônio</p>
-            <p className="text-xs text-zinc-500">Admin</p>
+          <Avatar className="h-9 w-9 border border-zinc-200 dark:border-zinc-700">
+            <AvatarImage src={user?.avatarUrl || ""} />
+            <AvatarFallback>{user?.name?.substring(0,2).toUpperCase() || "US"}</AvatarFallback>
+          </Avatar>
+          <div className="text-sm overflow-hidden">
+            <p className="font-medium truncate">{user?.name || "Usuário"}</p>
+            <p className="text-xs text-zinc-500 truncate" title={user?.bio || "Admin"}>
+                {user?.bio || "Admin"}
+            </p>
           </div>
         </div>
       </div>

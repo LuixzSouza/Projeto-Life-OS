@@ -126,3 +126,59 @@ html,
 body {
   height: 100%;
 }
+
+/* --- TEMAS DE CORES CORRIGIDOS (Compatível com Tailwind v4/Shadcn New York) --- */
+
+/* NOTA: Usamos hsl() explícito para sobrescrever o oklch do sistema.
+  Definimos cores para modo claro e modo escuro (.dark) para garantir contraste.
+*/
+
+/* TEMA AZUL (Padrão) */
+.theme-blue {
+  --primary: hsl(221.2 83.2% 53.3%);
+  --ring: hsl(221.2 83.2% 53.3%);
+}
+.dark .theme-blue {
+  --primary: hsl(217.2 91.2% 59.8%);
+  --ring: hsl(217.2 91.2% 59.8%);
+}
+
+/* TEMA VERDE (Foco/Produtividade) */
+.theme-green {
+  --primary: hsl(142 76% 36%);
+  --ring: hsl(142 76% 36%);
+}
+.dark .theme-green {
+  --primary: hsl(142 70% 50%); /* Verde mais claro no dark mode para leitura */
+  --ring: hsl(142 70% 50%);
+}
+
+/* TEMA LARANJA (Energia) */
+.theme-orange {
+  --primary: hsl(24 95% 53%);
+  --ring: hsl(24 95% 53%);
+}
+.dark .theme-orange {
+  --primary: hsl(24 100% 60%);
+  --ring: hsl(24 100% 60%);
+}
+
+/* TEMA ROXO (Criatividade) */
+.theme-violet {
+  --primary: hsl(262 83% 58%);
+  --ring: hsl(262 83% 58%);
+}
+.dark .theme-violet {
+  --primary: hsl(263 70% 65%);
+  --ring: hsl(263 70% 65%);
+}
+
+/* TEMA ROSE (Elegância) */
+.theme-rose {
+  --primary: hsl(346 77% 49%);
+  --ring: hsl(346 77% 49%);
+}
+.dark .theme-rose {
+  --primary: hsl(346 80% 65%);
+  --ring: hsl(346 80% 65%);
+}

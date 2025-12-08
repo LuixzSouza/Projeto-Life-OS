@@ -11,8 +11,18 @@ model User {
   id        String   @id @default(uuid())
   name      String
   email     String   @unique
+  password  String   // Hash (simulado por enquanto)
+  
+  // Novos campos:
+  avatarUrl String?  // URL de uma imagem da internet
+  bio       String?  // Ex: "Fullstack Developer focado em Next.js"
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  // Relacionamentos (Agora vai funcionar pois o outro lado existe)
+  accounts  Account[]
+  projects  Project[]
 }
 
 // --- MÓDULO FINANCEIRO ---
@@ -24,6 +34,10 @@ model Account {
   balance     Decimal       @default(0.00) // Saldo atual
   color       String?       @default("#000000") // Para UI (ex: Roxo do Nubank)
   transactions Transaction[]
+  
+  // CORREÇÃO: Relacionamento com User
+  userId      String?       // Opcional por enquanto para não quebrar dados existentes
+  user        User?         @relation(fields: [userId], references: [id])
   
   // Rastreio
   createdAt   DateTime      @default(now())
@@ -72,6 +86,10 @@ model Project {
   description String?
   status      String   @default("ACTIVE") // ACTIVE, COMPLETED, ARCHIVED
   createdAt   DateTime @default(now())
+  
+  // CORREÇÃO: Relacionamento com User
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
   
   tasks       Task[]
 }
@@ -125,13 +143,14 @@ model Event {
 
 model Settings {
   id          String   @id @default(uuid())
-  theme       String   @default("system") // light, dark, system
-  accentColor String   @default("zinc")   // zinc, blue, green, orange
+  theme       String   @default("system")
+  accentColor String   @default("zinc")
   language    String   @default("pt-BR")
   
-  // Vínculo (Singleton: Geralmente 1 settings por user)
-  // Como é single user offline, não precisamos complicar com User relation agora,
-  // mas vamos deixar preparado caso você queira login no futuro.
+  aiProvider  String   @default("ollama")
+  aiModel     String   @default("llama3")
+  aiPersona   String?  @db.Text
+  
   updatedAt   DateTime @updatedAt
 }
 

@@ -7,14 +7,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Folder, Layers } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
-export default async function ProjectsPage({ searchParams }: { searchParams: { id?: string } }) {
+interface ProjectsPageProps {
+  searchParams: Promise<{ id?: string }>;
+}
+
+export default async function ProjectsPage({ searchParams }: ProjectsPageProps) {
   // 1. Busca todos os projetos
   const projects = await prisma.project.findMany({ orderBy: { createdAt: 'desc' } });
   
   // 2. Identifica qual projeto está selecionado (ou se é Inbox)
   // Nota: No Next.js App Router, searchParams é uma Promise em versões futuras, 
   // mas na atual funciona direto. Se der erro de tipo, usaremos 'any' temporário no props.
-  const selectedProjectId = searchParams?.id || "inbox";
+  const params = await searchParams;
+  const selectedProjectId = params?.id || "inbox"
+  
   
   // 3. Busca as tarefas baseadas na seleção
   const tasks = await prisma.task.findMany({
