@@ -23,6 +23,7 @@ model User {
   // Relacionamentos (Agora vai funcionar pois o outro lado existe)
   accounts  Account[]
   projects  Project[]
+  jobApplications JobApplication[]
 }
 
 // --- MÓDULO FINANCEIRO ---
@@ -86,12 +87,15 @@ model Project {
   description String?
   status      String   @default("ACTIVE") // ACTIVE, COMPLETED, ARCHIVED
   createdAt   DateTime @default(now())
+
+  color        String?   @default("#6366f1") // Cor padrão (Ex: Indigo)
   
   // CORREÇÃO: Relacionamento com User
   userId      String?
   user        User?    @relation(fields: [userId], references: [id])
   
   tasks       Task[]
+  events       Event[]
 }
 
 model Task {
@@ -100,11 +104,33 @@ model Task {
   isDone      Boolean  @default(false)
   dueDate     DateTime?
   
-  // Relacionamento opcional (pode ser tarefa sem projeto)
+  priority    String   @default("MEDIUM") // LOW, MEDIUM, HIGH
+  image       String?  @db.LongText
   projectId   String?
   project     Project? @relation(fields: [projectId], references: [id])
   
   createdAt   DateTime @default(now())
+}
+
+// --- MÓDULO VAGAS (JOB TRACKER) ---
+
+model JobApplication {
+  id          String   @id @default(uuid())
+  company     String
+  role        String
+  status      String
+  jobUrl      String?
+  salary      String?
+  location    String?
+  
+  // NOVO CAMPO:
+  requirements String? @db.Text // Texto longo para descrição/requisitos
+  
+  appliedDate DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
 }
 
 // --- MÓDULO SAÚDE ---
@@ -136,6 +162,10 @@ model Event {
   isAllDay    Boolean  @default(false)
   description String?
   category    String   @default("general") // work, personal, important
+
+  projectId    String?
+  project      Project? @relation(fields: [projectId], references: [id])
+
   createdAt   DateTime @default(now())
 }
 
