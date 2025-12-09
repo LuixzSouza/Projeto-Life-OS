@@ -1,16 +1,20 @@
 version: '3.8'
+
 services:
   mysql:
-    image: mysql:8
+    image: mysql:5.7 
     container_name: life_os_db
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: life_os
+      MYSQL_USER: lifeos
+      MYSQL_PASSWORD: life123
     ports:
       - '3306:3306'
     volumes:
       - mysql_data:/var/lib/mysql
+    # REMOVER a linha 'command:'
 
 volumes:
   mysql_data:

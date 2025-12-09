@@ -1,118 +1,179 @@
 import { prisma } from "@/lib/prisma";
-import { getStorageStats } from "./actions"; // Importe a nova função
+import { getStorageStats } from "./actions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, Database, Upload, ShieldCheck, BrainCircuit } from "lucide-react";
+import { Download, Database, Upload, Shield, BrainCircuit, User, Palette } from "lucide-react";
 import Link from "next/link";
 
 // Componentes
 import { AppearanceLoader } from "@/components/settings/appearance-loader";
 import { RestoreBackupForm, FactoryResetButton } from "@/components/settings/settings-actions";
-import { StorageAnalytics, AIConfigForm, SecurityForm } from "@/components/settings/settings-ui"; // <--- Novos
+import { StorageAnalytics, AIConfigForm, SecurityForm } from "@/components/settings/settings-ui";
 
 export default async function SettingsPage() {
   const user = await prisma.user.findFirst();
   const settings = await prisma.settings.findFirst();
-  
-  // Busca estatísticas reais do banco (Optimized)
   const stats = await getStorageStats();
 
   return (
-    <div className="space-y-6 pb-10">
-      <h1 className="text-3xl font-bold">Painel de Controle</h1>
+    <div className="min-h-screen bg-gray-50/30 dark:bg-black p-6 md:p-10 space-y-8">
+      
+      {/* HEADER */}
+      <div className="flex flex-col gap-1 pb-6 border-b border-zinc-200 dark:border-zinc-800">
+        <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">Configurações</h1>
+        <p className="text-zinc-500">Gerencie suas preferências, dados e segurança.</p>
+      </div>
 
-      <Tabs defaultValue="appearance" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 lg:w-[600px]">
-          <TabsTrigger value="appearance">Visual</TabsTrigger>
-          <TabsTrigger value="intelligence">IA</TabsTrigger>
-          <TabsTrigger value="system">Dados</TabsTrigger>
-          <TabsTrigger value="security">Segurança</TabsTrigger>
-        </TabsList>
+      <Tabs defaultValue="profile" className="w-full space-y-8">
+        
+        {/* NAVEGAÇÃO SUPERIOR */}
+        <div className="overflow-x-auto pb-2">
+            <TabsList className="bg-transparent h-12 p-0 gap-6 w-full justify-start min-w-max">
+            <TabsTrigger 
+                value="profile" 
+                className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-zinc-900 dark:data-[state=active]:border-white rounded-none px-0 pb-2 font-medium text-zinc-500 data-[state=active]:text-zinc-900 dark:data-[state=active]:text-white flex items-center gap-2"
+            >
+                <User className="h-4 w-4" /> Perfil & Aparência
+            </TabsTrigger>
+            <TabsTrigger 
+                value="intelligence" 
+                className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-zinc-900 dark:data-[state=active]:border-white rounded-none px-0 pb-2 font-medium text-zinc-500 data-[state=active]:text-zinc-900 dark:data-[state=active]:text-white flex items-center gap-2"
+            >
+                <BrainCircuit className="h-4 w-4" /> Inteligência Artificial
+            </TabsTrigger>
+            <TabsTrigger 
+                value="system" 
+                className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-zinc-900 dark:data-[state=active]:border-white rounded-none px-0 pb-2 font-medium text-zinc-500 data-[state=active]:text-zinc-900 dark:data-[state=active]:text-white flex items-center gap-2"
+            >
+                <Database className="h-4 w-4" /> Dados & Backup
+            </TabsTrigger>
+            <TabsTrigger 
+                value="security" 
+                className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-zinc-900 dark:data-[state=active]:border-white rounded-none px-0 pb-2 font-medium text-zinc-500 data-[state=active]:text-zinc-900 dark:data-[state=active]:text-white flex items-center gap-2"
+            >
+                <Shield className="h-4 w-4" /> Segurança
+            </TabsTrigger>
+            </TabsList>
+        </div>
 
-        {/* 1. VISUAL (Perfil e Cores) */}
-        <TabsContent value="appearance" className="space-y-4">
-            <AppearanceLoader 
-                initialColor={settings?.accentColor} 
-                userName={user?.name} 
-                userEmail={user?.email} 
-                userAvatar={user?.avatarUrl} 
-                userBio={user?.bio}          
-            />
+        {/* 1. PERFIL E VISUAL */}
+        <TabsContent value="profile" className="space-y-6 focus-visible:outline-none">
+            <div className="grid gap-6 md:grid-cols-12">
+                <div className="md:col-span-4">
+                    <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">Identidade</h3>
+                    <p className="text-sm text-zinc-500">Como você aparece no sistema.</p>
+                </div>
+                <div className="md:col-span-8">
+                    <Card className="border-0 shadow-sm bg-white dark:bg-zinc-900 ring-1 ring-zinc-200 dark:ring-zinc-800">
+                        <CardContent className="p-6">
+                            {/* Componente que lida com Foto (Avatar) e Campos */}
+                            <AppearanceLoader 
+                                initialColor={settings?.accentColor} 
+                                userName={user?.name} 
+                                userEmail={user?.email} 
+                                userAvatar={user?.avatarUrl} // Passando a URL da foto
+                                userBio={user?.bio}          
+                            />
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
         </TabsContent>
 
-        {/* 2. INTELIGÊNCIA ARTIFICIAL (Novo) */}
-        <TabsContent value="intelligence" className="space-y-4">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><BrainCircuit className="h-5 w-5 text-purple-500" /> Configuração do Cérebro</CardTitle>
-                    <CardDescription>Defina como a IA deve pensar e responder.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <AIConfigForm settings={settings} />
-                </CardContent>
-            </Card>
+        {/* 2. INTELIGÊNCIA ARTIFICIAL */}
+        <TabsContent value="intelligence" className="space-y-6 focus-visible:outline-none">
+             <div className="grid gap-6 md:grid-cols-12">
+                <div className="md:col-span-4">
+                    <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">Cérebro Digital</h3>
+                    <p className="text-sm text-zinc-500">Personalize o comportamento da IA.</p>
+                </div>
+                <div className="md:col-span-8">
+                    <Card className="border-0 shadow-sm bg-white dark:bg-zinc-900 ring-1 ring-zinc-200 dark:ring-zinc-800">
+                        <CardContent className="p-6">
+                            <AIConfigForm settings={settings} />
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
         </TabsContent>
 
-        {/* 3. SISTEMA & DADOS (Melhorado) */}
-        <TabsContent value="system" className="space-y-4">
-          <div className="grid md:grid-cols-2 gap-4">
-              {/* Analytics Visual */}
-              <Card className="md:col-span-2">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><Database className="h-5 w-5" /> Distribuição de Dados</CardTitle>
-                    <CardDescription>Onde seu espaço está sendo usado.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <StorageAnalytics stats={stats} />
-                </CardContent>
-              </Card>
+        {/* 3. DADOS E SISTEMA */}
+        <TabsContent value="system" className="space-y-8 focus-visible:outline-none">
+             {/* Estatísticas */}
+             <div className="grid gap-6 md:grid-cols-12">
+                <div className="md:col-span-4">
+                    <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">Armazenamento</h3>
+                    <p className="text-sm text-zinc-500">Visão geral do uso do banco de dados.</p>
+                </div>
+                <div className="md:col-span-8">
+                    <Card className="border-0 shadow-sm bg-white dark:bg-zinc-900 ring-1 ring-zinc-200 dark:ring-zinc-800">
+                        <CardContent className="p-6">
+                            <StorageAnalytics stats={stats} />
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
 
-              {/* Exportar */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><Download className="h-5 w-5" /> Backup</CardTitle>
-                  <CardDescription>Salve seus dados.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                   <Link href="/api/backup" target="_blank">
-                      <Button variant="outline" className="w-full">
-                        <Download className="mr-2 h-4 w-4" /> Exportar JSON
-                      </Button>
-                   </Link>
-                </CardContent>
-              </Card>
+            {/* Backup e Restore */}
+            <div className="grid gap-6 md:grid-cols-12 pt-6 border-t border-zinc-200 dark:border-zinc-800">
+                <div className="md:col-span-4">
+                    <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">Backup & Reset</h3>
+                    <p className="text-sm text-zinc-500">Exporte seus dados ou reinicie o sistema.</p>
+                </div>
+                <div className="md:col-span-8 space-y-4">
+                    <div className="grid md:grid-cols-2 gap-4">
+                        <Card className="border-0 shadow-sm bg-white dark:bg-zinc-900 ring-1 ring-zinc-200 dark:ring-zinc-800">
+                            <CardHeader>
+                                <CardTitle className="text-base flex items-center gap-2"><Download className="h-4 w-4" /> Exportar</CardTitle>
+                                <CardDescription>Baixe um arquivo JSON com tudo.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <Link href="/api/backup" target="_blank">
+                                    <Button variant="outline" className="w-full">Download Backup</Button>
+                                </Link>
+                            </CardContent>
+                        </Card>
 
-              {/* Importar */}
-              <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><Upload className="h-5 w-5" /> Restaurar</CardTitle>
-                    <CardDescription>Carregue um backup.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <RestoreBackupForm />
-                </CardContent>
-              </Card>
-          </div>
+                        <Card className="border-0 shadow-sm bg-white dark:bg-zinc-900 ring-1 ring-zinc-200 dark:ring-zinc-800">
+                            <CardHeader>
+                                <CardTitle className="text-base flex items-center gap-2"><Upload className="h-4 w-4" /> Importar</CardTitle>
+                                <CardDescription>Restaure dados de um arquivo.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <RestoreBackupForm />
+                            </CardContent>
+                        </Card>
+                    </div>
 
-          <Card className="border-red-500/20 bg-red-50/10 mt-6">
-             <CardContent className="pt-6">
-                <FactoryResetButton />
-             </CardContent>
-          </Card>
+                    <Card className="border border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-900/50">
+                        <CardContent className="p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                            <div>
+                                <h4 className="text-sm font-bold text-red-800 dark:text-red-400">Zona de Perigo</h4>
+                                <p className="text-xs text-red-600 dark:text-red-300">Isso apaga todas as tarefas, eventos e finanças.</p>
+                            </div>
+                            <FactoryResetButton />
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
         </TabsContent>
 
-        {/* 4. SEGURANÇA (Novo) */}
-        <TabsContent value="security" className="space-y-4">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-green-600" /> Credenciais</CardTitle>
-                    <CardDescription>Gerencie o acesso ao seu Life OS.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <SecurityForm />
-                </CardContent>
-            </Card>
+        {/* 4. SEGURANÇA */}
+        <TabsContent value="security" className="space-y-6 focus-visible:outline-none">
+             <div className="grid gap-6 md:grid-cols-12">
+                <div className="md:col-span-4">
+                    <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">Acesso</h3>
+                    <p className="text-sm text-zinc-500">Altere sua senha mestre.</p>
+                </div>
+                <div className="md:col-span-8">
+                    <Card className="border-0 shadow-sm bg-white dark:bg-zinc-900 ring-1 ring-zinc-200 dark:ring-zinc-800">
+                        <CardContent className="p-6">
+                            <SecurityForm />
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
         </TabsContent>
 
       </Tabs>

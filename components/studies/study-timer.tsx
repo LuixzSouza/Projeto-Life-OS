@@ -1,157 +1,295 @@
 "use client";
 
-import { useState, useEffect, ChangeEvent } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Play, Pause, Square, Clock } from "lucide-react";
+import { Play, Pause, CheckCircle2, BrainCircuit, Lightbulb, Zap, Timer, RotateCcw } from "lucide-react";
 import { StudySubject } from "@prisma/client";
 import { logSession } from "@/app/(dashboard)/studies/actions";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch"; 
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner"; 
+
+const STUDY_TIPS = [
+  "A técnica Feynman: Tente explicar o que aprendeu em termos simples.",
+  "Faça pausas ativas: Caminhe ou alongue-se para oxigenar o cérebro.",
+  "Evite a curva do esquecimento: Revise este conteúdo em 24h.",
+  "Interleaving: Misture tópicos diferentes para fortalecer a memória.",
+  "Sono é essencial: A consolidação da memória acontece enquanto você dorme."
+];
 
 interface StudyTimerProps {
   subjects: StudySubject[];
 }
 
 export function StudyTimer({ subjects }: StudyTimerProps) {
+  // --- 1. ESTADOS ---
   const [selectedSubject, setSelectedSubject] = useState<string>("");
   const [isRunning, setIsRunning] = useState(false);
   const [seconds, setSeconds] = useState(0);
+  const [pomodoroMode, setPomodoroMode] = useState(false);
   const [notes, setNotes] = useState("");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  
+  // Inicializamos vazio para evitar erro de Hidratação
+  const [activeTip, setActiveTip] = useState("");
 
-  // Lógica do Cronômetro
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isRunning) {
-      interval = setInterval(() => {
-        setSeconds((prev) => prev + 1);
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [isRunning]);
-
-  // Formatar tempo (00:00:00)
+  // --- 2. FUNÇÕES AUXILIARES ---
+  
   const formatTime = (totalSeconds: number) => {
     const h = Math.floor(totalSeconds / 3600);
     const m = Math.floor((totalSeconds % 3600) / 60);
     const s = totalSeconds % 60;
-    return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+    return `${h > 0 ? h + ':' : ''}${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
-  // Salvar Sessão
+  const randomizeTip = () => {
+    setActiveTip(STUDY_TIPS[Math.floor(Math.random() * STUDY_TIPS.length)]);
+  };
+
+  const handleReset = () => {
+    if(confirm("Deseja descartar o tempo atual e zerar o cronômetro?")) {
+        setSeconds(0);
+        setIsRunning(false);
+    }
+  }
+
+  // --- 3. EFEITOS ---
+
+  useEffect(() => {
+    randomizeTip();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (isRunning) {
+      interval = setInterval(() => {
+        setSeconds((prev) => prev + 1);
+      }, 1000);
+      
+      document.title = `${formatTime(seconds)} - Focando`;
+    } else {
+      document.title = "LifeOS - Estudos";
+    }
+
+    return () => clearInterval(interval);
+  }, [isRunning, seconds]);
+
+
+  // --- 4. LÓGICA DE CÁLCULO ---
+  
+  const POMODORO_CYCLE = 25 * 60;
+  const currentCycleTime = seconds % POMODORO_CYCLE;
+  const completedCycles = Math.floor(seconds / POMODORO_CYCLE);
+  const pomodoroProgress = (currentCycleTime / POMODORO_CYCLE) * 100;
+  const timeToBreak = POMODORO_CYCLE - currentCycleTime;
+  const isCycleComplete = seconds > 0 && currentCycleTime === 0;
+
+  // --- 5. LOGICA DE SALVAR ATUALIZADA ---
   const handleSave = async () => {
-    if (!selectedSubject) return alert("Selecione uma matéria!");
+    if (!selectedSubject) {
+        toast.error("Selecione uma matéria para salvar!");
+        return;
+    }
     
     const minutes = Math.ceil(seconds / 60);
-    await logSession(selectedSubject, minutes, notes);
     
-    // Resetar
-    setSeconds(0);
-    setIsRunning(false);
-    setNotes("");
-    alert("Sessão salva com sucesso! +XP");
-  };
+    // Mostra loading (opcional, se quiser bloquear botão)
+    const loadingToast = toast.loading("Salvando sessão...");
 
-  // Tipagem do evento de mudança do select
-  const handleSubjectChange = (e: ChangeEvent<HTMLSelectElement>) => {
-    setSelectedSubject(e.target.value);
+    try {
+        // Chama a Server Action atualizada
+        const result = await logSession(selectedSubject, minutes, notes);
+
+        // Remove o loading
+        toast.dismiss(loadingToast);
+
+        if (result.success) {
+            // SUCESSO: Mostra mensagem e reseta tudo
+            toast.success(result.message);
+            
+            setSeconds(0);
+            setNotes("");
+            setIsDialogOpen(false);
+            setIsRunning(false);
+            randomizeTip();
+        } else {
+            // ERRO DA ACTION: Mostra o erro e NÃO reseta o timer
+            toast.error(result.message);
+        }
+    } catch (error) {
+        toast.dismiss(loadingToast);
+        toast.error("Erro de conexão ao tentar salvar.");
+    }
   };
 
   return (
-    <Card className="border-2 border-indigo-500/20 bg-indigo-50/50 dark:bg-indigo-950/20">
+    <Card className="relative overflow-hidden border-2 border-indigo-500/20 bg-gradient-to-br from-indigo-50/50 to-white dark:from-indigo-950/30 dark:to-zinc-950 transition-all duration-500">
+      <div className="absolute top-0 right-0 p-32 bg-indigo-500/10 rounded-full blur-3xl -z-10 transform translate-x-1/2 -translate-y-1/2" />
+
       <CardContent className="p-6 space-y-6">
-        <div className="flex items-center gap-2 text-indigo-500">
-            <Clock className="h-5 w-5" />
-            <h2 className="font-semibold">Sessão de Foco</h2>
+        
+        {/* --- HEADER --- */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400">
+            <BrainCircuit className="h-5 w-5" />
+            <h2 className="font-bold">Laboratório de Foco</h2>
+          </div>
+          
+          <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-900 p-1.5 rounded-lg border">
+             <Label htmlFor="pomodoro-mode" className="text-xs font-medium text-zinc-500 cursor-pointer pr-2">Modo Pomodoro</Label>
+             <Switch id="pomodoro-mode" checked={pomodoroMode} onCheckedChange={setPomodoroMode} />
+          </div>
         </div>
 
-        {/* Seleção de Matéria */}
-        {!isRunning && seconds === 0 && (
-          <select 
-            className="w-full p-2 rounded-md border bg-background"
-            value={selectedSubject}
-            onChange={handleSubjectChange}
-          >
-            <option value="">Selecione o que vai estudar...</option>
-            {subjects.map((s) => (
-              <option key={s.id} value={s.id}>{s.title}</option>
-            ))}
-          </select>
-        )}
-
-        {/* Mostrador do Tempo */}
-        <div className="text-center py-4">
-            <div className="text-6xl font-mono font-bold tracking-wider text-zinc-800 dark:text-zinc-100">
+        {/* --- MOSTRADOR DE TEMPO --- */}
+        <div className="text-center py-4 relative">
+            <div className={`text-7xl font-mono font-bold tracking-tight transition-all duration-300 ${isRunning ? 'text-indigo-600 dark:text-indigo-400 scale-105' : 'text-zinc-400'}`}>
                 {formatTime(seconds)}
             </div>
-            {selectedSubject && isRunning && (
-                <p className="text-sm text-green-500 animate-pulse mt-2">Estudando agora...</p>
+            <p className="text-xs text-zinc-400 uppercase tracking-widest mt-2 font-medium">
+                {isRunning ? "Sessão em Andamento" : "Aguardando Início"}
+            </p>
+
+            {/* GUIAS POMODORO */}
+            {pomodoroMode && (
+                <div className={`mt-6 p-4 rounded-xl border transition-all duration-500 ${isCycleComplete ? 'bg-green-100 border-green-200 dark:bg-green-900/20' : 'bg-white/60 dark:bg-black/20 border-indigo-100 dark:border-indigo-900/50'}`}>
+                    <div className="flex justify-between text-xs mb-2 font-medium">
+                        <span className="flex items-center gap-1 text-indigo-600">
+                            <Timer className="h-3 w-3" /> 
+                            {isCycleComplete ? "Hora da Pausa!" : `Ciclo: ${formatTime(timeToBreak)}`}
+                        </span>
+                        <span className="flex items-center gap-1 text-green-600">
+                            <Zap className="h-3 w-3" />
+                            {completedCycles} Ciclos Feitos
+                        </span>
+                    </div>
+                    <Progress 
+                        value={pomodoroProgress} 
+                        className="h-2" 
+                        indicatorClassName={isCycleComplete ? "bg-green-500" : "bg-indigo-600"}
+                    />
+                    <p className="text-[10px] text-zinc-400 mt-2 text-left">
+                        *Barra de 25 minutos. Ao completar, faça uma pausa curta.
+                    </p>
+                </div>
             )}
+
+            {/* DICA DO DIA */}
+            <div className="mt-6 flex items-start justify-center gap-2 text-sm text-zinc-500 bg-white/50 dark:bg-zinc-800/50 p-3 rounded-lg border border-dashed hover:border-indigo-300 transition-colors min-h-[50px]">
+                {activeTip ? (
+                  <>
+                    <Lightbulb className="h-4 w-4 text-yellow-500 shrink-0 mt-0.5" />
+                    <p className="italic">&quot;{activeTip}&quot;</p>
+                  </>
+                ) : (
+                  <span className="animate-pulse w-full h-4 bg-zinc-200 dark:bg-zinc-800 rounded"></span>
+                )}
+            </div>
         </div>
 
-        {/* Controles */}
-        <div className="flex justify-center gap-4">
+        {/* --- SELEÇÃO DE MATÉRIA --- */}
+        {(!isRunning && seconds === 0) ? (
+             <div className="relative">
+                 <select 
+                     className="w-full p-3 pl-4 rounded-xl border bg-background/50 backdrop-blur focus:ring-2 ring-indigo-500 outline-none transition-all appearance-none cursor-pointer hover:bg-background/80"
+                     value={selectedSubject}
+                     onChange={(e) => setSelectedSubject(e.target.value)}
+                 >
+                     <option value="">📚 Selecione o tópico de estudo...</option>
+                     {subjects.map((s) => (
+                     <option key={s.id} value={s.id}>{s.title}</option>
+                     ))}
+                 </select>
+                 <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">▼</div>
+             </div>
+        ) : (
+            <div className="flex justify-center">
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200">
+                    📚 {subjects.find(s => s.id === selectedSubject)?.title || "Estudo Livre"}
+                </span>
+            </div>
+        )}
+
+        {/* --- CONTROLES PRINCIPAIS --- */}
+        <div className="flex items-center justify-center gap-3 pt-2">
+            
+            {/* Botão Reset */}
+            {(!isRunning && seconds > 0) && (
+                 <Button variant="ghost" size="icon" onClick={handleReset} title="Reiniciar Timer" className="h-14 w-14 rounded-xl border-2 border-dashed text-zinc-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50">
+                    <RotateCcw className="h-5 w-5" />
+                 </Button>
+            )}
+
+            {/* Play / Pause */}
             {!isRunning ? (
                 <Button 
                     size="lg" 
-                    className="w-32 bg-green-600 hover:bg-green-700"
+                    className="flex-1 h-14 text-lg bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/20 rounded-xl transition-all hover:scale-[1.02] active:scale-95"
                     disabled={!selectedSubject && seconds === 0}
                     onClick={() => setIsRunning(true)}
                 >
-                    <Play className="mr-2 h-4 w-4" /> {seconds > 0 ? "Retomar" : "Iniciar"}
+                    <Play className="mr-2 h-5 w-5 fill-current" /> {seconds > 0 ? "Continuar Foco" : "Iniciar Sessão"}
                 </Button>
             ) : (
                 <Button 
                     size="lg" 
-                    variant="destructive"
-                    className="w-32"
+                    variant="outline"
+                    className="flex-1 h-14 text-lg rounded-xl border-2 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200"
                     onClick={() => setIsRunning(false)}
                 >
-                    <Pause className="mr-2 h-4 w-4" /> Pausar
+                    <Pause className="mr-2 h-5 w-5 fill-current" /> Pausar
                 </Button>
             )}
 
-            {/* Botão de Finalizar */}
-            {!isRunning && seconds > 0 && (
-                <DialogSave onSave={handleSave} notes={notes} setNotes={setNotes} />
+            {/* Botão Finalizar (Save) */}
+            {(!isRunning && seconds > 0) && (
+                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                 <DialogTrigger asChild>
+                     <Button variant="default" size="lg" className="h-14 px-6 rounded-xl bg-green-600 hover:bg-green-700 shadow-lg shadow-green-500/20">
+                         <CheckCircle2 className="mr-2 h-5 w-5" /> Salvar
+                     </Button>
+                 </DialogTrigger>
+                 <DialogContent className="sm:max-w-md">
+                     <DialogHeader>
+                         <DialogTitle className="flex items-center gap-2">
+                            <CheckCircle2 className="text-green-600" />
+                            Sessão Concluída!
+                         </DialogTitle>
+                     </DialogHeader>
+                     <div className="space-y-4 py-2">
+                         <div className="bg-zinc-50 dark:bg-zinc-900 p-4 rounded-lg text-center">
+                            <p className="text-sm text-zinc-500">Tempo Total</p>
+                            <p className="text-3xl font-bold text-indigo-600">{Math.ceil(seconds / 60)} min</p>
+                         </div>
+                         
+                         <div className="space-y-2">
+                            <Label className="text-xs font-semibold uppercase text-zinc-500">Notas da Sessão (Opcional)</Label>
+                            <Textarea 
+                                placeholder="- O que você aprendeu hoje?&#10;- Dificuldades encontradas..." 
+                                className="min-h-[120px] font-mono text-sm resize-none focus-visible:ring-indigo-500"
+                                value={notes} 
+                                onChange={(e) => setNotes(e.target.value)}
+                            />
+                         </div>
+                         
+                         <div className="flex justify-end gap-2 pt-2">
+                            <Button variant="ghost" onClick={() => setIsDialogOpen(false)}>Voltar</Button>
+                            <Button onClick={handleSave} className="bg-green-600 hover:bg-green-700 w-full sm:w-auto">
+                                Confirmar e Ganhar XP
+                            </Button>
+                         </div>
+                     </div>
+                 </DialogContent>
+             </Dialog>
             )}
         </div>
       </CardContent>
     </Card>
   );
-}
-
-// --- SUB-COMPONENTE CORRIGIDO ---
-
-// Interface para definir os tipos das props (substitui o 'any')
-interface DialogSaveProps {
-    onSave: () => void;
-    notes: string;
-    setNotes: (value: string) => void;
-}
-
-function DialogSave({ onSave, notes, setNotes }: DialogSaveProps) {
-    return (
-        <Dialog>
-            <DialogTrigger asChild>
-                <Button variant="outline" size="lg">
-                    <Square className="mr-2 h-4 w-4 fill-current" /> Finalizar
-                </Button>
-            </DialogTrigger>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Resumo da Sessão</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                    <Textarea 
-                        placeholder="O que você aprendeu hoje?" 
-                        value={notes} 
-                        // Tipagem do evento do Textarea
-                        onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setNotes(e.target.value)}
-                    />
-                    <Button onClick={onSave} className="w-full">Confirmar e Salvar</Button>
-                </div>
-            </DialogContent>
-        </Dialog>
-    )
 }

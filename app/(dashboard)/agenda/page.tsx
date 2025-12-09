@@ -1,357 +1,395 @@
 import { prisma } from "@/lib/prisma";
-import { createEvent, deleteEvent, toggleTaskDone } from "./actions";
+import { Prisma } from "@prisma/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
 import { 
     Calendar as CalendarIcon, 
     CheckSquare, 
-    Trash2, 
+    ChevronRight, 
+    CheckCircle2, 
+    Circle, 
+    Folder, 
+    MapPin, 
+    Filter, 
     Plus, 
-    ChevronRight,
-    Bell,
-    CheckCircle2,
-    Circle,
-    Folder,
-    Filter
+    Pencil,
+    Layout,
+    Clock,
+    Sparkles,
+    Target,
+    ListChecks,
+    CalendarClock
 } from "lucide-react";
-import { Calendar } from "@/components/ui/calendar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { format, isToday } from 'date-fns';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { format, isToday, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { EventDeleteButton } from "@/components/agenda/event-delete-button"; 
+import { toggleTaskDone, getRoutineItems } from "./actions";
 import Link from 'next/link';
 
-// TIPAGEM FORTE (Mantida)
-interface ProjectData {
-    title: string;
-    color: string | null;
-}
-interface EventWithProject {
-    id: string;
-    title: string;
-    startTime: Date;
-    description: string | null;
-    project: ProjectData | null;
-}
-interface TaskWithProject {
-    id: string;
-    title: string;
-    isDone: boolean;
-    dueDate: Date | null;
-    project: ProjectData | null;
-}
+// Componentes Client
+import { AgendaCalendar } from "@/components/agenda/agenda-calendar";
+import { EventForm } from "@/components/agenda/event-form";
+import { RoutineManager } from "@/components/agenda/routine-manager";
 
-// Componente helper para formatar a data
+// --- 1. CONFIGURAÇÃO DE TIPAGEM E QUERY ---
+
+const projectSelect = { 
+    select: { title: true, color: true } 
+} satisfies Prisma.ProjectArgs;
+
+type EventWithProject = Prisma.EventGetPayload<{
+    include: { project: typeof projectSelect }
+}>;
+
+type TaskWithProject = Prisma.TaskGetPayload<{
+    include: { project: typeof projectSelect }
+}>;
+
 const formatEventDate = (date: Date) => {
     if (isToday(date)) return "Hoje";
-    return format(date, 'EEE, d MMM', { locale: ptBR });
+    return format(date, "EEEE, d 'de' MMMM", { locale: ptBR });
 };
 
+interface AgendaPageProps {
+  searchParams: Promise<{ date?: string }>;
+}
 
-export default async function AgendaPage() {
-    const today = new Date();
-    const todayFormatted = format(today, 'yyyy-MM-dd');
-    const startOfToday = new Date(today.setHours(0, 0, 0, 0));
-    const startOfTomorrow = new Date(today);
-    startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+export default async function AgendaPage({ searchParams }: AgendaPageProps) {
+    const params = await searchParams;
+    const selectedDate = params.date ? parseISO(params.date) : new Date();
+    const isSpecificDate = !!params.date;
+    const now = new Date();
+    
+    const startFilter = isSpecificDate 
+        ? new Date(selectedDate.setHours(0,0,0,0)) 
+        : new Date(); 
+    
+    const endFilter = isSpecificDate
+        ? new Date(selectedDate.setHours(23,59,59,999))
+        : undefined; 
 
-    // DEFINE O SELECT REUTILIZÁVEL E TIPADO (AGORA COMO UMA VARIÁVEL SIMPLES)
-    // O Prisma requer que o select/include seja um objeto literal simples para funcionar
-    const projectSelection = { title: true as const, color: true as const }; 
+    // --- 2. BUSCA DE DADOS OTIMIZADA ---
+    const [events, futureEvents, pendingTasks, routineItems] = await Promise.all([
+        prisma.event.findMany({
+            where: { startTime: { gte: startFilter, lte: endFilter } },
+            orderBy: { startTime: 'asc' },
+            take: isSpecificDate ? 50 : 20,
+            include: { project: projectSelect }
+        }),
+        prisma.event.findMany({
+            where: { startTime: { gte: new Date() } },
+            select: { startTime: true }
+        }),
+        prisma.task.findMany({
+            where: { isDone: false },
+            orderBy: { dueDate: 'asc' },
+            take: 7, 
+            include: { project: projectSelect }, 
+        }),
+        getRoutineItems()
+    ]);
 
-    // 1. Buscar Eventos (CORREÇÃO APLICADA AQUI)
-    const events = await prisma.event.findMany({
-        where: { startTime: { gte: startOfToday } },
-        orderBy: { startTime: 'asc' },
-        take: 20,
-        // PASSANDO O OBJETO DE SELEÇÃO DIRETAMENTE NO INCLUDE
-        include: { 
-            project: { select: projectSelection } // Estrutura correta para include + select
-        } 
-    }) as unknown as EventWithProject[];
+    const bookedDays = futureEvents.map(e => e.startTime);
 
-    // 2. Buscar Tarefas Pendentes (CORREÇÃO APLICADA AQUI)
-    const pendingTasks = await prisma.task.findMany({
-        where: { isDone: false },
-        orderBy: { dueDate: 'asc' }, 
-        take: 7, 
-        include: { 
-            project: { select: projectSelection } 
-        }, 
-    }) as unknown as TaskWithProject[];
+    // Processamento para o novo card de "Foco"
+    const remainingEventsCount = events.filter(e => e.startTime > now).length;
+    // Encontra o próximo evento (o primeiro da lista que começa no futuro)
+    const nextUpEvent = events.find(e => e.startTime > now);
 
-    // Eventos de hoje (Filtra do array completo)
-    const todaysEvents = events.filter(event => 
-        new Date(event.startTime) >= startOfToday && 
-        new Date(event.startTime) < startOfTomorrow
-    ).slice(0, 5);
-
-    // 3. Agrupamento para a Linha do Tempo
     const groupedEvents = events.reduce((groups, event) => {
-        const date = event.startTime;
-        const key = formatEventDate(date);
-
-        if (!groups[key]) {
-            groups[key] = [];
-        }
-        groups[key].push(event);
+        const key = formatEventDate(event.startTime);
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(event as EventWithProject);
         return groups;
     }, {} as Record<string, EventWithProject[]>);
 
-    const sortedGroupKeys = Object.keys(groupedEvents).sort((a, b) => {
-        const dateA = groupedEvents[a][0].startTime;
-        const dateB = groupedEvents[b][0].startTime;
-        return dateA.getTime() - dateB.getTime();
-    });
+    const sortedGroupKeys = Object.keys(groupedEvents); 
+    
+    const pageTitle = isSpecificDate 
+        ? `Agenda de ${format(startFilter, "d 'de' MMMM", { locale: ptBR })}`
+        : "Próximos Compromissos";
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-4 md:p-8">
-            <div className="max-w-7xl mx-auto">
-                {/* Cabeçalho */}
-                <header className="mb-8">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Agenda Central</h1>
-                            <p className="text-gray-600 dark:text-gray-400 mt-2">
-                                {new Date().toLocaleDateString('pt-BR', { 
-                                    weekday: 'long', 
-                                    day: 'numeric', 
-                                    month: 'long',
-                                    year: 'numeric'
-                                })}
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <Button variant="outline" className="gap-2">
-                                <Filter className="h-4 w-4" /> Filtrar
-                            </Button>
-                            <Button className="gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700">
-                                <Plus className="h-4 w-4" /> Novo Evento
-                            </Button>
-                        </div>
+        <div className="min-h-screen bg-gray-50/50 dark:bg-zinc-950 p-6 md:p-10">
+            <div className="max-w-7xl mx-auto space-y-8">
+                
+                {/* --- HEADER CLEAN --- */}
+                <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-zinc-200 dark:border-zinc-800">
+                    <div>
+                        <h1 className="text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-white">Agenda</h1>
+                        <p className="text-zinc-500 dark:text-zinc-400 mt-1 text-lg capitalize flex items-center gap-2">
+                            <Clock className="h-5 w-5 text-zinc-400" />
+                            {format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}
+                        </p>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                        {isSpecificDate && (
+                            <Link href="/agenda">
+                                <Button variant="ghost" className="gap-2 text-zinc-500 hover:text-zinc-900">
+                                    <Filter className="h-4 w-4" /> Limpar Filtro
+                                </Button>
+                            </Link>
+                        )}
+                        <Dialog>
+                            <DialogTrigger asChild>
+                                <Button className="h-10 px-6 bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200 shadow-sm transition-all hover:scale-105">
+                                    <Plus className="h-4 w-4 mr-2" /> Novo Evento
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-[425px]">
+                                <DialogHeader>
+                                    <DialogTitle>Novo Compromisso</DialogTitle>
+                                    <CardDescription>O que você vai fazer?</CardDescription>
+                                </DialogHeader>
+                                <EventForm /> 
+                            </DialogContent>
+                        </Dialog>
                     </div>
                 </header>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                     
-                    {/* COLUNA ESQUERDA - CALENDÁRIO & NOVO EVENTO */}
-                    <div className="lg:col-span-1 space-y-8">
-                        
-                        {/* Calendário Visual */}
-                        <Card className="border-none shadow-lg">
+                    {/* --- COLUNA ESQUERDA --- */}
+                    <div className="lg:col-span-4 space-y-6">
+                        {/* Calendário */}
+                        <Card className="border-0 shadow-sm bg-white dark:bg-zinc-900 ring-1 ring-zinc-200 dark:ring-zinc-800">
                             <CardContent className="p-4 flex justify-center">
-                                <Calendar mode="single" selected={today} className="w-full" />
+                                <AgendaCalendar bookedDays={bookedDays} />
                             </CardContent>
                         </Card>
 
-                        {/* Novo Evento Form */}
-                        <Card className="border-none shadow-lg">
-                            <CardHeader>
-                                <CardTitle className="text-lg">Agendar Rápido</CardTitle>
-                                <CardDescription>Preencha os detalhes do seu novo compromisso</CardDescription>
+                        {/* NOVO CARD: Resumo e Foco */}
+                        <Card className="border-0 shadow-sm bg-white dark:bg-zinc-900 ring-1 ring-zinc-200 dark:ring-zinc-800 overflow-hidden">
+                            <CardHeader className="pb-3 border-b border-zinc-50 dark:border-zinc-800/50">
+                                <CardTitle className="text-base font-semibold flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
+                                    <Target className="h-5 w-5 text-indigo-500" /> Visão do Dia
+                                </CardTitle>
                             </CardHeader>
-                            <CardContent>
-                                <form action={createEvent} className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="title">Título</Label>
-                                        <Input id="title" name="title" placeholder="Ex: Reunião de equipe" required />
+                            <CardContent className="p-4 space-y-5">
+                                
+                                {/* Contadores */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-xl border border-zinc-100 dark:border-zinc-800 flex flex-col">
+                                        <CalendarClock className="h-5 w-5 text-zinc-400 mb-2" />
+                                        <span className="text-2xl font-bold text-zinc-900 dark:text-white leading-none">{remainingEventsCount}</span>
+                                        <span className="text-xs text-zinc-500 mt-1">Eventos restantes</span>
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="description">Descrição (Opcional)</Label>
-                                        <Textarea id="description" name="description" placeholder="Detalhes adicionais sobre o compromisso" rows={2} />
+                                    <div className="bg-zinc-50 dark:bg-zinc-800/50 p-3 rounded-xl border border-zinc-100 dark:border-zinc-800 flex flex-col">
+                                        <ListChecks className="h-5 w-5 text-zinc-400 mb-2" />
+                                        <span className="text-2xl font-bold text-zinc-900 dark:text-white leading-none">{pendingTasks.length}</span>
+                                        <span className="text-xs text-zinc-500 mt-1">Tarefas foco</span>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="date">Data</Label>
-                                            <Input id="date" name="date" type="date" required className="block" defaultValue={todayFormatted} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="time">Horário</Label>
-                                            <Input id="time" name="time" type="time" required className="block" defaultValue="09:00" />
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center space-x-2">
-                                        <input type="checkbox" id="notification" name="notification" className="rounded border-gray-300" defaultChecked />
-                                        <Label htmlFor="notification" className="text-sm flex items-center gap-1">
-                                            <Bell className="h-4 w-4" /> Lembrete (30 min antes)
-                                        </Label>
-                                    </div>
+                                </div>
 
-                                    <Button type="submit" className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700">
-                                        <CalendarIcon className="h-4 w-4 mr-2" /> Agendar Compromisso
-                                    </Button>
-                                </form>
+                                {/* Próximo Compromisso em Destaque */}
+                                <div>
+                                    <h4 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Próximo na agenda</h4>
+                                    {nextUpEvent ? (
+                                        <div className="bg-indigo-50/80 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-800/50 p-3 rounded-lg border-l-4 border-l-indigo-500 transition-all hover:shadow-sm">
+                                            <p className="font-semibold text-indigo-900 dark:text-indigo-100 truncate">{nextUpEvent.title}</p>
+                                            <div className="flex items-center justify-between mt-2">
+                                                <p className="text-sm font-medium text-indigo-700 dark:text-indigo-300 flex items-center gap-1.5">
+                                                    <Clock className="h-4 w-4" />
+                                                    {format(nextUpEvent.startTime, 'HH:mm')}
+                                                </p>
+                                                {nextUpEvent.location && (
+                                                     <p className="text-xs text-indigo-600 dark:text-indigo-400 flex items-center gap-1 truncate max-w-[120px]">
+                                                        <MapPin className="h-3 w-3" /> {nextUpEvent.location}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-4 bg-zinc-50 dark:bg-zinc-800/30 rounded-lg border border-zinc-100 dark:border-zinc-800">
+                                            <p className="text-sm text-zinc-500 italic">Nenhum evento próximo hoje.</p>
+                                        </div>
+                                    )}
+                                </div>
                             </CardContent>
                         </Card>
                     </div>
 
-                    {/* COLUNA DIREITA - AGENDA DO DIA & LINHA DO TEMPO & TAREFAS */}
-                    <div className="lg:col-span-2 space-y-8">
+                    {/* --- COLUNA DIREITA (Conteúdo Principal) --- */}
+                    <div className="lg:col-span-8">
                         
-                        {/* 1. Agenda do Dia (Destaque) */}
-                        <Card className="border-none shadow-lg bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900">
-                            <CardHeader>
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <CardTitle className="text-lg">Compromissos de Hoje</CardTitle>
-                                        <CardDescription>{todaysEvents.length} eventos agendados</CardDescription>
-                                    </div>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                {todaysEvents.length === 0 ? (
-                                    <div className="text-center py-8">
-                                        <CalendarIcon className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
-                                        <p className="text-gray-500 dark:text-gray-400">Nenhum evento para hoje</p>
-                                    </div>
-                                ) : (
-                                    todaysEvents.map(event => (
-                                        <div key={event.id} className="flex items-start gap-3 p-3 rounded-lg border border-indigo-300 dark:border-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors">
-                                            <div className="flex-shrink-0 w-12 text-center pt-1">
-                                                <div className="text-xs text-gray-500 dark:text-gray-400">
-                                                    {new Date(event.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                                </div>
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="font-medium truncate">{event.title}</p>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    {event.project && (
-                                                        <Badge variant="secondary" className="text-xs" style={{ 
-                                                            borderColor: event.project.color || '#6366f1',
-                                                            backgroundColor: `${event.project.color}20` || '#6366f120'
-                                                        }}>
-                                                            {event.project.title}
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            <EventDeleteButton eventId={event.id} eventTitle={event.title} />
-                                        </div>
-                                    ))
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        {/* 2. Próxima Linha do Tempo e Tarefas (Tabs) */}
-                        <Card className="border-none shadow-lg">
-                            <CardContent className="p-0">
-                                <Tabs defaultValue="events" className="w-full">
-                                    <TabsList className="grid grid-cols-2 w-full rounded-t-lg">
-                                        <TabsTrigger value="events" className="rounded-tl-lg">
-                                            <CalendarIcon className="h-4 w-4 mr-2" /> Próximos Eventos
-                                        </TabsTrigger>
-                                        <TabsTrigger value="tasks" className="rounded-tr-lg">
-                                            <CheckSquare className="h-4 w-4 mr-2" /> Foco do Dia
-                                        </TabsTrigger>
+                        <Card className="border-0 shadow-sm bg-white dark:bg-zinc-900 ring-1 ring-zinc-200 dark:ring-zinc-800 h-full min-h-[600px] flex flex-col">
+                            
+                            {/* Tabs Header */}
+                            <Tabs defaultValue="events" className="w-full flex-1 flex flex-col">
+                                <div className="px-6 py-4 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center bg-zinc-50/30 dark:bg-zinc-900/30">
+                                    <TabsList className="bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg h-auto">
+                                        <TabsTrigger value="events" className="rounded-md px-4 py-1.5 text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-zinc-700">Linha do Tempo</TabsTrigger>
+                                        <TabsTrigger value="tasks" className="rounded-md px-4 py-1.5 text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-zinc-700">Foco do Dia</TabsTrigger>
+                                        <TabsTrigger value="routine" className="rounded-md px-4 py-1.5 text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-zinc-700">Rotina</TabsTrigger>
                                     </TabsList>
-                                    
-                                    {/* Tab 1: Linha do Tempo Agrupada */}
-                                    <TabsContent value="events" className="p-6 space-y-6">
-                                        {sortedGroupKeys.length === 0 ? (
-                                            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                                                Nenhum evento futuro agendado
+                                    <Badge variant="secondary" className="hidden sm:flex bg-zinc-100 dark:bg-zinc-800 text-zinc-500">
+                                        {events.length} eventos
+                                    </Badge>
+                                </div>
+                                
+                                {/* ABA 1: EVENTOS */}
+                                <TabsContent value="events" className="p-0 flex-1">
+                                    <div className="p-6 space-y-8">
+                                        {events.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center py-20 text-zinc-400">
+                                                <div className="h-16 w-16 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center mb-4">
+                                                    <CalendarIcon className="h-8 w-8 opacity-40" />
+                                                </div>
+                                                <p className="font-medium">Agenda livre.</p>
+                                                <p className="text-sm">Aproveite o tempo livre ou planeje algo novo.</p>
                                             </div>
                                         ) : (
                                             sortedGroupKeys.map(dateKey => (
-                                                <div key={dateKey} className="space-y-3">
-                                                    <h3 className="font-semibold text-indigo-600 dark:text-indigo-400 text-sm uppercase border-b border-dashed pb-1">
-                                                        {dateKey}
-                                                    </h3>
-                                                    {groupedEvents[dateKey].map(event => (
-                                                        <div key={event.id} className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                                                            <div className="flex-shrink-0 w-12 text-center pt-1">
-                                                                <div className="text-sm font-semibold text-gray-900 dark:text-white">
-                                                                    {new Date(event.startTime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                                <div key={dateKey} className="relative pl-4 border-l-2 border-zinc-100 dark:border-zinc-800 space-y-6">
+                                                    <div className="absolute -left-[9px] top-0 h-4 w-4 rounded-full bg-zinc-200 dark:bg-zinc-700 border-4 border-white dark:border-zinc-950"></div>
+                                                    
+                                                    <div>
+                                                        <h3 className="font-bold text-zinc-900 dark:text-zinc-100 text-lg capitalize mb-4 leading-none transform -translate-y-1">
+                                                            {dateKey}
+                                                        </h3>
+                                                        
+                                                        <div className="grid gap-3">
+                                                            {groupedEvents[dateKey].map(event => (
+                                                                <div key={event.id} className="group relative flex items-center gap-4 p-4 rounded-2xl bg-zinc-50/50 dark:bg-zinc-800/30 border border-zinc-100 dark:border-zinc-700/50 hover:bg-white dark:hover:bg-zinc-800 hover:shadow-md hover:border-zinc-200 transition-all duration-300">
+                                                                    
+                                                                    {/* Barra de Cor */}
+                                                                    <div className="w-1.5 h-12 rounded-full shrink-0" style={{ backgroundColor: event.color || '#6366f1' }} />
+                                                                    
+                                                                    {/* Hora */}
+                                                                    <div className="flex flex-col w-16 shrink-0">
+                                                                        <span className="text-lg font-bold text-zinc-700 dark:text-zinc-200">
+                                                                            {format(event.startTime, 'HH:mm')}
+                                                                        </span>
+                                                                        {event.endTime && (
+                                                                            <span className="text-xs text-zinc-400">
+                                                                                - {format(event.endTime, 'HH:mm')}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    
+                                                                    {/* Conteúdo */}
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className="flex items-center gap-2 mb-0.5">
+                                                                            <h4 className="font-semibold text-zinc-900 dark:text-zinc-100 truncate">{event.title}</h4>
+                                                                            {event.project && (
+                                                                                <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-zinc-200 text-zinc-500 font-normal">
+                                                                                    {event.project.title}
+                                                                                </Badge>
+                                                                            )}
+                                                                        </div>
+                                                                        
+                                                                        <div className="flex items-center gap-4 text-xs text-zinc-500">
+                                                                            {event.location && (
+                                                                                <span className="flex items-center gap-1">
+                                                                                    <MapPin className="h-3 w-3" /> {event.location}
+                                                                                </span>
+                                                                            )}
+                                                                            {event.description && (
+                                                                                <span className="truncate max-w-[200px] opacity-70">
+                                                                                    {event.description}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* Ações */}
+                                                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                        <Dialog>
+                                                                            <DialogTrigger asChild>
+                                                                                <Button size="icon" variant="ghost" className="h-8 w-8 text-zinc-400 hover:text-indigo-600 hover:bg-indigo-50">
+                                                                                    <Pencil className="h-4 w-4" />
+                                                                                </Button>
+                                                                            </DialogTrigger>
+                                                                            <DialogContent className="sm:max-w-[425px]">
+                                                                                <DialogHeader>
+                                                                                    <DialogTitle>Editar Compromisso</DialogTitle>
+                                                                                    <CardDescription>Atualize os detalhes.</CardDescription>
+                                                                                </DialogHeader>
+                                                                                
+                                                                                {/* CORREÇÃO: Mapeamento explícito para satisfazer a tipagem */}
+                                                                                <EventForm initialData={{
+                                                                                    id: event.id,
+                                                                                    title: event.title,
+                                                                                    startTime: event.startTime,
+                                                                                    // Garante que null seja passado se não existir, evitando undefined
+                                                                                    description: event.description || null,
+                                                                                    location: event.location || null,
+                                                                                    color: event.color || null
+                                                                                }} /> 
+                                                                            </DialogContent>
+                                                                        </Dialog>
+                                                                        <EventDeleteButton eventId={event.id} eventTitle={event.title} />
+                                                                    </div>
                                                                 </div>
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <p className="font-medium truncate">{event.title}</p>
-                                                                {event.project && (
-                                                                    <Badge variant="secondary" className="text-xs mt-1" style={{ 
-                                                                        borderColor: event.project.color || '#6366f1',
-                                                                        backgroundColor: `${event.project.color}20` || '#6366f120'
-                                                                    }}>
-                                                                        {event.project.title}
-                                                                    </Badge>
-                                                                )}
-                                                            </div>
-                                                            <EventDeleteButton eventId={event.id} eventTitle={event.title} />
+                                                            ))}
                                                         </div>
-                                                    ))}
+                                                    </div>
                                                 </div>
                                             ))
                                         )}
-                                    </TabsContent>
+                                    </div>
+                                </TabsContent>
+                                
+                                {/* ABA 2: TAREFAS */}
+                                <TabsContent value="tasks" className="p-6">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <h3 className="font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
+                                            <CheckSquare className="h-5 w-5 text-indigo-500" /> Prioridade Alta
+                                        </h3>
+                                        <Badge variant="secondary">{pendingTasks.length} pendentes</Badge>
+                                    </div>
                                     
-                                    {/* Tab 2: Tarefas Pendentes */}
-                                    <TabsContent value="tasks" className="p-6 space-y-4">
+                                    <div className="space-y-3">
                                         {pendingTasks.length === 0 ? (
-                                            <div className="text-center py-8 text-green-600 dark:text-green-400 border border-dashed rounded-lg">
-                                                <CheckCircle2 className="h-12 w-12 mx-auto mb-4" />
-                                                <p>Nenhuma tarefa pendente! Bom trabalho!</p>
-                                            </div>
+                                             <div className="text-center py-12 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-50/50">
+                                                <CheckCircle2 className="h-10 w-10 mx-auto mb-2 text-green-500" />
+                                                <p className="text-zinc-500">Tudo limpo por aqui!</p>
+                                             </div>
                                         ) : (
                                             pendingTasks.map(task => (
-                                                <div key={task.id} className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                                                <div key={task.id} className="group flex items-center gap-4 p-4 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-indigo-300 transition-all shadow-sm">
                                                     <form action={toggleTaskDone.bind(null, task.id)}>
-                                                        <Button type="submit" size="icon" variant="ghost" className="h-6 w-6 rounded-full p-0">
-                                                            {task.isDone ? (
-                                                                <CheckCircle2 className="h-5 w-5 text-green-500" />
-                                                            ) : (
-                                                                <Circle className="h-5 w-5 text-gray-400 hover:text-green-500" />
-                                                            )}
+                                                        <Button type="submit" size="icon" variant="ghost" className="h-6 w-6 rounded-full p-0 text-zinc-300 hover:text-green-600 hover:bg-green-50">
+                                                            <Circle className="h-5 w-5" />
                                                         </Button>
                                                     </form>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="font-medium truncate">{task.title}</p>
-                                                        {task.dueDate && (
-                                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                                                Vence em {new Date(task.dueDate).toLocaleDateString('pt-BR')}
-                                                            </p>
-                                                        )}
+                                                    <div className="flex-1">
+                                                        <p className="font-medium text-sm text-zinc-800 dark:text-zinc-200">{task.title}</p>
+                                                        <div className="flex items-center gap-3 mt-1">
+                                                            {task.dueDate && (
+                                                                <span className={`text-xs font-medium ${new Date(task.dueDate) < new Date() ? 'text-red-500' : 'text-zinc-500'}`}>
+                                                                    {format(task.dueDate, 'dd MMM')}
+                                                                </span>
+                                                            )}
+                                                            {task.project && (
+                                                                <span className="flex items-center gap-1 text-[10px] text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full">
+                                                                    <Folder className="h-3 w-3" /> {task.project.title}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                    {task.project && (
-                                                        <Badge variant="secondary" className="text-xs flex items-center gap-1" style={{ 
-                                                            borderColor: task.project.color || '#6366f1',
-                                                            backgroundColor: `${task.project.color}20` || '#6366f120'
-                                                        }}>
-                                                            <Folder className="h-3 w-3" /> {task.project.title}
-                                                        </Badge>
-                                                    )}
                                                 </div>
                                             ))
                                         )}
-                                        <Button variant="outline" className="w-full mt-4" asChild>
-                                            <Link href="/projects">
-                                                Gerenciar todas as tarefas <ChevronRight className="h-4 w-4 ml-2" />
-                                            </Link>
-                                        </Button>
-                                    </TabsContent>
-                                </Tabs>
-                            </CardContent>
-                        </Card>
-                        
-                        {/* 3. Estatísticas Rápidas (Mantido, mas estilizado) */}
-                        <Card className="border-none shadow-lg bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20">
-                            <CardContent className="p-6">
-                                <h3 className="font-semibold mb-4 text-gray-900 dark:text-white">Resumo da Produtividade</h3>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="text-center p-3 bg-white/50 dark:bg-gray-800/50 rounded-lg">
-                                        <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{events.length}</p>
-                                        <p className="text-xs text-gray-600 dark:text-gray-400">Próximos Eventos</p>
                                     </div>
-                                    <div className="text-center p-3 bg-white/50 dark:bg-gray-800/50 rounded-lg">
-                                        <p className="text-2xl font-bold text-green-600 dark:text-green-400">{pendingTasks.length}</p>
-                                        <p className="text-xs text-gray-600 dark:text-gray-400">Tarefas Pendentes</p>
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
+                                    
+                                    <Button variant="ghost" className="w-full mt-6 text-zinc-500 hover:text-indigo-600" asChild>
+                                        <Link href="/projects">Ver quadro de projetos completo &rarr;</Link>
+                                    </Button>
+                                </TabsContent>
 
+                                {/* ABA 3: ROTINA */}
+                                <TabsContent value="routine" className="h-full flex flex-col">
+                                    <div className="p-6 h-full flex-1">
+                                        <RoutineManager items={routineItems} />
+                                    </div>
+                                </TabsContent>
+                            </Tabs>
+                        </Card>
                     </div>
                 </div>
             </div>
