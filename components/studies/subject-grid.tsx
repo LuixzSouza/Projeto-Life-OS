@@ -3,7 +3,7 @@
 import { StudySubject } from "@prisma/client";
 import { deleteSubject } from "@/app/(dashboard)/studies/actions";
 import { Button } from "@/components/ui/button";
-import { Plus, GitFork, BookOpen, Search, SortAsc, Filter, Loader2 } from "lucide-react";
+import { Plus, GitFork, BookOpen, Search, SortAsc, Filter, Loader2, Layers, ChevronRight } from "lucide-react";
 import { useState, useMemo } from "react";
 import { toast } from "sonner"; 
 import { SubjectCard } from "./subject-card";
@@ -11,6 +11,8 @@ import { SubjectFormDialog } from "./subject-form-dialog.tsx";
 import { SubjectDetailsModal } from "./subject-details-modal";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import Link from "next/link";
+import { Card, CardContent } from "../ui/card";
 
 
 interface RichSubject extends StudySubject {
@@ -146,6 +148,20 @@ export function SubjectGrid({ subjects }: SubjectListProps) {
                     <Plus className="h-4 w-4" /> Novo Nodo
                 </Button>
             </div>
+
+            <Link href="/flashcards" className="block group">
+                <Card className="bg-gradient-to-br from-indigo-600 to-violet-600 border-none text-white hover:shadow-lg hover:shadow-indigo-500/20 transition-all cursor-pointer">
+                    <CardContent className="p-5 flex items-center justify-between">
+                        <div>
+                            <h3 className="font-bold text-lg flex items-center gap-2">
+                                <Layers className="h-5 w-5 text-indigo-200" /> Flashcards
+                            </h3>
+                            <p className="text-xs text-indigo-100 mt-1">Memorização ativa e repetição espaçada.</p>
+                        </div>
+                        <ChevronRight className="h-6 w-6 text-indigo-300 group-hover:translate-x-1 transition-transform" />
+                    </CardContent>
+                </Card>
+            </Link>
 
             {/* --- CONTROLES DE PESQUISA E FILTRO (Barra Dinâmica) --- */}
             <div className="flex flex-wrap gap-3 p-4 bg-zinc-800/60 rounded-xl border border-zinc-700">

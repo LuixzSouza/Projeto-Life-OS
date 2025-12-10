@@ -59,6 +59,42 @@ model UserStats {
   updatedAt         DateTime       @updatedAt
 }
 
+// --- MÓDULO FLASHCARDS ---
+
+model FlashcardDeck {
+  id              String        @id @default(uuid())
+  title           String        // Ex: "Biologia - Capítulo 5"
+  description     String?       @db.Text
+  category        String?       // Ex: "Ciências", "Programação"
+  
+  studySubjectId  String?
+  studySubject    StudySubject? @relation(fields: [studySubjectId], references: [id])
+
+  // Relação com os cartões
+  cards           Flashcard[]
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model Flashcard {
+  id              String        @id @default(uuid())
+  term            String        // Pergunta ou Frente (Ex: "O que é Mitose?")
+  definition      String        @db.Text // Resposta ou Verso
+  imageUrl        String?       @db.Text // Opcional: Imagem de ajuda
+  
+  // Campos para o Algoritmo de Repetição Espaçada (SM-2)
+  box             Int           @default(1) // Caixa atual (Leitner system)
+  nextReview      DateTime?     // Quando deve ser revisado novamente
+  lastReviewed    DateTime?     // Última vez que foi estudado
+
+  // Relação com o Baralho
+  deckId          String
+  deck            FlashcardDeck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime      @default(now())
+}
+
 
 // --- MÓDULO FINANCEIRO ---
 
@@ -132,6 +168,7 @@ model StudySubject {
   color         String         @default("blue")
   sessions      StudySession[]
   createdAt     DateTime       @default(now())
+  decks         FlashcardDeck[]
 }
 
 model StudySession {
