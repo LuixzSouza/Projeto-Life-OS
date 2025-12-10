@@ -398,3 +398,19 @@ model SavedLink {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+model MediaItem {
+  id          String   @id @default(uuid())
+  type        String   // 'MOVIE', 'TV', 'ALBUM', 'SONG'
+  title       String
+  subtitle    String?  // Nome do Artista (Música) ou Ano (Filme)
+  coverUrl    String?  @db.Text
+  
+  rating      Int      @default(0) // 0 a 5 estrelas
+  category    String?  // "Favoritos", "Assistir Depois", "Ouvindo Agora"
+  
+  externalId  String?  // ID do TMDB ou iTunes (para evitar duplicatas)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

@@ -22,14 +22,15 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   ChevronRight,
-  LinkIcon
+  Bookmark, // ✅ Ícone melhor para "Favoritos"
+  Film,     // ✅ Novo ícone para Entretenimento
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
-// Lista plana (sem grupos)
+// Lista atualizada com Entretenimento e ícones melhores
 const sidebarItems = [
   { label: "Visão Geral", icon: LayoutDashboard, href: "/dashboard" },
   { label: "Agenda", icon: Calendar, href: "/agenda" },
@@ -38,8 +39,9 @@ const sidebarItems = [
   { label: "Financeiro", icon: Wallet, href: "/finance" },
   { label: "Saúde", icon: Dumbbell, href: "/health" },
   { label: "Estudos", icon: BookOpen, href: "/studies" },
+  { label: "Entretenimento", icon: Film, href: "/entertainment" }, // ✅ Nova Funcionalidade
   { label: "Sites & CMS", icon: Globe, href: "/cms" },
-  { label: "Link/App Favoritos", icon: LinkIcon, href: "/links" },
+  { label: "Links & Apps", icon: Bookmark, href: "/links" }, // ✅ Ícone Bookmark (Favoritos)
   { label: "Acessos", icon: Lock, href: "/access" },
   { label: "Configurações", icon: Settings, href: "/settings" },
 ];
@@ -55,7 +57,7 @@ interface SidebarProps {
 export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [isCollapsed, setIsCollapsed] = useState(false); // Estado para abrir/fechar
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [energyLevel, setEnergyLevel] = useState<"high" | "medium" | "low">("high");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -103,7 +105,6 @@ export function Sidebar({ user }: SidebarProps) {
             </div>
         )}
 
-        {/* Se estiver fechado, mostra só o logo pequeno */}
         {isCollapsed && (
              <div className="h-8 w-8 rounded-lg bg-zinc-900 dark:bg-white text-white dark:text-black flex items-center justify-center shadow-md">
                 <span className="font-mono text-base font-bold">L</span>
@@ -114,14 +115,12 @@ export function Sidebar({ user }: SidebarProps) {
             variant="ghost" 
             size="icon" 
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className={cn("text-zinc-400 hover:text-zinc-900 dark:hover:text-white", isCollapsed && "hidden")} // Esconde botão interno se fechado (opcional, ou muda layout)
+            className={cn("text-zinc-400 hover:text-zinc-900 dark:hover:text-white", isCollapsed && "hidden")}
         >
             {isCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
         </Button>
       </div>
 
-      {/* Botão de Toggle Externo (Caso queira reabrir quando fechado e o de cima sumir, ou manter o de cima fixo. 
-          Neste design, vou deixar o Header fixo controlando o toggle para ficar mais limpo) */}
       {isCollapsed && (
           <div className="w-full flex justify-center py-2 border-b border-zinc-100 dark:border-zinc-800/50">
              <Button variant="ghost" size="icon" onClick={() => setIsCollapsed(false)}>
@@ -131,13 +130,12 @@ export function Sidebar({ user }: SidebarProps) {
       )}
 
 
-      {/* 2. Menu de Navegação (Lista Plana) */}
+      {/* 2. Menu de Navegação */}
       <div className="flex-1 overflow-y-auto py-6 px-3 scrollbar-thin scrollbar-thumb-zinc-200 dark:scrollbar-thumb-zinc-800 scrollbar-track-transparent">
         <nav className="space-y-1">
           {sidebarItems.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive = pathname.startsWith(item.href); // Melhoria: startsWith para sub-rotas
             
-            // Componente do Link (com ou sem Tooltip dependendo do estado)
             const LinkContent = (
               <Link
                 href={item.href}
@@ -151,7 +149,7 @@ export function Sidebar({ user }: SidebarProps) {
               >
                 <item.icon className={cn(
                     "transition-colors",
-                    isCollapsed ? "h-6 w-6" : "h-5 w-5", // Ícone maior quando fechado
+                    isCollapsed ? "h-6 w-6" : "h-5 w-5",
                     isActive ? "text-indigo-600 dark:text-indigo-400" : "text-zinc-400 group-hover:text-zinc-600 dark:text-zinc-500"
                 )} />
                 
@@ -166,7 +164,6 @@ export function Sidebar({ user }: SidebarProps) {
               </Link>
             );
 
-            // Se estiver colapsado, envolve em Tooltip
             if (isCollapsed) {
                 return (
                     <TooltipProvider key={item.href} delayDuration={0}>
@@ -206,7 +203,6 @@ export function Sidebar({ user }: SidebarProps) {
                             {user?.name || "Usuário"}
                         </span>
                         <div className="flex items-center gap-2 mt-0.5">
-                            {/* Energia (Mini) */}
                             <div className="flex items-center gap-1 cursor-pointer" onClick={(e) => { e.preventDefault(); toggleEnergy(); }}>
                                 <EnergyStatus.icon className={cn("h-3 w-3", EnergyStatus.color)} />
                                 <span className="text-[10px] text-zinc-400 hover:text-zinc-600 transition-colors">Estado</span>
@@ -218,7 +214,6 @@ export function Sidebar({ user }: SidebarProps) {
             </div>
         </Link>
         
-        {/* Botão Sair */}
         <div className={cn("mt-2 flex", isCollapsed ? "justify-center" : "justify-center")}>
              <TooltipProvider>
                 <Tooltip delayDuration={500}>
