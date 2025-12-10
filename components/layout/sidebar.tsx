@@ -21,7 +21,8 @@ import {
   Plus,
   PanelLeftClose,
   PanelLeftOpen,
-  ChevronRight
+  ChevronRight,
+  LinkIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -38,6 +39,7 @@ const sidebarItems = [
   { label: "Saúde", icon: Dumbbell, href: "/health" },
   { label: "Estudos", icon: BookOpen, href: "/studies" },
   { label: "Sites & CMS", icon: Globe, href: "/cms" },
+  { label: "Link/App Favoritos", icon: LinkIcon, href: "/links" },
   { label: "Acessos", icon: Lock, href: "/access" },
   { label: "Configurações", icon: Settings, href: "/settings" },
 ];

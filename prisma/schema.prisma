@@ -385,3 +385,16 @@ model AccessItem {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
+
+model SavedLink {
+  id          String   @id @default(uuid())
+  title       String
+  url         String
+  description String?  @db.Text
+  imageUrl    String?  @db.Text // Para o visual "Meta Tag"
+  category    String?  // Ex: "Design", "Dev", "Leitura"
+  
+  isFavorite  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
