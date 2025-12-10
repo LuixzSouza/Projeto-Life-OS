@@ -7,312 +7,344 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id        String   @id @default(uuid())
-  name      String
-  email     String   @unique
-  password  String   // Hash (simulado por enquanto)
-  
-  // Novos campos:
-  avatarUrl String?  // URL de uma imagem da internet
-  bio       String?  // Ex: "Fullstack Developer focado em Next.js"
-  
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  // Relacionamentos (Agora vai funcionar pois o outro lado existe)
-  accounts  Account[]
-  projects  Project[]
-  jobApplications JobApplication[]
-  accessItem  AccessItem[]
+// --- ENUMS ---
+
+enum SessionType {
+  LEITURA
+  VIDEO
+  EXERCICIO
+  REVISAO
+  PROJETO
 }
 
-// --- MÓDULO FINANCEIRO (ATUALIZADO) ---
+// --- MÓDULO USUÁRIO E ESTATÍSTICAS ---
+
+model User {
+  id            String         @id @default(uuid())
+  name          String
+  email         String         @unique
+  password      String
+
+  avatarUrl     String?
+  bio           String?
+
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  // Relacionamentos
+  accounts      Account[]
+  projects      Project[]
+  jobApplications JobApplication[]
+  accessItem    AccessItem[]
+  
+  // ✅ NOVO RELACIONAMENTO
+  stats         UserStats?
+}
+
+model UserStats {
+  id                String         @id @default(uuid())
+  
+  // Rastreamento do usuário
+  userId            String         @unique
+  user              User           @relation(fields: [userId], references: [id])
+  
+  // ✅ STREAK E METAS
+  currentStreak     Int            @default(0)
+  lastStudyDate     DateTime?
+  dailyGoalMinutes  Int            @default(60)
+  
+  // ✅ MEDALHAS
+  badges            String?        @db.Text // JSON string: ["MASTER_FOCUS", "21_DAY_STREAK"]
+  
+  updatedAt         DateTime       @updatedAt
+}
+
+
+// --- MÓDULO FINANCEIRO ---
 
 model Account {
-  id          String        @id @default(uuid())
-  name        String        // Nubank, Carteira
-  type        String        // CHECKING, SAVINGS, CASH, INVESTMENT
-  balance     Decimal       @default(0.00)
-  color       String?       @default("#000000") 
-  transactions Transaction[]
-  
-  userId      String?
-  user        User?         @relation(fields: [userId], references: [id])
-  
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id            String         @id @default(uuid())
+  name          String
+  type          String
+  balance       Decimal        @default(0.00)
+  color         String?        @default("#000000")
+  transactions  Transaction[]
+
+  userId        String?
+  user          User?          @relation(fields: [userId], references: [id])
+
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
 model Transaction {
-  id          String   @id @default(uuid())
-  description String
-  amount      Decimal
-  type        String   // INCOME, EXPENSE
-  category    String
-  date        DateTime @default(now())
-  
-  // Relacionamentos
-  accountId   String
-  account     Account  @relation(fields: [accountId], references: [id])
-  
-  createdAt   DateTime @default(now())
+  id            String   @id @default(uuid())
+  description   String
+  amount        Decimal
+  type          String   // INCOME, EXPENSE
+  category      String
+  date          DateTime @default(now())
+
+  accountId     String
+  account       Account  @relation(fields: [accountId], references: [id])
+
+  createdAt     DateTime @default(now())
 }
 
-// ASSINATURAS RECORRENTES
 model RecurringExpense {
-  id          String   @id @default(uuid())
-  title       String   // "Spotify"
-  amount      Decimal  // 19.90
-  dayOfMonth  Int      // Dia de vencimento (ex: 10)
-  category    String   // "Lazer"
-  active      Boolean  @default(true)
-  
-  createdAt   DateTime @default(now())
+  id            String   @id @default(uuid())
+  title         String
+  amount        Decimal
+  dayOfMonth    Int
+  category      String
+  active        Boolean  @default(true)
+
+  createdAt     DateTime @default(now())
 }
 
-// METAS DE COMPRA
 model WishlistItem {
-  id          String   @id @default(uuid())
-  name        String   
-  price       Decimal  
-  saved       Decimal  @default(0.00) 
-  priority    String   @default("MEDIUM")
-  
-  // MUDANÇA AQUI: Adicionar @db.Text para aceitar URLs gigantes
-  imageUrl    String?  @db.Text 
-  productUrl  String?  @db.Text 
-  
-  status      String   @default("SAVING") 
+  id            String   @id @default(uuid())
+  name          String
+  price         Decimal
+  saved         Decimal  @default(0.00)
+  priority      String   @default("MEDIUM")
 
-  createdAt   DateTime @default(now())
+  imageUrl      String?  @db.Text
+  productUrl    String?  @db.Text
+
+  status        String   @default("SAVING")
+
+  createdAt     DateTime @default(now())
 }
 
-// --- MÓDULO ESTUDOS ---
+// --- MÓDULO ESTUDOS (ATUALIZADO) ---
 
 model StudySubject {
-  id        String   @id @default(uuid())
-  title     String   // Ex: "Next.js", "Inglês"
-  category  String   // Ex: "Programação", "Idiomas"
-  color     String   @default("blue") // blue, red, green...
-  sessions  StudySession[]
-  createdAt DateTime @default(now())
+  id            String         @id @default(uuid())
+  title         String
+  category      String
+
+  // ✅ NOVOS CAMPOS PARA VISUALIZAÇÃO E GAMIFICAÇÃO
+  icon          String?
+  difficulty    Int            @default(3)
+  goalMinutes   Int            @default(3600)
+
+  color         String         @default("blue")
+  sessions      StudySession[]
+  createdAt     DateTime       @default(now())
 }
 
 model StudySession {
-  id              String       @id @default(uuid())
-  durationMinutes Int          // Tempo total em minutos
-  notes           String?      @db.Text
-  date            DateTime     @default(now())
-  
+  id              String         @id @default(uuid())
+  durationMinutes Int
+  notes           String?        @db.Text
+  date            DateTime       @default(now())
+
+  // ✅ NOVOS CAMPOS PARA RIQUEZA DA SESSÃO
+  focusLevel      Int            @default(3)
+  tags            String?        @db.Text // JSON string: ["react", "performance"]
+  type            SessionType    @default(LEITURA)
+
   subjectId       String
-  subject         StudySubject @relation(fields: [subjectId], references: [id])
+  subject         StudySubject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 }
+
 
 // --- MÓDULO PROJETOS & TAREFAS ---
 
 model Project {
-  id          String   @id @default(uuid())
-  title       String
-  description String?
-  status      String   @default("ACTIVE") // ACTIVE, COMPLETED, ARCHIVED
-  createdAt   DateTime @default(now())
+  id            String   @id @default(uuid())
+  title         String
+  description   String?
+  status        String   @default("ACTIVE")
+  createdAt     DateTime @default(now())
+  color         String?  @default("#6366f1")
 
-  color        String?   @default("#6366f1") // Cor padrão (Ex: Indigo)
-  
-  // CORREÇÃO: Relacionamento com User
-  userId      String?
-  user        User?    @relation(fields: [userId], references: [id])
-  
-  tasks       Task[]
-  events       Event[]
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id])
+
+  tasks         Task[]
+  events        Event[]
 }
 
 model Task {
-  id          String   @id @default(uuid())
-  title       String
-  isDone      Boolean  @default(false)
-  dueDate     DateTime?
-  
-  priority    String   @default("MEDIUM") // LOW, MEDIUM, HIGH
-  image       String?  @db.LongText
-  projectId   String?
-  project     Project? @relation(fields: [projectId], references: [id])
-  
-  createdAt   DateTime @default(now())
+  id            String   @id @default(uuid())
+  title         String
+  isDone        Boolean  @default(false)
+  dueDate       DateTime?
+
+  priority      String   @default("MEDIUM")
+  image         String?  @db.LongText
+  projectId     String?
+  project       Project? @relation(fields: [projectId], references: [id])
+
+  createdAt     DateTime @default(now())
 }
 
 // --- MÓDULO VAGAS (JOB TRACKER) ---
 
 model JobApplication {
-  id          String   @id @default(uuid())
-  company     String   // Nome da Empresa ou Cliente
-  role        String   // Cargo ou Serviço (ex: "Landing Page")
-  status      String   // APPLIED, INTERVIEW, etc...
-  jobUrl      String?
-  salary      String?  // Valor ou Orçamento
-  location    String?
-  requirements String? @db.Text
-  
-  // NOVO CAMPO:
-  type        String   @default("JOB") // "JOB" ou "FREELANCE"
-  
-  appliedDate DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  userId      String?
-  user        User?    @relation(fields: [userId], references: [id])
+  id            String   @id @default(uuid())
+  company       String
+  role          String
+  status        String
+  jobUrl        String?
+  salary        String?
+  location      String?
+  requirements  String?  @db.Text
+
+  type          String   @default("JOB")
+
+  appliedDate   DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id])
 }
 
 // --- MÓDULO SAÚDE ---
 
-model Workout {  
-  id        String   @id @default(uuid())
-  title     String   // Ex: "Treino A" ou "Corrida Matinal"
-  type      String   // "GYM", "RUN", "SPORT"
-  
-  // CAMPOS GERAIS
-  duration  Int      // Minutos totais
-  intensity String   // LOW, MEDIUM, HIGH
-  feeling   String?  // Emojis: 😄, 😫, 🔥
-  notes     String?  @db.Text
+model Workout {
+  id            String   @id @default(uuid())
+  title         String
+  type          String
 
-  // CAMPOS DE CORRIDA
-  distance  Float?   // Km (apenas para RUN)
-  pace      String?  // Min/Km (calculado ou inserido)
+  duration      Int
+  intensity     String
+  feeling       String?
+  notes         String?  @db.Text
 
-  // CAMPOS DE MUSCULAÇÃO (JSON para lista de exercícios)
-  muscleGroup String? // "CHEST", "LEGS", "BACK", "ARMS"
-  exercises   String? @db.Text // JSON string: [{name: "Supino", sets: 3, reps: 10, weight: 20}]
+  distance      Float?
+  pace          String?
 
-  date      DateTime @default(now())
+  muscleGroup   String?
+  exercises     String?  @db.Text
+
+  date          DateTime @default(now())
 }
 
 model HealthMetric {
-  id    String   @id @default(uuid())
-  type  String   // "WEIGHT", "WATER", "HEIGHT" (Novo: Altura para IMC)
-  value Float    
-  date  DateTime @default(now())
+  id            String   @id @default(uuid())
+  type          String
+  value         Float
+  date          DateTime @default(now())
 }
 
 // --- MÓDULO NUTRIÇÃO ---
 
 model Meal {
-  id        String   @id @default(uuid())
-  title     String   // "Almoço", "Jantar", "Lanche"
-  items     String   // "Arroz, Feijão, Frango"
-  calories  Int?     // Estimativa (opcional)
-  type      String   // "HEALTHY" (Saudável), "TRASH" (Lixo/Cheat Meal), "NEUTRAL"
-  date      DateTime @default(now())
+  id            String   @id @default(uuid())
+  title         String
+  items         String
+  calories      Int?
+  type          String
+  date          DateTime @default(now())
 }
 
 // --- MÓDULO AGENDA ---
 
 model Event {
-  id          String    @id @default(uuid())
-  title       String
-  startTime   DateTime
-  endTime     DateTime?
-  isAllDay    Boolean   @default(false)
-  description String?
-  category    String    @default("general")
-  
-  // --- NOVOS CAMPOS ---
-  location    String?   // Ex: "Google Meet", "Av. Paulista, 1000"
-  color       String    @default("#6366f1") // Cor do evento (Indigo default)
-  emailAlert  Boolean   @default(true) // Configuração de notificação
-  
-  projectId   String?
-  project     Project?  @relation(fields: [projectId], references: [id])
-  
-  createdAt   DateTime  @default(now())
+  id            String    @id @default(uuid())
+  title         String
+  startTime     DateTime
+  endTime       DateTime?
+  isAllDay      Boolean   @default(false)
+  description   String?
+  category      String    @default("general")
+
+  location      String?
+  color         String    @default("#6366f1")
+  emailAlert    Boolean   @default(true)
+
+  projectId     String?
+  project       Project?  @relation(fields: [projectId], references: [id])
+
+  createdAt     DateTime  @default(now())
 }
 
 model RoutineItem {
-  id          String   @id @default(uuid())
-  title       String   // Ex: "Treino"
-  startTime   String   // "07:00" (Guardamos como string HH:mm para simplificar repetição)
-  endTime     String   // "08:00"
-  description String?  @db.Text
-  category    String   // "health", "study", "work", "leisure", "home"
-  
-  // Define em quais dias isso acontece
-  // Ex: "mon,tue,wed,thu" ou "fri" ou "weekend"
-  daysOfWeek  String   
-  
-  createdAt   DateTime @default(now())
+  id            String   @id @default(uuid())
+  title         String
+  startTime     String
+  endTime       String
+  description   String?  @db.Text
+  category      String
+
+  daysOfWeek    String
+
+  createdAt     DateTime @default(now())
 }
 
 // --- MÓDULO CONFIGURAÇÕES ---
 
 model Settings {
-  id          String   @id @default(uuid())
-  theme       String   @default("system")
-  accentColor String   @default("zinc")
-  language    String   @default("pt-BR")
-  
-  aiProvider  String   @default("ollama")
-  aiModel     String   @default("llama3")
-  aiPersona   String?  @db.Text
-  
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(uuid())
+  theme         String   @default("system")
+  accentColor   String   @default("zinc")
+  language      String   @default("pt-BR")
+
+  aiProvider    String   @default("ollama")
+  aiModel       String   @default("llama3")
+  aiPersona     String?  @db.Text
+
+  updatedAt     DateTime @updatedAt
 }
 
 // --- MÓDULO CMS ---
 
 model ManagedSite {
-  id        String   @id @default(uuid())
-  name      String   // Ex: "Landing Page Advogado"
-  url       String?  // Ex: "https://advogado.com"
-  apiKey    String   @unique @default(uuid()) // A chave para o site externo acessar
-  createdAt DateTime @default(now())
-  
-  pages     SitePage[]
+  id            String      @id @default(uuid())
+  name          String
+  url           String?
+  apiKey        String      @unique @default(uuid())
+  createdAt     DateTime    @default(now())
+
+  pages         SitePage[]
 }
 
 model SitePage {
-  id          String      @id @default(uuid())
-  slug        String      // Ex: "home", "sobre", "contato"
-  content     String      @db.Text // JSON stringificado
-  
-  siteId      String
-  site        ManagedSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  
-  updatedAt   DateTime    @updatedAt
+  id            String      @id @default(uuid())
+  slug          String
+  content       String      @db.Text
+
+  siteId        String
+  site          ManagedSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  updatedAt     DateTime    @updatedAt
 }
 
 // --- MÓDULO IA ---
 
 model AiChat {
-  id        String      @id @default(uuid())
-  title     String      @default("Nova Conversa")
-  createdAt DateTime    @default(now())
-  messages  AiMessage[]
+  id            String      @id @default(uuid())
+  title         String      @default("Nova Conversa")
+  createdAt     DateTime    @default(now())
+  messages      AiMessage[]
 }
 
 model AiMessage {
-  id        String   @id @default(uuid())
-  role      String   // "user" ou "assistant"
-  content   String   @db.Text
-  chatId    String
-  chat      AiChat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
+  id            String   @id @default(uuid())
+  role          String
+  content       String   @db.Text
+  chatId        String
+  chat          AiChat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
 }
 
 // --- MÓDULO ACESSOS (VAULT) ---
 
 model AccessItem {
-  id          String   @id @default(uuid())
-  title       String   // "Nubank", "Instagram"
-  username    String?  // "luiz@email.com"
-  password    String   // A senha em si
-  url         String?  // "https://nubank.com.br"
-  category    String   // SOCIAL, FINANCE, WORK, OTHERS
-  notes       String?  @db.Text // "Pin de segurança: 1234"
-  
-  userId      String?
-  user        User?    @relation(fields: [userId], references: [id])
+  id            String   @id @default(uuid())
+  title         String
+  username      String?
+  password      String
+  url           String?
+  category      String
+  notes         String?  @db.Text
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id])
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }

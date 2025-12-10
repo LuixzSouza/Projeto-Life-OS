@@ -2,13 +2,22 @@ import { prisma } from "@/lib/prisma";
 import { StudyTimer } from "@/components/studies/study-timer";
 import { StudySessionList } from "@/components/studies/study-session-list";
 import { SubjectGrid } from "@/components/studies/subject-grid"; 
-import { Trophy, History, Zap } from "lucide-react"; // Adicionando Zap para o Empty State
+import { Trophy, History, Zap } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"; // Importando Card components para o histórico
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { StudySubject } from "@prisma/client"; // Importa o tipo base
+
+// 1. Definição do tipo enriquecido (para o SubjectGrid)
+interface SubjectWithStats extends StudySubject {
+    totalMinutes: number;
+}
 
 export default async function StudiesPage() {
-    // 1. Buscando dados em paralelo para performance
-    const [subjects, recentSessions, stats] = await Promise.all([
+    // --- 1. Buscando dados ---
+
+    // A consulta aggregate é mais eficiente no MySQL, mas não retorna os títulos.
+    // Vamos fazer três buscas e processar a agregação.
+    const [subjects, recentSessions, stats, aggregatedTime] = await Promise.all([
         prisma.studySubject.findMany(),
         prisma.studySession.findMany({
             take: 5,
@@ -18,7 +27,12 @@ export default async function StudiesPage() {
         prisma.studySession.aggregate({
             _sum: { durationMinutes: true },
             _count: { id: true }
-        })
+        }),
+        // ✅ NOVA CONSULTA: Agrega o tempo total por Matéria
+        prisma.studySession.groupBy({
+            by: ['subjectId'],
+            _sum: { durationMinutes: true },
+        }),
     ]);
 
     // 2. Cálculos de Gamificação
@@ -35,10 +49,21 @@ export default async function StudiesPage() {
     
     const hasSessions = stats._count.id > 0;
 
+    // 3. Processamento de Matérias (Injetando totalMinutes)
+    const timeMap = new Map(
+        aggregatedTime.map(item => [item.subjectId, item._sum.durationMinutes || 0])
+    );
+
+    const subjectsWithStats: SubjectWithStats[] = subjects.map(subject => ({
+        ...subject,
+        totalMinutes: timeMap.get(subject.id) as number || 0,
+    }));
+
+
     return (
         <div className="space-y-8 max-w-6xl mx-auto p-4 pb-20">
             
-            {/* --- HEADER GAMIFICADO --- */}
+            {/* --- HEADER GAMIFICADO (Mantido) --- */}
             <div className={`text-white rounded-2xl p-6 shadow-xl relative overflow-hidden transition-all duration-500 ${hasSessions ? 'bg-zinc-900 border border-zinc-800' : 'bg-indigo-600 border border-indigo-700'}`}>
                 <div className="absolute top-0 right-0 w-64 h-64 bg-yellow-500/10 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2"></div>
                 
@@ -82,11 +107,14 @@ export default async function StudiesPage() {
                 
                 {/* COLUNA ESQUERDA (2/3): Timer e Matérias */}
                 <div className="lg:col-span-2 space-y-8">
-                    <StudyTimer subjects={subjects} />
-                    <SubjectGrid subjects={subjects} />
+                    {/* O StudyTimer precisa do tipo Subject[] básico */}
+                    <StudyTimer subjects={subjects} /> 
+                    
+                    {/* ✅ Agora o SubjectGrid recebe a lista enriquecida */}
+                    <SubjectGrid subjects={subjectsWithStats} />
                 </div>
 
-                {/* COLUNA DIREITA (1/3): Histórico - Agora em um Card Único */}
+                {/* COLUNA DIREITA (1/3): Histórico */}
                 <div className="space-y-6">
                     <Card className="bg-zinc-800/60 border border-zinc-700/50 min-h-[300px]">
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
@@ -97,11 +125,9 @@ export default async function StudiesPage() {
                         <CardContent className="px-0">
                             {hasSessions ? (
                                 <div className="px-6 pb-2">
-                                    {/* O componente de lista precisa de um wrapper para padding, então o p-6 fica aqui */}
                                     <StudySessionList sessions={recentSessions} />
                                 </div>
                             ) : (
-                                // Novo Empty State para o Histórico dentro do Card
                                 <div className="flex flex-col items-center justify-center py-12 text-zinc-500 rounded-xl">
                                     <Zap className="h-10 w-10 mb-3 text-zinc-700" />
                                     <p className="font-semibold text-zinc-400">Seu histórico está limpo!</p>

@@ -1,247 +1,238 @@
 "use client";
 
 import { StudySubject } from "@prisma/client";
-import { createSubject, deleteSubject } from "@/app/(dashboard)/studies/actions";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { deleteSubject } from "@/app/(dashboard)/studies/actions";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Plus, Hexagon, GitFork, Trash2, ChevronRight, AlertTriangle } from "lucide-react";
-import { useMemo, useState } from "react";
-import { Badge } from "@/components/ui/badge";
+import { Plus, GitFork, BookOpen, Search, SortAsc, Filter, Loader2 } from "lucide-react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner"; 
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-
-// ✅ Importa o novo componente de Modal de Detalhes
+import { SubjectCard } from "./subject-card";
+import { SubjectFormDialog } from "./subject-form-dialog.tsx";
 import { SubjectDetailsModal } from "./subject-details-modal";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 
-interface SubjectGridProps {
-  subjects: StudySubject[];
+interface RichSubject extends StudySubject {
+    totalMinutes: number; 
 }
 
-// Subcomponente para o Modal de Exclusão do Cluster (Nó Pai)
-function ClusterDeleteAction({ category, subjectId }: { category: string, subjectId: string }) {
+interface SubjectListProps {
+    subjects: RichSubject[]; 
+}
+
+// Opções de Ordenação
+const SORT_OPTIONS = [
+    { value: 'title', label: 'Nome (A-Z)' },
+    { value: 'totalMinutes', label: 'Mais Focado' },
+    { value: 'createdAt', label: 'Mais Recente' },
+];
+
+export function SubjectGrid({ subjects }: SubjectListProps) {
+    // --- ESTADOS DE CONTROLE GERAL ---
+    const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
+    const [subjectToEdit, setSubjectToEdit] = useState<RichSubject | null>(null);
+    const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+    const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null); 
     
-    const handleDelete = async () => {
-        const toastId = toast.loading(`Removendo ${category}...`);
-        try {
-            // A Server Action deleteSubject precisa estar configurada para deletar
-            // o SUBJECT e suas SESSIONS (usando CASCADE no Prisma)
-            const result = await deleteSubject(subjectId);
-            toast.dismiss(toastId);
-            toast[result.success ? 'success' : 'error'](result.message);
-        } catch (error) {
-            toast.error("Erro de conexão.", { id: toastId });
+    // ✅ NOVOS ESTADOS DE FILTRO E PESQUISA
+    const [searchTerm, setSearchTerm] = useState('');
+    const [sortBy, setSortBy] = useState('totalMinutes');
+    const [filterCategory, setFilterCategory] = useState('all'); // 'all' ou o nome da categoria
+
+    // --- FUNÇÕES DE INTERAÇÃO (CRUD) ---
+
+    const handleEdit = (id: string) => {
+        const subject = subjects.find(s => s.id === id);
+        if (subject) {
+            setSubjectToEdit(subject);
+            setIsFormDialogOpen(true);
+        } else {
+            toast.error("Matéria não encontrada para edição.");
         }
+    }
+
+    const handleDelete = async (id: string) => {
+        if (!confirm("Tem certeza que deseja deletar esta matéria e todos os seus registros?")) return;
+        
+        const toastId = toast.loading("Removendo matéria...");
+        const result = await deleteSubject(id);
+
+        toast.dismiss(toastId);
+        toast[result.success ? 'success' : 'error'](result.message);
+    }
+    
+    const handleStartCreate = () => {
+        setSubjectToEdit(null);
+        setIsFormDialogOpen(true);
+    }
+    
+    const handleCloseForm = () => {
+        setIsFormDialogOpen(false);
+        setSubjectToEdit(null);
+    }
+    
+    const handleCloseDetailsModal = () => {
+        setIsDetailsModalOpen(false);
+        setSelectedSubjectId(null);
+    }
+
+    const handleOpenDetails = (id: string) => {
+        setSelectedSubjectId(id);
+        setIsDetailsModalOpen(true);
     };
 
-    return (
-        <AlertDialog>
-            <AlertDialogTrigger asChild>
-                 <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    title={`Excluir Cluster: ${category}`}
-                    className="h-8 w-8 text-zinc-500 hover:text-red-500 hover:bg-zinc-700/50 ml-auto transition-opacity"
-                 >
-                    <Trash2 className="h-4 w-4" />
-                 </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle className="flex items-center gap-2 text-red-600">
-                        <AlertTriangle className="h-5 w-5" /> Confirma a Exclusão?
-                    </AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Você está prestes a remover o **Nó Principal:** <span className="font-bold text-red-400">{category}</span>. 
-                        Essa ação é irreversível e removerá todos os dados de estudo associados.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction 
-                        onClick={handleDelete}
-                        className="bg-red-600 hover:bg-red-700"
-                    >
-                        Sim, Excluir Definitivamente
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-    );
-}
-
-
-export function SubjectGrid({ subjects }: SubjectGridProps) {
-  // --- NOVOS ESTADOS PARA DETALHES ---
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false); // ✅ Controla o Modal de Detalhes
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null); // ✅ ID do Nó Clicado
-  
-  // 1. Agrupamento Lógico (Clusters)
-  const clusters = useMemo(() => {
-    const groups: Record<string, StudySubject[]> = {};
-    
-    subjects.forEach(sub => {
-      const cat = sub.category || "Sem Categoria";
-      if (!groups[cat]) groups[cat] = [];
-      groups[cat].push(sub);
-    });
-
-    return groups;
-  }, [subjects]);
-
-  const categories = Object.keys(clusters);
-
-  // 2. Função Wrapper para o Form
-  async function handleCreateSubject(formData: FormData) {
-    const toastId = toast.loading("Criando nodo...");
-    
-    try {
-        const result = await createSubject(formData);
-
-        if (result.success) {
-            toast.success(result.message, { id: toastId });
-            setIsDialogOpen(false); 
-        } else {
-            toast.error(result.message, { id: toastId });
-        }
-    } catch (error) {
-        toast.error("Erro inesperado.", { id: toastId });
-    }
-  }
-
-  // Helper para obter o ID do Cluster
-  const getSubjectIdForCluster = (category: string) => {
-    return clusters[category]?.[0]?.id || ''; 
-  }
-
-  // ✅ FUNÇÃO QUE O CARD DO ASSUNTO VAI CHAMAR
-  const handleSubjectClick = (id: string) => {
-      setSelectedSubjectId(id);       // Salva o ID
-      setIsDetailsModalOpen(true);    // Abre o modal
-  };
-
-  const handleCloseDetailsModal = () => {
-      setIsDetailsModalOpen(false);
-      setSelectedSubjectId(null);
-  }
-
-
-  return (
-    <div className="space-y-6">
-      
-      {/* --- HEADER --- */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-xl font-semibold flex items-center gap-2 text-zinc-100">
-          <GitFork className="h-5 w-5 text-indigo-500" />
-          Atlas de Conhecimento
-        </h3>
-
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gap-1 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-500/30">
-              <Plus className="h-4 w-4" /> Novo Nodo
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Criar Novo Nodo de Conhecimento</DialogTitle>
-            </DialogHeader>
-            <form action={handleCreateSubject} className="space-y-4 mt-2">
-              <div className="space-y-2">
-                <Label htmlFor="title">Nome do Assunto</Label>
-                <Input id="title" name="title" placeholder="Ex: React Query" required autoComplete="off" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="category">Nodo Pai (Categoria)</Label>
-                <Input id="category" name="category" placeholder="Ex: Front-end" autoComplete="off" />
-                <p className="text-[10px] text-zinc-500">Isso criará o agrupamento no mapa.</p>
-              </div>
-              <DialogFooter>
-                <Button type="submit">Adicionar ao Mapa</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {/* --- VISUALIZAÇÃO DE CLUSTERS --- */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+    // 🎯 LÓGICA DE FILTRAGEM E ORDENAÇÃO DINÂMICA
+    const filteredAndSortedSubjects = useMemo(() => {
+        let filtered = subjects;
         
-        {categories.length === 0 && (
-           <div className="col-span-full py-20 text-center border border-dashed border-zinc-700 rounded-2xl bg-zinc-900/50">
-             <Hexagon className="h-12 w-12 text-zinc-700 mx-auto mb-3" />
-             <p className="text-zinc-500">Seu universo está vazio.</p>
-             <p className="text-xs text-zinc-600">Crie um nodo para começar a mapear seu conhecimento.</p>
-           </div>
-        )}
+        // 1. Filtragem por Pesquisa (Título e Categoria)
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            filtered = filtered.filter(sub => 
+                sub.title.toLowerCase().includes(term) || 
+                sub.category.toLowerCase().includes(term)
+            );
+        }
 
-        {categories.map((category) => (
-          <div key={category} className="relative group">
+        // 2. Filtragem por Categoria
+        if (filterCategory !== 'all') {
+            filtered = filtered.filter(sub => 
+                (sub.category || 'Sem Categoria') === filterCategory
+            );
+        }
+
+        // 3. Ordenação
+        filtered.sort((a, b) => {
+            if (sortBy === 'title') {
+                return a.title.localeCompare(b.title);
+            }
+            if (sortBy === 'totalMinutes') {
+                return (b.totalMinutes || 0) - (a.totalMinutes || 0);
+            }
+            if (sortBy === 'createdAt') {
+                // Datas: mais recente primeiro (b - a)
+                return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+            }
+            return 0;
+        });
+
+        // 4. Agrupamento por Categoria (para o Select de filtro e visualização)
+        const categories = Array.from(new Set(subjects.map(s => s.category || 'Sem Categoria')));
+
+        return { list: filtered, categories };
+
+    }, [subjects, searchTerm, sortBy, filterCategory]);
+
+    const { list: finalSubjectList, categories: uniqueCategories } = filteredAndSortedSubjects;
+
+
+    return (
+        <div className="space-y-6">
             
-            {/* CARD DO NÓ PAI (CATEGORIA) */}
-            <div className="bg-zinc-800/60 border border-indigo-700/50 p-5 rounded-xl shadow-lg shadow-indigo-900/10 mb-4 transition-all duration-300 hover:border-indigo-500/80">
-              
-              <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-xl bg-indigo-800/70 flex items-center justify-center shadow-lg">
-                    <Hexagon className="h-6 w-6 text-indigo-300" />
-                </div>
-                <div>
-                    <h4 className="text-xl font-extrabold text-zinc-100 tracking-tight">{category}</h4>
-                    <span className="text-sm text-zinc-400">{clusters[category].length} Assuntos Mapeados</span>
-                </div>
+            {/* --- HEADER --- */}
+            <div className="flex items-center justify-between">
+                <h3 className="text-xl font-semibold flex items-center gap-2 text-zinc-100">
+                    <GitFork className="h-5 w-5 text-indigo-500" />
+                    Mapa de Matérias
+                </h3>
+
+                {/* Botão que inicia a Criação */}
+                <Button 
+                    size="sm" 
+                    className="gap-1 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-500/30"
+                    onClick={handleStartCreate}
+                >
+                    <Plus className="h-4 w-4" /> Novo Nodo
+                </Button>
+            </div>
+
+            {/* --- CONTROLES DE PESQUISA E FILTRO (Barra Dinâmica) --- */}
+            <div className="flex flex-wrap gap-3 p-4 bg-zinc-800/60 rounded-xl border border-zinc-700">
                 
-                <div className="ml-auto">
-                    <ClusterDeleteAction 
-                        category={category} 
-                        subjectId={getSubjectIdForCluster(category)} 
+                {/* Pesquisa */}
+                <div className="relative flex-1 min-w-[200px]">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                    <Input 
+                        placeholder="Pesquisar por Título ou Categoria..." 
+                        value={searchTerm} 
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10 bg-zinc-900 border-zinc-700 focus:border-indigo-500"
                     />
                 </div>
-              </div>
+                
+                {/* Filtro por Categoria */}
+                <Select value={filterCategory} onValueChange={setFilterCategory}>
+                    <SelectTrigger className="w-[180px] bg-zinc-900 border-zinc-700 text-zinc-300">
+                        <Filter className="h-4 w-4 mr-2 text-indigo-400" />
+                        <SelectValue placeholder="Filtrar por Categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">Todas as Categorias</SelectItem>
+                        {uniqueCategories.map(cat => (
+                            <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+
+                {/* Ordenação */}
+                <Select value={sortBy} onValueChange={setSortBy}>
+                    <SelectTrigger className="w-[180px] bg-zinc-900 border-zinc-700 text-zinc-300">
+                        <SortAsc className="h-4 w-4 mr-2 text-indigo-400" />
+                        <SelectValue placeholder="Ordenar por" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {SORT_OPTIONS.map(opt => (
+                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
             </div>
 
-            {/* LISTA DE NÓS FILHOS (ASSUNTOS) */}
-            <div className="relative pl-6 space-y-3">
-              
-              {/* Linha Vertical Sutil para indicar conexão */}
-              <div className="absolute left-7 top-0 bottom-0 w-px bg-zinc-700/50"></div>
 
-              {clusters[category].map((sub) => (
-                <div key={sub.id} className="relative flex items-center gap-3 group/item">
-                  
-                  {/* Ponto de Conexão (Nó Filho) */}
-                  <div 
-                      className="absolute left-5 transform -translate-x-1/2 z-10 h-3 w-3 rounded-full border-2 border-zinc-800 transition-all duration-300 group-hover/item:scale-150 group-hover/item:border-indigo-400 group-hover/item:shadow-[0_0_15px_rgba(99,102,241,0.8)]"
-                      style={{ backgroundColor: sub.color || "#6366f1" }}
-                  ></div>
+            {/* --- LISTA DE CARDS RICOS --- */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+                
+                {finalSubjectList.length === 0 && subjects.length > 0 && (
+                     <div className="col-span-full py-12 text-center border-2 border-dashed border-zinc-700 rounded-xl bg-zinc-900/50 flex flex-col items-center justify-center">
+                         <Search className="h-10 w-10 text-zinc-700 mb-3" />
+                         <p className="text-zinc-500 font-semibold">Nenhuma matéria corresponde à pesquisa.</p>
+                         <p className="text-sm text-zinc-600">Tente ajustar seus filtros ou termos de busca.</p>
+                     </div>
+                )}
 
-                  {/* Card do Assunto (Clicável para ver detalhes/editar) */}
-                  <div 
-                    className="flex-1 ml-4 p-3 rounded-lg border border-zinc-800 bg-zinc-800/70 hover:bg-indigo-950/40 hover:border-indigo-500/30 transition-all cursor-pointer shadow-sm flex justify-between items-center"
-                    // ✅ CHAMADA CORRIGIDA PARA ACESSAR DETALHES
-                    onClick={() => handleSubjectClick(sub.id)} 
-                  >
-                      <span className="text-sm font-medium text-zinc-300">
-                          {sub.title}
-                      </span>
-                      <ChevronRight className="h-4 w-4 text-zinc-500 group-hover/item:text-indigo-400 transition-colors" />
-                  </div>
-                </div>
-              ))}
+                {subjects.length === 0 && (
+                    <div className="col-span-full py-12 text-center border-2 border-dashed border-zinc-700 rounded-xl bg-zinc-900/50 flex flex-col items-center justify-center">
+                        <BookOpen className="h-10 w-10 text-zinc-700 mb-3" />
+                        <p className="text-zinc-500 font-semibold">Seu mapa de conhecimento está vazio.</p>
+                        <p className="text-sm text-zinc-600">Comece adicionando seu primeiro *Nodo*!</p>
+                    </div>
+                )}
+                
+                {finalSubjectList.map((sub) => (
+                    <SubjectCard 
+                        key={sub.id}
+                        subject={sub}
+                        onDetailsClick={handleOpenDetails} 
+                        onEdit={handleEdit} 
+                        onDelete={handleDelete}
+                    />
+                ))}
             </div>
 
-          </div>
-        ))}
-      </div>
-      
-      {/* ✅ RENDERIZAÇÃO DO MODAL DE DETALHES (Visível quando isDetailsModalOpen = true) */}
-      <SubjectDetailsModal
-        subjectId={selectedSubjectId}
-        open={isDetailsModalOpen}
-        onClose={handleCloseDetailsModal}
-      />
-    </div>
-  );
+            {/* ✅ MODAIS DE AÇÃO */}
+            <SubjectFormDialog
+                key={subjectToEdit?.id || 'create'} 
+                open={isFormDialogOpen}
+                onClose={handleCloseForm}
+                currentSubject={subjectToEdit}
+            />
+
+            <SubjectDetailsModal
+                subjectId={selectedSubjectId}
+                open={isDetailsModalOpen}
+                onClose={handleCloseDetailsModal}
+            />
+        </div>
+    );
 }
