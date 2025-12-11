@@ -23,7 +23,9 @@ import {
   PanelLeftOpen,
   ChevronRight,
   Bookmark, // ✅ Ícone melhor para "Favoritos"
-  Film,     // ✅ Novo ícone para Entretenimento
+  Film,
+  Users,
+  Shirt,     // ✅ Novo ícone para Entretenimento
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -43,6 +45,8 @@ const sidebarItems = [
   { label: "Sites & CMS", icon: Globe, href: "/cms" },
   { label: "Links & Apps", icon: Bookmark, href: "/links" }, // ✅ Ícone Bookmark (Favoritos)
   { label: "Acessos", icon: Lock, href: "/access" },
+  { label: "Conexões", icon: Users, href: "/social" },
+  { label: "Closet", icon: Shirt, href: "/wardrobe" },
   { label: "Configurações", icon: Settings, href: "/settings" },
 ];
 

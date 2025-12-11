@@ -37,8 +37,8 @@ model User {
   projects      Project[]
   jobApplications JobApplication[]
   accessItem    AccessItem[]
-  
-  // ✅ NOVO RELACIONAMENTO
+  friends       Friend[]
+  wardrobe      WardrobeItem[] 
   stats         UserStats?
 }
 
@@ -419,4 +419,79 @@ model MediaItem {
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// Amigos
+
+model Friend {
+  id          String   @id @default(cuid())
+  name        String
+  nickname    String?  // O "Vulgo"
+  email       String?
+  phone       String?  // Para o botão de WhatsApp
+  
+  // Datas
+  birthday    DateTime?
+  
+  // Social & Trabalho
+  instagram   String?
+  linkedin    String?
+  twitter     String?
+  jobTitle    String?  // Cargo
+  company     String?  // Empresa
+  
+  // Detalhes Pessoais
+  proximity   String   @default("CASUAL") // CLOSE, FAMILY, WORK, NETWORK
+  pixKey      String?  // Útil para dividir contas
+  address     String?  // Para mandar Uber/iFood
+  notes       String?  // "Alergias", "Gostos", "Como conheci"
+
+  imageUrl    String?  @db.Text // Foto do amigo
+  giftIdeas   String?  @db.Text // O que dar de presente?
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model WardrobeItem {
+  id          String   @id @default(uuid())
+  name        String   // Ex: "Jaqueta de Couro Preta"
+  
+  // Detalhes Visuais
+  imageUrl    String?  @db.LongText // Foto da peça
+  brand       String?  // Ex: "Zara", "Nike"
+  color       String?  // Ex: "#000000" ou "Preto"
+  size        String?  // Ex: "M", "42", "US 9"
+  
+  // Classificação
+  category    String   // Vamos usar String para flexibilidade, mas sugerir via UI (TOP, BOTTOM, SHOES...)
+  season      String?  // "VERAO", "INVERNO", "TODAS"
+  
+  // Métricas Inteligentes (Pensando no Futuro)
+  price       Decimal? // Quanto custou
+  wearCount   Int      @default(0) // Quantas vezes usou (para calcular custo por uso)
+  lastWorn    DateTime? // Última vez que usou
+  
+  // Estado
+  isFavorite  Boolean  @default(false)
+  status      WardrobeStatus @default(IN_CLOSET) // Onde está a peça?
+
+  // Relacionamento
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Enums para deixar o sistema organizado
+enum WardrobeStatus {
+  IN_CLOSET   // Disponível
+  LAUNDRY     // Lavando
+  LENT        // Emprestado
+  REPAIR      // Costureira/Conserto
+  DONATED     // Doado (Histórico)
 }
