@@ -9,25 +9,25 @@ import Link from "next/link";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 
-// ✅ CORREÇÃO DEFINITIVA: Removemos o 'any'.
-// Usamos 'string | number' que satisfaz o Recharts e o ESLint.
+// ✅ CORREÇÃO: Removemos o 'any'.
+// 'string | number' cobre todos os seus campos (name, total, type, value) e satisfaz o Recharts.
 interface FinanceData { 
   name: string; 
   total: number; 
   type: 'INCOME' | 'EXPENSE';
-  [key: string]: string | number; // Index signature segura
+  [key: string]: string | number; 
 }
 
 interface StudyData { 
   name: string; 
   value: number; 
-  [key: string]: string | number; // Index signature segura
+  [key: string]: string | number;
 }
 
 export default async function DashboardPage() {
   const today = new Date();
   
-  // --- CARREGAMENTO DE DADOS PARALELO (Alta Performance) ---
+  // --- CARREGAMENTO DE DADOS PARALELO ---
   const [
     user,
     accounts,
@@ -66,6 +66,7 @@ export default async function DashboardPage() {
   const income = transactionsAll.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + Number(t.amount), 0);
   const expense = transactionsAll.filter(t => t.type === 'EXPENSE').reduce((acc, t) => acc + Number(t.amount), 0);
   
+  // Tipagem explícita aqui ajuda o TS a garantir que o array segue a interface
   const financeData: FinanceData[] = [
     { name: 'Entradas', total: income, type: 'INCOME' },
     { name: 'Saídas', total: expense, type: 'EXPENSE' },
@@ -79,7 +80,7 @@ export default async function DashboardPage() {
   });
   const studyData: StudyData[] = Array.from(studyMap, ([name, value]) => ({ name, value }));
 
-  // 4. Score de Produtividade (Gamification)
+  // 4. Score de Produtividade
   const totalStudyMinutes = studySessions.reduce((acc, s) => acc + s.durationMinutes, 0);
   const productivityScore = (completedTasksCount * 10) + Math.floor(totalStudyMinutes / 10);
 
@@ -112,7 +113,7 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* --- KPI CARDS (Resumo Superior) --- */}
+      {/* --- KPI CARDS --- */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         
         {/* Financeiro */}

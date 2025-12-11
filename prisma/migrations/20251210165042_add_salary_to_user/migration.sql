@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `User` ADD COLUMN `salary` DECIMAL(65, 30) NULL DEFAULT 0;

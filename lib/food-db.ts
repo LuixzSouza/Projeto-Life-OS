@@ -21,228 +21,188 @@ export const FOOD_DATABASE: FoodItem[] = [
   { id: 'pasta', name: 'Macarrão Cozido', emoji: '🍝', calories: 160, unit: '100g' },
   { id: 'spaghetti', name: 'Espaguete', emoji: '🍝', calories: 158, unit: '100g' },
   { id: 'lasagna', name: 'Lasanha (fatia)', emoji: '🍽️', calories: 320, unit: 'fatia' },
+  { id: 'barley', name: 'Cevada Cozida', emoji: '🥣', calories: 123, unit: '100g' },
+  { id: 'couscous', name: 'Cuscuz Marroquino', emoji: '🥣', calories: 112, unit: '100g' },
+  { id: 'polenta', name: 'Polenta Cozida', emoji: '🌽', calories: 70, unit: '100g' },
+  { id: 'granola_sugar_free', name: 'Granola sem açúcar', emoji: '🥣', calories: 400, unit: '100g' },
 
   // Tubérculos e raízes
-  { id: 'potato', name: 'Batata', emoji: '🥔', calories: 85, unit: '100g' },
+  { id: 'potato', name: 'Batata Inglesa', emoji: '🥔', calories: 85, unit: '100g' },
   { id: 'sweet_potato', name: 'Batata Doce', emoji: '🍠', calories: 86, unit: '100g' },
   { id: 'cassava', name: 'Mandioca (Aipim)', emoji: '🌿', calories: 160, unit: '100g' },
   { id: 'yam', name: 'Inhame', emoji: '🍠', calories: 118, unit: '100g' },
+  { id: 'beetroot', name: 'Beterraba Cozida', emoji: '🍠', calories: 44, unit: '100g' },
+  { id: 'carrot_cooked', name: 'Cenoura Cozida', emoji: '🥕', calories: 35, unit: '100g' },
 
   // Leguminosas
-  { id: 'beans', name: 'Feijão Cozido', emoji: '🫘', calories: 95, unit: '100g' },
+  { id: 'beans_black', name: 'Feijão Preto', emoji: '🫘', calories: 132, unit: '100g' },
+  { id: 'beans_pinto', name: 'Feijão Carioca', emoji: '🫘', calories: 76, unit: '100g' },
   { id: 'lentils', name: 'Lentilha Cozida', emoji: '🥣', calories: 116, unit: '100g' },
   { id: 'chickpeas', name: 'Grão-de-bico', emoji: '🥗', calories: 164, unit: '100g' },
   { id: 'peas', name: 'Ervilhas', emoji: '🥣', calories: 81, unit: '100g' },
+  { id: 'soybeans', name: 'Soja Cozida', emoji: '🫘', calories: 173, unit: '100g' },
+  { id: 'edamame', name: 'Edamame', emoji: '🫛', calories: 122, unit: '100g' },
 
   // Proteínas - carnes e aves
-  { id: 'chicken', name: 'Frango Grelhado', emoji: '🍗', calories: 165, unit: '100g' },
-  { id: 'chicken_breast', name: 'Peito de Frango', emoji: '🍗', calories: 165, unit: '100g' },
-  { id: 'turkey', name: 'Peru', emoji: '🦃', calories: 135, unit: '100g' },
-  { id: 'beef', name: 'Carne Bovina (magra)', emoji: '🥩', calories: 250, unit: '100g' },
-  { id: 'pork', name: 'Carne Suína', emoji: '🍖', calories: 242, unit: '100g' },
-  { id: 'lamb', name: 'Carne de Cordeiro', emoji: '🍖', calories: 294, unit: '100g' },
-  { id: 'bacon', name: 'Bacon', emoji: '🥓', calories: 541, unit: '100g' },
-  { id: 'sausage', name: 'Linguiça/Balada', emoji: '🌭', calories: 301, unit: '100g' },
+  { id: 'chicken_grilled', name: 'Frango Grelhado', emoji: '🍗', calories: 165, unit: '100g' },
+  { id: 'chicken_breast', name: 'Peito de Frango Cozido', emoji: '🍗', calories: 150, unit: '100g' },
+  { id: 'chicken_thigh', name: 'Sobrecoxa de Frango', emoji: '🍗', calories: 209, unit: '100g' },
+  { id: 'turkey_breast', name: 'Peito de Peru', emoji: '🦃', calories: 135, unit: '100g' },
+  { id: 'beef_ground', name: 'Carne Moída (magra)', emoji: '🥩', calories: 250, unit: '100g' },
+  { id: 'beef_steak', name: 'Bife Grelhado', emoji: '🥩', calories: 270, unit: '100g' },
+  { id: 'pork_chop', name: 'Bisteca de Porco', emoji: '🍖', calories: 242, unit: '100g' },
+  { id: 'lamb_chop', name: 'Costeleta de Cordeiro', emoji: '🍖', calories: 294, unit: '100g' },
+  { id: 'bacon', name: 'Bacon Frito', emoji: '🥓', calories: 541, unit: '100g' },
+  { id: 'sausage_pork', name: 'Linguiça Toscana', emoji: '🌭', calories: 300, unit: '100g' },
+  { id: 'ham', name: 'Presunto Cozido', emoji: '🥓', calories: 145, unit: '100g' },
 
   // Peixes e frutos do mar
-  { id: 'salmon', name: 'Salmão', emoji: '🐟', calories: 208, unit: '100g' },
-  { id: 'tuna', name: 'Atum', emoji: '🐟', calories: 132, unit: '100g' },
-  { id: 'shrimp', name: 'Camarão', emoji: '🦐', calories: 99, unit: '100g' },
-  { id: 'cod', name: 'Bacalhau/Polvo (peixe branco)', emoji: '🐟', calories: 82, unit: '100g' },
-  { id: 'sardine', name: 'Sardinha', emoji: '🐟', calories: 208, unit: '100g' },
-  { id: 'mackerel', name: 'Cavala', emoji: '🐟', calories: 205, unit: '100g' },
+  { id: 'salmon_grilled', name: 'Salmão Grelhado', emoji: '🐟', calories: 208, unit: '100g' },
+  { id: 'tuna_fresh', name: 'Atum Fresco', emoji: '🐟', calories: 144, unit: '100g' },
+  { id: 'tuna_canned_water', name: 'Atum em Lata (água)', emoji: '🐟', calories: 116, unit: '100g' },
+  { id: 'shrimp_steamed', name: 'Camarão no Vapor', emoji: '🦐', calories: 99, unit: '100g' },
+  { id: 'cod', name: 'Bacalhau', emoji: '🐟', calories: 82, unit: '100g' },
+  { id: 'tilapia', name: 'Tilápia', emoji: '🐟', calories: 96, unit: '100g' },
+  { id: 'sardine_canned', name: 'Sardinha em Lata', emoji: '🐟', calories: 208, unit: '100g' },
 
   // Ovos
-  { id: 'egg', name: 'Ovo Cozido', emoji: '🥚', calories: 70, unit: 'unid' },
-  { id: 'omelette', name: 'Omelete (2 ovos)', emoji: '🍳', calories: 180, unit: 'porção' },
+  { id: 'egg_boiled', name: 'Ovo Cozido', emoji: '🥚', calories: 70, unit: 'unid' },
+  { id: 'egg_fried', name: 'Ovo Frito', emoji: '🍳', calories: 90, unit: 'unid' },
+  { id: 'omelette_cheese', name: 'Omelete com Queijo', emoji: '🍳', calories: 250, unit: 'porção' },
+  { id: 'egg_whites', name: 'Claras de Ovo', emoji: '🥚', calories: 17, unit: 'unid' },
 
-  // Laticínios
-  { id: 'milk', name: 'Leite Integral', emoji: '🥛', calories: 60, unit: '100ml' },
-  { id: 'milk_sk', name: 'Leite Desnatado', emoji: '🥛', calories: 34, unit: '100ml' },
-  { id: 'yogurt', name: 'Iogurte Natural', emoji: '🥛', calories: 59, unit: '100g' },
+  // Laticínios e Substitutos
+  { id: 'milk_whole', name: 'Leite Integral', emoji: '🥛', calories: 60, unit: '100ml' },
+  { id: 'milk_skim', name: 'Leite Desnatado', emoji: '🥛', calories: 34, unit: '100ml' },
+  { id: 'soy_milk', name: 'Leite de Soja', emoji: '🥛', calories: 54, unit: '100ml' },
+  { id: 'almond_milk', name: 'Leite de Amêndoas', emoji: '🥛', calories: 17, unit: '100ml' },
+  { id: 'yogurt_plain', name: 'Iogurte Natural', emoji: '🥛', calories: 59, unit: '100g' },
   { id: 'greek_yogurt', name: 'Iogurte Grego', emoji: '🥣', calories: 97, unit: '100g' },
   { id: 'cheese_cheddar', name: 'Queijo Cheddar', emoji: '🧀', calories: 402, unit: '100g' },
-  { id: 'cheese_mozz', name: 'Muçarela', emoji: '🧀', calories: 280, unit: '100g' },
+  { id: 'cheese_mozzarella', name: 'Queijo Muçarela', emoji: '🧀', calories: 280, unit: '100g' },
+  { id: 'cheese_parmesan', name: 'Queijo Parmesão', emoji: '🧀', calories: 431, unit: '100g' },
+  { id: 'cheese_cottage', name: 'Queijo Cottage', emoji: '🧀', calories: 98, unit: '100g' },
+  { id: 'cheese_ricotta', name: 'Ricota', emoji: '🧀', calories: 174, unit: '100g' },
   { id: 'butter', name: 'Manteiga', emoji: '🧈', calories: 717, unit: '100g' },
-  { id: 'cream', name: 'Creme de Leite', emoji: '🥛', calories: 340, unit: '100g' },
+  { id: 'cream_heavy', name: 'Creme de Leite', emoji: '🥛', calories: 340, unit: '100g' },
 
-  // Vegetais
-  { id: 'salad', name: 'Salada Mista', emoji: '🥗', calories: 30, unit: 'prato' },
+  // Vegetais e Legumes
   { id: 'lettuce', name: 'Alface', emoji: '🥬', calories: 15, unit: '100g' },
-  { id: 'spinach', name: 'Espinafre', emoji: '🥬', calories: 23, unit: '100g' },
-  { id: 'kale', name: 'Couve', emoji: '🥬', calories: 49, unit: '100g' },
-  { id: 'broccoli', name: 'Brócolis', emoji: '🥦', calories: 35, unit: '100g' },
-  { id: 'cauliflower', name: 'Couve-flor', emoji: '🥦', calories: 25, unit: '100g' },
-  { id: 'carrot', name: 'Cenoura', emoji: '🥕', calories: 41, unit: '100g' },
+  { id: 'arugula', name: 'Rúcula', emoji: '🥗', calories: 25, unit: '100g' },
+  { id: 'spinach_raw', name: 'Espinafre Cru', emoji: '🥬', calories: 23, unit: '100g' },
+  { id: 'kale', name: 'Couve Manteiga', emoji: '🥬', calories: 49, unit: '100g' },
+  { id: 'broccoli', name: 'Brócolis Cozido', emoji: '🥦', calories: 35, unit: '100g' },
+  { id: 'cauliflower', name: 'Couve-flor Cozida', emoji: '🥦', calories: 25, unit: '100g' },
+  { id: 'carrot_raw', name: 'Cenoura Crua', emoji: '🥕', calories: 41, unit: '100g' },
   { id: 'tomato', name: 'Tomate', emoji: '🍅', calories: 18, unit: '100g' },
   { id: 'cucumber', name: 'Pepino', emoji: '🥒', calories: 16, unit: '100g' },
+  { id: 'zucchini', name: 'Abobrinha', emoji: '🥒', calories: 17, unit: '100g' },
+  { id: 'eggplant', name: 'Berinjela', emoji: '🍆', calories: 25, unit: '100g' },
+  { id: 'pepper_bell', name: 'Pimentão', emoji: '🫑', calories: 20, unit: '100g' },
   { id: 'onion', name: 'Cebola', emoji: '🧅', calories: 40, unit: '100g' },
   { id: 'garlic', name: 'Alho', emoji: '🧄', calories: 149, unit: '100g' },
-  { id: 'pepper', name: 'Pimentão', emoji: '🫑', calories: 20, unit: '100g' },
-  { id: 'eggplant', name: 'Berinjela', emoji: '🍆', calories: 25, unit: '100g' },
-  { id: 'mushroom', name: 'Cogumelo', emoji: '🍄', calories: 22, unit: '100g' },
+  { id: 'mushroom', name: 'Cogumelo Champignon', emoji: '🍄', calories: 22, unit: '100g' },
+  { id: 'pumpkin', name: 'Abóbora Cozida', emoji: '🎃', calories: 26, unit: '100g' },
+  { id: 'green_beans', name: 'Vagem', emoji: '🥬', calories: 31, unit: '100g' },
+  { id: 'cabbage', name: 'Repolho', emoji: '🥬', calories: 25, unit: '100g' },
 
   // Frutas
-  { id: 'banana', name: 'Banana', emoji: '🍌', calories: 89, unit: 'unid' },
-  { id: 'apple', name: 'Maçã', emoji: '🍎', calories: 52, unit: 'unid' },
+  { id: 'banana', name: 'Banana Prata', emoji: '🍌', calories: 89, unit: 'unid' },
+  { id: 'apple', name: 'Maçã Fuji', emoji: '🍎', calories: 52, unit: 'unid' },
+  { id: 'pear', name: 'Pera', emoji: '🍐', calories: 57, unit: 'unid' },
   { id: 'orange', name: 'Laranja', emoji: '🍊', calories: 47, unit: 'unid' },
+  { id: 'tangerine', name: 'Mexerica/Tangerina', emoji: '🍊', calories: 53, unit: 'unid' },
   { id: 'grapes', name: 'Uvas', emoji: '🍇', calories: 69, unit: '100g' },
-  { id: 'mango', name: 'Manga', emoji: '🥭', calories: 60, unit: '100g' },
-  { id: 'pineapple', name: 'Abacaxi', emoji: '🍍', calories: 50, unit: '100g' },
-  { id: 'papaya', name: 'Mamão', emoji: '🍈', calories: 43, unit: '100g' },
-  { id: 'avocado', name: 'Abacate', emoji: '🥑', calories: 160, unit: '100g' },
-  { id: 'strawberry', name: 'Morangos', emoji: '🍓', calories: 33, unit: '100g' },
-  { id: 'blueberry', name: 'Blueberry', emoji: '🫐', calories: 57, unit: '100g' },
   { id: 'watermelon', name: 'Melancia', emoji: '🍉', calories: 30, unit: '100g' },
-  { id: 'pear', name: 'Pera', emoji: '🍐', calories: 57, unit: '100g' },
+  { id: 'melon', name: 'Melão', emoji: '🍈', calories: 34, unit: '100g' },
+  { id: 'papaya', name: 'Mamão Papaia', emoji: '🍈', calories: 43, unit: '100g' },
+  { id: 'pineapple', name: 'Abacaxi', emoji: '🍍', calories: 50, unit: '100g' },
+  { id: 'mango', name: 'Manga Palmer', emoji: '🥭', calories: 60, unit: '100g' },
+  { id: 'avocado', name: 'Abacate', emoji: '🥑', calories: 160, unit: '100g' },
+  { id: 'strawberry', name: 'Morango', emoji: '🍓', calories: 32, unit: '100g' },
+  { id: 'blueberry', name: 'Mirtilo (Blueberry)', emoji: '🫐', calories: 57, unit: '100g' },
   { id: 'kiwi', name: 'Kiwi', emoji: '🥝', calories: 61, unit: 'unid' },
+  { id: 'peach', name: 'Pêssego', emoji: '🍑', calories: 39, unit: 'unid' },
+  { id: 'lemon', name: 'Limão', emoji: '🍋', calories: 29, unit: 'unid' },
+  { id: 'coconut_meat', name: 'Coco (polpa)', emoji: '🥥', calories: 354, unit: '100g' },
+  { id: 'acai_pure', name: 'Açaí (polpa pura)', emoji: '🥣', calories: 60, unit: '100g' },
 
-  // Nuts & seeds
+  // Nozes, Sementes e Castanhas
   { id: 'almond', name: 'Amêndoas', emoji: '🌰', calories: 579, unit: '100g' },
-  { id: 'peanut', name: 'Amendoim', emoji: '🥜', calories: 567, unit: '100g' },
+  { id: 'peanut', name: 'Amendoim Torrado', emoji: '🥜', calories: 567, unit: '100g' },
   { id: 'cashew', name: 'Castanha de Caju', emoji: '🌰', calories: 553, unit: '100g' },
   { id: 'walnut', name: 'Nozes', emoji: '🌰', calories: 654, unit: '100g' },
-  { id: 'chia', name: 'Sementes de Chia', emoji: '🫙', calories: 486, unit: '100g' },
-  { id: 'sunflower', name: 'Sementes de Girassol', emoji: '🌻', calories: 584, unit: '100g' },
+  { id: 'brazil_nut', name: 'Castanha do Pará', emoji: '🌰', calories: 656, unit: '100g' },
+  { id: 'chia_seeds', name: 'Sementes de Chia', emoji: '🌱', calories: 486, unit: '100g' },
+  { id: 'flax_seeds', name: 'Sementes de Linhaça', emoji: '🌱', calories: 534, unit: '100g' },
+  { id: 'sunflower_seeds', name: 'Sementes de Girassol', emoji: '🌻', calories: 584, unit: '100g' },
 
-  // Óleos, gorduras e molhos
-  { id: 'olive_oil', name: 'Azeite de Oliva', emoji: '🫒', calories: 884, unit: '100g' },
-  { id: 'vegetable_oil', name: 'Óleo Vegetal', emoji: '🛢️', calories: 884, unit: '100g' },
-  { id: 'mayonnaise', name: 'Maionese', emoji: '🥪', calories: 680, unit: '100g' },
+  // Óleos, Gorduras e Condimentos
+  { id: 'olive_oil', name: 'Azeite de Oliva', emoji: '🫒', calories: 884, unit: '100ml' },
+  { id: 'coconut_oil', name: 'Óleo de Coco', emoji: '🥥', calories: 862, unit: '100ml' },
+  { id: 'butter_unsalted', name: 'Manteiga sem sal', emoji: '🧈', calories: 717, unit: '100g' },
+  { id: 'mayonnaise', name: 'Maionese', emoji: '🥣', calories: 680, unit: '100g' },
   { id: 'ketchup', name: 'Ketchup', emoji: '🍅', calories: 112, unit: '100g' },
-  { id: 'soy_sauce', name: 'Molho de Soja', emoji: '🫙', calories: 53, unit: '100g' },
+  { id: 'mustard', name: 'Mostarda', emoji: '🌭', calories: 66, unit: '100g' },
+  { id: 'soy_sauce', name: 'Molho Shoyu', emoji: '🥡', calories: 53, unit: '100ml' },
   { id: 'honey', name: 'Mel', emoji: '🍯', calories: 304, unit: '100g' },
-  { id: 'sugar', name: 'Açúcar', emoji: '🧂', calories: 387, unit: '100g' },
+  { id: 'sugar_white', name: 'Açúcar Refinado', emoji: '🧂', calories: 387, unit: '100g' },
 
-  // Lanches e snacks
-  { id: 'chips', name: 'Batata Chips', emoji: '🍟', calories: 536, unit: '100g' },
-  { id: 'popcorn', name: 'Pipoca (com manteiga)', emoji: '🍿', calories: 550, unit: '100g' },
+  // Lanches e Petiscos
+  { id: 'potato_chips', name: 'Batata Chips', emoji: '🍟', calories: 536, unit: '100g' },
+  { id: 'popcorn', name: 'Pipoca (com óleo)', emoji: '🍿', calories: 387, unit: '100g' },
+  { id: 'french_fries', name: 'Batata Frita', emoji: '🍟', calories: 312, unit: '100g' },
   { id: 'pretzel', name: 'Pretzel', emoji: '🥨', calories: 380, unit: '100g' },
-  { id: 'cracker', name: 'Biscoito Salgado', emoji: '🍘', calories: 450, unit: '100g' },
+  { id: 'crackers', name: 'Bolacha Água e Sal', emoji: '🍘', calories: 421, unit: '100g' },
+  { id: 'cheese_bread', name: 'Pão de Queijo', emoji: '🧀', calories: 280, unit: '100g' },
+  { id: 'coxinha', name: 'Coxinha de Frango', emoji: '🍗', calories: 300, unit: 'unid (média)' },
+  { id: 'pastel_meat', name: 'Pastel de Carne', emoji: '🥟', calories: 250, unit: 'unid (médio)' },
 
-  // Fast-food e refeições prontas
-  { id: 'pizza', name: 'Pizza (fatia média)', emoji: '🍕', calories: 285, unit: 'fatia' },
-  { id: 'burger', name: 'Hambúrguer', emoji: '🍔', calories: 500, unit: 'unid' },
-  { id: 'fries', name: 'Batata Frita', emoji: '🍟', calories: 312, unit: '100g' },
+  // Fast-food e Refeições Prontas
+  { id: 'pizza_mozzarella', name: 'Pizza de Muçarela', emoji: '🍕', calories: 280, unit: 'fatia' },
+  { id: 'pizza_pepperoni', name: 'Pizza de Calabresa', emoji: '🍕', calories: 300, unit: 'fatia' },
+  { id: 'burger_cheeseburger', name: 'Cheeseburger', emoji: '🍔', calories: 303, unit: 'unid' },
   { id: 'hotdog', name: 'Cachorro Quente', emoji: '🌭', calories: 290, unit: 'unid' },
-  { id: 'sushi', name: 'Sushi (roll)', emoji: '🍣', calories: 200, unit: '6 peças' },
+  { id: 'sushi_roll', name: 'Sushi (Uramaki)', emoji: '🍣', calories: 40, unit: 'unid' },
+  { id: 'lasagna_bolognese', name: 'Lasanha à Bolonhesa', emoji: '🍽️', calories: 135, unit: '100g' },
+  { id: 'nuggets', name: 'Nuggets de Frango', emoji: '🍗', calories: 296, unit: '100g' },
 
-  // Confeitaria e sobremesas
-  { id: 'cake', name: 'Bolo (fatia)', emoji: '🍰', calories: 350, unit: 'fatia' },
-  { id: 'cookie', name: 'Biscoito Doce', emoji: '🍪', calories: 502, unit: '100g' },
-  { id: 'ice_cream', name: 'Sorvete', emoji: '🍨', calories: 207, unit: '100g' },
-  { id: 'chocolate', name: 'Chocolate', emoji: '🍫', calories: 546, unit: '100g' },
-  { id: 'pudding', name: 'Pudim/Creme', emoji: '🍮', calories: 150, unit: 'porção' },
+  // Doces e Sobremesas
+  { id: 'chocolate_milk', name: 'Chocolate ao Leite', emoji: '🍫', calories: 535, unit: '100g' },
+  { id: 'chocolate_dark', name: 'Chocolate Amargo (70%)', emoji: '🍫', calories: 598, unit: '100g' },
+  { id: 'ice_cream_vanilla', name: 'Sorvete de Creme', emoji: '🍨', calories: 207, unit: '100g' },
+  { id: 'cake_chocolate', name: 'Bolo de Chocolate', emoji: '🍰', calories: 371, unit: '100g' },
+  { id: 'cookie_chocolate_chip', name: 'Cookie com Gotas de Chocolate', emoji: '🍪', calories: 488, unit: '100g' },
+  { id: 'pudding_milk', name: 'Pudim de Leite', emoji: '🍮', calories: 180, unit: '100g' },
+  { id: 'brigadeiro', name: 'Brigadeiro', emoji: '🍬', calories: 45, unit: 'unid' },
+  { id: 'donut', name: 'Donut (com cobertura)', emoji: '🍩', calories: 452, unit: '100g' },
+  { id: 'churros', name: 'Churros (com doce de leite)', emoji: '🥖', calories: 350, unit: 'unid' },
 
   // Bebidas
-  { id: 'coffee_black', name: 'Café Preto', emoji: '☕', calories: 2, unit: 'xícara' },
-  { id: 'coffee_with_milk', name: 'Café com Leite', emoji: '☕', calories: 60, unit: 'xícara' },
-  { id: 'tea', name: 'Chá (sem açúcar)', emoji: '🍵', calories: 2, unit: 'xícara' },
-  { id: 'soda', name: 'Refrigerante', emoji: '🥤', calories: 40, unit: '100ml' },
-  { id: 'juice_orange', name: 'Suco de Laranja', emoji: '🍊', calories: 45, unit: '100ml' },
+  { id: 'water', name: 'Água', emoji: '💧', calories: 0, unit: '200ml' },
+  { id: 'coffee_black', name: 'Café Preto (sem açúcar)', emoji: '☕', calories: 2, unit: 'xícara' },
+  { id: 'coffee_latte', name: 'Café com Leite', emoji: '☕', calories: 40, unit: 'xícara' },
+  { id: 'tea_green', name: 'Chá Verde', emoji: '🍵', calories: 2, unit: 'xícara' },
+  { id: 'juice_orange', name: 'Suco de Laranja (natural)', emoji: '🍊', calories: 45, unit: '100ml' },
+  { id: 'soda_cola', name: 'Refrigerante Cola', emoji: '🥤', calories: 42, unit: '100ml' },
   { id: 'beer', name: 'Cerveja', emoji: '🍺', calories: 43, unit: '100ml' },
   { id: 'wine_red', name: 'Vinho Tinto', emoji: '🍷', calories: 85, unit: '100ml' },
-  { id: 'cocktail', name: 'Coquetel (ex: caipirinha)', emoji: '🍸', calories: 150, unit: 'dose' },
+  { id: 'vodka', name: 'Vodka', emoji: '🍸', calories: 231, unit: '100ml' },
+  { id: 'whiskey', name: 'Whisky', emoji: '🥃', calories: 250, unit: '100ml' },
+  { id: 'energy_drink', name: 'Bebida Energética', emoji: '⚡', calories: 45, unit: '100ml' },
+  { id: 'coconut_water', name: 'Água de Coco', emoji: '🥥', calories: 19, unit: '100ml' },
 
-  // Produtos industrializados e derivados
-  { id: 'tofu', name: 'Tofu', emoji: '🍱', calories: 76, unit: '100g' },
-  { id: 'tempeh', name: 'Tempeh', emoji: '🍱', calories: 192, unit: '100g' },
-  { id: 'protein_powder', name: 'Whey Protein', emoji: '💪', calories: 110, unit: 'scoop' },
-  { id: 'granola', name: 'Granola', emoji: '🥣', calories: 471, unit: '100g' },
+  // Suplementos e Fitness
+  { id: 'whey_protein', name: 'Whey Protein (pó)', emoji: '💪', calories: 370, unit: '100g' },
+  { id: 'protein_bar', name: 'Barra de Proteína', emoji: '🍫', calories: 350, unit: '100g' },
+  { id: 'creatine', name: 'Creatina', emoji: '💊', calories: 0, unit: '5g' },
 
-  // Produtos de padaria e confeitaria diversos
-  { id: 'croissant', name: 'Croissant', emoji: '🥐', calories: 406, unit: 'unid' },
-  { id: 'muffin', name: 'Muffin', emoji: '🧁', calories: 377, unit: 'unid' },
-  { id: 'donut', name: 'Donut', emoji: '🍩', calories: 452, unit: 'unid' },
-
-  // Sobremesas tradicionais brasileiras
-  { id: 'brigadeiro', name: 'Brigadeiro (docinho)', emoji: '🍬', calories: 90, unit: 'unid' },
-  { id: 'pao_de_queijo', name: 'Pão de Queijo', emoji: '🧀', calories: 120, unit: 'unid' },
-  { id: 'acaraje', name: 'Acarajé', emoji: '🍤', calories: 250, unit: 'unid' },
-
-  // Cereais e complementos
-  { id: 'brownie', name: 'Brownie', emoji: '🍫', calories: 466, unit: '100g' },
-  { id: 'peanut_butter', name: 'Manteiga de Amendoim', emoji: '🥜', calories: 588, unit: '100g' },
-
-  // Snacks doces e salgados adicionais
-  { id: 'nachos', name: 'Nachos com Queijo', emoji: '🌮', calories: 550, unit: '100g' },
-  { id: 'cheese_sticks', name: 'Palitos de Queijo', emoji: '🧀', calories: 330, unit: '100g' },
-
-  // Bebidas lácteas e alternativas
-  { id: 'almond_milk', name: 'Leite de Amêndoas', emoji: '🥛', calories: 17, unit: '100ml' },
-  { id: 'soy_milk', name: 'Leite de Soja', emoji: '🥛', calories: 54, unit: '100ml' },
-
-  // Pratos comuns
-  { id: 'stew', name: 'Ensopado/Guisado', emoji: '🍲', calories: 180, unit: '100g' },
-  { id: 'beans_rice', name: 'Feijão com Arroz', emoji: '🍛', calories: 210, unit: 'porção' },
-  { id: 'salmon_plate', name: 'Prato com Salmão', emoji: '🍽️', calories: 520, unit: 'prato' },
-
-  // Itens para café da manhã
-  { id: 'pancakes', name: 'Panquecas', emoji: '🥞', calories: 227, unit: '100g' },
-  { id: 'waffle', name: 'Waffle', emoji: '🧇', calories: 291, unit: '100g' },
-  { id: 'cereal_milk', name: 'Cereal com Leite', emoji: '🥣', calories: 200, unit: 'porção' },
-
-  // Ingredientes e condimentos menores
-  { id: 'vinegar', name: 'Vinagre', emoji: '🫙', calories: 22, unit: '100g' },
-  { id: 'mustard', name: 'Mostarda', emoji: '🌭', calories: 66, unit: '100g' },
-  { id: 'jam', name: 'Geleia', emoji: '🍓', calories: 250, unit: '100g' },
-
-  // Outros frutos do mar e peixes
-  { id: 'oyster', name: 'Ostra', emoji: '🦪', calories: 68, unit: '100g' },
-  { id: 'crab', name: 'Caranguejo', emoji: '🦀', calories: 83, unit: '100g' },
-
-  // Especiarias e aromáticos (valores por 100g geralmente altos por concentração)
-  { id: 'cinnamon', name: 'Canela (em pó)', emoji: '🫚', calories: 247, unit: '100g' },
-  { id: 'ginger', name: 'Gengibre', emoji: '🫚', calories: 80, unit: '100g' },
-
-  // Bebidas energéticas e isotônicas
-  { id: 'energy_drink', name: 'Energético', emoji: '⚡', calories: 45, unit: '100ml' },
-  { id: 'sports_drink', name: 'Isotônico', emoji: '🧃', calories: 25, unit: '100ml' },
-
-  // Queijos variados
-  { id: 'parmesan', name: 'Parmesão', emoji: '🧀', calories: 431, unit: '100g' },
-  { id: 'ricotta', name: 'Ricota', emoji: '🧀', calories: 174, unit: '100g' },
-  { id: 'goat_cheese', name: 'Queijo de Cabra', emoji: '🧀', calories: 364, unit: '100g' },
-
-  // Legumes enlatados e conservas
-  { id: 'corn_canned', name: 'Milho Enlatado', emoji: '🌽', calories: 96, unit: '100g' },
-  { id: 'tuna_canned', name: 'Atum enlatado (óleo)', emoji: '🐟', calories: 198, unit: '100g' },
-
-  // Doces brasileiros tradicionais
-  { id: 'quindim', name: 'Quindim', emoji: '🥮', calories: 240, unit: 'unid' },
-  { id: 'beijinho', name: 'Beijinho', emoji: '🍬', calories: 80, unit: 'unid' },
-
-  // Saladas compostas
-  { id: 'caesar_salad', name: 'Salada Caesar', emoji: '🥗', calories: 180, unit: 'porção' },
-  { id: 'greek_salad', name: 'Salada Grega', emoji: '🥗', calories: 150, unit: 'porção' },
-
-  // Substitutos e complementos
-  { id: 'breadcrumbs', name: 'Farinha de Rosca', emoji: '🥖', calories: 395, unit: '100g' },
-  { id: 'flour', name: 'Farinha de Trigo', emoji: '🌾', calories: 364, unit: '100g' },
-
-  // Produtos congelados
-  { id: 'frozen_pizza', name: 'Pizza Congelada (fatia)', emoji: '🍕', calories: 300, unit: 'fatia' },
-  { id: 'frozen_veggies', name: 'Legumes Congelados', emoji: '🧊', calories: 50, unit: '100g' },
-
-  // Comidas de rua e petiscos
-  { id: 'tapioca', name: 'Tapioca (com recheio)', emoji: '🥞', calories: 200, unit: 'porção' },
-  { id: 'esfiha', name: 'Esfiha', emoji: '🥙', calories: 220, unit: 'unid' },
-
-  // Outros grãos
-  { id: 'bulgur', name: 'Bulgur', emoji: '🥣', calories: 83, unit: '100g' },
-  { id: 'couscous', name: 'Cuscuz', emoji: '🥣', calories: 112, unit: '100g' },
-
-  // Bebidas com leite e shakes
-  { id: 'milkshake', name: 'Milkshake', emoji: '🥤', calories: 250, unit: 'copo' },
-
-  // Conservas e antepastos
-  { id: 'pickles', name: 'Picles', emoji: '🥒', calories: 11, unit: '100g' },
-
-  // Finalizando com alguns itens populares
-  { id: 'cottage', name: 'Cottage', emoji: '🧀', calories: 98, unit: '100g' },
-  { id: 'prosciutto', name: 'Presunto Cru (Prosciutto)', emoji: '🥓', calories: 260, unit: '100g' },
-
-  // Placeholder para expansões futuras
+  // Pratos Brasileiros
+  { id: 'feijoada', name: 'Feijoada Completa', emoji: '🍲', calories: 150, unit: '100g' },
+  { id: 'farofa', name: 'Farofa de Mandioca', emoji: '🥣', calories: 400, unit: '100g' },
+  { id: 'strogonoff_chicken', name: 'Strogonoff de Frango', emoji: '🥘', calories: 160, unit: '100g' },
+  { id: 'moqueca', name: 'Moqueca de Peixe', emoji: '🥘', calories: 120, unit: '100g' },
+  { id: 'acai_bowl', name: 'Açaí na Tigela (com granola e banana)', emoji: '🥣', calories: 150, unit: '100g' }
 ];
 
 export default FOOD_DATABASE;

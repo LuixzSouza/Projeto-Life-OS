@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { fetchPluggyTransactions } from "@/lib/pluggy";
 
 // =========================================================
 // 1. GESTÃO DE CARTEIRAS (CONTAS)
@@ -235,4 +236,115 @@ export async function updateRecurring(formData: FormData) {
 export async function deleteRecurring(id: string) {
     await prisma.recurringExpense.delete({ where: { id } });
     revalidatePath("/finance");
+}
+
+export async function syncBankAccount(localAccountId: string) {
+  try {
+    // 1. Achar a conta no seu banco para pegar o ID externo
+    const account = await prisma.account.findUnique({ 
+        where: { id: localAccountId } 
+    });
+
+    if (!account?.externalId) throw new Error("Conta não conectada.");
+
+    // 2. Buscar dados na API da Pluggy
+    const externalTrans = await fetchPluggyTransactions(account.externalId);
+
+    // 3. Salvar no Prisma (Evitando duplicatas pelo ID da transação se tiver, ou hash)
+    let count = 0;
+    
+    for (const t of externalTrans) {
+      // Verifica se já existe essa transação (idealmente transaction teria um campo externalId também)
+      const exists = await prisma.transaction.findFirst({
+        where: { 
+            description: t.description, 
+            date: new Date(t.date),
+            amount: Math.abs(t.amount) // Pluggy manda negativo para saída, verifique seu padrão
+        }
+      });
+
+      if (!exists) {
+        await prisma.transaction.create({
+          data: {
+            accountId: localAccountId,
+            description: t.description,
+            amount: Math.abs(t.amount),
+            type: t.amount < 0 ? 'EXPENSE' : 'INCOME',
+            date: new Date(t.date),
+            category: t.category || "Geral" // Pluggy categoriza automaticamente!
+          }
+        });
+        count++;
+      }
+    }
+
+    revalidatePath("/finance");
+    return { success: true, message: `${count} novas transações importadas.` };
+
+  } catch (error) {
+    console.error(error);
+    return { success: false, message: "Erro na sincronização." };
+  }
+}
+
+// =========================================================
+// 5. INTEGRAÇÃO BANCÁRIA (PLUGGY)
+// =========================================================
+
+// Importe as funções do seu lib/pluggy (verifique se o caminho está correto)
+import { createConnectToken, fetchPluggyAccounts } from "@/lib/pluggy";
+
+export async function createConnectTokenAction() {
+  try {
+    const token = await createConnectToken();
+    return token;
+  } catch (error) {
+    console.error("Erro ao criar token Pluggy:", error);
+    throw new Error("Falha ao iniciar conexão bancária.");
+  }
+}
+
+export async function linkAccountToPluggyAction(itemId: string) {
+  try {
+    // 1. Buscar as contas que existem dentro desse "Item" (Conexão Bancária)
+    const pluggyAccounts = await fetchPluggyAccounts(itemId);
+
+    // 2. Para cada conta encontrada, criar ou atualizar no nosso banco
+    let createdCount = 0;
+
+    for (const acc of pluggyAccounts) {
+      // Verifica se já existe uma conta com esse externalId
+      const existing = await prisma.account.findFirst({
+        where: { externalId: acc.id }
+      });
+
+      if (!existing) {
+        await prisma.account.create({
+          data: {
+            name: `${acc.name} (${acc.number})`, 
+            type: "CHECKING", 
+            balance: acc.balance,
+            color: "#820ad1", // Roxo padrão, pode randomizar
+            isConnected: true,
+            provider: "PLUGGY",
+            externalId: acc.id
+          }
+        });
+        createdCount++;
+      } else {
+        // Atualiza saldo se já existir
+        await prisma.account.update({
+            where: { id: existing.id },
+            data: { balance: acc.balance }
+        })
+      }
+    }
+
+    revalidatePath("/finance");
+    return { success: true, message: `${createdCount} contas vinculadas com sucesso!` };
+
+  } catch (error) {
+    console.error("Erro ao vincular conta:", error);
+    return { success: false, message: "Erro ao processar dados do banco." };
+  }
 }

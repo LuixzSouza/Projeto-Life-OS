@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -10,8 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Scale, Pencil, ArrowRight, User } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { logMetric } from "@/app/(dashboard)/health/actions";
+import { logMetric } from "@/app/(dashboard)/health/actions"; // Importe a action
 import { toast } from "sonner";
+import { useState } from "react";
 
 interface BodyStatsProps {
     weight: number;
@@ -23,15 +23,15 @@ interface BodyStatsProps {
 export function BodySummaryCard({ weight, height, age = 25, gender = 'MALE' }: BodyStatsProps) {
     const [open, setOpen] = useState(false);
 
-    // 1. IMC Calculation
+    // 1. IMC
     const heightInMeters = height / 100;
     const bmi = (weight > 0 && height > 0) ? (weight / (heightInMeters * heightInMeters)) : 0;
     
-    // 2. Body Fat Estimate (Deurenberg Formula)
+    // 2. Estimativa de Gordura
     const genderFactor = gender === 'MALE' ? 1 : 0;
     const estimatedBodyFat = bmi > 0 ? (1.2 * bmi) + (0.23 * age) - (10.8 * genderFactor) - 5.4 : 0;
 
-    // BMI Classification Logic
+    // Classificação IMC
     let status = "Não calculado";
     let colorClass = "bg-zinc-200";
     let textClass = "text-zinc-500";
@@ -61,30 +61,26 @@ export function BodySummaryCard({ weight, height, age = 25, gender = 'MALE' }: B
         }
     }
 
-    // ✅ FIXED: Wrapper function to handle ActionResponse type
+    // ✅ CORREÇÃO: Função Wrapper para o formulário
     const handleSubmit = async (formData: FormData) => {
-        // We need to call logMetric twice (once for weight, once for height)
-        // Or create a new action that handles both. For now, calling twice is fine.
-        
-        const weightVal = formData.get("weight");
-        const heightVal = formData.get("height");
+        // Enviar Peso
+        const weightData = new FormData();
+        weightData.append("type", "WEIGHT");
+        weightData.append("value", formData.get("weight") as string);
+        await logMetric(weightData);
 
-        if (weightVal) {
-            const wData = new FormData();
-            wData.append("type", "WEIGHT");
-            wData.append("value", weightVal.toString());
-            await logMetric(wData);
+        // Enviar Altura
+        const heightData = new FormData();
+        heightData.append("type", "HEIGHT");
+        heightData.append("value", formData.get("height") as string);
+        const result = await logMetric(heightData);
+
+        if (result.success) {
+            toast.success("Medidas atualizadas!");
+            setOpen(false); // Fecha o modal
+        } else {
+            toast.error("Erro ao salvar: " + result.message);
         }
-
-        if (heightVal) {
-            const hData = new FormData();
-            hData.append("type", "HEIGHT");
-            hData.append("value", heightVal.toString());
-            await logMetric(hData);
-        }
-
-        toast.success("Medidas atualizadas com sucesso!");
-        setOpen(false);
     };
 
     return (
@@ -94,7 +90,7 @@ export function BodySummaryCard({ weight, height, age = 25, gender = 'MALE' }: B
                     <User className="h-4 w-4" /> Composição Corporal
                 </CardTitle>
                 
-                {/* Quick Edit Modal */}
+                {/* Modal de Edição Rápida */}
                 <Dialog open={open} onOpenChange={setOpen}>
                     <DialogTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-6 w-6 text-zinc-400 hover:text-zinc-600">
@@ -103,6 +99,7 @@ export function BodySummaryCard({ weight, height, age = 25, gender = 'MALE' }: B
                     </DialogTrigger>
                     <DialogContent>
                         <DialogHeader><DialogTitle>Atualizar Medidas</DialogTitle></DialogHeader>
+                        {/* A action agora aponta para o wrapper */}
                         <form action={handleSubmit} className="space-y-4 pt-2">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
@@ -121,7 +118,7 @@ export function BodySummaryCard({ weight, height, age = 25, gender = 'MALE' }: B
             </CardHeader>
             
             <CardContent className="space-y-5">
-                {/* Main BMI Display */}
+                {/* IMC Principal */}
                 <div className="flex justify-between items-end">
                     <div>
                         <div className="flex items-baseline gap-1">
@@ -131,7 +128,7 @@ export function BodySummaryCard({ weight, height, age = 25, gender = 'MALE' }: B
                         <p className={cn("text-xs font-medium mt-1", textClass)}>{status}</p>
                     </div>
 
-                    {/* Estimated Fat (Secondary) */}
+                    {/* Estimativa de Gordura (Secundário) */}
                     <div className="text-right">
                         <div className="flex items-baseline gap-1 justify-end">
                             <span className="text-xl font-bold text-zinc-700 dark:text-zinc-300">
@@ -143,7 +140,7 @@ export function BodySummaryCard({ weight, height, age = 25, gender = 'MALE' }: B
                     </div>
                 </div>
 
-                {/* Visual Bar */}
+                {/* Barra Visual */}
                 <div className="space-y-1.5">
                     <Progress value={percentage} className={cn("h-2", colorClass)} />
                     <div className="flex justify-between text-[10px] text-zinc-400 font-medium px-0.5">
@@ -154,7 +151,7 @@ export function BodySummaryCard({ weight, height, age = 25, gender = 'MALE' }: B
                     </div>
                 </div>
 
-                {/* Link to Full Page */}
+                {/* Link para Página Completa */}
                 <Link href="/health/body" className="block pt-2">
                     <Button variant="ghost" size="sm" className="w-full text-xs h-8 gap-1 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800">
                         Ver Bioimpedância Completa <ArrowRight className="h-3 w-3" />
