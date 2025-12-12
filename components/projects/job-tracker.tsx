@@ -2,35 +2,45 @@
 
 import { useState } from "react";
 import { JobApplication } from "@prisma/client";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Briefcase, ExternalLink, DollarSign, Plus, Trash2, Calendar, Pencil, FileText, Zap, Laptop } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { 
+    Briefcase, ExternalLink, DollarSign, Plus, Trash2, Calendar, Pencil, 
+    CheckCircle2, XCircle, Clock, Search, FileCode, Users, Globe, LayoutGrid, List, FileText 
+} from "lucide-react";
 import { createJob, deleteJob, updateJob } from "@/app/(dashboard)/projects/actions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
-// Cores dos Status
-const statusConfig: Record<string, { label: string, color: string, columnBg: string, borderColor: string }> = {
-  APPLIED: { label: "Início / Inscrito", color: "text-blue-600 bg-blue-100", columnBg: "bg-blue-50/50 dark:bg-blue-900/10", borderColor: "border-blue-200 dark:border-blue-800" },
-  SCREENING: { label: "Triagem / Contato", color: "text-purple-600 bg-purple-100", columnBg: "bg-purple-50/50 dark:bg-purple-900/10", borderColor: "border-purple-200 dark:border-purple-800" },
-  INTERVIEW: { label: "Entrevista / Negociação", color: "text-yellow-600 bg-yellow-100", columnBg: "bg-yellow-50/50 dark:bg-yellow-900/10", borderColor: "border-yellow-200 dark:border-yellow-800" },
-  TEST: { label: "Teste / Fazendo", color: "text-orange-600 bg-orange-100", columnBg: "bg-orange-50/50 dark:bg-orange-900/10", borderColor: "border-orange-200 dark:border-orange-800" },
-  OFFER: { label: "Proposta / Entregue", color: "text-emerald-600 bg-emerald-100", columnBg: "bg-emerald-50/50 dark:bg-emerald-900/10", borderColor: "border-emerald-200 dark:border-emerald-800" },
-  ACTIVE: { label: "Emprego Atual / Em Andamento", color: "text-cyan-700 bg-cyan-100", columnBg: "bg-cyan-50/50 dark:bg-cyan-900/10", borderColor: "border-cyan-200 dark:border-cyan-800" },
-  REJECTED: { label: "Recusado / Cancelado", color: "text-zinc-500 bg-zinc-100", columnBg: "bg-zinc-50/50 dark:bg-zinc-900/10", borderColor: "border-zinc-200 dark:border-zinc-800" },
+// Tipagem segura para os ícones e config
+type StatusConfig = {
+    label: string;
+    color: string;
+    progress: number;
+    icon: React.ElementType;
 };
 
-const KANBAN_COLUMNS = ['APPLIED', 'SCREENING', 'INTERVIEW', 'TEST', 'OFFER', 'ACTIVE', 'REJECTED'];
+const statusConfig: Record<string, StatusConfig> = {
+    APPLIED: { label: "Inscrito", color: "text-blue-600 bg-blue-50 border-blue-200", progress: 15, icon: Clock },
+    SCREENING: { label: "Triagem", color: "text-purple-600 bg-purple-50 border-purple-200", progress: 30, icon: Search },
+    TEST: { label: "Teste Técnico", color: "text-orange-600 bg-orange-50 border-orange-200", progress: 50, icon: FileCode },
+    INTERVIEW: { label: "Entrevista", color: "text-yellow-600 bg-yellow-50 border-yellow-200", progress: 75, icon: Users },
+    OFFER: { label: "Proposta", color: "text-emerald-600 bg-emerald-50 border-emerald-200", progress: 90, icon: DollarSign },
+    ACTIVE: { label: "Contratado", color: "text-indigo-600 bg-indigo-50 border-indigo-200", progress: 100, icon: CheckCircle2 },
+    REJECTED: { label: "Encerrado", color: "text-zinc-500 bg-zinc-100 border-zinc-200", progress: 0, icon: XCircle },
+};
 
-function JobCard({ job }: { job: JobApplication }) {
+// Item de Lista (Modo Lista)
+function JobListItem({ job, mode }: { job: JobApplication, mode: 'list' | 'grid' }) {
     const [isEditOpen, setIsEditOpen] = useState(false);
     
     const handleDeleteConfirmed = async () => {
@@ -47,302 +57,298 @@ function JobCard({ job }: { job: JobApplication }) {
     };
 
     const logo = getLogoUrl(job.jobUrl);
-    const statusInfo = statusConfig[job.status] || statusConfig.APPLIED;
-    const isFreelance = job.type === 'FREELANCE';
+    const status = statusConfig[job.status] || statusConfig.APPLIED;
+    const StatusIcon = status.icon;
 
-    return (
-        <Card className="group hover:border-indigo-500/50 transition-all flex flex-col h-auto mb-3 bg-white dark:bg-zinc-900 shadow-sm">
-            <CardHeader className="flex flex-row items-start justify-between pb-2 space-y-0 p-3">
-                <div className="flex items-center gap-3 overflow-hidden">
-                    <div className="h-8 w-8 rounded-md bg-zinc-50 dark:bg-zinc-800 flex items-center justify-center border shrink-0">
-                        {logo ? (
-                            <img src={logo} alt={job.company} className="w-5 h-5 object-contain" />
-                        ) : (
-                            isFreelance ? <Zap className="h-4 w-4 text-amber-500" /> : <Briefcase className="h-4 w-4 text-zinc-400" />
-                        )}
+    if (mode === 'grid') {
+        return (
+            <Card className="group relative overflow-hidden hover:shadow-lg transition-all border-zinc-200 dark:border-zinc-800">
+                <div className={cn("absolute top-0 left-0 w-full h-1", status.color.split(" ")[1].replace("bg-", "bg-"))} />
+                <CardContent className="p-5 pt-6">
+                    <div className="flex justify-between items-start mb-4">
+                        <div className="h-12 w-12 rounded-xl bg-zinc-50 dark:bg-zinc-900 border flex items-center justify-center shadow-sm">
+                            {logo ? <img src={logo} alt={job.company} className="w-6 h-6 object-contain" /> : <Briefcase className="w-5 h-5 text-zinc-400" />}
+                        </div>
+                        <Badge variant="outline" className={cn("text-[10px] font-bold uppercase", status.color)}>
+                            {status.label}
+                        </Badge>
                     </div>
-                    <div className="min-w-0">
-                        <CardTitle className="text-sm font-bold truncate">{job.company}</CardTitle>
-                        <p className="text-xs text-zinc-500 truncate">{job.role}</p>
+                    
+                    <h4 className="font-bold text-lg truncate">{job.company}</h4>
+                    <p className="text-sm text-zinc-500 truncate mb-4">{job.role}</p>
+                    
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between text-xs text-zinc-500">
+                            <span>Progresso</span>
+                            <span>{status.progress}%</span>
+                        </div>
+                        <Progress value={status.progress} className="h-1.5" />
+                        
+                        <div className="flex justify-between items-center pt-2">
+                             {job.salary && <span className="text-xs font-mono bg-green-50 text-green-700 px-1.5 py-0.5 rounded">{job.salary}</span>}
+                             <div className="flex gap-1 ml-auto">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsEditOpen(true)}><Pencil className="h-3.5 w-3.5" /></Button>
+                                <DeleteDialog onConfirm={handleDeleteConfirmed} />
+                             </div>
+                        </div>
                     </div>
-                </div>
-            </CardHeader>
-            
-            <CardContent className="p-3 pt-0 space-y-2">
-                <div className="flex flex-wrap gap-2 text-[10px] text-zinc-500">
-                    <span className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">
-                        <Calendar className="h-3 w-3" />
-                        {new Date(job.appliedDate).toLocaleDateString()}
-                    </span>
-                    {job.salary && (
-                        <span className="flex items-center gap-1 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded font-medium">
-                            <DollarSign className="h-3 w-3" />
-                            {job.salary}
-                        </span>
-                    )}
-                </div>
-            </CardContent>
-
-            <CardFooter className="p-2 gap-2 border-t bg-zinc-50/50 dark:bg-zinc-900/50">
-                {job.jobUrl && (
-                    <a href={job.jobUrl} target="_blank" rel="noreferrer" className="flex-1">
-                        <Button variant="ghost" size="sm" className="w-full text-xs h-7 px-0 text-zinc-500">
-                            <ExternalLink className="mr-1 h-3 w-3" /> Abrir
-                        </Button>
-                    </a>
-                )}
-
+                </CardContent>
+                
+                {/* Modal de Edição (Grid) */}
                 <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                    <DialogTrigger asChild>
-                        <Button variant="ghost" size="sm" className="flex-1 text-xs h-7 px-0 text-zinc-500 hover:text-indigo-600">
-                            <Pencil className="mr-1 h-3 w-3" /> Editar
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-                        <DialogHeader>
-                            <DialogTitle>Editar {isFreelance ? 'Serviço' : 'Candidatura'}</DialogTitle>
-                        </DialogHeader>
-                        <form action={async (fd) => {
-                            await updateJob(fd);
-                            toast.success("Atualizado!");
-                            setIsEditOpen(false);
-                        }} className="space-y-4">
-                            <input type="hidden" name="id" value={job.id} />
-                            
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label>Tipo</Label>
-                                    <Select name="type" defaultValue={job.type}>
-                                        <SelectTrigger><SelectValue /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="JOB">Vaga de Emprego</SelectItem>
-                                            <SelectItem value="FREELANCE">Serviço / Freela</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Status</Label>
-                                    <Select name="status" defaultValue={job.status}>
-                                        <SelectTrigger><SelectValue /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="APPLIED">Início / Inscrito</SelectItem>
-                                            <SelectItem value="SCREENING">Triagem / Contato</SelectItem>
-                                            <SelectItem value="INTERVIEW">Entrevista / Negociação</SelectItem>
-                                            <SelectItem value="TEST">Teste / Fazendo</SelectItem>
-                                            <SelectItem value="OFFER">Aprovado / Entregue</SelectItem>
-                                            <SelectItem value="ACTIVE">⭐ Emprego Atual / Rodando</SelectItem>
-                                            <SelectItem value="REJECTED">Recusado / Cancelado</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-                            
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label>{isFreelance ? 'Cliente' : 'Empresa'}</Label>
-                                    <Input name="company" defaultValue={job.company} required />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>{isFreelance ? 'Serviço' : 'Cargo'}</Label>
-                                    <Input name="role" defaultValue={job.role} required />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label>{isFreelance ? 'Valor' : 'Salário'}</Label>
-                                    <Input name="salary" defaultValue={job.salary || ""} />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Link</Label>
-                                    <Input name="jobUrl" defaultValue={job.jobUrl || ""} />
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label>Notas</Label>
-                                <Textarea name="requirements" defaultValue={job.requirements || ""} className="min-h-[100px]" />
-                            </div>
-
-                            <div className="flex gap-2 pt-2">
-                                <AlertDialog>
-                                    <AlertDialogTrigger asChild>
-                                        <Button type="button" variant="destructive" className="w-1/3">
-                                            <Trash2 className="mr-2 h-4 w-4" /> Excluir
-                                        </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                            <AlertDialogTitle>Excluir?</AlertDialogTitle>
-                                            <AlertDialogDescription>Esta ação é irreversível.</AlertDialogDescription>
-                                        </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                            <AlertDialogAction onClick={handleDeleteConfirmed} className="bg-red-600 hover:bg-red-700">Sim, Deletar</AlertDialogAction>
-                                        </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                </AlertDialog>
-                                
-                                <Button type="submit" className="w-2/3 bg-indigo-600 hover:bg-indigo-700">Salvar</Button>
-                            </div>
-                        </form>
+                    <DialogContent className="max-w-xl">
+                        <DialogHeader><DialogTitle>Editar Vaga</DialogTitle></DialogHeader>
+                        <JobForm defaultValues={job} type={job.type} mode="edit" onSubmit={() => setIsEditOpen(false)} />
                     </DialogContent>
                 </Dialog>
-            </CardFooter>
-        </Card>
-    );
-}
-
-// --- COMPONENTE PRINCIPAL ---
-
-export function JobTracker({ jobs }: { jobs: JobApplication[] }) {
-
-    // MODAL DE CRIAÇÃO (Reutilizável)
-    const CreateModal = ({ defaultType }: { defaultType: string }) => (
-        <Dialog>
-            <DialogTrigger asChild>
-                <Button className="bg-indigo-600 hover:bg-indigo-700 gap-2">
-                    <Plus className="h-4 w-4" /> 
-                    {defaultType === 'JOB' ? 'Nova Vaga' : 'Novo Serviço'}
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg">
-                <DialogHeader>
-                    <DialogTitle>Adicionar {defaultType === 'JOB' ? 'Vaga' : 'Serviço'}</DialogTitle>
-                </DialogHeader>
-                <form action={async (fd) => { await createJob(fd); toast.success("Registrado!"); }} className="space-y-4">
-                    <input type="hidden" name="type" value={defaultType} />
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label>{defaultType === 'JOB' ? 'Empresa' : 'Cliente'}</Label>
-                            <Input name="company" placeholder="Ex: Google" required />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>{defaultType === 'JOB' ? 'Cargo' : 'Serviço'}</Label>
-                            <Input name="role" placeholder={defaultType === 'JOB' ? 'Frontend Dev' : 'Landing Page'} required />
-                        </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label>{defaultType === 'JOB' ? 'Salário' : 'Orçamento'}</Label>
-                            <Input name="salary" placeholder="$$$" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Link</Label>
-                            <Input name="jobUrl" placeholder="https://..." />
-                        </div>
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Status Inicial</Label>
-                        <Select name="status" defaultValue="APPLIED">
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="APPLIED">Início / Inscrito</SelectItem>
-                                <SelectItem value="INTERVIEW">Em Conversa</SelectItem>
-                                {/* NOVO ITEM (Caso já queira cadastrar como atual) */}
-                                <SelectItem value="ACTIVE">Já estou trabalhando aqui</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Notas</Label>
-                        <Textarea name="requirements" placeholder="Detalhes..." />
-                    </div>
-
-                    <Button type="submit" className="w-full">Salvar</Button>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-
-    // Renderiza as colunas do Grid
-    const renderBoard = (type: string) => {
-        const filteredJobs = jobs.filter(j => (j.type || 'JOB') === type);
-        
-        // Agrupar
-        const grouped = filteredJobs.reduce((acc, job) => {
-            const status = job.status || 'APPLIED';
-            if (!acc[status]) acc[status] = [];
-            acc[status].push(job);
-            return acc;
-        }, {} as Record<string, JobApplication[]>);
-
-        return (
-            <div className="space-y-6">
-                <div className="flex justify-between items-center">
-                    <h3 className="text-lg font-semibold text-zinc-700 dark:text-zinc-200">
-                        {type === 'JOB' ? 'Processos Seletivos' : 'Meus Freelas & Serviços'}
-                    </h3>
-                    <CreateModal defaultType={type} />
-                </div>
-
-                {/* GRID RESPONSIVO (SUBSTITUI O SCROLL HORIZONTAL) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
-                    {KANBAN_COLUMNS.map(statusKey => {
-                        const info = statusConfig[statusKey] || statusConfig.APPLIED;
-                        const jobsInColumn = grouped[statusKey] || [];
-                        
-                        // Só mostra a coluna se tiver itens (opcional, para limpar a tela)
-                        // OU mostra sempre para manter a estrutura. Vamos mostrar sempre mas com visual clean.
-                        
-                        return (
-                            <div 
-                                key={statusKey} 
-                                className={cn(
-                                    "flex flex-col rounded-xl border-2 border-transparent transition-all",
-                                    info.columnBg,
-                                    jobsInColumn.length > 0 ? info.borderColor : "opacity-70 border-dashed"
-                                )}
-                            >
-                                <div className="p-3 flex justify-between items-center">
-                                    <h4 className={`font-bold text-xs uppercase tracking-wider ${info.color.split(' ')[0]}`}>
-                                        {info.label}
-                                    </h4>
-                                    <span className="text-[10px] font-mono bg-white/50 dark:bg-black/20 px-2 py-0.5 rounded-full">
-                                        {jobsInColumn.length}
-                                    </span>
-                                </div>
-
-                                <div className="p-3 pt-0 flex-1 flex flex-col gap-3 min-h-[100px]">
-                                    {jobsInColumn.length === 0 ? (
-                                        <div className="h-full flex items-center justify-center text-zinc-400 text-xs italic">
-                                            Vazio
-                                        </div>
-                                    ) : (
-                                        jobsInColumn.map(job => <JobCard key={job.id} job={job} />)
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
+            </Card>
         );
     }
 
+    // Modo Lista (Padrão)
     return (
-        <Tabs defaultValue="jobs" className="w-full h-full flex flex-col">
-            <div className="flex justify-center mb-6">
-                <TabsList className="grid w-full max-w-[400px] grid-cols-2">
-                    <TabsTrigger value="jobs" className="gap-2">
-                        <Briefcase className="h-4 w-4" /> Vagas de Emprego
-                    </TabsTrigger>
-                    <TabsTrigger value="services" className="gap-2">
-                        <Laptop className="h-4 w-4" /> Meus Serviços
-                    </TabsTrigger>
+        <div className="group flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-xl hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-800 transition-all mb-3 relative overflow-hidden">
+            <div className={cn("absolute left-0 top-0 bottom-0 w-1", status.color.split(" ")[1].replace("bg-", "bg-"))} />
+            
+            <div className="flex items-center gap-4 flex-1 min-w-0">
+                <div className="h-12 w-12 rounded-lg bg-zinc-50 dark:bg-zinc-800 flex items-center justify-center border shrink-0 shadow-sm">
+                    {logo ? <img src={logo} alt={job.company} className="w-7 h-7 object-contain" /> : <Briefcase className="h-5 w-5 text-zinc-400" />}
+                </div>
+                <div className="min-w-0">
+                    <h4 className="font-bold text-base text-zinc-900 dark:text-zinc-100 truncate">{job.company}</h4>
+                    <p className="text-sm text-zinc-500 truncate">{job.role}</p>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-zinc-400">
+                        <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {new Date(job.appliedDate).toLocaleDateString()}</span>
+                        {job.salary && <span className="flex items-center gap-1 text-green-600 font-medium"><DollarSign className="h-3 w-3" /> {job.salary}</span>}
+                    </div>
+                </div>
+            </div>
+
+            <div className="w-full sm:w-48 flex flex-col gap-1.5 shrink-0">
+                <div className="flex justify-between items-center text-xs">
+                    <span className={cn("font-bold flex items-center gap-1.5", status.color.split(" ")[0])}>
+                        <StatusIcon className="h-3.5 w-3.5" /> {status.label}
+                    </span>
+                    <span className="text-zinc-400">{status.progress}%</span>
+                </div>
+                <Progress value={status.progress} className="h-1.5 bg-zinc-100 dark:bg-zinc-800" indicatorClassName={status.color.split(" ")[1].replace("bg-", "bg-")} />
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end border-t sm:border-0 pt-3 sm:pt-0 mt-2 sm:mt-0">
+                {job.jobUrl && (
+                    <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-zinc-400 hover:text-blue-600">
+                        <a href={job.jobUrl} target="_blank" rel="noreferrer"><ExternalLink className="h-4 w-4" /></a>
+                    </Button>
+                )}
+                
+                <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+                    <DialogTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-indigo-600"><Pencil className="h-4 w-4" /></Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-xl">
+                        <DialogHeader><DialogTitle>Editar Vaga</DialogTitle></DialogHeader>
+                        <JobForm defaultValues={job} type={job.type} mode="edit" onSubmit={() => setIsEditOpen(false)} />
+                    </DialogContent>
+                </Dialog>
+
+                <DeleteDialog onConfirm={handleDeleteConfirmed} />
+            </div>
+        </div>
+    )
+}
+
+// Botão de Deletar Isolado
+function DeleteDialog({ onConfirm }: { onConfirm: () => void }) {
+    return (
+        <AlertDialog>
+            <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-red-600"><Trash2 className="h-4 w-4" /></Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Excluir?</AlertDialogTitle>
+                    <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={onConfirm} className="bg-red-600">Excluir</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+    )
+}
+
+// Formulário Profissional
+function JobForm({ defaultValues, type, mode = 'create', onSubmit }: { defaultValues?: JobApplication, type: string, mode?: 'create'|'edit', onSubmit?: () => void }) {
+    return (
+        <form action={async (fd) => { 
+            if (mode === 'create') await createJob(fd);
+            else await updateJob(fd);
+            toast.success(mode === 'create' ? "Criado com sucesso!" : "Atualizado com sucesso!");
+            onSubmit?.();
+        }} className="space-y-6 pt-4">
+            <input type="hidden" name="id" value={defaultValues?.id} />
+            <input type="hidden" name="type" value={type} />
+            
+            <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                    <Label className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2">
+                        <Briefcase className="h-3.5 w-3.5" /> {type === 'JOB' ? 'Empresa' : 'Cliente'}
+                    </Label>
+                    <Input name="company" defaultValue={defaultValues?.company} placeholder="Ex: Google" required className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800" />
+                </div>
+                <div className="space-y-2">
+                    <Label className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2">
+                        <Users className="h-3.5 w-3.5" /> {type === 'JOB' ? 'Cargo' : 'Serviço'}
+                    </Label>
+                    <Input name="role" defaultValue={defaultValues?.role} placeholder="Ex: Frontend Engineer" required className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800" />
+                </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                    <Label className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2">
+                        <DollarSign className="h-3.5 w-3.5" /> Valor / Salário
+                    </Label>
+                    <Input name="salary" defaultValue={defaultValues?.salary || ""} placeholder="R$ 5.000" className="bg-zinc-50 dark:bg-zinc-900 font-mono" />
+                </div>
+                <div className="space-y-2">
+                    <Label className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2">
+                        <Globe className="h-3.5 w-3.5" /> Link da Vaga
+                    </Label>
+                    <Input name="jobUrl" defaultValue={defaultValues?.jobUrl || ""} placeholder="https://..." className="bg-zinc-50 dark:bg-zinc-900" />
+                </div>
+            </div>
+
+            <div className="space-y-2">
+                <Label className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2">
+                    <Clock className="h-3.5 w-3.5" /> Status Atual
+                </Label>
+                <Select name="status" defaultValue={defaultValues?.status || "APPLIED"}>
+                    <SelectTrigger className="bg-zinc-50 dark:bg-zinc-900"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="APPLIED">🔵 Início / Inscrito</SelectItem>
+                        <SelectItem value="SCREENING">🟣 Triagem / RH</SelectItem>
+                        <SelectItem value="TEST">🟠 Teste Técnico</SelectItem>
+                        <SelectItem value="INTERVIEW">🟡 Entrevista</SelectItem>
+                        <SelectItem value="OFFER">🟢 Proposta Recebida</SelectItem>
+                        <SelectItem value="ACTIVE">⭐ Contratado / Ativo</SelectItem>
+                        <SelectItem value="REJECTED">⚪ Encerrado / Recusado</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+
+            <div className="space-y-2">
+                <Label className="text-xs font-bold text-zinc-500 uppercase flex items-center gap-2">
+                    <FileText className="h-3.5 w-3.5" /> Notas
+                </Label>
+                <Textarea 
+                    name="requirements" 
+                    defaultValue={defaultValues?.requirements || ""} 
+                    placeholder="Requisitos, dúvidas, anotações..." 
+                    className="min-h-[100px] bg-yellow-50/50 dark:bg-yellow-900/10 border-yellow-200 focus-visible:ring-yellow-400" 
+                />
+            </div>
+
+            <DialogFooter>
+                 <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 font-bold shadow-lg shadow-indigo-500/20">Salvar Registro</Button>
+            </DialogFooter>
+        </form>
+    );
+}
+
+// Componente Principal
+export function JobTracker({ jobs }: { jobs: JobApplication[] }) {
+    const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+
+    const renderContent = (type: string) => {
+        const filtered = jobs.filter(j => (j.type || 'JOB') === type);
+        
+        // Stats
+        const active = filtered.filter(j => j.status !== 'REJECTED' && j.status !== 'ACTIVE').length;
+        const interviews = filtered.filter(j => j.status === 'INTERVIEW').length;
+        const offers = filtered.filter(j => j.status === 'OFFER' || j.status === 'ACTIVE').length;
+
+        return (
+            <div className="space-y-6">
+                {/* Stats Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <Card className="bg-blue-50/50 dark:bg-blue-900/10 border-blue-100 dark:border-blue-900 shadow-sm">
+                        <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                            <span className="text-3xl font-black text-blue-600">{active}</span>
+                            <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mt-1">Em Andamento</span>
+                        </CardContent>
+                    </Card>
+                    <Card className="bg-yellow-50/50 dark:bg-yellow-900/10 border-yellow-100 dark:border-yellow-900 shadow-sm">
+                        <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                            <span className="text-3xl font-black text-yellow-600">{interviews}</span>
+                            <span className="text-[10px] font-bold text-yellow-400 uppercase tracking-widest mt-1">Entrevistas</span>
+                        </CardContent>
+                    </Card>
+                    <Card className="bg-emerald-50/50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-900 shadow-sm">
+                        <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                            <span className="text-3xl font-black text-emerald-600">{offers}</span>
+                            <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mt-1">Conquistas</span>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                <div className="flex justify-between items-center border-b pb-4 mb-4">
+                    <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg">
+                        <button onClick={() => setViewMode('list')} className={cn("p-1.5 rounded-md transition-all", viewMode === 'list' ? "bg-white shadow text-indigo-600" : "text-zinc-400 hover:text-zinc-600")}>
+                            <List className="h-4 w-4" />
+                        </button>
+                        <button onClick={() => setViewMode('grid')} className={cn("p-1.5 rounded-md transition-all", viewMode === 'grid' ? "bg-white shadow text-indigo-600" : "text-zinc-400 hover:text-zinc-600")}>
+                            <LayoutGrid className="h-4 w-4" />
+                        </button>
+                    </div>
+
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <Button className="bg-indigo-600 hover:bg-indigo-700 gap-2 shadow-md h-9 text-xs uppercase font-bold tracking-wide">
+                                <Plus className="h-4 w-4" /> Novo {type === 'JOB' ? 'Processo' : 'Serviço'}
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-xl">
+                            <DialogHeader>
+                                <DialogTitle className="text-xl flex items-center gap-2">
+                                    <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg"><Briefcase className="h-5 w-5"/></div>
+                                    Novo Registro
+                                </DialogTitle>
+                            </DialogHeader>
+                            <JobForm type={type} />
+                        </DialogContent>
+                    </Dialog>
+                </div>
+
+                <div className={cn("space-y-1", viewMode === 'grid' && "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 space-y-0")}>
+                    {filtered.length === 0 ? (
+                        <div className="text-center py-16 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl col-span-full">
+                            <div className="w-16 h-16 bg-zinc-50 dark:bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <Briefcase className="h-8 w-8 text-zinc-300" />
+                            </div>
+                            <p className="text-zinc-500 font-medium">Nenhum registro encontrado.</p>
+                            <p className="text-zinc-400 text-sm">Adicione uma vaga para começar a rastrear.</p>
+                        </div>
+                    ) : (
+                        filtered.map(job => <JobListItem key={job.id} job={job} mode={viewMode} />)
+                    )}
+                </div>
+            </div>
+        )
+    };
+
+    return (
+        <Tabs defaultValue="jobs" className="w-full">
+            <div className="flex justify-center mb-8">
+                <TabsList className="bg-zinc-100 dark:bg-zinc-900 p-1.5 rounded-full border border-zinc-200 dark:border-zinc-800 h-auto">
+                    <TabsTrigger value="jobs" className="rounded-full px-6 py-2 data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm transition-all font-medium text-sm">Vagas de Emprego</TabsTrigger>
+                    <TabsTrigger value="freela" className="rounded-full px-6 py-2 data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm transition-all font-medium text-sm">Freelas & Projetos</TabsTrigger>
                 </TabsList>
             </div>
 
-            <div className="flex-1 overflow-y-auto pr-2 pb-10">
-                <TabsContent value="jobs" className="mt-0 outline-none">
-                    {renderBoard('JOB')}
-                </TabsContent>
-                <TabsContent value="services" className="mt-0 outline-none">
-                    {renderBoard('FREELANCE')}
-                </TabsContent>
-            </div>
+            <TabsContent value="jobs" className="mt-0 focus-visible:ring-0">{renderContent('JOB')}</TabsContent>
+            <TabsContent value="freela" className="mt-0 focus-visible:ring-0">{renderContent('FREELANCE')}</TabsContent>
         </Tabs>
     );
 }

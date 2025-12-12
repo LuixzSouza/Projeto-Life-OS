@@ -9,14 +9,15 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { 
     Search, Heart, MoreVertical, Pencil, Trash2, 
-    Shirt, CheckCircle2, RotateCcw, Droplets, DollarSign, X 
+    Shirt, CheckCircle2, RotateCcw, Droplets, Filter, X 
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { deleteWardrobeItem, toggleFavoriteItem, wearItem } from "@/app/(dashboard)/wardrobe/actions";
 import { WardrobeFormDialog, WardrobeItemData } from "./wardrobe-form-dialog";
 
-// ✅ TIPAGEM FORTE: Define exatamente o que vem do banco de dados
+// Definindo a interface exata do que vem do banco de dados (Prisma)
+// Isso substitui o uso de 'any' e satisfaz o ESLint
 interface WardrobeItem {
     id: string;
     name: string;
@@ -28,21 +29,18 @@ interface WardrobeItem {
     imageUrl: string | null;
     price: number | null;
     wearCount: number;
-    isFavorite: boolean;
-    status: "IN_CLOSET" | "LAUNDRY" | "LENT" | "REPAIR" | "DONATED";
     lastWorn: string | null;
+    isFavorite: boolean;
+    // Status deve ser restrito aos valores do Enum
+    status: "IN_CLOSET" | "LAUNDRY" | "LENT" | "REPAIR" | "DONATED";
     createdAt: string;
     updatedAt: string;
 }
 
-export function WardrobeList({ initialData }: { initialData: WardrobeItem[] }) { 
-    // Agora initialData é fortemente tipado como WardrobeItem[]
-
+export function WardrobeList({ initialData }: { initialData: WardrobeItem[] }) {
     const [search, setSearch] = useState("");
     const [filterCategory, setFilterCategory] = useState("ALL");
     const [filterStatus, setFilterStatus] = useState<string | null>(null);
-    
-    // Estado para edição (convertendo WardrobeItem para WardrobeItemData que o form espera)
     const [editingItem, setEditingItem] = useState<WardrobeItemData | null>(null);
 
     // --- FILTRAGEM ---
@@ -74,8 +72,8 @@ export function WardrobeList({ initialData }: { initialData: WardrobeItem[] }) {
         else toast.error("Erro ao excluir.");
     };
 
+    // Converter para formato de edição
     const handleEditClick = (item: WardrobeItem) => {
-        // Converte o item completo do banco para o formato simplificado do formulário
         setEditingItem({
             id: item.id,
             name: item.name,

@@ -1,23 +1,34 @@
 'use client';
 
-import { Plus, Image as ImageIcon, X } from "lucide-react";
+import { Plus, Image as ImageIcon, X, Paperclip, Smile, Code } from "lucide-react";
 import { createTask } from "@/app/(dashboard)/projects/actions";
 import { toast } from "sonner";
 import { useRef, useState, useEffect } from "react";
 import { Button } from "../ui/button";
-import { Input } from "../ui/input";
+// Usaremos Textarea do shadcn ou nativo para suportar multiline
+import { Textarea } from "../ui/textarea"; 
+import { cn } from "@/lib/utils";
 
 interface TaskInputProps {
   projectId: string;
 }
 
 export function TaskInput({ projectId }: TaskInputProps) {
-  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
   const [image, setImage] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false); // Para expandir ao focar
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Converte arquivo em base64
+  // Auto-resize do textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [content]);
+
   const handleFile = (file: File) => {
     if (!file.type.startsWith("image/")) return;
     const reader = new FileReader();
@@ -25,61 +36,87 @@ export function TaskInput({ projectId }: TaskInputProps) {
     reader.readAsDataURL(file);
   };
 
-  // Paste handler (mais simples e focado no evento que vem do input)
   const handlePaste = (e: React.ClipboardEvent) => {
-    // Evita que o texto ou ícone quebre a linha se o navegador tentar colar algo não processado
-    if (e.clipboardData.types.includes('text/plain') && !e.clipboardData.types.includes('Files')) return;
-
     const clipboard = e.clipboardData;
     if (!clipboard || !clipboard.items) return;
 
     for (let i = 0; i < clipboard.items.length; i++) {
-        const item = clipboard.items[i];
-        if (item.type && item.type.indexOf("image") !== -1) {
-            const file = item.getAsFile();
-            if (file) {
-                // Previne a inserção de texto no input para que o setState gerencie
-                e.preventDefault(); 
-                handleFile(file);
-                toast.success("Imagem anexada!");
-                break;
-            }
+      const item = clipboard.items[i];
+      if (item.type.indexOf("image") !== -1) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          handleFile(file);
+          toast.success("Imagem anexada!");
+          break;
         }
+      }
     }
   };
 
-  // Handler para input file
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) handleFile(file);
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    // Enter envia, Shift+Enter pula linha
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit();
+    }
   };
 
-  // Enviar / Criar a Task
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim()) return;
+  const insertMarkdown = (type: 'code' | 'list' | 'bold') => {
+    if (!textareaRef.current) return;
+    
+    const start = textareaRef.current.selectionStart;
+    const end = textareaRef.current.selectionEnd;
+    const text = content;
+    
+    let newText = "";
+    let cursorOffset = 0;
+
+    switch (type) {
+      case 'code':
+        newText = text.substring(0, start) + "```\n" + text.substring(start, end) + "\n```" + text.substring(end);
+        cursorOffset = 4; // Posiciona cursor dentro do bloco
+        break;
+      case 'list':
+        newText = text.substring(0, start) + "- " + text.substring(start, end) + text.substring(end);
+        cursorOffset = 2;
+        break;
+    }
+
+    setContent(newText);
+    textareaRef.current.focus();
+    // setTimeout para garantir que o react renderizou o novo valor
+    setTimeout(() => {
+        if(textareaRef.current) textareaRef.current.setSelectionRange(start + cursorOffset, start + cursorOffset);
+    }, 0);
+  };
+
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!content.trim() && !image) return;
 
     setIsUploading(true);
 
     try {
-      const tempFormData = new FormData();
-      tempFormData.append("title", title);
-      tempFormData.append("projectId", projectId);
+      const formData = new FormData();
+      formData.append("title", content); // Usamos 'title' como conteúdo principal por enquanto
+      formData.append("projectId", projectId);
+      formData.append("priority", "MEDIUM");
       
-      // *** FIX PRINCIPAL: ENVIAR IMAGEM ***
       if (image) {
-        tempFormData.append("image", image);
+        formData.append("image", image);
       }
-      
-      // Campos Padrão que a Server Action espera
-      tempFormData.append("priority", "MEDIUM");
-      tempFormData.append("dueDate", ""); 
 
-      await createTask(tempFormData);
+      await createTask(formData);
 
-      setTitle("");
-      setImage(null); // Zera a imagem após o sucesso
+      setContent("");
+      setImage(null);
+      setIsExpanded(false); // Colapsa após enviar
       toast.success("Tarefa criada!");
+      
+      // Reset height
+      if (textareaRef.current) textareaRef.current.style.height = "auto";
+
     } catch (err) {
       console.error(err);
       toast.error("Erro ao criar tarefa.");
@@ -88,18 +125,17 @@ export function TaskInput({ projectId }: TaskInputProps) {
     }
   };
 
-  // Fallback global desnecessário já que o input tem onPaste e o form tem onSubmit.
-  // Mantenha o código limpo, removendo o useEffect global que pode causar conflitos.
-  // (O input já está focado e lidará com Ctrl+V)
-
   return (
-    <div className="p-3 border-t bg-zinc-50/50 dark:bg-zinc-900/50 backdrop-blur-sm">
-      {/* Removemos o onPaste do form, deixando apenas o onSubmit, para que o onPaste do Input seja o único a ser disparado */}
-      <form onSubmit={handleSubmit} className="relative flex flex-col gap-2">
-        {/* PREVIEW DA IMAGEM (Aparece acima se existir) */}
+    <div className={cn(
+        "border-t bg-white dark:bg-zinc-950 transition-all duration-300 ease-in-out",
+        isExpanded ? "p-4 shadow-lg -mt-4 border rounded-t-xl z-20 relative" : "p-3"
+    )}>
+      
+      <div className="relative flex flex-col gap-3">
+        {/* PREVIEW DA IMAGEM */}
         {image && (
-          <div className="relative w-fit group">
-            <img src={image} alt="Preview" className="h-20 w-auto rounded-lg border shadow-sm object-cover" />
+          <div className="relative w-fit group animate-in fade-in zoom-in duration-200">
+            <img src={image} alt="Preview" className="h-24 w-auto rounded-lg border shadow-sm object-cover" />
             <button
               type="button"
               onClick={() => setImage(null)}
@@ -110,48 +146,83 @@ export function TaskInput({ projectId }: TaskInputProps) {
           </div>
         )}
 
-        <div className="flex gap-2 items-center">
-          {/* Botão de Anexo Discreto */}
-          <div className="relative">
-            <Button
+        <div className="flex gap-3 items-start">
+           {/* Botão Add (Mudou para clip/plus) */}
+           <Button
               type="button"
               size="icon"
               variant="ghost"
-              className="text-zinc-400 hover:text-indigo-500"
+              className="text-zinc-400 hover:text-indigo-500 mt-1 shrink-0"
               onClick={() => fileInputRef.current?.click()}
             >
-              <ImageIcon className="h-5 w-5" />
+              <Paperclip className="h-5 w-5" />
             </Button>
             <input
               type="file"
               ref={fileInputRef}
               className="hidden"
               accept="image/*"
-              onChange={handleFileChange}
+              onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFile(file);
+              }}
             />
+
+          {/* Textarea Auto-Expanding */}
+          <div className="flex-1 relative">
+            <Textarea
+                ref={textareaRef}
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                onPaste={handlePaste}
+                onKeyDown={handleKeyDown}
+                onFocus={() => setIsExpanded(true)}
+                // Blur condicional: só fecha se estiver vazio. Se tiver texto, mantemos aberto para evitar perda acidental
+                // onBlur={() => !content && !image && setIsExpanded(false)} 
+                placeholder={image ? "Adicionar legenda..." : "O que precisa ser feito?"}
+                className="min-h-[44px] max-h-[300px] resize-none overflow-hidden py-3 bg-transparent border-none focus-visible:ring-0 shadow-none text-base placeholder:text-zinc-400"
+                rows={1}
+            />
+            
+            {/* Toolbar (Só aparece quando expandido) */}
+            {isExpanded && (
+                <div className="flex items-center gap-2 mt-2 animate-in fade-in slide-in-from-top-2">
+                    <div className="flex gap-1 mr-auto">
+                         <button onClick={() => insertMarkdown('code')} className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded text-xs flex items-center gap-1 transition-colors" title="Bloco de Código">
+                            <Code className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Code</span>
+                         </button>
+                         <button onClick={() => insertMarkdown('list')} className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded text-xs flex items-center gap-1 transition-colors" title="Lista">
+                            <span className="font-bold text-sm leading-none">•</span> <span className="hidden sm:inline">Lista</span>
+                         </button>
+                    </div>
+                    
+                    <span className="text-[10px] text-zinc-400 mr-2 hidden sm:block">
+                        <strong>Enter</strong> enviar, <strong>Shift+Enter</strong> nova linha
+                    </span>
+
+                    <Button
+                        onClick={() => handleSubmit()}
+                        size="sm"
+                        disabled={isUploading || (!content.trim() && !image)}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm h-8 px-4 rounded-lg transition-all"
+                    >
+                        Criar Tarefa
+                    </Button>
+                </div>
+            )}
           </div>
-
-          {/* Input de Texto */}
-          <Input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onPaste={handlePaste} // Ação no Input garante que o Base64 seja processado antes do submit
-            placeholder={image ? "Descreva a imagem ou tarefa..." : "Nova tarefa... (Cole uma imagem com Ctrl+V)"}
-            className="flex-1 bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 focus-visible:ring-indigo-500"
-            autoComplete="off"
-          />
-
-          {/* Botão Enviar */}
-          <Button
-            type="submit"
-            size="icon"
-            disabled={isUploading || !title.trim()}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm"
-          >
-            <Plus className="h-5 w-5" />
-          </Button>
         </div>
-      </form>
+      </div>
+      
+      {/* Botão flutuante para fechar se estiver expandido e vazio (UX) */}
+      {isExpanded && (
+          <button 
+            onClick={() => setIsExpanded(false)} 
+            className="absolute top-2 right-2 text-zinc-300 hover:text-zinc-500 p-1"
+          >
+              <X className="h-4 w-4" />
+          </button>
+      )}
     </div>
   );
 }
