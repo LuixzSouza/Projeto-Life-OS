@@ -329,6 +329,11 @@ model Settings {
   aiProvider    String   @default("ollama")
   aiModel       String   @default("llama3")
   aiPersona     String?  @db.Text
+  aiUsage       String?  @db.Text
+
+  openaiKey     String?  @db.Text
+  groqKey       String?  @db.Text
+  googleKey     String?  @db.Text
 
   updatedAt     DateTime @updatedAt
 }
@@ -369,6 +374,10 @@ model AiMessage {
   id            String   @id @default(uuid())
   role          String
   content       String   @db.Text
+
+  provider  String?  // ex: "ollama", "openai"
+  model     String?  // ex: "llama3", "gpt-4"
+
   chatId        String
   chat          AiChat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
   createdAt     DateTime @default(now())

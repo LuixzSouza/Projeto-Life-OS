@@ -85,7 +85,7 @@ export default async function DashboardPage() {
   const productivityScore = (completedTasksCount * 10) + Math.floor(totalStudyMinutes / 10);
 
   return (
-    <div className="space-y-6 max-w-[1600px] mx-auto p-2 md:p-0">
+    <div className="space-y-6 max-w-[1600px] mx-auto p-2 md:p-4">
       
       {/* --- HEADER --- */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">

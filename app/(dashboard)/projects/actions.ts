@@ -3,46 +3,71 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
+/**
+ * Helper para obter um valor de FormData, retornando string (limpa) ou null se vazio.
+ * Esta função resolve os erros de 'any' e 'as string'.
+ */
+function getStringValue(formData: FormData, key: string): string | null {
+    const value = formData.get(key);
+    // Verifica se é string e se não está vazio após remover espaços
+    if (typeof value === 'string' && value.trim() !== '') {
+        return value.trim();
+    }
+    return null;
+}
+
 // =========================================================
 // 1. GERENCIAMENTO DE PROJETOS
 // =========================================================
 
 export async function createProject(formData: FormData) {
-  const title = formData.get("title") as string;
-  const description = formData.get("description") as string;
+    const title = getStringValue(formData, "title");
+    const description = getStringValue(formData, "description");
+    const color = getStringValue(formData, "color") || "#6366f1";
+    
+    if (!title) throw new Error("O título do projeto é obrigatório.");
 
-  await prisma.project.create({
-    data: { title, description },
-  });
+    await prisma.project.create({
+        data: { 
+            title, 
+            description,
+            color
+        },
+    });
 
-  revalidatePath("/projects");
+    revalidatePath("/projects");
 }
 
 export async function updateProject(formData: FormData) {
-  const id = formData.get("id") as string;
-  const title = formData.get("title") as string;
-  const description = formData.get("description") as string;
+    const id = getStringValue(formData, "id");
+    const title = getStringValue(formData, "title");
+    const description = getStringValue(formData, "description");
 
-  await prisma.project.update({
-    where: { id },
-    data: { title, description }
-  });
+    if (!id || !title) throw new Error("ID e título são obrigatórios para atualização.");
 
-  revalidatePath("/projects");
+    await prisma.project.update({
+        where: { id },
+        data: { 
+            title, 
+            description 
+        }
+    });
+
+    revalidatePath("/projects");
 }
 
 export async function deleteProject(projectId: string) {
-  // 1. Deleta todas as tarefas associadas primeiro (Limpeza)
-  await prisma.task.deleteMany({
-    where: { projectId: projectId }
-  });
+    // 1. Deleta todas as tarefas associadas primeiro (Limpeza)
+    await prisma.task.deleteMany({
+        where: { projectId: projectId }
+    });
 
-  // 2. Deleta o projeto pai
-  await prisma.project.delete({
-    where: { id: projectId }
-  });
+    // 2. Deleta o projeto pai
+    await prisma.project.delete({
+        where: { id: projectId }
+    });
 
-  revalidatePath("/projects");
+    revalidatePath("/projects");
 }
 
 
@@ -51,56 +76,64 @@ export async function deleteProject(projectId: string) {
 // =========================================================
 
 export async function createTask(formData: FormData) {
-  const title = formData.get("title") as string;
-  const projectId = formData.get("projectId") as string || null;
-  const priority = formData.get("priority") as string || "MEDIUM";
-  const dateStr = formData.get("dueDate") as string;
-  const image = formData.get("image") as string; 
+    const title = getStringValue(formData, "title");
+    const projectId = getStringValue(formData, "projectId");
+    // Usamos || "MEDIUM" para fallback do valor enum, mas o helper garante que é string ou null
+    const priority = getStringValue(formData, "priority") || "MEDIUM"; 
+    const dateStr = getStringValue(formData, "dueDate");
+    const image = getStringValue(formData, "image"); 
+    
+    if (!title) throw new Error("O título da tarefa é obrigatório.");
 
-  await prisma.task.create({
-    data: {
-      title,
-      priority,
-      image: image || null, 
-      dueDate: dateStr ? new Date(dateStr) : null,
-      projectId: projectId === "inbox" ? null : projectId,
-    },
-  });
+    await prisma.task.create({
+        data: {
+            title,
+            // Castamos para garantir que o Prisma aceite o valor string que pegamos
+            priority: priority as "HIGH" | "MEDIUM" | "LOW", 
+            image, 
+            dueDate: dateStr ? new Date(dateStr) : null,
+            projectId: projectId === "inbox" ? null : projectId,
+        },
+    });
 
-  revalidatePath("/projects");
+    revalidatePath("/projects");
 }
 
 export async function updateTask(formData: FormData) {
-  const id = formData.get("id") as string;
-  const title = formData.get("title") as string;
-  const priority = formData.get("priority") as string;
-  const dateStr = formData.get("dueDate") as string;
-  const image = formData.get("image") as string;
+    const id = getStringValue(formData, "id");
+    const title = getStringValue(formData, "title");
+    const priority = getStringValue(formData, "priority");
+    const dateStr = getStringValue(formData, "dueDate");
+    const image = getStringValue(formData, "image");
 
-  await prisma.task.update({
-    where: { id },
-    data: {
-      title,
-      priority,
-      dueDate: dateStr ? new Date(dateStr) : null,
-      image: image || null 
-    }
-  });
+    if (!id || !title) throw new Error("ID e título são obrigatórios para atualização de tarefa.");
 
-  revalidatePath("/projects");
+    await prisma.task.update({
+        where: { id },
+        data: {
+            title,
+            // Se o campo for nulo (priority === null), passamos undefined para o Prisma
+            // não tocar no campo. Se tiver valor, castamos para o tipo enum.
+            priority: (priority || undefined) as "HIGH" | "MEDIUM" | "LOW" | undefined, 
+            dueDate: dateStr ? new Date(dateStr) : null,
+            image, 
+        }
+    });
+
+    revalidatePath("/projects");
 }
 
 export async function toggleTask(taskId: string, currentStatus: boolean) {
-  await prisma.task.update({
-    where: { id: taskId },
-    data: { isDone: !currentStatus },
-  });
-  revalidatePath("/projects");
+    await prisma.task.update({
+        where: { id: taskId },
+        data: { isDone: !currentStatus },
+    });
+    revalidatePath("/projects");
 }
 
 export async function deleteTask(taskId: string) {
-  await prisma.task.delete({ where: { id: taskId } });
-  revalidatePath("/projects");
+    await prisma.task.delete({ where: { id: taskId } });
+    revalidatePath("/projects");
 }
 
 
@@ -109,52 +142,65 @@ export async function deleteTask(taskId: string) {
 // =========================================================
 
 export async function createJob(formData: FormData) {
-  const company = formData.get("company") as string;
-  const role = formData.get("role") as string;
-  const jobUrl = formData.get("jobUrl") as string;
-  const salary = formData.get("salary") as string;
-  const status = formData.get("status") as string;
-  const requirements = formData.get("requirements") as string;
-  const type = formData.get("type") as string || "JOB"; // Padrão para Vaga
+    const company = getStringValue(formData, "company");
+    const role = getStringValue(formData, "role");
+    const jobUrl = getStringValue(formData, "jobUrl");
+    const salary = getStringValue(formData, "salary");
+    const status = getStringValue(formData, "status") || "APPLIED";
+    const requirements = getStringValue(formData, "requirements");
+    const type = getStringValue(formData, "type") || "JOB"; 
 
-  const user = await prisma.user.findFirst();
+    if (!company || !role) throw new Error("Empresa/Cliente e Cargo/Serviço são obrigatórios.");
 
-  await prisma.jobApplication.create({
-    data: {
-      company,
-      role,
-      jobUrl: jobUrl || null,
-      salary: salary || null,
-      status,
-      requirements: requirements || null,
-      type,
-      userId: user?.id
-    }
-  });
+    const user = await prisma.user.findFirst();
 
-  revalidatePath("/projects");
+    await prisma.jobApplication.create({
+        data: {
+            company,
+            role,
+            jobUrl,
+            salary,
+            // Casts para tipos enum (assumindo que o status/type estão corretos no formulário)
+            status: status as "APPLIED" | "SCREENING" | "INTERVIEW" | "TEST" | "OFFER" | "ACTIVE" | "REJECTED",
+            requirements,
+            type: type as "JOB" | "FREELANCE",
+            userId: user?.id 
+        }
+    });
+
+    revalidatePath("/projects");
 }
 
 export async function updateJob(formData: FormData) {
-  const id = formData.get("id") as string;
-  
-  await prisma.jobApplication.update({
-    where: { id },
-    data: {
-      company: formData.get("company") as string,
-      role: formData.get("role") as string,
-      jobUrl: (formData.get("jobUrl") as string) || null,
-      salary: (formData.get("salary") as string) || null,
-      status: formData.get("status") as string,
-      requirements: (formData.get("requirements") as string) || null,
-      type: formData.get("type") as string
-    }
-  });
+    const id = getStringValue(formData, "id");
+    const company = getStringValue(formData, "company");
+    const role = getStringValue(formData, "role");
+    const jobUrl = getStringValue(formData, "jobUrl");
+    const salary = getStringValue(formData, "salary");
+    const status = getStringValue(formData, "status");
+    const requirements = getStringValue(formData, "requirements");
+    const type = getStringValue(formData, "type");
+    
+    if (!id || !company || !role) throw new Error("Campos chave são obrigatórios para atualização.");
 
-  revalidatePath("/projects");
+    await prisma.jobApplication.update({
+        where: { id },
+        data: {
+            company,
+            role,
+            jobUrl,
+            salary,
+            // Conversão segura com fallback para undefined
+            status: (status || undefined) as "APPLIED" | "SCREENING" | "INTERVIEW" | "TEST" | "OFFER" | "ACTIVE" | "REJECTED" | undefined, 
+            requirements,
+            type: (type || undefined) as "JOB" | "FREELANCE" | undefined
+        }
+    });
+
+    revalidatePath("/projects");
 }
 
 export async function deleteJob(jobId: string) {
-  await prisma.jobApplication.delete({ where: { id: jobId } });
-  revalidatePath("/projects");
+    await prisma.jobApplication.delete({ where: { id: jobId } });
+    revalidatePath("/projects");
 }

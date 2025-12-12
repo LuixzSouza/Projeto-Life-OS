@@ -3,43 +3,106 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea"; 
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Send, Loader2, Bot, User, Sparkles, TrendingUp, Wallet, CheckCircle2 } from "lucide-react";
+import { 
+    Send, 
+    Loader2, 
+    Bot, 
+    User, 
+    Sparkles, 
+    TrendingUp, 
+    Wallet, 
+    CheckCircle2, 
+    ArrowUp,
+    Zap,
+    Cloud,
+    HardDrive,
+    LucideIcon
+} from "lucide-react";
 import { sendMessage } from "@/app/(dashboard)/ai/actions";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
+import { MessageResponse } from "@/types/ai"; // Certifique-se que o tipo MessageResponse no arquivo types/ai.d.ts tenha provider?: string
 
-// ❌ REMOVEMOS AS DECLARAÇÕES DUPLICADAS AQUI (linhas 10-21)
+// Tipo local estendido para garantir o campo provider
+type Message = MessageResponse & { provider?: string | null };
 
-// ✅ IMPORTAMOS O TIPO CENTRAL
-import { MessageResponse, SendMessageResult } from "@/types/ai"; // Certifique-se do caminho correto
+interface ProviderStyle {
+    icon: LucideIcon;
+    color: string;
+    bgColor: string;
+    borderColor: string;
+    label: string;
+}
 
-// Tipo local para mensagem (usado no useState)
-type Message = MessageResponse;
+// --- CONFIGURAÇÃO VISUAL ---
+const PROVIDER_STYLES: Record<string, ProviderStyle> = {
+    ollama: {
+        label: "Ollama",
+        icon: HardDrive, 
+        color: "text-zinc-700 dark:text-zinc-400",
+        bgColor: "bg-zinc-100 dark:bg-zinc-800",
+        borderColor: "border-zinc-200 dark:border-zinc-700"
+    },
+    openai: {
+        label: "GPT-4",
+        icon: Bot, 
+        color: "text-emerald-600 dark:text-emerald-400",
+        bgColor: "bg-emerald-50 dark:bg-emerald-950/40",
+        borderColor: "border-emerald-200 dark:border-emerald-800"
+    },
+    groq: {
+        label: "Groq",
+        icon: Zap, 
+        color: "text-orange-600 dark:text-orange-400",
+        bgColor: "bg-orange-50 dark:bg-orange-950/40",
+        borderColor: "border-orange-200 dark:border-orange-800"
+    },
+    google: {
+        label: "Gemini",
+        icon: Sparkles, 
+        color: "text-blue-600 dark:text-blue-400",
+        bgColor: "bg-blue-50 dark:bg-blue-950/40",
+        borderColor: "border-blue-200 dark:border-blue-800"
+    },
+    // Fallback para mensagens de erro do sistema
+    system: {
+        label: "Sistema",
+        icon: Bot,
+        color: "text-red-600 dark:text-red-400",
+        bgColor: "bg-red-50 dark:bg-red-950/40",
+        borderColor: "border-red-200 dark:border-red-800"
+    }
+};
 
-// Sugestões rápidas baseadas no seu Life OS
 const QUICK_PROMPTS = [
-// ... (array de prompts)
-    { label: "Resumo Financeiro", icon: Wallet, prompt: "Como estão minhas finanças hoje? Tenho gastos recentes?" },
-    { label: "O que priorizar?", icon: CheckCircle2, prompt: "Baseado nas minhas tarefas e prazos, o que devo focar agora?" },
-    { label: "Análise de Saúde", icon: TrendingUp, prompt: "Analise meu último peso e treino. Estou no caminho certo?" },
-    { label: "Planejar o dia", icon: Sparkles, prompt: "Crie um plano para meu dia considerando minha agenda e tarefas." },
+    { label: "Resumo Financeiro", icon: Wallet, prompt: "Como estão minhas finanças hoje? Tenho gastos recentes?", color: "text-emerald-500 bg-emerald-50 dark:bg-emerald-950/30" },
+    { label: "Prioridades do Dia", icon: CheckCircle2, prompt: "Baseado nas minhas tarefas e prazos, o que devo focar agora?", color: "text-blue-500 bg-blue-50 dark:bg-blue-950/30" },
+    { label: "Análise de Saúde", icon: TrendingUp, prompt: "Analise meu último peso e treino. Estou no caminho certo?", color: "text-rose-500 bg-rose-50 dark:bg-rose-950/30" },
+    { label: "Planejar Rotina", icon: Sparkles, prompt: "Crie um plano para meu dia considerando minha agenda e tarefas.", color: "text-amber-500 bg-amber-50 dark:bg-amber-950/30" },
 ];
 
 export function ChatInterface({ 
     initialChatId, 
-    initialMessages = [] 
+    initialMessages = [],
+    provider = "ollama",
+    model
 }: { 
     initialChatId?: string, 
-    initialMessages?: Message[] 
+    initialMessages?: Message[],
+    provider?: string,
+    model?: string
 }) {
     const [messages, setMessages] = useState<Message[]>(initialMessages);
     const [chatId, setChatId] = useState(initialChatId);
     const [input, setInput] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     
+    // Estilo da IA ATUALMENTE SELECIONADA (Para o input e empty state)
+    const currentSelectionStyle = PROVIDER_STYLES[provider] || PROVIDER_STYLES.ollama;
+    const CurrentIcon = currentSelectionStyle.icon;
+
     const scrollRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -64,13 +127,12 @@ export function ChatInterface({
         setIsLoading(true);
 
         try {
-            // ✅ CORREÇÃO AQUI: Não precisamos mais do cast forçado, o TS agora entende o tipo.
             const response = await sendMessage(chatId, text); 
 
             if (response.success && response.message) {
                 setMessages(prev => {
                     const newMessages = prev.filter(msg => msg.id !== tempUserMsg.id);
-                    return [...newMessages, response.message as Message]; // As Message é apenas um cast de tipo.
+                    return [...newMessages, response.message as Message];
                 });
                 
                 if (!chatId && response.chatId) {
@@ -78,13 +140,13 @@ export function ChatInterface({
                     window.history.pushState({}, '', `/ai?id=${response.chatId}`);
                 }
             } else {
-                // Se a IA falhou, adiciona a mensagem de erro no histórico
                 const errorMsg: Message = {
                     id: Date.now().toString() + 'err',
                     chatId: chatId || "temp",
                     role: "assistant",
-                    content: response.error || "Erro desconhecido.",
-                    createdAt: new Date()
+                    content: response.error || "Erro ao processar.",
+                    createdAt: new Date(),
+                    provider: "system"
                 }
                  setMessages(prev => {
                     const newMessages = prev.filter(msg => msg.id !== tempUserMsg.id); 
@@ -92,13 +154,11 @@ export function ChatInterface({
                 });
             }
         } catch (error) {
-            toast.error("Erro de conexão com o servidor.");
+            toast.error("Erro de conexão.");
         } finally {
             setIsLoading(false);
         }
     };
-    
-    // ... (restante do código handleKeyDown e do JSX)
     
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === "Enter" && !e.shiftKey) {
@@ -108,91 +168,123 @@ export function ChatInterface({
     };
 
     return (
-        <div className="flex flex-col h-[calc(100vh-8rem)] bg-white dark:bg-zinc-950 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
+        <div className="flex flex-col h-full bg-white dark:bg-zinc-950 relative overflow-hidden">
             
-            {/* --- ÁREA DE MENSAGENS --- */}
-            <div className="flex-1 overflow-y-auto p-4 md:p-6">
-                <div className="flex flex-col gap-6 max-w-3xl mx-auto pb-4">
+            {/* MARCA D'ÁGUA (Da IA Selecionada no Momento) */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">
+                <CurrentIcon 
+                    className={cn(
+                        "w-[400px] h-[400px] opacity-[0.03] dark:opacity-[0.02] -rotate-12 transition-colors duration-700", 
+                        currentSelectionStyle.color
+                    )} 
+                />
+            </div>
+
+            {/* ÁREA DE MENSAGENS */}
+            <div className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth z-10">
+                <div className="flex flex-col gap-8 max-w-3xl mx-auto pb-4">
                     
-                    {/* Empty State (Boas vindas) */}
+                    {/* Empty State */}
                     {messages.length === 0 && (
-                        <div className="flex flex-col items-center justify-center py-20 text-center space-y-6">
-                            <div className="bg-indigo-100 dark:bg-indigo-900/30 p-4 rounded-full">
-                                <Sparkles className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
+                        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center space-y-8 animate-in fade-in zoom-in-95 duration-500">
+                            <div className="relative">
+                                <div className={cn("absolute inset-0 blur-3xl opacity-20 rounded-full animate-pulse", currentSelectionStyle.bgColor.replace("bg-", "bg-"))}></div>
+                                <div className={cn("p-6 rounded-3xl shadow-xl ring-1 relative transition-colors duration-500", currentSelectionStyle.bgColor, currentSelectionStyle.borderColor)}>
+                                    <CurrentIcon className={cn("h-10 w-10", currentSelectionStyle.color)} />
+                                </div>
                             </div>
-                            <div>
-                                <h3 className="text-xl font-bold text-zinc-800 dark:text-zinc-100">Life OS Intelligence</h3>
-                                <p className="text-zinc-500 mt-2 max-w-md mx-auto">
-                                    Conectado ao seu financeiro, tarefas e saúde. Como posso ajudar a otimizar sua vida hoje?
+                            <div className="space-y-2 max-w-md">
+                                <h3 className="text-2xl font-bold text-zinc-900 dark:text-white">Olá, Luiz.</h3>
+                                <p className="text-zinc-500 dark:text-zinc-400 leading-relaxed">
+                                    Estou usando o cérebro <span className={cn("font-bold", currentSelectionStyle.color)}>{currentSelectionStyle.label}</span>.
                                 </p>
                             </div>
-                            
-                            {/* Grid de Sugestões */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full max-w-lg">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-2xl">
                                 {QUICK_PROMPTS.map((item, idx) => (
-                                    <button
-                                        key={idx}
-                                        onClick={() => handleSend(item.prompt)}
-                                        className="flex items-center gap-3 p-3 text-left text-sm bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-all group"
-                                    >
-                                        <div className="p-2 bg-white dark:bg-zinc-800 rounded-lg group-hover:text-indigo-600">
-                                            <item.icon className="h-4 w-4" />
-                                        </div>
-                                        <span className="text-zinc-700 dark:text-zinc-300 group-hover:text-indigo-700 dark:group-hover:text-indigo-300 font-medium">
-                                            {item.label}
-                                        </span>
+                                    <button key={idx} onClick={() => handleSend(item.prompt)} className="flex flex-col items-start gap-3 p-4 text-left text-sm bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl hover:border-indigo-500/50 hover:shadow-md hover:scale-[1.02] transition-all group">
+                                        <div className={cn("p-2 rounded-lg", item.color)}><item.icon className="h-4 w-4" /></div>
+                                        <span className="text-zinc-600 dark:text-zinc-300 font-medium">{item.label}</span>
                                     </button>
                                 ))}
                             </div>
                         </div>
                     )}
 
-                    {/* Lista de Mensagens */}
-                    {messages.map((msg) => (
-                        <div 
-                            key={msg.id} 
-                            className={cn(
-                                "flex gap-4 w-full animate-in fade-in slide-in-from-bottom-2",
-                                msg.role === "user" ? "flex-row-reverse" : "flex-row"
-                            )}
-                        >
-                            {/* Avatar */}
-                            <Avatar className={cn("h-8 w-8 border", msg.role === "assistant" ? "bg-indigo-600 border-indigo-600" : "bg-zinc-200 border-zinc-200")}>
-                                {msg.role === "assistant" ? (
-                                    <AvatarFallback className="bg-indigo-600 text-white"><Bot className="h-4 w-4" /></AvatarFallback>
-                                ) : (
-                                    <AvatarFallback><User className="h-4 w-4 text-zinc-600" /></AvatarFallback>
-                                )}
-                            </Avatar>
+                    {/* LISTA DE MENSAGENS (Renderização Inteligente) */}
+                    {messages.map((msg) => {
+                        // ✅ LÓGICA MÁGICA:
+                        // Se a mensagem tem um 'provider' salvo no banco, usa o estilo dele.
+                        // Se for uma mensagem antiga (sem provider) ou do usuário, usa o padrão/atual.
+                        const msgProvider = msg.provider || "ollama"; 
+                        const style = PROVIDER_STYLES[msgProvider] || PROVIDER_STYLES.ollama;
+                        const MsgIcon = style.icon;
 
-                            {/* Balão de Texto */}
-                            <div className={cn(
-                                "flex flex-col max-w-[85%] md:max-w-[75%] rounded-2xl px-5 py-3 shadow-sm text-sm leading-relaxed",
-                                msg.role === "user" 
-                                    ? "bg-indigo-600 text-white rounded-tr-none" 
-                                    : "bg-zinc-100 dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 rounded-tl-none border border-zinc-200 dark:border-zinc-800"
-                            )}>
-                                {msg.role === "assistant" ? (
-                                    <div className="prose prose-sm dark:prose-invert max-w-none">
-                                        <ReactMarkdown>{msg.content}</ReactMarkdown>
-                                    </div>
-                                ) : (
-                                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                        return (
+                            <div 
+                                key={msg.id} 
+                                className={cn(
+                                    "flex gap-4 w-full group animate-in fade-in slide-in-from-bottom-4 duration-300 relative",
+                                    msg.role === "user" ? "flex-row-reverse" : "flex-row"
                                 )}
+                            >
+                                {/* Avatar */}
+                                <Avatar className={cn(
+                                    "h-9 w-9 border shadow-sm mt-1 shrink-0 transition-colors duration-300", 
+                                    msg.role === "assistant" 
+                                        ? cn(style.bgColor, style.borderColor) // Usa a cor DAQUELA mensagem
+                                        : "bg-white dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700"
+                                )}>
+                                    {msg.role === "assistant" ? (
+                                        <AvatarFallback className={cn("bg-transparent", style.color)}>
+                                            <MsgIcon className="h-5 w-5" />
+                                        </AvatarFallback>
+                                    ) : (
+                                        <AvatarFallback><User className="h-5 w-5 text-zinc-600 dark:text-zinc-400" /></AvatarFallback>
+                                    )}
+                                </Avatar>
+
+                                {/* Balão */}
+                                <div className={cn(
+                                    "flex flex-col max-w-[85%] md:max-w-[75%] rounded-2xl px-5 py-3.5 shadow-sm text-[15px] leading-7 transition-colors duration-300",
+                                    msg.role === "user" 
+                                        ? "bg-zinc-900 dark:bg-white text-white dark:text-black rounded-tr-none" 
+                                        : "bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-200 rounded-tl-none border border-zinc-200 dark:border-zinc-800"
+                                )}>
+                                    {msg.role === "assistant" ? (
+                                        <div className={cn(
+                                            "prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-2 prose-li:my-0.5 prose-strong:text-zinc-900 dark:prose-strong:text-white",
+                                            // Títulos com a cor da IA específica
+                                            `prose-headings:${style.color.split(" ")[0]} dark:prose-headings:${style.color.split(" ")[1]}`
+                                        )}>
+                                            <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                            
+                                            {/* Tag discreta mostrando quem gerou a msg (Opcional, mas útil) */}
+                                            <div className="mt-2 flex items-center justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <span className={cn("text-[10px] uppercase font-bold tracking-widest flex items-center gap-1", style.color)}>
+                                                    <MsgIcon className="h-3 w-3" /> {style.label}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
 
-                    {/* Loading Indicator */}
+                    {/* Loading Indicator (Usa o estilo da IA ATUALMENTE SELECIONADA) */}
                     {isLoading && (
                         <div className="flex gap-4 w-full animate-in fade-in">
-                            <Avatar className="h-8 w-8 border bg-indigo-600 border-indigo-600">
-                                <AvatarFallback className="bg-indigo-600 text-white"><Bot className="h-4 w-4" /></AvatarFallback>
+                            <Avatar className={cn("h-9 w-9 border shadow-sm mt-1", currentSelectionStyle.bgColor, currentSelectionStyle.borderColor)}>
+                                <AvatarFallback className={cn("bg-transparent", currentSelectionStyle.color)}>
+                                    <CurrentIcon className="h-5 w-5 animate-pulse" />
+                                </AvatarFallback>
                             </Avatar>
-                            <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 px-4 py-3 rounded-2xl rounded-tl-none border border-zinc-200 dark:border-zinc-800">
-                                <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                                <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                                <span className="w-1.5 h-1.5 bg-zinc-400 rounded-full animate-bounce"></span>
+                            <div className="flex items-center gap-1.5 bg-white dark:bg-zinc-900 px-5 py-4 rounded-2xl rounded-tl-none border border-zinc-200 dark:border-zinc-800 shadow-sm w-fit">
+                                <span className={cn("w-2 h-2 rounded-full animate-bounce [animation-delay:-0.3s]", currentSelectionStyle.color.split(" ")[0].replace("text-", "bg-"))}></span>
+                                <span className={cn("w-2 h-2 rounded-full animate-bounce [animation-delay:-0.15s]", currentSelectionStyle.color.split(" ")[0].replace("text-", "bg-"))}></span>
+                                <span className={cn("w-2 h-2 rounded-full animate-bounce", currentSelectionStyle.color.split(" ")[0].replace("text-", "bg-"))}></span>
                             </div>
                         </div>
                     )}
@@ -202,32 +294,49 @@ export function ChatInterface({
             </div>
 
             {/* --- INPUT AREA --- */}
-            <div className="p-4 bg-white dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-800">
-                <div className="max-w-3xl mx-auto relative flex items-end gap-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-2 shadow-sm focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all">
-                    <Textarea 
-                        placeholder="Pergunte sobre suas finanças, tarefas ou saúde..." 
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        disabled={isLoading}
-                        className="flex-1 min-h-[44px] max-h-[120px] bg-transparent border-0 focus-visible:ring-0 resize-none py-2.5 text-sm"
-                        rows={1}
-                    />
-                    <Button 
-                        size="icon" 
-                        onClick={() => handleSend(input)}
-                        disabled={isLoading || !input.trim()}
-                        className={cn(
-                            "h-9 w-9 mb-0.5 transition-all shrink-0",
-                            input.trim() ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-md" : "bg-zinc-200 text-zinc-400 dark:bg-zinc-800"
-                        )}
-                    >
-                        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                    </Button>
+            <div className="p-4 bg-gradient-to-t from-white via-white to-transparent dark:from-black dark:via-black dark:to-transparent pt-10 z-20">
+                <div className="max-w-3xl mx-auto relative">
+                    <div className="flex justify-center mb-2">
+                        <span className={cn(
+                            "text-[10px] uppercase font-bold tracking-widest px-3 py-1 rounded-full border bg-white/80 dark:bg-black/80 backdrop-blur shadow-sm transition-colors duration-500 flex items-center gap-1.5",
+                            currentSelectionStyle.color,
+                            currentSelectionStyle.borderColor
+                        )}>
+                            <CurrentIcon className="w-3 h-3" />
+                            {currentSelectionStyle.label}
+                        </span>
+                    </div>
+
+                    <div className={cn(
+                        "flex items-end gap-2 bg-white dark:bg-zinc-900 border rounded-2xl p-2 shadow-lg shadow-zinc-200/50 dark:shadow-black/50 transition-all",
+                        "focus-within:ring-2 focus-within:ring-opacity-30",
+                        currentSelectionStyle.borderColor,
+                        `focus-within:ring-${currentSelectionStyle.color.split("-")[1]}-500`
+                    )}>
+                        <Textarea 
+                            placeholder={`Pergunte ao ${currentSelectionStyle.label.split(" ")[0]}...`} 
+                            value={input}
+                            onChange={(e) => setInput(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            disabled={isLoading}
+                            className="flex-1 min-h-[48px] max-h-[160px] bg-transparent border-0 focus-visible:ring-0 resize-none py-3 px-3 text-base text-zinc-800 dark:text-zinc-200 placeholder:text-zinc-400"
+                            rows={1}
+                        />
+                        <Button 
+                            size="icon" 
+                            onClick={() => handleSend(input)}
+                            disabled={isLoading || !input.trim()}
+                            className={cn(
+                                "h-10 w-10 mb-1 rounded-xl transition-all shrink-0",
+                                input.trim() 
+                                    ? "bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:text-black dark:hover:bg-zinc-200 shadow-md hover:scale-105" 
+                                    : "bg-zinc-100 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-600 cursor-not-allowed"
+                            )}
+                        >
+                            {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowUp className="h-5 w-5" />}
+                        </Button>
+                    </div>
                 </div>
-                <p className="text-center text-[10px] text-zinc-400 mt-2">
-                    A IA tem acesso aos seus dados do Life OS para fornecer respostas personalizadas.
-                </p>
             </div>
         </div>
     );

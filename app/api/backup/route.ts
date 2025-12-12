@@ -3,55 +3,79 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    // 1. Coleta TODOS os dados do sistema
+    // 1. Busca TUDO do banco de dados
+    // Usamos Promise.all para buscar tabelas independentes em paralelo
+    const [
+      user,
+      settings,
+      accounts,
+      projects,
+      tasksWithoutProject,
+      jobApplications,
+      studySubjects,
+      flashcardDecks,
+      workouts,
+      healthMetrics,
+      events,
+      sites,
+      accessItems,
+      aiMessages
+    ] = await Promise.all([
+      prisma.user.findFirst(),
+      prisma.settings.findFirst(),
+      prisma.account.findMany({ include: { transactions: true } }), // Inclui transações dentro das contas
+      prisma.project.findMany({ include: { tasks: true, events: true } }), // Inclui tarefas e eventos do projeto
+      prisma.task.findMany({ where: { projectId: null } }), // Tarefas soltas (Inbox)
+      prisma.jobApplication.findMany(),
+      prisma.studySubject.findMany({ include: { sessions: true } }), // Inclui sessões de estudo
+      prisma.flashcardDeck.findMany({ include: { cards: true } }), // Inclui flashcards
+      prisma.workout.findMany(),
+      prisma.healthMetric.findMany(),
+      prisma.event.findMany({ where: { projectId: null } }), // Eventos soltos (sem projeto)
+      prisma.managedSite.findMany({ include: { pages: true } }), // CMS
+      prisma.accessItem.findMany(),
+      prisma.aiMessage.findMany({ take: 100, orderBy: { createdAt: 'desc' } }) // Últimas 100 msgs de IA (opcional)
+    ]);
+
+    // 2. Monta o objeto de Backup
     const backupData = {
       meta: {
+        system: "Life OS",
         version: "1.0",
-        exportedAt: new Date().toISOString(),
-        system: "Life OS"
+        date: new Date().toISOString(),
       },
-      user: await prisma.user.findFirst(),
-      settings: await prisma.settings.findFirst(),
-      
-      // Módulo Financeiro
-      accounts: await prisma.account.findMany({ include: { transactions: true } }),
-      
-      // Módulo Estudos
-      studySubjects: await prisma.studySubject.findMany({ include: { sessions: true } }),
-      
-      // Módulo Projetos
-      projects: await prisma.project.findMany({ include: { tasks: true } }),
-      tasksWithoutProject: await prisma.task.findMany({ where: { projectId: null } }),
-      
-      // Módulo Saúde
-      workouts: await prisma.workout.findMany(),
-      healthMetrics: await prisma.healthMetric.findMany(),
-      
-      // Módulo Agenda
-      events: await prisma.event.findMany(),
-      
-      // Módulo CMS
-      sites: await prisma.managedSite.findMany({ include: { pages: true } }),
-      
-      // Módulo IA
-      chats: await prisma.aiChat.findMany({ include: { messages: true } }),
+      user,
+      settings,
+      accounts,
+      projects,
+      tasksWithoutProject,
+      jobApplications,
+      studySubjects,
+      flashcardDecks,
+      workouts,
+      healthMetrics,
+      events, // Eventos que não estão dentro de projetos
+      sites, // ManagedSite
+      accessItems,
+      aiMessages: aiMessages.reverse() // Reordena cronologicamente
     };
 
-    // 2. Cria o nome do arquivo com a data de hoje (ex: life-os-backup-2025-10-10.json)
-    const date = new Date().toISOString().split("T")[0];
-    const filename = `life-os-backup-${date}.json`;
+    // 3. Prepara a resposta como arquivo JSON para download
+    const json = JSON.stringify(backupData, null, 2); // Identação bonita
 
-    // 3. Retorna como Download
-    return new NextResponse(JSON.stringify(backupData, null, 2), {
+    return new NextResponse(json, {
       status: 200,
       headers: {
-        "Content-Type": "application/json",
-        "Content-Disposition": `attachment; filename="${filename}"`,
+        'Content-Type': 'application/json',
+        'Content-Disposition': `attachment; filename="life-os-backup-${new Date().toISOString().split('T')[0]}.json"`,
       },
     });
 
   } catch (error) {
-    console.error("Erro no backup:", error);
-    return NextResponse.json({ error: "Falha ao gerar backup" }, { status: 500 });
+    console.error("Erro ao gerar backup:", error);
+    return NextResponse.json(
+      { error: "Falha ao gerar arquivo de backup." },
+      { status: 500 }
+    );
   }
 }

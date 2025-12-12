@@ -3,21 +3,24 @@ import { getStorageStats } from "./actions";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, Database, Upload, Shield, BrainCircuit, User, Palette } from "lucide-react";
+import { Download, Database, Upload, Shield, BrainCircuit, User } from "lucide-react";
 import Link from "next/link";
 
 // Componentes
 import { AppearanceLoader } from "@/components/settings/appearance-loader";
 import { RestoreBackupForm, FactoryResetButton } from "@/components/settings/settings-actions";
-import { StorageAnalytics, AIConfigForm, SecurityForm } from "@/components/settings/settings-ui";
+// Importar os novos formulários refatorados
+import { StorageAnalytics, AIConfigForm, SecurityForm } from "@/components/settings/settings-forms"; 
 
 export default async function SettingsPage() {
   const user = await prisma.user.findFirst();
   const settings = await prisma.settings.findFirst();
+  
+  // Buscar estatísticas (Assumindo que a action retorna o formato correto para o novo componente)
   const stats = await getStorageStats();
 
   return (
-    <div className="min-h-screen bg-gray-50/30 dark:bg-black p-6 md:p-10 space-y-8">
+    <div className="min-h-screen bg-zinc-50/30 dark:bg-black p-6 md:p-10 space-y-8">
       
       {/* HEADER */}
       <div className="flex flex-col gap-1 pb-6 border-b border-zinc-200 dark:border-zinc-800">
@@ -72,7 +75,7 @@ export default async function SettingsPage() {
                                 initialColor={settings?.accentColor} 
                                 userName={user?.name} 
                                 userEmail={user?.email} 
-                                userAvatar={user?.avatarUrl} // Passando a URL da foto
+                                userAvatar={user?.avatarUrl} 
                                 userBio={user?.bio}          
                             />
                         </CardContent>
@@ -91,6 +94,7 @@ export default async function SettingsPage() {
                 <div className="md:col-span-8">
                     <Card className="border-0 shadow-sm bg-white dark:bg-zinc-900 ring-1 ring-zinc-200 dark:ring-zinc-800">
                         <CardContent className="p-6">
+                            {/* Novo Form Refatorado */}
                             <AIConfigForm settings={settings} />
                         </CardContent>
                     </Card>
@@ -107,11 +111,8 @@ export default async function SettingsPage() {
                     <p className="text-sm text-zinc-500">Visão geral do uso do banco de dados.</p>
                 </div>
                 <div className="md:col-span-8">
-                    <Card className="border-0 shadow-sm bg-white dark:bg-zinc-900 ring-1 ring-zinc-200 dark:ring-zinc-800">
-                        <CardContent className="p-6">
-                            <StorageAnalytics stats={stats} />
-                        </CardContent>
-                    </Card>
+                    {/* Novo Componente Visual de Storage */}
+                    <StorageAnalytics stats={stats} />
                 </div>
             </div>
 
@@ -167,11 +168,8 @@ export default async function SettingsPage() {
                     <p className="text-sm text-zinc-500">Altere sua senha mestre.</p>
                 </div>
                 <div className="md:col-span-8">
-                    <Card className="border-0 shadow-sm bg-white dark:bg-zinc-900 ring-1 ring-zinc-200 dark:ring-zinc-800">
-                        <CardContent className="p-6">
-                            <SecurityForm />
-                        </CardContent>
-                    </Card>
+                    {/* Novo Form Refatorado */}
+                    <SecurityForm />
                 </div>
             </div>
         </TabsContent>
