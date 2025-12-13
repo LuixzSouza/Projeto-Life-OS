@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation"; // Removido useRouter, pois a action fará o redirect
+import { signOut } from "@/app/auth-actions"; // ✅ Importar a action de logout
 import { 
   LayoutDashboard, 
   Wallet, 
@@ -18,21 +19,22 @@ import {
   Zap,
   Battery,
   BatteryLow,
-  Plus,
   PanelLeftClose,
   PanelLeftOpen,
   ChevronRight,
-  Bookmark, // ✅ Ícone melhor para "Favoritos"
+  Bookmark, 
   Film,
   Users,
-  Shirt,     // ✅ Novo ícone para Entretenimento
+  Shirt,
+  Loader2,    
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { toast } from "sonner"; // Opcional: Feedback visual
 
-// Lista atualizada com Entretenimento e ícones melhores
+// Lista atualizada
 const sidebarItems = [
   { label: "Visão Geral", icon: LayoutDashboard, href: "/dashboard" },
   { label: "Agenda", icon: Calendar, href: "/agenda" },
@@ -41,9 +43,9 @@ const sidebarItems = [
   { label: "Financeiro", icon: Wallet, href: "/finance" },
   { label: "Saúde", icon: Dumbbell, href: "/health" },
   { label: "Estudos", icon: BookOpen, href: "/studies" },
-  { label: "Entretenimento", icon: Film, href: "/entertainment" }, // ✅ Nova Funcionalidade
+  { label: "Entretenimento", icon: Film, href: "/entertainment" }, 
   { label: "Sites & CMS", icon: Globe, href: "/cms" },
-  { label: "Links & Apps", icon: Bookmark, href: "/links" }, // ✅ Ícone Bookmark (Favoritos)
+  { label: "Links & Apps", icon: Bookmark, href: "/links" }, 
   { label: "Acessos", icon: Lock, href: "/access" },
   { label: "Conexões", icon: Users, href: "/social" },
   { label: "Closet", icon: Shirt, href: "/wardrobe" },
@@ -60,7 +62,6 @@ interface SidebarProps {
 
 export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [energyLevel, setEnergyLevel] = useState<"high" | "medium" | "low">("high");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -79,11 +80,19 @@ export function Sidebar({ user }: SidebarProps) {
       }
   };
 
-  const handleLogout = (e: React.MouseEvent) => {
+  const handleLogout = async (e: React.MouseEvent) => {
       e.preventDefault();
       if (isLoggingOut) return;
+      
       setIsLoggingOut(true);
-      setTimeout(() => router.push("/"), 1000);
+      toast.info("Desconectando..."); // Feedback visual rápido
+
+      try {
+          await signOut(); // ✅ Chama a Server Action que apaga o cookie e redireciona
+      } catch (error) {
+          toast.error("Erro ao sair.");
+          setIsLoggingOut(false);
+      }
   };
 
   const EnergyStatus = getEnergyIcon();
@@ -138,7 +147,7 @@ export function Sidebar({ user }: SidebarProps) {
       <div className="flex-1 overflow-y-auto py-6 px-3 scrollbar-thin scrollbar-thumb-zinc-200 dark:scrollbar-thumb-zinc-800 scrollbar-track-transparent">
         <nav className="space-y-1">
           {sidebarItems.map((item) => {
-            const isActive = pathname.startsWith(item.href); // Melhoria: startsWith para sub-rotas
+            const isActive = pathname.startsWith(item.href); 
             
             const LinkContent = (
               <Link
@@ -223,15 +232,15 @@ export function Sidebar({ user }: SidebarProps) {
                 <Tooltip delayDuration={500}>
                     <TooltipTrigger asChild>
                         <button 
-                            onClick={handleLogout} 
+                            onClick={handleLogout} // ✅ Agora chama a função que executa a action
                             disabled={isLoggingOut}
                             className={cn(
-                                "text-zinc-400 hover:text-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center",
-                                isCollapsed ? "p-2" : "gap-1.5 text-[10px]"
+                                "text-zinc-400 hover:text-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center w-full justify-center hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg",
+                                isCollapsed ? "p-2" : "gap-1.5 text-[10px] py-2"
                             )}
                         >
-                            <LogOut className={cn("transition-transform group-hover:-translate-x-1", isCollapsed ? "h-5 w-5" : "h-3 w-3")} />
-                            {!isCollapsed && (isLoggingOut ? "Saindo..." : "Sair")}
+                            {isLoggingOut ? <Loader2 className="animate-spin h-3 w-3" /> : <LogOut className={cn("transition-transform group-hover:-translate-x-1", isCollapsed ? "h-5 w-5" : "h-3 w-3")} />}
+                            {!isCollapsed && (isLoggingOut ? "Saindo..." : "Encerrar Sessão")}
                         </button>
                     </TooltipTrigger>
                     {isCollapsed && <TooltipContent side="right">Sair do Sistema</TooltipContent>}

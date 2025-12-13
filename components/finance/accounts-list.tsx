@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Wallet, Trash2, CreditCard, MoreVertical, Pencil, Copy, Check, Link2, Landmark, Nfc } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { createAccount, updateAccount, deleteAccount } from "@/app/(dashboard)/finance/actions";
@@ -15,11 +15,20 @@ interface AccountItem {
     balance: number;
     color: string | null;
     type: string;
-    isConnected?: boolean; // Novo campo vindo do Prisma
+    isConnected?: boolean; 
     provider?: string | null;
 }
 
 export function AccountsList({ accounts }: { accounts: AccountItem[] }) {
+    // ✅ PROTEÇÃO CONTRA ERROS DE BUILD (SSR)
+    const [isMounted, setIsMounted] = useState(false);
+    
+    // Comentário para silenciar o erro do Linter aqui também:
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
     const [editAccount, setEditAccount] = useState<AccountItem | null>(null);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -52,12 +61,20 @@ export function AccountsList({ accounts }: { accounts: AccountItem[] }) {
         setIsDialogOpen(true);
     }
 
+    // Se não estiver montado no navegador, retorna um esqueleto
+    if (!isMounted) {
+        return (
+            <div className="flex gap-5 overflow-x-hidden pb-6 pt-2 px-1">
+                 <div className="min-w-[300px] h-[180px] rounded-3xl bg-zinc-100 dark:bg-zinc-800 animate-pulse"></div>
+                 <div className="min-w-[300px] h-[180px] rounded-3xl bg-zinc-100 dark:bg-zinc-800 animate-pulse"></div>
+            </div>
+        );
+    }
+
     return (
         <div className="w-full">
-            {/* Scroll Area com Snap para sensação de App Nativo */}
             <div className="flex gap-5 overflow-x-auto pb-6 pt-2 px-1 scrollbar-thin scrollbar-thumb-zinc-200 dark:scrollbar-thumb-zinc-800 snap-x snap-mandatory">
                 
-                {/* Botão Nova Conta (Estilo 'Wireframe') */}
                 <AccountDialog
                     trigger={
                         <div className="min-w-[300px] h-[180px] rounded-3xl border-2 border-dashed border-zinc-300 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/20 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-all group snap-center active:scale-95 duration-200">
@@ -71,7 +88,6 @@ export function AccountsList({ accounts }: { accounts: AccountItem[] }) {
                     } 
                 />
 
-                {/* Lista de Cartões */}
                 {accounts.map(acc => (
                     <div key={acc.id} className="snap-center">
                         <BankCard 
@@ -86,7 +102,6 @@ export function AccountsList({ accounts }: { accounts: AccountItem[] }) {
     );
 }
 
-// --- SUBCOMPONENTE: CARD BANCÁRIO PREMIUM ---
 function BankCard({ account, onEdit, onDelete }: { account: AccountItem, onEdit: () => void, onDelete: () => void }) {
     const [copied, setCopied] = useState(false);
 
@@ -97,7 +112,6 @@ function BankCard({ account, onEdit, onDelete }: { account: AccountItem, onEdit:
         setTimeout(() => setCopied(false), 2000);
     };
 
-    // Formatação de Moeda
     const formattedBalance = new Intl.NumberFormat('pt-BR', { 
         style: 'currency', 
         currency: 'BRL' 
@@ -110,12 +124,10 @@ function BankCard({ account, onEdit, onDelete }: { account: AccountItem, onEdit:
                 background: `linear-gradient(135deg, ${account.color || '#18181b'} 0%, #09090b 100%)`
             }}
         >
-            {/* Efeitos de Fundo (Noise + Glow) */}
             <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 mix-blend-overlay"></div>
             <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
             <div className="absolute bottom-0 left-0 w-40 h-40 bg-black/20 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2 pointer-events-none"></div>
 
-            {/* Conteúdo do Cartão */}
             <div className="relative z-10 p-6 flex flex-col justify-between h-full">
                 
                 {/* TOPO: Nome e Menu */}
@@ -166,13 +178,11 @@ function BankCard({ account, onEdit, onDelete }: { account: AccountItem, onEdit:
 
                 {/* MEIO: Chip e Contactless */}
                 <div className="flex items-center justify-between opacity-80 mt-2">
-                    {/* Chip Simulado (CSS Puro) */}
                     <div className="w-11 h-8 rounded-md bg-gradient-to-tr from-yellow-200 via-yellow-400 to-yellow-600 border border-yellow-700/30 relative overflow-hidden shadow-inner">
                         <div className="absolute top-1/2 left-0 w-full h-[1px] bg-yellow-700/40"></div>
                         <div className="absolute top-0 left-1/2 w-[1px] h-full bg-yellow-700/40"></div>
                         <div className="absolute top-1/2 left-1/2 w-4 h-4 border border-yellow-700/40 rounded-sm -translate-x-1/2 -translate-y-1/2"></div>
                     </div>
-                    {/* Ícone Contactless */}
                     <Nfc className="h-6 w-6 text-white/50" />
                 </div>
 

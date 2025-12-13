@@ -3,9 +3,11 @@ import { NextResponse } from "next/server";
 
 export async function GET(
   request: Request,
-  { params }: { params: { apiKey: string; slug: string } }
+  // MUDANÇA 1: O tipo agora é uma Promise
+  { params }: { params: Promise<{ apiKey: string; slug: string }> }
 ) {
-  const { apiKey, slug } = params;
+  // MUDANÇA 2: Precisamos aguardar (await) os parâmetros antes de usar
+  const { apiKey, slug } = await params;
 
   // 1. Valida se o site existe pela API Key
   const site = await prisma.managedSite.findUnique({

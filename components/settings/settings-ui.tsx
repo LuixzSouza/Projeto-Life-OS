@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { updateAISettings, changePassword } from "@/app/(dashboard)/settings/actions";
@@ -19,7 +18,6 @@ interface StatItem {
     count: number;
     percent: number;
     color: string;
-    icon: string; // Lucide icon type
 }
 
 interface StorageStats {
@@ -120,7 +118,7 @@ export function AIConfigForm({ settings }: { settings: Settings | null }) {
                             id="apiKey"
                             type="password"
                             placeholder="sk-..." 
-                            disabled // Placeholder logic
+                            disabled // Placeholder logic since we don't save API keys in this demo form directly yet
                             className="bg-zinc-50/50 dark:bg-zinc-900/50 border-zinc-200 dark:border-zinc-800 opacity-50 cursor-not-allowed"
                         />
                          <p className="text-[11px] text-zinc-400">Gerenciado via variáveis de ambiente (.env).</p>

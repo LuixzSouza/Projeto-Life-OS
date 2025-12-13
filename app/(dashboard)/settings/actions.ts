@@ -2,6 +2,10 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import fs from 'fs';
+import path from 'path';
+import { getDatabasePath, setDatabasePath } from "@/lib/db-config";
+import os from 'os';
 // Importamos os tipos do Prisma para compor nossa interface de Backup
 import { 
   Project, 
@@ -524,6 +528,7 @@ export async function updateSettings(formData: FormData) {
     const bio = formData.get("bio") as string;
     const avatarUrl = formData.get("avatarUrl") as string;
     const accentColor = formData.get("accentColor") as string;
+    const coverUrl = formData.get("coverUrl") as string
 
     const user = await prisma.user.findFirst();
     const settings = await prisma.settings.findFirst();
@@ -531,7 +536,7 @@ export async function updateSettings(formData: FormData) {
     if (user) {
         await prisma.user.update({
             where: { id: user.id },
-            data: { name, email, bio, avatarUrl }
+            data: { name, email, bio, avatarUrl, coverUrl: coverUrl, }
         });
     } else {
         // Fallback create se não existir user (incomum mas possível em dev)
@@ -553,4 +558,109 @@ export async function updateSettings(formData: FormData) {
 
     revalidatePath("/settings");
     return { success: true };
+}
+
+// ============================================================================
+// 7. GERENCIAMENTO DE ARMAZENAMENTO (MOVER BANCO)
+// ============================================================================
+export async function updateStoragePath(formData: FormData) {
+  const newPathRaw = formData.get("storagePath") as string;
+  
+  if (!newPathRaw) throw new Error("Caminho inválido.");
+
+  // Normaliza o caminho
+  let newDbPath = path.normalize(newPathRaw);
+  
+  // Se o usuário digitou apenas uma pasta (ex: D:/LifeOS), adicionamos o arquivo
+  if (!newDbPath.endsWith(".db")) {
+    newDbPath = path.join(newDbPath, "life_os.db");
+  }
+
+  const currentDbPath = getDatabasePath();
+
+  // Se for o mesmo caminho, não faz nada
+  if (currentDbPath === newDbPath) return;
+
+  try {
+    // 1. Garante que a pasta de destino existe
+    const targetDir = path.dirname(newDbPath);
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+
+    // 2. Copia o banco atual para o novo local
+    if (fs.existsSync(currentDbPath)) {
+        fs.copyFileSync(currentDbPath, newDbPath);
+        console.log(`✅ Banco copiado de ${currentDbPath} para ${newDbPath}`);
+    } else {
+        console.log("ℹ️ Nenhum banco anterior encontrado. Um novo será criado.");
+    }
+
+    // 3. Atualiza o arquivo JSON de configuração
+    setDatabasePath(newDbPath);
+    
+    // 4. Salva no banco SQL para o monitoramento de disco (Dashboard)
+    // O erro sumirá após rodar 'npx prisma generate'
+    const settings = await prisma.settings.findFirst();
+    
+    if (settings) {
+        await prisma.settings.update({
+            where: { id: settings.id },
+            data: { storagePath: targetDir } // Salva a pasta, não o arquivo
+        });
+    } else {
+        // Fallback caso não exista settings ainda
+        await prisma.settings.create({
+            data: { storagePath: targetDir }
+        });
+    }
+
+    return { success: true, message: "Local alterado! Reinicie o aplicativo." };
+
+  } catch (error) {
+    console.error("Erro ao mover banco:", error);
+    throw new Error("Falha ao mover o arquivo. Verifique permissões da pasta.");
+  }
+}
+
+export async function listDirectories(currentPath: string) {
+  try {
+    // Lógica para detectar Discos no Windows quando o caminho for "ROOT"
+    if (currentPath === "ROOT" && os.platform() === 'win32') {
+        const drives = [];
+        // Verifica letras de A a Z
+        for (let i = 65; i <= 90; i++) {
+            const drive = String.fromCharCode(i) + ":\\";
+            try {
+                fs.accessSync(drive); // Testa se o disco existe/está acessível
+                drives.push({ name: `Disco Local (${drive})`, path: drive, type: 'drive' });
+            } catch (e) {
+                // Disco não existe, ignora
+            }
+        }
+        return { success: true, path: "Este Computador", directories: drives, isRoot: true };
+    }
+
+    // Se caminho vazio, usa a Home do usuário como padrão
+    const searchPath = currentPath && currentPath !== "Este Computador" ? currentPath : os.homedir();
+    
+    // Tenta ler o diretório
+    const entries = fs.readdirSync(searchPath, { withFileTypes: true });
+    
+    const directories = entries
+      .filter(entry => entry.isDirectory()) // Só mostra pastas
+      .map(entry => ({
+        name: entry.name,
+        path: path.join(searchPath, entry.name),
+        type: 'folder'
+      }))
+      // Ordena alfabeticamente
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    return { success: true, path: searchPath, directories, isRoot: false };
+
+  } catch (error) {
+    console.error("Erro ao ler pasta:", error);
+    return { success: false, error: "Acesso negado ou pasta inválida." };
+  }
 }

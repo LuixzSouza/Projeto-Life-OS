@@ -1,71 +1,141 @@
-# 🌟 Life OS: Sistema de Gestão Pessoal
+🌌 Life OS: Seu Segundo Cérebro Digital
+Gerencie Finanças, Projetos, Estudos e IA em uma única plataforma local. Sem assinaturas, sem nuvem obrigatória, privacidade total.
 
-![Badge - Status: Em Desenvolvimento](https://img.shields.io/badge/Status-Em%20Desenvolvimento-blue)
-![Badge - Tech Stack](https://img.shields.io/badge/Tech-Next.js%20%7C%20Prisma%20%7C%20Tailwind-informational)
+📖 Visão Geral
+O Life OS é um sistema operacional pessoal projetado para rodar localmente no seu computador. Diferente de ferramentas SaaS tradicionais (Notion, Trello, Mint), o Life OS prioriza a privacidade e a velocidade.
 
-## Visão Geral
+Todos os dados são salvos em um arquivo SQLite que você controla. Você pode mover o banco de dados para um HD externo, Pen Drive ou pasta segura diretamente pela interface do sistema.
 
-O **Life OS** é um painel de controle pessoal (Personal Operating System) construído para centralizar as áreas de **Produtividade**, **Finanças**, **Agenda** e **Trabalho** em um único local. O foco principal é a performance (Next.js Server Actions) e a privacidade (local-first / Ollama).
+🌟 Destaques da Versão Atual
+Landing Page Premium: Apresentação visual do sistema.
 
-Este projeto é resultado de um desenvolvimento passo a passo visando criar um ambiente digital altamente customizado.
+Setup Wizard: Assistente de configuração inicial (Perfil, Tema, IA).
 
-## ✨ Funcionalidades Principais
+Autenticação JWT: Sistema de login seguro com cookies criptografados.
 
-| Módulo | Funcionalidades |
-| :--- | :--- |
-| **Projetos & Tarefas** | Gestão de tarefas por projetos com prioridade, datas e status. Suporte a anexos de imagem (via Ctrl+V) na criação/edição. |
-| **Kanban de Vagas** | Rastreamento visual de candidaturas de emprego (Kanban View) com status, link da vaga e notas/requisitos detalhados. |
-| **Agenda** | Calendário de compromissos com agrupamento por dia ("Hoje", "Amanhã") e integração visual com tarefas pendentes para foco diário. |
-| **Finanças (Base)** | Rastreamento de Contas e Transações. Dashboard com saldo total e fluxo de caixa. |
-| **CMS Headless** | Gestor de conteúdo JSON para sites externos, com API Key e edição de páginas dinâmicas. |
-| **IA Local** | Interface de chat integrada para uso de LLMs locais via Ollama (sem limites de token/custo). |
-| **Configurações** | Controle de Dark Mode, Perfil e Configurações do Provedor de IA. |
+Armazenamento Dinâmico: Escolha onde salvar seus dados (ex: G:/MeusDados/life.db) via interface visual.
 
-## 🚀 Tecnologias Utilizadas
+✨ Funcionalidades Principais
+🧠 Inteligência Artificial Híbrida
+Converse com seus dados. O sistema suporta múltiplos provedores:
 
-* **Framework:** Next.js (App Router, Server Actions)
-* **Linguagem:** TypeScript
-* **Estilização:** Tailwind CSS (Shadcn/UI)
-* **Banco de Dados:** Prisma ORM (Configurado para MySQL, mas compatível com SQLite)
-* **Gráficos:** Recharts
-* **IA:** Ollama (Integração Local)
-* **Utils:** `date-fns`, `sonner` (Toast Notifications)
+Local (Privacidade Máxima): Integração nativa com Ollama (Llama 3, Mistral, etc).
 
-## 🛠️ Pré-requisitos
+Nuvem (Alta Performance): Suporte para OpenAI (GPT-4), Groq (Llama 3.3 Ultra-rápido) e Google Gemini.
 
-Para rodar o Life OS, você precisa ter:
+Context Aware: A IA pode ler seus dados (tarefas, finanças) para dar conselhos contextualizados.
 
-1.  **Node.js** (versão 18+)
-2.  **npm** ou **yarn**
-3.  **MySQL** (Rodando localmente ou via Docker)
-4.  **(Opcional) Ollama:** Instalado localmente para rodar o módulo de Chat IA.
+💰 Controle Financeiro
+Gestão de Contas: Carteira, Bancos, Investimentos.
 
-## ⚙️ Instalação e Execução
+Transações: Receitas e Despesas com categorização.
 
-Siga os passos abaixo para configurar o ambiente.
+Dashboard: Gráficos de fluxo de caixa e cálculo automático de patrimônio líquido.
 
-### 1. Clonar e Instalar Dependências
+🚀 Produtividade & Projetos
+Projetos: Gestão de grandes objetivos com status e prazos.
 
-```bash
-# Substitua pelo seu link
-git clone [SEU REPOSITÓRIO AQUI]
+Tarefas: Listas de afazeres vinculadas a projetos.
+
+Agenda: Visualização dos próximos compromissos.
+
+📚 Study Engine (Motor de Estudos)
+Sessões de Foco: Registre tempo de estudo por matéria.
+
+Flashcards: (Em breve) Sistema de repetição espaçada.
+
+Análise: Gráficos de distribuição de foco.
+
+🎨 Personalização & Sistema
+Temas: Claro, Escuro e Sistema.
+
+Cores de Destaque: 6 opções de cores (Zinc, Blue, Violet, Rose, Orange, Green).
+
+Perfil: Foto de perfil (com upload local em Base64) e Capa personalizada.
+
+🛠️ Stack Tecnológico
+O projeto foi construído com as tecnologias mais modernas do ecossistema React:
+
+Framework: Next.js 15 (App Router & Server Actions)
+
+Database: SQLite + Prisma ORM (Arquivo .db portátil)
+
+Styling: Tailwind CSS + Shadcn/UI (Radix Primitives)
+
+Auth: jose (JWT Stateless)
+
+Animações: Framer Motion
+
+Gráficos: Recharts
+
+Utils: sonner (Toasts), lucide-react (Ícones), next-themes.
+
+🚀 Como Rodar o Projeto (Passo a Passo)
+Siga este guia para instalar o Life OS no seu computador.
+
+1. Pré-requisitos
+Node.js (Versão 18 ou superior).
+
+(Opcional) Ollama instalado se quiser usar IA local.
+
+2. Clonar e Instalar
+Bash
+
+git clone [URL_DO_SEU_REPOSITORIO]
 cd life-os
 npm install
-2. Configurar o Ambiente
-Crie um arquivo .env na raiz do projeto (baseado em um env.example se você tiver) e preencha a string de conexão:
+3. Configurar o Banco de Dados
+Crie um arquivo .env na raiz do projeto. Como usamos SQLite, a configuração é simples:
 
-DATABASE_URL="mysql://USER:PASSWORD@HOST:3306/life_os?schema=public"
-3. Inicializar o Banco de Dados
-Aplique as migrações que criamos. Este comando cria todas as tabelas (Project, Task, Event, JobApplication, etc.) e gera o Prisma Client:
+Snippet de código
+
+# Define o local inicial do banco de dados.
+# Use barras normais (/) mesmo no Windows.
+DATABASE_URL="file:./prisma/life_os.db"
+4. Criar as Tabelas (Migração)
+Execute o comando para criar o arquivo do banco de dados e as tabelas:
 
 Bash
 
-npx prisma migrate dev --name init_life_os_full_setup
-npx prisma generate
-4. Rodar o Servidor
-Inicie o projeto em modo de desenvolvimento:
-
+npx prisma migrate dev --name init_sqlite
+5. Iniciar o Sistema
 Bash
 
 npm run dev
-O sistema estará acessível em http://localhost:3000.
+Acesse http://localhost:3000 no seu navegador.
+
+🧭 Guia de Primeiro Uso
+Landing Page: Você verá a tela inicial. Clique em "Começar Agora".
+
+Setup Wizard:
+
+Defina seu Nome e Bio.
+
+Escolha seu provedor de IA preferido.
+
+Defina o Tema e a Moeda.
+
+Dashboard: Após o setup, você será redirecionado para o painel principal.
+
+Tour Guiado: Um tutorial interativo apresentará os módulos.
+
+💾 Como Mudar o Local do Banco de Dados?
+Se você quiser salvar seus dados em um HD Externo ou outra partição (ex: Disco D:):
+
+Vá em Configurações > Dados & Armazenamento.
+
+No campo "Localização do Banco", clique no ícone de pasta 📂.
+
+Navegue pelas pastas do seu PC e selecione o destino.
+
+Clique em Mover Banco de Dados.
+
+O sistema copiará automaticamente seus dados atuais para o novo local e atualizará a configuração.
+
+🤝 Contribuição
+Este é um projeto pessoal open-source. Sinta-se à vontade para abrir Issues ou Pull Requests para melhorar funcionalidades ou corrigir bugs.
+
+📄 Licença
+Este projeto está sob a licença MIT. Você é livre para usar, modificar e distribuir.
+
+<p align="center"> Feito com 💜 para produtividade máxima. </p>

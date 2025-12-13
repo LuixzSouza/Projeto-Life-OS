@@ -1,13 +1,26 @@
 import { PrismaClient } from "@prisma/client";
+import { getDatabasePath } from "./db-config";
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
+// Função que cria o cliente com a URL dinâmica
+const prismaClientSingleton = () => {
+  const dbPath = getDatabasePath();
+  const url = `file:${dbPath}`; // Formato que o SQLite exige
+
+  console.log(`🔌 Conectando ao Banco de Dados em: ${dbPath}`);
+
+  return new PrismaClient({
+    datasources: {
+      db: {
+        url: url,
+      },
+    },
+  });
 };
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: ["query"],
-  });
+declare global {
+  var prisma: undefined | ReturnType<typeof prismaClientSingleton>;
+}
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+export const prisma = globalThis.prisma ?? prismaClientSingleton();
+
+if (process.env.NODE_ENV !== "production") globalThis.prisma = prisma;

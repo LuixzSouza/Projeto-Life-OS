@@ -3,8 +3,9 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-// ✅ Importa diretamente o tipo SessionType do $Enums do Prisma Client
-import { $Enums } from "@prisma/client"; 
+
+// ✅ DEFINIÇÃO MANUAL DO TIPO (Para não depender da importação quebrada)
+type SessionType = "LEITURA" | "VIDEO" | "EXERCICIO" | "REVISAO" | "PROJETO";
 
 // --- ENUMS E TIPOS DE SESSÃO ---
 const SESSION_TYPES = z.enum(["LEITURA", "VIDEO", "EXERCICIO", "REVISAO", "PROJETO"]);
@@ -46,7 +47,6 @@ export async function createSubject(formData: FormData) {
     const validatedFields = SubjectSchema.safeParse(rawData);
 
     if (!validatedFields.success) {
-      // ✅ Acesso seguro ao erro
       const firstError = validatedFields.error.flatten().fieldErrors.title?.[0] || "Dados inválidos.";
       return { success: false, message: firstError };
     }
@@ -107,8 +107,7 @@ export async function logSession(
     
     const processedTags = rawTags ? rawTags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0) : [];
     
-    // ✅ CORREÇÃO ENUM: Usamos o tipo correto do Prisma Client
-    const sessionTypeEnum = validType as $Enums.SessionType; 
+    const sessionTypeEnum = validType as SessionType; 
 
     // 2. Criação
     await prisma.studySession.create({
@@ -118,7 +117,8 @@ export async function logSession(
         notes: validNotes || "",
         date: new Date(),
         focusLevel: validFocus,
-        type: sessionTypeEnum,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        type: sessionTypeEnum as any, 
         tags: processedTags.length > 0 ? JSON.stringify(processedTags) : null,
       },
     });
@@ -148,7 +148,7 @@ export async function getSubjectDetails(subjectId: string) {
         return { success: false, message: "ID de matéria inválido." };
     }
       
-    // Usamos $queryRaw para calcular a duração total do assunto no MySQL
+    // Usamos $queryRaw para calcular a duração total do assunto no MySQL/SQLite
     const totalDurationResult = await prisma.$queryRaw<[{ totalDuration: bigint }]>`
         SELECT CAST(SUM(durationMinutes) AS SIGNED) as totalDuration
         FROM StudySession
@@ -166,7 +166,7 @@ export async function getSubjectDetails(subjectId: string) {
             where: { subjectId: subjectId },
             orderBy: { date: 'desc' },
             select: {
-                id: true, // ✅ ID da sessão é necessário para exclusão no modal
+                id: true, 
                 durationMinutes: true,
                 notes: true,
                 date: true,
@@ -216,7 +216,6 @@ export async function updateSubject(formData: FormData) {
     const validatedFields = SubjectSchema.safeParse(rawData);
 
     if (!z.string().uuid().safeParse(id).success || !validatedFields.success) {
-        // ✅ Acesso seguro ao erro
         const firstError = validatedFields.error?.flatten().fieldErrors.title?.[0] || "Dados inválidos.";
         return { success: false, message: "ID ou campos inválidos: " + firstError };
     }

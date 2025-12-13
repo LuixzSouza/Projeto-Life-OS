@@ -1,16 +1,20 @@
 import { prisma } from "@/lib/prisma";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BookOpen, DollarSign, CheckSquare, Calendar as CalendarIcon, ArrowUpRight, ArrowDownRight, TrendingUp, PlayCircle, Gamepad2, Film, Music, Briefcase, Star, Tv } from "lucide-react";
+import { 
+    BookOpen, DollarSign, CheckSquare, Calendar as CalendarIcon, 
+    ArrowUpRight, ArrowDownRight, TrendingUp, PlayCircle, 
+    Gamepad2, Film, Music, Briefcase, Star, Tv 
+} from "lucide-react";
 import { FinanceChart } from "@/components/dashboard/finance-chart";
 import { StudyChart } from "@/components/dashboard/study-chart";
 import { QuickActions } from "@/components/dashboard/quick-actions";
+import { WelcomeTour } from "@/components/dashboard/welcome-tour";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 
-// ✅ CORREÇÃO: Removemos o 'any'.
-// 'string | number' cobre todos os seus campos (name, total, type, value) e satisfaz o Recharts.
+// Interfaces
 interface FinanceData { 
   name: string; 
   total: number; 
@@ -27,7 +31,7 @@ interface StudyData {
 export default async function DashboardPage() {
   const today = new Date();
   
-  // --- CARREGAMENTO DE DADOS PARALELO ---
+  // --- CARREGAMENTO DE DADOS ---
   const [
     user,
     accounts,
@@ -38,7 +42,8 @@ export default async function DashboardPage() {
     studySessions,
     nextEvent,
     activeMedia,
-    activeProjects
+    activeProjects,
+    settings
   ] = await Promise.all([
     prisma.user.findFirst(),
     prisma.account.findMany(),
@@ -49,10 +54,11 @@ export default async function DashboardPage() {
     prisma.studySession.findMany({ include: { subject: true } }),
     prisma.event.findFirst({ where: { startTime: { gte: new Date() } }, orderBy: { startTime: 'asc' } }),
     prisma.mediaItem.findMany({ where: { category: 'PLAYING' }, take: 3 }), 
-    prisma.project.findMany({ where: { status: 'IN_PROGRESS' }, take: 3 })
+    prisma.project.findMany({ where: { status: 'IN_PROGRESS' }, take: 3 }),
+    prisma.settings.findFirst()
   ]);
 
-  // --- PROCESSAMENTO DE DADOS ---
+  // --- LÓGICA ---
 
   // 1. Saudação
   const hours = today.getHours();
@@ -62,17 +68,15 @@ export default async function DashboardPage() {
 
   // 2. Financeiro
   const totalBalance = accounts.reduce((acc, item) => acc + Number(item.balance), 0);
-
   const income = transactionsAll.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + Number(t.amount), 0);
   const expense = transactionsAll.filter(t => t.type === 'EXPENSE').reduce((acc, t) => acc + Number(t.amount), 0);
   
-  // Tipagem explícita aqui ajuda o TS a garantir que o array segue a interface
   const financeData: FinanceData[] = [
     { name: 'Entradas', total: income, type: 'INCOME' },
     { name: 'Saídas', total: expense, type: 'EXPENSE' },
   ];
 
-  // 3. Estudos (Agregação)
+  // 3. Estudos
   const studyMap = new Map<string, number>();
   studySessions.forEach(s => {
     const current = studyMap.get(s.subject.title) || 0;
@@ -80,18 +84,21 @@ export default async function DashboardPage() {
   });
   const studyData: StudyData[] = Array.from(studyMap, ([name, value]) => ({ name, value }));
 
-  // 4. Score de Produtividade
+  // 4. Score
   const totalStudyMinutes = studySessions.reduce((acc, s) => acc + s.durationMinutes, 0);
   const productivityScore = (completedTasksCount * 10) + Math.floor(totalStudyMinutes / 10);
 
   return (
     <div className="space-y-6 max-w-[1600px] mx-auto p-2 md:p-4">
       
+      {/* TOUR GUIADO (Se necessário) */}
+      {!settings?.onboardingCompleted && <WelcomeTour />}
+
       {/* --- HEADER --- */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
             <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-                {greeting}, {user?.name?.split(" ")[0] || "Luiz"}! 
+                {greeting}, {user?.name?.split(" ")[0] || "Viajante"}! 
                 <span className="text-2xl">👋</span>
             </h1>
             <div className="flex items-center gap-2 text-zinc-500 mt-1">
@@ -113,7 +120,7 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* --- KPI CARDS --- */}
+      {/* --- KPI CARDS (LAYOUT CLÁSSICO) --- */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         
         {/* Financeiro */}
@@ -185,10 +192,10 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      {/* --- SEÇÃO PRINCIPAL (Bento Grid) --- */}
+      {/* --- GRID PRINCIPAL (Layout Clássico) --- */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
         
-        {/* COLUNA ESQUERDA (4/7) */}
+        {/* ESQUERDA (4 colunas) */}
         <div className="lg:col-span-4 space-y-6">
             
             {/* Gráfico Financeiro */}
@@ -232,10 +239,10 @@ export default async function DashboardPage() {
             </div>
         </div>
 
-        {/* COLUNA DIREITA (3/7) */}
+        {/* DIREITA (3 colunas) */}
         <div className="lg:col-span-3 space-y-6">
             
-            {/* O Que Estou Consumindo (Entretenimento) */}
+            {/* Mídia */}
             <Card className="border-indigo-100 dark:border-indigo-900 bg-gradient-to-b from-white to-indigo-50/30 dark:from-zinc-950 dark:to-indigo-950/10">
                 <CardHeader className="pb-3">
                     <CardTitle className="text-sm flex items-center justify-between">
@@ -261,10 +268,6 @@ export default async function DashboardPage() {
                                     <div className="flex-1 min-w-0">
                                         <p className="font-bold text-sm truncate">{item.title}</p>
                                         <div className="flex items-center gap-2 text-xs text-zinc-500">
-                                            {item.type === 'GAME' && <Gamepad2 className="h-3 w-3" />}
-                                            {item.type === 'MOVIE' && <Film className="h-3 w-3" />}
-                                            {item.type === 'TV' && <Tv className="h-3 w-3" />}
-                                            {item.type === 'ALBUM' && <Music className="h-3 w-3" />}
                                             <span className="truncate">{item.subtitle}</span>
                                         </div>
                                     </div>
@@ -275,7 +278,7 @@ export default async function DashboardPage() {
                 </CardContent>
             </Card>
 
-            {/* Gráfico de Estudos */}
+            {/* Estudos */}
             <Card>
                 <CardHeader>
                     <CardTitle className="text-sm">Foco por Matéria</CardTitle>
@@ -285,7 +288,7 @@ export default async function DashboardPage() {
                 </CardContent>
             </Card>
 
-            {/* Últimas Transações */}
+            {/* Transações */}
             <Card>
                 <CardHeader className="pb-2">
                     <CardTitle className="text-sm">Recentes</CardTitle>

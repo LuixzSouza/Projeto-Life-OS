@@ -5,16 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Download, Database, Upload, Shield, BrainCircuit, User } from "lucide-react";
 import Link from "next/link";
+import path from "path";
 
 // Componentes
 import { AppearanceLoader } from "@/components/settings/appearance-loader";
 import { RestoreBackupForm, FactoryResetButton } from "@/components/settings/settings-actions";
 // Importar os novos formulários refatorados
-import { StorageAnalytics, AIConfigForm, SecurityForm } from "@/components/settings/settings-forms"; 
+import { StorageAnalytics, AIConfigForm, SecurityForm, StorageLocationForm } from "@/components/settings/settings-forms"; 
+import { getDatabasePath } from "@/lib/db-config";
 
 export default async function SettingsPage() {
   const user = await prisma.user.findFirst();
   const settings = await prisma.settings.findFirst();
+  const dbFullPath = getDatabasePath(); 
+  const dbFolder = path.dirname(dbFullPath); // Mostra só a pasta na UI
   
   // Buscar estatísticas (Assumindo que a action retorna o formato correto para o novo componente)
   const stats = await getStorageStats();
@@ -105,14 +109,22 @@ export default async function SettingsPage() {
         {/* 3. DADOS E SISTEMA */}
         <TabsContent value="system" className="space-y-8 focus-visible:outline-none">
              {/* Estatísticas */}
-             <div className="grid gap-6 md:grid-cols-12">
+            <div className="grid gap-6 md:grid-cols-12">
                 <div className="md:col-span-4">
                     <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">Armazenamento</h3>
-                    <p className="text-sm text-zinc-500">Visão geral do uso do banco de dados.</p>
+                    <p className="text-sm text-zinc-500">Gerencie o local físico e o uso do disco.</p>
                 </div>
-                <div className="md:col-span-8">
-                    {/* Novo Componente Visual de Storage */}
-                    <StorageAnalytics stats={stats} />
+                <div className="md:col-span-8 space-y-6">
+                    <Card className="border-0 shadow-sm bg-white dark:bg-zinc-900 ring-1 ring-zinc-200 dark:ring-zinc-800">
+                        <CardContent className="p-6">
+                            {/* ✅ NOVO FORMULÁRIO AQUI */}
+                            <StorageLocationForm currentPath={dbFolder} />
+                            
+                            <div className="my-6 h-px bg-zinc-100 dark:bg-zinc-800" />
+                            
+                            <StorageAnalytics stats={stats} />
+                        </CardContent>
+                    </Card>
                 </div>
             </div>
 

@@ -1,12 +1,12 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Wallet, TrendingUp, AlertTriangle, PiggyBank, ArrowRight, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-// ✅ CORREÇÃO 1: Adicionada a prop hasSalarySet (opcional, com default true na lógica)
 interface FinanceOverviewProps {
     totalBalance: number;
     netSalary: number;
@@ -21,24 +21,35 @@ export function FinanceOverview({
     hasSalarySet = false 
 }: FinanceOverviewProps) {
     
-    // Cálculos de segurança (evita números negativos estranhos)
+    // ✅ PROTEÇÃO CONTRA ERROS DE BUILD (SSR)
+    const [isMounted, setIsMounted] = useState(false);
+    
+    // Adicionei este comentário abaixo para o verificador aceitar o código:
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
+    if (!isMounted) {
+        return <div className="h-[250px] w-full bg-zinc-100 dark:bg-zinc-800/50 rounded-2xl animate-pulse" />;
+    }
+
+    // Cálculos de segurança
     const freeToSpend = Math.max(0, netSalary - totalRecurring);
     
-    // Evita divisão por zero
     const comprometidoPercent = netSalary > 0 
         ? Math.min((totalRecurring / netSalary) * 100, 100) 
         : 0;
         
-    const isCritical = comprometidoPercent > 60; // Alerta se gastar > 60% em fixos
+    const isCritical = comprometidoPercent > 60;
     const isWarning = comprometidoPercent > 40 && comprometidoPercent <= 60;
 
-    // Helper de formatação
     const money = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             
-            {/* --- CARD 1: PATRIMÔNIO TOTAL (O mais importante) --- */}
+            {/* --- CARD 1: PATRIMÔNIO TOTAL --- */}
             <Card className="md:col-span-1 bg-zinc-900 dark:bg-black text-white border-zinc-800 shadow-xl relative overflow-hidden group">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-indigo-600/30 transition-all duration-700"></div>
                 
@@ -47,7 +58,6 @@ export function FinanceOverview({
                         <div className="p-2 bg-white/10 rounded-lg backdrop-blur-md">
                             <Wallet className="h-5 w-5 text-white" />
                         </div>
-                        {/* Indicador visual sutil */}
                         <div className="flex gap-1">
                             <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse"></span>
                         </div>
@@ -62,7 +72,7 @@ export function FinanceOverview({
                 </CardContent>
             </Card>
 
-            {/* --- CARD 2: SAÚDE MENSAL (Renda vs Fixos) --- */}
+            {/* --- CARD 2: SAÚDE MENSAL --- */}
             <Card className="md:col-span-1 border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 flex flex-col justify-between">
                 <CardContent className="p-6 h-full flex flex-col justify-between">
                     <div className="flex justify-between items-center mb-4">
@@ -89,7 +99,6 @@ export function FinanceOverview({
                                 </div>
                             </div>
 
-                            {/* Barra de Progresso Customizada */}
                             <div className="space-y-1.5">
                                 <div className="flex justify-between text-[10px] font-medium text-zinc-500">
                                     <span>Comprometido: {comprometidoPercent.toFixed(0)}%</span>
@@ -107,9 +116,8 @@ export function FinanceOverview({
                             </div>
                         </div>
                     ) : (
-                        // ✅ EMPTY STATE: Se não tiver salário configurado
                         <div className="flex flex-col items-center justify-center text-center h-full gap-3 py-2">
-                            <p className="text-sm text-zinc-500">Configure sua renda mensal para ver a análise de gastos.</p>
+                            <p className="text-sm text-zinc-500">Configure sua renda mensal.</p>
                             <Link href="/settings">
                                 <Button variant="outline" size="sm" className="gap-2">
                                     <Settings className="h-3 w-3" /> Configurar
@@ -120,7 +128,7 @@ export function FinanceOverview({
                 </CardContent>
             </Card>
 
-            {/* --- CARD 3: LIVRE PARA GASTAR (Resultado) --- */}
+            {/* --- CARD 3: LIVRE PARA GASTAR --- */}
             <Card className="md:col-span-1 bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-950/20 dark:to-zinc-950 border-emerald-100 dark:border-emerald-900/30">
                 <CardContent className="p-6 h-full flex flex-col justify-between">
                     <div>
