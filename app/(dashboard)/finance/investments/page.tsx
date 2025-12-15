@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, LineChart } from "lucide-react";
 import Link from "next/link";
-import { InvestmentDashboard } from "@/components/finance/investment-dashboard";
+import { InvestmentDashboard } from "@/components/investment/investment-dashboard";
 import { getMarketOverview } from "@/lib/market-service"; // Importa nosso novo serviço
 
 export default async function InvestmentsPage() {

@@ -1,133 +1,261 @@
 "use client";
 
-import { useState } from "react";
-import { 
-    Dialog, 
-    DialogContent,
-    DialogTitle // ✅ 1. Importar o DialogTitle
-} from "@/components/ui/dialog";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { completeOnboarding } from "@/app/actions";
-import { Wallet, CheckSquare, BrainCircuit, ArrowRight, Check } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Wallet, CheckSquare, BrainCircuit, ArrowRight, Check, Sparkles, X, ChevronRight, ChevronLeft, Rocket } from "lucide-react";
+import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
+import { cn } from "@/lib/utils";
 
+// Configuração dos Slides
 const SLIDES = [
     {
         id: "intro",
-        icon: "👋",
+        icon: <Sparkles className="w-full h-full text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]" />,
         title: "Bem-vindo ao Life OS",
-        desc: "Seu sistema operacional pessoal para gerenciar vida, trabalho e estudos em um só lugar.",
-        color: "bg-zinc-900"
+        desc: "Seu sistema operacional pessoal. Centralize vida, trabalho e finanças em um ambiente local e seguro.",
+        glowColor: "from-indigo-500/20 via-purple-500/20 to-zinc-900/0",
+        iconBg: "bg-gradient-to-br from-indigo-500 to-purple-600"
     },
     {
         id: "finance",
-        icon: <Wallet className="h-12 w-12 text-emerald-500" />,
-        title: "Controle Financeiro",
-        desc: "Gerencie contas, registre gastos e acompanhe seu patrimônio. Tudo integrado e local.",
-        color: "bg-emerald-50 dark:bg-emerald-950/20"
+        icon: <Wallet className="w-full h-full text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]" />,
+        title: "Finanças Blindadas",
+        desc: "Acompanhe seu patrimônio em tempo real. Registre entradas, saídas e veja gráficos detalhados sem planilhas.",
+        glowColor: "from-emerald-500/20 via-teal-500/20 to-zinc-900/0",
+        iconBg: "bg-gradient-to-br from-emerald-500 to-teal-600"
     },
     {
         id: "projects",
-        icon: <CheckSquare className="h-12 w-12 text-indigo-500" />,
-        title: "Projetos & Tarefas",
-        desc: "Organize seus objetivos em projetos e quebre em tarefas menores. Use o método Kanban ou Lista.",
-        color: "bg-indigo-50 dark:bg-indigo-950/20"
+        icon: <CheckSquare className="w-full h-full text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]" />,
+        title: "Gestão de Projetos",
+        desc: "Do planejamento à execução. Quebre grandes objetivos em tarefas menores e acompanhe seu progresso.",
+        glowColor: "from-blue-500/20 via-cyan-500/20 to-zinc-900/0",
+        iconBg: "bg-gradient-to-br from-blue-500 to-cyan-600"
     },
     {
         id: "ai",
-        icon: <BrainCircuit className="h-12 w-12 text-purple-500" />,
-        title: "Inteligência Artificial",
-        desc: "Seu assistente pessoal (GPT/Ollama) tem acesso aos seus dados para te dar conselhos reais.",
-        color: "bg-purple-50 dark:bg-purple-950/20"
+        icon: <BrainCircuit className="w-full h-full text-white drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]" />,
+        title: "Inteligência Local",
+        desc: "Sua IA pessoal analisa seus dados para dar insights reais, rodando 100% no seu navegador ou localmente.",
+        glowColor: "from-rose-500/20 via-orange-500/20 to-zinc-900/0",
+        iconBg: "bg-gradient-to-br from-rose-500 to-orange-600"
     }
 ];
 
 export function WelcomeTour() {
     const [open, setOpen] = useState(true);
     const [currentSlide, setCurrentSlide] = useState(0);
+    const [direction, setDirection] = useState(0);
 
-    const handleNext = () => {
+    // Variáveis para o efeito de Tilt 3D
+    const x = useMotionValue(0);
+    const y = useMotionValue(0);
+    const rotateX = useTransform(y, [-100, 100], [5, -5]);
+    const rotateY = useTransform(x, [-100, 100], [-5, 5]);
+
+    const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        x.set((event.clientX - centerX) / 4); // Suavidade do tilt X
+        y.set((event.clientY - centerY) / 4); // Suavidade do tilt Y
+    };
+
+    const handleMouseLeave = () => {
+        x.set(0);
+        y.set(0);
+    };
+
+    // 1. Definir handleFinish PRIMEIRO (Resolve o erro)
+    const handleFinish = useCallback(async () => {
+        setOpen(false);
+        // Pequeno delay para a animação de saída
+        setTimeout(async () => {
+            await completeOnboarding();
+        }, 300);
+    }, []);
+
+    // 2. Definir handleNext (Depende de handleFinish)
+    const handleNext = useCallback(() => {
         if (currentSlide < SLIDES.length - 1) {
-            setCurrentSlide(s => s + 1);
+            setDirection(1);
+            setCurrentSlide((curr) => curr + 1);
         } else {
             handleFinish();
         }
-    };
+    }, [currentSlide, handleFinish]);
 
-    const handleFinish = async () => {
-        await completeOnboarding();
-        setOpen(false);
-    };
+    const handlePrev = useCallback(() => {
+        if (currentSlide > 0) {
+            setDirection(-1);
+            setCurrentSlide((curr) => curr - 1);
+        }
+    }, [currentSlide]);
+
+    // Navegação por Teclado
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (!open) return;
+            if (e.key === "ArrowRight") handleNext();
+            if (e.key === "ArrowLeft") handlePrev();
+            if (e.key === "Escape") handleFinish();
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [open, handleNext, handlePrev, handleFinish]);
+
+    if (!open) return null;
 
     const slide = SLIDES[currentSlide];
+    const isLastSlide = currentSlide === SLIDES.length - 1;
 
     return (
-        <Dialog open={open} onOpenChange={() => {}}> 
-            <DialogContent className="max-w-md p-0 overflow-hidden border-0 shadow-2xl bg-white dark:bg-zinc-950">
-                
-                {/* ✅ 2. Adicionar o Título Invisível (Acessibilidade) */}
-                <DialogTitle className="sr-only">
-                    Tour de Boas-vindas
-                </DialogTitle>
+        <div className="fixed inset-0 w-full min-h-[100vh] z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-500">
+            
+            {/* GLOW DE FUNDO (AMBIENT LIGHT) */}
+            <motion.div 
+                animate={{ 
+                    opacity: [0.4, 0.6, 0.4],
+                    scale: [1, 1.1, 1]
+                }}
+                transition={{ duration: 4, repeat: Infinity }}
+                className={cn(
+                    "absolute inset-0 z-0 bg-gradient-radial transition-all duration-1000 ease-in-out blur-3xl",
+                    slide.glowColor
+                )}
+            />
 
-                <div className="flex flex-col h-[450px]">
+            {/* CARTÃO 3D */}
+            <motion.div 
+                style={{ rotateX, rotateY, perspective: 1000 }}
+                initial={{ opacity: 0, scale: 0.9, y: 30 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: -30 }}
+                transition={{ type: "spring", bounce: 0.4, duration: 0.6 }}
+                onMouseMove={handleMouseMove}
+                onMouseLeave={handleMouseLeave}
+                className="relative z-10 w-full max-w-[500px] bg-card/90 dark:bg-zinc-950/90 border border-white/20 dark:border-white/10 rounded-[2rem] shadow-2xl overflow-hidden backdrop-blur-xl"
+            >
+                {/* Efeito de Brilho no Card (Glass Reflection) */}
+                <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none" />
+
+                <button 
+                    onClick={handleFinish}
+                    className="absolute top-5 right-5 p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/10 transition-colors z-50"
+                >
+                    <X className="w-5 h-5" />
+                </button>
+
+                <div className="flex flex-col items-center text-center pt-14 pb-8 px-8 min-h-[520px]">
                     
-                    {/* ÁREA VISUAL (TOPO) */}
-                    <div className={`h-1/2 flex items-center justify-center transition-colors duration-500 ${slide.color}`}>
-                        <AnimatePresence mode="wait">
+                    {/* ÁREA DO ÍCONE */}
+                    <div className="relative mb-10 h-32 flex items-center justify-center">
+                        <AnimatePresence mode="popLayout" custom={direction}>
                             <motion.div
-                                key={slide.id}
-                                initial={{ opacity: 0, y: 10, scale: 0.9 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, y: -10, scale: 0.9 }}
-                                transition={{ duration: 0.3 }}
-                                className="flex flex-col items-center"
+                                key={currentSlide}
+                                custom={direction}
+                                initial={{ opacity: 0, scale: 0.4, rotateY: direction * 90 }}
+                                animate={{ opacity: 1, scale: 1, rotateY: 0 }}
+                                exit={{ opacity: 0, scale: 0.4, rotateY: direction * -90 }}
+                                transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                                className={cn(
+                                    "w-32 h-32 rounded-[2rem] flex items-center justify-center shadow-[0_20px_50px_-12px_rgba(0,0,0,0.5)] p-7 ring-1 ring-white/20",
+                                    slide.iconBg
+                                )}
                             >
-                                <div className="text-6xl mb-4 drop-shadow-sm">
-                                    {typeof slide.icon === 'string' ? slide.icon : slide.icon}
-                                </div>
+                                {slide.icon}
                             </motion.div>
                         </AnimatePresence>
                     </div>
 
-                    {/* ÁREA DE TEXTO (BAIXO) */}
-                    <div className="h-1/2 p-8 flex flex-col justify-between text-center bg-white dark:bg-zinc-950">
-                        <div className="space-y-3">
-                            <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">
-                                {slide.title}
-                            </h2>
-                            <p className="text-zinc-500 dark:text-zinc-400 text-sm leading-relaxed">
-                                {slide.desc}
-                            </p>
+                    {/* TEXTO */}
+                    <div className="space-y-4 max-w-sm flex-1 relative">
+                        <AnimatePresence mode="wait">
+                            <motion.div
+                                key={currentSlide}
+                                initial={{ opacity: 0, y: 20, filter: "blur(10px)" }}
+                                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                                exit={{ opacity: 0, y: -20, filter: "blur(10px)" }}
+                                transition={{ duration: 0.4 }}
+                            >
+                                <h2 className="text-3xl font-bold tracking-tight text-foreground mb-3 bg-clip-text text-transparent bg-gradient-to-b from-foreground to-foreground/70">
+                                    {slide.title}
+                                </h2>
+                                <p className="text-muted-foreground text-base leading-relaxed font-medium">
+                                    {slide.desc}
+                                </p>
+                            </motion.div>
+                        </AnimatePresence>
+                    </div>
+
+                    {/* RODAPÉ */}
+                    <div className="w-full mt-12 space-y-8">
+                        
+                        {/* Indicadores */}
+                        <div className="flex justify-center gap-3">
+                            {SLIDES.map((_, idx) => (
+                                <motion.button 
+                                    key={idx}
+                                    onClick={() => {
+                                        setDirection(idx > currentSlide ? 1 : -1);
+                                        setCurrentSlide(idx);
+                                    }}
+                                    className="relative h-2 rounded-full overflow-hidden bg-muted"
+                                    initial={false}
+                                    animate={{ 
+                                        width: idx === currentSlide ? 32 : 8,
+                                        backgroundColor: idx === currentSlide ? "var(--primary)" : "var(--muted)"
+                                    }}
+                                >
+                                    {idx === currentSlide && (
+                                        <motion.div 
+                                            layoutId="activeIndicator"
+                                            className="absolute inset-0 bg-primary"
+                                        />
+                                    )}
+                                </motion.button>
+                            ))}
                         </div>
 
-                        <div className="space-y-6">
-                            {/* Indicadores (Bolinhas) */}
-                            <div className="flex justify-center gap-2">
-                                {SLIDES.map((_, idx) => (
-                                    <div 
-                                        key={idx} 
-                                        className={`h-1.5 rounded-full transition-all duration-300 ${
-                                            idx === currentSlide ? "w-6 bg-zinc-900 dark:bg-zinc-100" : "w-1.5 bg-zinc-200 dark:bg-zinc-800"
-                                        }`} 
-                                    />
-                                ))}
-                            </div>
+                        {/* Botões */}
+                        <div className="flex items-center justify-between gap-4">
+                            <Button 
+                                variant="ghost" 
+                                onClick={handlePrev}
+                                disabled={currentSlide === 0}
+                                className={cn(
+                                    "text-muted-foreground hover:text-foreground transition-opacity",
+                                    currentSlide === 0 ? "opacity-0 pointer-events-none" : "opacity-100"
+                                )}
+                            >
+                                <ChevronLeft className="mr-1 h-4 w-4" /> Voltar
+                            </Button>
 
                             <Button 
                                 onClick={handleNext} 
-                                className="w-full bg-zinc-900 dark:bg-zinc-100 text-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200 h-11 rounded-xl text-base shadow-lg shadow-zinc-500/20"
+                                size="lg"
+                                className={cn(
+                                    "rounded-full px-8 font-semibold shadow-xl transition-all hover:scale-105 active:scale-95 group",
+                                    isLastSlide 
+                                        ? "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white border-0" 
+                                        : "bg-primary text-primary-foreground"
+                                )}
                             >
-                                {currentSlide === SLIDES.length - 1 ? (
-                                    <span className="flex items-center gap-2">Começar a Usar <Check className="w-4 h-4" /></span>
+                                {isLastSlide ? (
+                                    <span className="flex items-center gap-2">
+                                        Vamos lá <Rocket className="w-4 h-4 group-hover:animate-bounce" />
+                                    </span>
                                 ) : (
-                                    <span className="flex items-center gap-2">Próximo <ArrowRight className="w-4 h-4" /></span>
+                                    <span className="flex items-center">
+                                        Próximo <ChevronRight className="ml-1 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+                                    </span>
                                 )}
                             </Button>
                         </div>
                     </div>
                 </div>
-            </DialogContent>
-        </Dialog>
+            </motion.div>
+        </div>
     );
 }

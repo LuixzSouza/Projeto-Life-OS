@@ -1,30 +1,30 @@
-// components/client-providers.tsx
 "use client";
 
-import { ThemeProvider } from "next-themes";
 import { Toaster } from "sonner";
 import { DialogProvider } from "@/components/ui/dialog-context";
+import { ThemeProvider } from "@/components/providers/theme-provider"; // Importe o do passo 2
+import { ThemeColorProvider } from "@/components/providers/theme-color-provider"; // Importe o do passo 3
 
 interface ClientProvidersProps {
     children: React.ReactNode;
-    themeClass: string;
+    themeClass: string; // Vem do Layout
 }
 
 export default function ClientProviders({ children, themeClass }: ClientProvidersProps) {
     return (
-        // O themeClass é injetado no <html> do servidor, mas o ThemeProvider precisa dele
         <ThemeProvider
             attribute="class"
             defaultTheme="system"
             enableSystem
             disableTransitionOnChange
         >
-            <div className={themeClass}>
+            {/* ✅ Passamos a cor do banco para o Provider iniciar corretamente */}
+            <ThemeColorProvider initialColor={themeClass}>
                 <DialogProvider>
                     {children}
                 </DialogProvider>
-            </div>
-            <Toaster richColors position="top-right" />
+                <Toaster richColors position="top-right" />
+            </ThemeColorProvider>
         </ThemeProvider>
     );
 }

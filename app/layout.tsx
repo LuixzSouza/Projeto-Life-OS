@@ -2,7 +2,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import type { Metadata } from "next";
 import "./globals.css";
 import { prisma } from "@/lib/prisma"; 
-import ClientProviders from "@/components/client-providers"; // Importe o wrapper
+import ClientProviders from "@/components/providers/client-providers";
 
 const geistSans = Geist({
     variable: "--font-geist-sans",
@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-    title: "Life OS - Seu Sistema Pessoal",
-    description: "Gerencie Finanças, Projetos e IA em um só lugar.",
+    title: "Life OS",
+    description: "Gerencie Finanças, Projetos e IA.",
 };
 
 export default async function RootLayout({
@@ -24,7 +24,7 @@ export default async function RootLayout({
 }: Readonly<{
     children: React.ReactNode;
 }>) {
-    // 1. BUSCA DE DADOS (NO SERVIDOR)
+    // 1. Busca configuração no banco (se não existir, usa theme-blue)
     const settings = await prisma.settings.findFirst();
     const themeClass = settings?.accentColor || "theme-blue";
 
@@ -32,10 +32,9 @@ export default async function RootLayout({
         <html 
             lang="pt-BR" 
             suppressHydrationWarning 
-            className={`${geistSans.variable} ${geistMono.variable}`} // Adiciona classes de fontes aqui
+            className={`${geistSans.variable} ${geistMono.variable}`} 
         >
             <body className={`antialiased bg-background text-foreground`}>
-                {/* 2. PASSA OS DADOS PARA O CLIENTE */}
                 <ClientProviders themeClass={themeClass}>
                     {children}
                 </ClientProviders>

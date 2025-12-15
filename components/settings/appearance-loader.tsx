@@ -1,26 +1,26 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { updateSettings } from "@/app/(dashboard)/settings/actions";
 import { toast } from "sonner";
-import { User, Mail, Palette, Save, Loader2, Camera, Upload, Trash2, Sparkles, Moon, Sun, Laptop, Image as ImageIcon } from "lucide-react";
+import { User, Mail, Palette, Save, Loader2, Camera, Upload, Trash2, Sparkles, Moon, Sun, Laptop, Image as ImageIcon, Check } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useTheme } from "next-themes";
+import { useThemeColor } from "@/components/providers/theme-color-provider"; // ✅ Importe o contexto
 
-// Cores do Tema
+// Cores compatíveis com o globals.css
 const THEME_COLORS = [
-    { name: "Zinc", value: "zinc", class: "bg-zinc-600", ring: "ring-zinc-600", hex: "#52525b" },
-    { name: "Blue", value: "blue", class: "bg-blue-600", ring: "ring-blue-600", hex: "#2563eb" },
-    { name: "Violet", value: "violet", class: "bg-violet-600", ring: "ring-violet-600", hex: "#7c3aed" },
-    { name: "Rose", value: "rose", class: "bg-rose-600", ring: "ring-rose-600", hex: "#e11d48" },
-    { name: "Orange", value: "orange", class: "bg-orange-500", ring: "ring-orange-500", hex: "#f97316" },
-    { name: "Green", value: "green", class: "bg-emerald-500", ring: "ring-emerald-500", hex: "#10b981" },
+    { name: "theme-blue", label: "Azul", bg: "bg-blue-600" },
+    { name: "theme-green", label: "Verde", bg: "bg-green-600" },
+    { name: "theme-orange", label: "Laranja", bg: "bg-orange-500" },
+    { name: "theme-violet", label: "Roxo", bg: "bg-violet-600" },
+    { name: "theme-rose", label: "Rose", bg: "bg-rose-600" },
 ];
 
 interface AppearanceProps {
@@ -29,7 +29,7 @@ interface AppearanceProps {
     userEmail?: string;
     userAvatar?: string | null;
     userBio?: string | null;
-    userCover?: string | null; // ✅ Novo Prop
+    userCover?: string | null;
 }
 
 export function AppearanceLoader({ 
@@ -41,23 +41,32 @@ export function AppearanceLoader({
     userCover 
 }: AppearanceProps) {
     const { setTheme, theme } = useTheme();
+    // ✅ Usando contexto global para mudança instantânea
+    const { themeColor, setThemeColor } = useThemeColor(); 
+    
+    // ✅ Estado de montagem para corrigir erro de Hidratação
+    const [mounted, setMounted] = useState(false);
+    
     const [isLoading, setIsLoading] = useState(false);
-    const [selectedColor, setSelectedColor] = useState(initialColor || "zinc");
     
     // Estados para preview
     const [previewName, setPreviewName] = useState(userName || "");
     const [previewAvatar, setPreviewAvatar] = useState(userAvatar || "");
-    const [previewCover, setPreviewCover] = useState(userCover || ""); // ✅ Estado da Capa
+    const [previewCover, setPreviewCover] = useState(userCover || "");
     
     // Referências para os inputs invisíveis
     const avatarInputRef = useRef<HTMLInputElement>(null);
-    const coverInputRef = useRef<HTMLInputElement>(null); // ✅ Ref da Capa
+    const coverInputRef = useRef<HTMLInputElement>(null);
 
-    // Função genérica para processar imagem (Avatar ou Capa)
+    // Efeito para garantir que rodamos apenas no cliente
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
     const handleImageProcess = (e: React.ChangeEvent<HTMLInputElement>, isCover: boolean) => {
         const file = e.target.files?.[0];
         if (file) {
-            if (file.size > 3 * 1024 * 1024) { // 3MB limit
+            if (file.size > 3 * 1024 * 1024) { 
                 toast.error("A imagem deve ter no máximo 3MB.");
                 return;
             }
@@ -78,28 +87,24 @@ export function AppearanceLoader({
     const handleSubmit = async (formData: FormData) => {
         setIsLoading(true);
         
-        // Avatar Logic
         if (previewAvatar.startsWith("data:image")) {
             formData.set("avatarUrl", previewAvatar);
         } else if (previewAvatar === "") {
             formData.set("avatarUrl", ""); 
         }
 
-        // ✅ Capa Logic
         if (previewCover.startsWith("data:image")) {
             formData.set("coverUrl", previewCover);
         } else if (previewCover === "") {
             formData.set("coverUrl", "");
         }
 
-        formData.set("accentColor", selectedColor);
+        // Envia a cor atual do contexto
+        formData.set("accentColor", themeColor);
 
         try {
             await updateSettings(formData);
             toast.success("Perfil atualizado com sucesso!");
-            if (initialColor !== selectedColor) {
-                setTimeout(() => window.location.reload(), 800);
-            }
         } catch (error) {
             toast.error("Erro ao atualizar perfil.");
         } finally {
@@ -107,27 +112,34 @@ export function AppearanceLoader({
         }
     };
 
-    const currentColorObj = THEME_COLORS.find(c => c.value === selectedColor) || THEME_COLORS[0];
+    // ✅ Se não estiver montado, renderiza um esqueleto ou loader para evitar conflito de HTML
+    if (!mounted) {
+        return (
+            <div className="flex h-[400px] w-full items-center justify-center text-muted-foreground animate-pulse">
+                <Loader2 className="h-8 w-8 animate-spin" />
+                <span className="ml-2">Carregando preferências...</span>
+            </div>
+        );
+    }
 
     return (
         <form action={handleSubmit} className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-5xl mx-auto">
             
             {/* 1. CARTÃO DE IDENTIDADE */}
-            <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-lg overflow-hidden group">
+            <Card className="border-border bg-card shadow-lg overflow-hidden group">
                 
                 {/* --- BANNER / CAPA --- */}
                 <div 
-                    className="h-48 w-full relative transition-colors duration-500 bg-cover bg-center"
+                    className="h-48 w-full relative transition-all duration-500 bg-cover bg-center"
                     style={{ 
-                        // Se tiver capa, usa ela. Se não, usa gradiente da cor do tema.
-                        backgroundImage: previewCover ? `url(${previewCover})` : `linear-gradient(to right, ${currentColorObj.hex}40, ${currentColorObj.hex}10)`,
+                        backgroundImage: previewCover 
+                            ? `url(${previewCover})` 
+                            : `linear-gradient(to right, hsl(var(--primary) / 0.2), hsl(var(--primary) / 0.05))`,
                     }}
                 >
-                    {/* Overlay suave se não tiver imagem, grid se tiver */}
                     {!previewCover && <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-30" />}
-                    {previewCover && <div className="absolute inset-0 bg-black/20" />} {/* Escurecer levemente a foto */}
+                    {previewCover && <div className="absolute inset-0 bg-black/20" />}
 
-                    {/* Botões de Ação da Capa */}
                     <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button 
                             type="button" 
@@ -152,42 +164,31 @@ export function AppearanceLoader({
                         )}
                     </div>
 
-                    {/* Inputs Invisíveis */}
                     <input 
-                        type="file" 
-                        ref={coverInputRef} 
-                        className="hidden" 
-                        accept="image/*" 
-                        onChange={(e) => handleImageProcess(e, true)} // True = é capa
+                        type="file" ref={coverInputRef} className="hidden" accept="image/*" 
+                        onChange={(e) => handleImageProcess(e, true)} 
                     />
                     <input 
-                        type="file" 
-                        ref={avatarInputRef} 
-                        className="hidden" 
-                        accept="image/*" 
-                        onChange={(e) => handleImageProcess(e, false)} // False = é avatar
+                        type="file" ref={avatarInputRef} className="hidden" accept="image/*" 
+                        onChange={(e) => handleImageProcess(e, false)} 
                     />
                 </div>
 
                 <CardContent className="relative px-8 pb-10">
-                    
                     {/* --- ÁREA DO AVATAR --- */}
                     <div className="flex flex-col md:flex-row gap-8 -mt-20 items-start">
-                        
                         <div className="flex flex-col items-center gap-3 shrink-0">
                             <div className="relative group/avatar">
                                 <Avatar 
-                                    className="h-36 w-36 border-[6px] border-white dark:border-zinc-950 shadow-2xl bg-zinc-100 dark:bg-zinc-900 cursor-pointer" 
+                                    className="h-36 w-36 border-[6px] border-background shadow-2xl bg-muted cursor-pointer" 
                                     onClick={() => avatarInputRef.current?.click()}
                                 >
-                                    {/* ✅ CORREÇÃO DO ERRO: src={previewAvatar || undefined} */}
                                     <AvatarImage src={previewAvatar || undefined} className="object-cover" />
-                                    <AvatarFallback className="text-4xl font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-300">
+                                    <AvatarFallback className="text-4xl font-bold bg-muted text-muted-foreground">
                                         {previewName?.slice(0, 2).toUpperCase() || "EU"}
                                     </AvatarFallback>
                                 </Avatar>
                                 
-                                {/* Overlay de Upload no Avatar */}
                                 <div 
                                     className="absolute inset-0 bg-black/60 rounded-full flex flex-col items-center justify-center text-white opacity-0 group-hover/avatar:opacity-100 transition-opacity cursor-pointer border-[6px] border-transparent"
                                     onClick={() => avatarInputRef.current?.click()}
@@ -197,12 +198,9 @@ export function AppearanceLoader({
                                 </div>
                             </div>
 
-                            {/* Botões do Avatar */}
                             <div className="flex gap-2">
                                 <Button 
-                                    type="button" 
-                                    variant="outline" 
-                                    size="sm" 
+                                    type="button" variant="outline" size="sm" 
                                     className="h-7 text-xs px-2 shadow-sm"
                                     onClick={() => avatarInputRef.current?.click()}
                                 >
@@ -210,10 +208,8 @@ export function AppearanceLoader({
                                 </Button>
                                 {previewAvatar && (
                                     <Button 
-                                        type="button" 
-                                        variant="ghost" 
-                                        size="sm" 
-                                        className="h-7 text-xs px-2 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                        type="button" variant="ghost" size="sm" 
+                                        className="h-7 text-xs px-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
                                         onClick={() => { setPreviewAvatar(""); if(avatarInputRef.current) avatarInputRef.current.value = ""; }}
                                     >
                                         <Trash2 className="w-3 h-3" />
@@ -226,7 +222,7 @@ export function AppearanceLoader({
                         <div className="flex-1 w-full pt-4 md:pt-20 space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
-                                    <Label htmlFor="name" className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 font-medium">
+                                    <Label htmlFor="name" className="flex items-center gap-2 text-muted-foreground font-medium">
                                         <User className="h-4 w-4" /> Nome de Exibição
                                     </Label>
                                     <Input 
@@ -234,29 +230,29 @@ export function AppearanceLoader({
                                         value={previewName}
                                         onChange={(e) => setPreviewName(e.target.value)}
                                         placeholder="Seu nome" 
-                                        className="h-11 bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 focus-visible:ring-indigo-500 transition-all" 
+                                        className="h-11 bg-muted/50 border-border focus-visible:ring-primary transition-all" 
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="email" className="flex items-center gap-2 text-zinc-600 dark:text-zinc-400 font-medium">
+                                    <Label htmlFor="email" className="flex items-center gap-2 text-muted-foreground font-medium">
                                         <Mail className="h-4 w-4" /> Email de Login
                                     </Label>
                                     <Input 
                                         name="email" 
                                         defaultValue={userEmail} 
                                         placeholder="seu@email.com" 
-                                        className="h-11 bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 focus-visible:ring-indigo-500 transition-all" 
+                                        className="h-11 bg-muted/50 border-border focus-visible:ring-primary transition-all" 
                                     />
                                 </div>
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="bio" className="text-zinc-600 dark:text-zinc-400 font-medium">Bio / Objetivo Atual</Label>
+                                <Label htmlFor="bio" className="text-muted-foreground font-medium">Bio / Objetivo Atual</Label>
                                 <Textarea 
                                     name="bio" 
                                     defaultValue={userBio || ""} 
                                     placeholder="O que você está focando no momento?" 
-                                    className="bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 resize-none h-24 focus-visible:ring-indigo-500" 
+                                    className="bg-muted/50 border-border resize-none h-24 focus-visible:ring-primary" 
                                 />
                             </div>
                         </div>
@@ -264,91 +260,79 @@ export function AppearanceLoader({
                 </CardContent>
             </Card>
 
-            {/* 2. PERSONALIZAÇÃO DE INTERFACE (CORES E TEMAS) */}
+            {/* 2. PERSONALIZAÇÃO DE INTERFACE */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 
                 {/* Cores */}
-                <Card className="md:col-span-2 border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm">
+                <Card className="md:col-span-2 border-border bg-card shadow-sm">
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
-                            <Palette className="h-5 w-5 text-indigo-500" /> Cor de Destaque
+                            <Palette className="h-5 w-5 text-primary" /> Cor de Destaque
                         </CardTitle>
                         <CardDescription>Define a personalidade visual do seu sistema.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="grid grid-cols-3 sm:grid-cols-6 gap-4">
                             {THEME_COLORS.map((color) => (
-                                <label key={color.value} className="relative cursor-pointer group">
-                                    <input 
-                                        type="radio" 
-                                        name="accentColor" 
-                                        value={color.value} 
-                                        className="peer sr-only" 
-                                        checked={selectedColor === color.value}
-                                        onChange={() => setSelectedColor(color.value)}
-                                    />
-                                    <div className={cn(
-                                        "flex flex-col items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all duration-200",
-                                        selectedColor === color.value 
-                                            ? `bg-white dark:bg-zinc-900 border-${color.value}-500 ring-1 ${color.ring} ring-offset-2 dark:ring-offset-zinc-950`
-                                            : "border-transparent bg-zinc-50 dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                                    )}>
-                                        <div className={cn("w-6 h-6 rounded-full shadow-sm", color.class)} />
-                                        <span className="text-[10px] font-semibold text-zinc-600 dark:text-zinc-400">{color.name}</span>
-                                    </div>
-                                </label>
+                                <div 
+                                    key={color.name}
+                                    onClick={() => setThemeColor(color.name)} // Muda o contexto global
+                                    className={cn(
+                                        "cursor-pointer relative flex flex-col items-center justify-center gap-2 p-3 rounded-xl border-2 transition-all duration-200 hover:bg-muted",
+                                        themeColor === color.name 
+                                            ? "border-primary bg-primary/5 ring-1 ring-primary ring-offset-2 dark:ring-offset-zinc-950"
+                                            : "border-transparent bg-muted/30"
+                                    )}
+                                >
+                                    <div className={cn("w-6 h-6 rounded-full shadow-sm", color.bg)} />
+                                    <span className="text-[10px] font-semibold text-muted-foreground">{color.label}</span>
+                                    {themeColor === color.name && (
+                                        <div className="absolute top-1 right-1 bg-primary text-primary-foreground rounded-full p-0.5">
+                                            <Check className="h-2 w-2" />
+                                        </div>
+                                    )}
+                                </div>
                             ))}
                         </div>
                     </CardContent>
                 </Card>
 
                 {/* Tema (Claro/Escuro) */}
-                <Card className="border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-sm">
+                <Card className="border-border bg-card shadow-sm">
                     <CardHeader>
                         <CardTitle className="text-base">Modo</CardTitle>
                         <CardDescription>Aparência geral.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-2">
-                        <div 
-                            onClick={() => setTheme("light")} 
-                            className={cn(
-                                "flex items-center gap-3 p-2.5 rounded-lg border-2 cursor-pointer transition-all",
-                                theme === 'light' ? "border-zinc-900 bg-zinc-50 dark:border-zinc-100" : "border-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900"
-                            )}
-                        >
-                            <Sun className="w-4 h-4 text-orange-500" />
-                            <span className="text-sm font-medium">Claro</span>
-                        </div>
-                        <div 
-                            onClick={() => setTheme("dark")} 
-                            className={cn(
-                                "flex items-center gap-3 p-2.5 rounded-lg border-2 cursor-pointer transition-all",
-                                theme === 'dark' ? "border-indigo-500 bg-zinc-900" : "border-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900"
-                            )}
-                        >
-                            <Moon className="w-4 h-4 text-indigo-500" />
-                            <span className="text-sm font-medium">Escuro</span>
-                        </div>
-                        <div 
-                            onClick={() => setTheme("system")} 
-                            className={cn(
-                                "flex items-center gap-3 p-2.5 rounded-lg border-2 cursor-pointer transition-all",
-                                theme === 'system' ? "border-zinc-500" : "border-transparent hover:bg-zinc-100 dark:hover:bg-zinc-900"
-                            )}
-                        >
-                            <Laptop className="w-4 h-4 text-zinc-500" />
-                            <span className="text-sm font-medium">Sistema</span>
-                        </div>
+                        {[
+                            { id: "light", icon: Sun, label: "Claro" },
+                            { id: "dark", icon: Moon, label: "Escuro" },
+                            { id: "system", icon: Laptop, label: "Sistema" }
+                        ].map((item) => (
+                            <div 
+                                key={item.id}
+                                onClick={() => setTheme(item.id)} 
+                                className={cn(
+                                    "flex items-center gap-3 p-2.5 rounded-lg border-2 cursor-pointer transition-all",
+                                    theme === item.id 
+                                        ? "border-primary bg-primary/10 text-primary font-medium" 
+                                        : "border-transparent hover:bg-muted text-muted-foreground"
+                                )}
+                            >
+                                <item.icon className={cn("w-4 h-4", theme === item.id ? "text-primary" : "text-muted-foreground")} />
+                                <span className="text-sm">{item.label}</span>
+                            </div>
+                        ))}
                     </CardContent>
                 </Card>
             </div>
 
             {/* BOTÃO SALVAR */}
-            <div className="flex justify-end pt-6 border-t border-zinc-100 dark:border-zinc-800">
-                <Button type="submit" disabled={isLoading} className="bg-zinc-900 dark:bg-white text-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200 font-bold px-8 h-12 rounded-xl shadow-xl transition-transform hover:scale-[1.02]">
+            <div className="flex justify-end pt-6 border-t border-border">
+                <Button type="submit" disabled={isLoading} className="bg-primary text-primary-foreground hover:bg-primary/90 font-bold px-8 h-12 rounded-xl shadow-xl transition-transform hover:scale-[1.02]">
                     {isLoading ? (
                         <>
-                            <Loader2 className="h-4 w-4 animate-spin mr-2" /> Salvando Perfil...
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" /> Salvando...
                         </>
                     ) : (
                         <>

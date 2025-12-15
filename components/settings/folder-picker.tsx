@@ -28,14 +28,11 @@ interface FolderPickerProps {
 export function FolderPicker({ onSelect, currentPath }: FolderPickerProps) {
     const [open, setOpen] = useState(false);
     
-    // Estado local para navegação
     const [browsingPath, setBrowsingPath] = useState(currentPath);
     const [folders, setFolders] = useState<{name: string, path: string, type?: string}[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // ✅ CORREÇÃO: Definimos a função ANTES de usar no useEffect
-    // Usamos useCallback para garantir que ela não seja recriada a cada render
     const loadFolders = useCallback(async (path: string) => {
         setIsLoading(true);
         setError(null);
@@ -45,7 +42,6 @@ export function FolderPicker({ onSelect, currentPath }: FolderPickerProps) {
             
             if (result.success && result.directories) {
                 setFolders(result.directories);
-                // Se retornou um path válido (e não é a lista de drives "ROOT"), atualiza o input
                 if (result.path && !result.isRoot) {
                     setBrowsingPath(result.path);
                 } else if (result.isRoot) {
@@ -53,7 +49,6 @@ export function FolderPicker({ onSelect, currentPath }: FolderPickerProps) {
                 }
             } else {
                 setError(result.error || "Erro desconhecido");
-                // Não limpamos o path para o usuário poder corrigir se digitou errado
             }
         } catch (e) {
             setError("Erro de conexão com o sistema de arquivos.");
@@ -62,17 +57,15 @@ export function FolderPicker({ onSelect, currentPath }: FolderPickerProps) {
         }
     }, []);
 
-    // Efeito para carregar quando abre
     useEffect(() => {
         if (open) {
-            // Se o caminho atual parecer inválido ou vazio, começa na Home ou Root
             loadFolders(browsingPath || "ROOT");
         }
-    }, [open, loadFolders]); // Removemos browsingPath das dependências para evitar loop infinito
+    }, [open, loadFolders]);
 
     const handleSelect = () => {
         if (browsingPath === "Este Computador") {
-            toast.error("Por favor, selecione uma pasta específica, não a lista de discos.");
+            toast.error("Por favor, selecione uma pasta específica.");
             return;
         }
         onSelect(browsingPath);
@@ -82,22 +75,17 @@ export function FolderPicker({ onSelect, currentPath }: FolderPickerProps) {
     const handleGoUp = () => {
         if (browsingPath === "Este Computador") return;
         
-        // Lógica simples para subir um nível
-        // Se estiver em C:\, vai para "ROOT" (lista de discos)
         if (browsingPath.match(/^[a-zA-Z]:\\?$/)) {
             loadFolders("ROOT");
             return;
         }
         
-        // Pega o diretório pai (funciona em Windows e Linux)
-        // ex: C:\Users\Luiz -> C:\Users
         const separator = browsingPath.includes("\\") ? "\\" : "/";
         const parts = browsingPath.split(separator).filter(Boolean);
-        parts.pop(); // Remove a última pasta
+        parts.pop(); 
         
-        const newPath = parts.join(separator) + (separator === "\\" && parts.length === 1 ? "\\" : ""); // Mantém a barra se for raiz (C:\)
+        const newPath = parts.join(separator) + (separator === "\\" && parts.length === 1 ? "\\" : ""); 
         
-        // Se ficou vazio, vai para ROOT
         if (!newPath) {
             loadFolders("ROOT");
         } else {
@@ -108,14 +96,14 @@ export function FolderPicker({ onSelect, currentPath }: FolderPickerProps) {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline" size="icon" className="shrink-0 bg-zinc-50 dark:bg-zinc-800" title="Navegar nas pastas">
-                    <FolderOpen className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                <Button variant="outline" size="icon" className="shrink-0 bg-secondary hover:bg-secondary/80 border-border" title="Navegar nas pastas">
+                    <FolderOpen className="h-4 w-4 text-primary" />
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
+            <DialogContent className="max-w-2xl bg-background border-border">
                 <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2 text-zinc-900 dark:text-zinc-100">
-                        <HardDrive className="h-5 w-5 text-indigo-500" /> Explorador de Arquivos
+                    <DialogTitle className="flex items-center gap-2 text-foreground">
+                        <HardDrive className="h-5 w-5 text-primary" /> Explorador de Arquivos
                     </DialogTitle>
                 </DialogHeader>
                 
@@ -123,13 +111,13 @@ export function FolderPicker({ onSelect, currentPath }: FolderPickerProps) {
                     {/* Barra de Navegação */}
                     <div className="flex gap-2 items-center">
                         <div className="flex gap-1">
-                            <Button variant="outline" size="icon" onClick={() => loadFolders("ROOT")} title="Este Computador / Discos">
+                            <Button variant="outline" size="icon" onClick={() => loadFolders("ROOT")} title="Este Computador" className="text-muted-foreground hover:text-foreground">
                                 <Monitor className="h-4 w-4" />
                             </Button>
-                            <Button variant="outline" size="icon" onClick={() => loadFolders("")} title="Pasta do Usuário (Home)">
+                            <Button variant="outline" size="icon" onClick={() => loadFolders("")} title="Pasta do Usuário" className="text-muted-foreground hover:text-foreground">
                                 <Home className="h-4 w-4" />
                             </Button>
-                            <Button variant="outline" size="icon" onClick={handleGoUp} title="Subir Nível">
+                            <Button variant="outline" size="icon" onClick={handleGoUp} title="Subir Nível" className="text-muted-foreground hover:text-foreground">
                                 <ArrowUp className="h-4 w-4" />
                             </Button>
                         </div>
@@ -138,12 +126,12 @@ export function FolderPicker({ onSelect, currentPath }: FolderPickerProps) {
                                 value={browsingPath} 
                                 onChange={(e) => setBrowsingPath(e.target.value)}
                                 onKeyDown={(e) => e.key === 'Enter' && loadFolders(browsingPath)}
-                                className="pr-16 font-mono text-xs bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
+                                className="pr-16 font-mono text-xs bg-muted/50 border-border focus-visible:ring-primary"
                             />
                             <Button 
                                 size="sm" 
                                 variant="ghost" 
-                                className="absolute right-1 top-1 h-7 text-xs text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50"
+                                className="absolute right-1 top-1 h-7 text-xs text-primary hover:text-primary hover:bg-primary/10"
                                 onClick={() => loadFolders(browsingPath)}
                             >
                                 Ir
@@ -152,12 +140,12 @@ export function FolderPicker({ onSelect, currentPath }: FolderPickerProps) {
                     </div>
 
                     {/* Área de Lista */}
-                    <div className="border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden relative min-h-[300px] bg-zinc-50/30 dark:bg-zinc-900/30">
+                    <div className="border border-border rounded-lg overflow-hidden relative min-h-[300px] bg-muted/20">
                         {isLoading && (
-                            <div className="absolute inset-0 z-10 bg-white/50 dark:bg-black/50 backdrop-blur-sm flex items-center justify-center">
+                            <div className="absolute inset-0 z-10 bg-background/80 backdrop-blur-sm flex items-center justify-center">
                                 <div className="flex flex-col items-center gap-2">
-                                    <div className="h-6 w-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                                    <span className="text-xs font-medium text-indigo-600">Lendo disco...</span>
+                                    <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                                    <span className="text-xs font-medium text-primary">Lendo disco...</span>
                                 </div>
                             </div>
                         )}
@@ -165,7 +153,7 @@ export function FolderPicker({ onSelect, currentPath }: FolderPickerProps) {
                         <ScrollArea className="h-[300px]">
                             <div className="p-2 space-y-1">
                                 {error && (
-                                    <div className="flex flex-col items-center justify-center h-full py-10 text-red-500 gap-2">
+                                    <div className="flex flex-col items-center justify-center h-full py-10 text-destructive gap-2">
                                         <AlertCircle className="h-8 w-8 opacity-50" />
                                         <p className="text-sm">{error}</p>
                                         <Button variant="outline" size="sm" onClick={handleGoUp} className="mt-2">Voltar</Button>
@@ -176,25 +164,25 @@ export function FolderPicker({ onSelect, currentPath }: FolderPickerProps) {
                                     <button
                                         key={folder.path}
                                         onClick={() => loadFolders(folder.path)}
-                                        className="w-full flex items-center gap-3 p-2.5 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-left transition-all group border border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50"
+                                        className="w-full flex items-center gap-3 p-2.5 rounded-md text-left transition-all group border border-transparent hover:bg-primary/10 hover:border-primary/20"
                                     >
-                                        {/* Ícone diferente para Disco ou Pasta */}
                                         {folder.type === 'drive' ? (
-                                            <HardDrive className="h-5 w-5 text-zinc-500 group-hover:text-indigo-600" />
+                                            <HardDrive className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
                                         ) : (
-                                            <Folder className="h-5 w-5 text-indigo-300 fill-indigo-100 dark:text-indigo-700 dark:fill-indigo-900/50 group-hover:text-indigo-500" />
+                                            // Ícone de pasta adaptável ao tema
+                                            <Folder className="h-5 w-5 text-primary/40 fill-primary/10 group-hover:text-primary group-hover:fill-primary/20" />
                                         )}
                                         
-                                        <span className="text-sm truncate flex-1 text-zinc-700 dark:text-zinc-300 font-medium">
+                                        <span className="text-sm truncate flex-1 text-foreground font-medium">
                                             {folder.name}
                                         </span>
                                         
-                                        <ChevronRight className="h-4 w-4 text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        <ChevronRight className="h-4 w-4 text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity" />
                                     </button>
                                 ))}
                                 
                                 {!error && !isLoading && folders.length === 0 && (
-                                    <div className="flex flex-col items-center justify-center py-12 text-zinc-400">
+                                    <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                                         <FolderOpen className="h-10 w-10 mb-2 opacity-20" />
                                         <p className="text-xs">Pasta vazia</p>
                                     </div>
@@ -204,13 +192,13 @@ export function FolderPicker({ onSelect, currentPath }: FolderPickerProps) {
                     </div>
 
                     <div className="flex justify-between items-center pt-2">
-                        <p className="text-[10px] text-zinc-400">
-                            SQLite requer permissão de escrita na pasta.
+                        <p className="text-[10px] text-muted-foreground">
+                            O sistema requer permissão de escrita.
                         </p>
                         <div className="flex gap-2">
                             <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
-                            <Button onClick={handleSelect} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md transition-all hover:scale-105">
-                                <Check className="h-4 w-4 mr-2" /> Selecionar Esta Pasta
+                            <Button onClick={handleSelect} className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-md">
+                                <Check className="h-4 w-4 mr-2" /> Selecionar
                             </Button>
                         </div>
                     </div>

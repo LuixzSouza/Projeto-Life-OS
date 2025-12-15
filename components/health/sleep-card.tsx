@@ -1,54 +1,55 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { Moon, Plus, ArrowRight, BedDouble, AlarmClock, BrainCircuit, Battery } from "lucide-react";
+import { Moon, Plus, ArrowRight, BedDouble, AlarmClock, BrainCircuit, Battery, Loader2 } from "lucide-react";
 import { logMetric } from "@/app/(dashboard)/health/actions";
 import { toast } from "sonner";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { Label } from "@/components/ui/label";
 
 export function SleepCard({ value }: { value: number | string }) {
     const [isOpen, setIsOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const hours = Number(value) || 0;
 
     // --- LÓGICA DE ANÁLISE DO SONO ---
     const getSleepAnalysis = (h: number) => {
         if (h === 0) return {
             status: "Sem dados",
-            color: "bg-zinc-100 text-zinc-500",
-            barColor: "bg-zinc-200",
+            color: "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400",
+            barColor: "bg-zinc-200 dark:bg-zinc-700",
             icon: BedDouble,
             tip: "Registre seu sono para receber análises."
         };
         if (h < 5) return { 
             status: "Crítico", 
-            color: "bg-red-100 text-red-700 border-red-200", 
+            color: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400", 
             barColor: "bg-red-500",
             icon: Battery,
             tip: "Cuidado! Privação de sono afeta a imunidade e o foco. Tente sonecas de 20min."
         };
         if (h < 7) return { 
             status: "Insuficiente", 
-            color: "bg-orange-100 text-orange-700 border-orange-200", 
+            color: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400", 
             barColor: "bg-orange-500",
             icon: AlarmClock,
             tip: "Quase lá. Tente dormir 30min mais cedo hoje para melhorar a recuperação."
         };
         if (h <= 9) return { 
             status: "Excelente", 
-            color: "bg-indigo-100 text-indigo-700 border-indigo-200", 
+            color: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400", 
             barColor: "bg-indigo-500",
             icon: Moon,
             tip: "Ótimo descanso! Seu corpo e mente estão recuperados para hoje."
         };
         return { 
             status: "Excesso", 
-            color: "bg-blue-100 text-blue-700 border-blue-200", 
+            color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400", 
             barColor: "bg-blue-500",
             icon: BrainCircuit,
             tip: "Dormir demais pode causar letargia. Tente manter uma rotina consistente."
@@ -59,13 +60,26 @@ export function SleepCard({ value }: { value: number | string }) {
     const percentage = Math.min((hours / 8) * 100, 100); // Baseado em meta de 8h
 
     const handleSave = async (formData: FormData) => {
-        await logMetric(formData);
-        toast.success("Sono registrado! Bons sonhos. 💤");
-        setIsOpen(false);
+        setIsLoading(true);
+        try {
+            const val = parseFloat(formData.get("value") as string);
+            if(isNaN(val) || val < 0 || val > 24) {
+                toast.error("Insira um valor válido entre 0 e 24h.");
+                return;
+            }
+
+            await logMetric(formData);
+            toast.success("Sono registrado! Bons sonhos. 💤");
+            setIsOpen(false);
+        } catch {
+            toast.error("Erro ao salvar.");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
-        <Card className="border-0 shadow-sm bg-white dark:bg-zinc-900 ring-1 ring-zinc-200 dark:ring-zinc-800 h-full flex flex-col relative overflow-hidden group">
+        <Card className="border border-zinc-200 dark:border-zinc-800 shadow-sm bg-white dark:bg-zinc-900 h-full flex flex-col relative overflow-hidden group hover:border-indigo-200 dark:hover:border-indigo-900 transition-colors">
             
             {/* Background Decorativo Suave */}
             <div className={`absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl opacity-20 -translate-y-1/2 translate-x-1/2 transition-colors duration-500 ${analysis.barColor}`}></div>
@@ -90,7 +104,7 @@ export function SleepCard({ value }: { value: number | string }) {
                     {/* Botão de Registro Rápido */}
                     <Dialog open={isOpen} onOpenChange={setIsOpen}>
                         <DialogTrigger asChild>
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-zinc-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full">
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-zinc-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-full transition-colors">
                                 <Plus className="h-5 w-5" />
                             </Button>
                         </DialogTrigger>
@@ -103,19 +117,23 @@ export function SleepCard({ value }: { value: number | string }) {
                                 <input type="hidden" name="type" value="SLEEP" />
                                 <div className="space-y-2">
                                     <Label className="text-xs uppercase font-bold text-zinc-500">Horas</Label>
-                                    <div className="flex items-center gap-2">
+                                    <div className="relative">
                                         <Input 
                                             name="value" 
                                             type="number" 
                                             step="0.5" 
                                             placeholder="Ex: 7.5" 
-                                            className="text-2xl font-bold h-12" 
+                                            className="text-2xl font-bold h-12 pr-8" 
                                             autoFocus 
+                                            required
                                         />
-                                        <span className="text-sm font-medium text-zinc-400">horas</span>
+                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-zinc-400">h</span>
                                     </div>
                                 </div>
-                                <Button className="w-full bg-indigo-600 hover:bg-indigo-700">Salvar Registro</Button>
+                                <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white" disabled={isLoading}>
+                                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                                    Salvar Registro
+                                </Button>
                             </form>
                         </DialogContent>
                     </Dialog>
@@ -136,7 +154,7 @@ export function SleepCard({ value }: { value: number | string }) {
                 </div>
 
                 {/* Dica do Coach (Feedback) */}
-                <div className="mt-4 p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg border border-zinc-100 dark:border-zinc-800">
+                <div className="mt-4 p-3 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg border border-zinc-100 dark:border-zinc-800/50">
                     <p className="text-xs text-zinc-600 dark:text-zinc-300 italic leading-relaxed">
                         &quot;{analysis.tip}&quot;
                     </p>
@@ -150,5 +168,5 @@ export function SleepCard({ value }: { value: number | string }) {
 
             </CardContent>
         </Card>
-    )
+    );
 }

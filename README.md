@@ -139,3 +139,7 @@ Este é um projeto pessoal open-source. Sinta-se à vontade para abrir Issues ou
 Este projeto está sob a licença MIT. Você é livre para usar, modificar e distribuir.
 
 <p align="center"> Feito com 💜 para produtividade máxima. </p>
+
+npx prisma generate
+
+npx prisma db push

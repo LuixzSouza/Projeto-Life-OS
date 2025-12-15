@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { 
   Select, 
   SelectContent, 
@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/select";
 import { updateAISettings } from "@/app/(dashboard)/settings/actions"; 
 import { toast } from "sonner";
-import { Bot, Zap, Sparkles, Cloud, HardDrive, Cpu, Check } from "lucide-react";
+import { Bot, Zap, Sparkles, Cloud, HardDrive, Cpu, Check, Box } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ModelSelectorProps {
@@ -18,10 +18,10 @@ interface ModelSelectorProps {
   currentModel: string;
 }
 
-// Configuração centralizada das opções para facilitar a renderização visual
+// Configuração centralizada
 const MODEL_OPTIONS = [
     {
-        category: "Nuvem (Rápido & Inteligente)",
+        category: "Nuvem (Alta Performance)",
         items: [
             { value: "groq:llama-3.3-70b-versatile", label: "Groq (Llama 3.3)", icon: Zap, color: "text-orange-500" },
             { value: "google:gemini-1.5-flash", label: "Gemini Flash", icon: Sparkles, color: "text-blue-500" },
@@ -30,17 +30,16 @@ const MODEL_OPTIONS = [
         ]
     },
     {
-        category: "Local (Privacidade)",
+        category: "Local (Privacidade Total)",
         items: [
-            { value: "ollama:llama3", label: "Llama 3 (Local)", icon: HardDrive, color: "text-zinc-500" },
-            { value: "ollama:mistral", label: "Mistral (Local)", icon: HardDrive, color: "text-zinc-500" },
+            { value: "ollama:llama3", label: "Llama 3 (Local)", icon: HardDrive, color: "text-muted-foreground" },
+            { value: "ollama:mistral", label: "Mistral (Local)", icon: HardDrive, color: "text-muted-foreground" },
+            { value: "ollama:deepseek-r1", label: "DeepSeek (Local)", icon: Box, color: "text-muted-foreground" },
         ]
     }
 ];
 
 export function ModelSelector({ currentProvider, currentModel }: ModelSelectorProps) {
-  // Estado local combinando "provider:model" para o Select funcionar
-  // Se vier vazio do banco, forçamos um padrão seguro
   const initialValue = currentProvider && currentModel 
     ? `${currentProvider}:${currentModel}` 
     : "ollama:llama3";
@@ -48,29 +47,23 @@ export function ModelSelector({ currentProvider, currentModel }: ModelSelectorPr
   const [value, setValue] = useState(initialValue);
   const [isPending, setIsPending] = useState(false);
 
-  // Encontra a opção atual para mostrar o ícone correto no Trigger
   const selectedOption = MODEL_OPTIONS.flatMap(g => g.items).find(i => i.value === value);
   const SelectedIcon = selectedOption?.icon || Bot;
 
   const handleValueChange = async (newValue: string) => {
-    setValue(newValue); // Atualiza UI imediatamente (Optimistic)
+    setValue(newValue);
     setIsPending(true);
     
     const [newProvider, newModel] = newValue.split(":");
-
     const formData = new FormData();
     formData.append("aiProvider", newProvider);
     formData.append("aiModel", newModel);
     
-    // Preserva a persona atual para não apagar (opcional, dependendo da sua action)
-    // formData.append("aiPersona", "..."); 
-
     try {
         await updateAISettings(formData);
-        toast.success(`Cérebro alterado para ${selectedOption?.label || newProvider}`);
+        toast.success(`Modelo alterado para ${selectedOption?.label || newProvider}`);
     } catch (error) {
         toast.error("Erro ao salvar preferência.");
-        // Reverte em caso de erro (opcional)
         setValue(initialValue); 
     } finally {
         setIsPending(false);
@@ -81,34 +74,36 @@ export function ModelSelector({ currentProvider, currentModel }: ModelSelectorPr
     <Select value={value} onValueChange={handleValueChange} disabled={isPending}>
       <SelectTrigger 
         className={cn(
-            "h-9 px-3 text-xs font-medium border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 transition-all focus:ring-indigo-500/20",
-            "hover:border-indigo-200 dark:hover:border-indigo-900",
-            "min-w-[180px] w-auto"
+            "h-9 px-3 text-xs font-medium border-border bg-background transition-all focus:ring-primary/20",
+            "hover:border-primary/30 hover:bg-muted/30",
+            "min-w-[180px] w-auto shadow-sm"
         )}
       >
-        <div className="flex items-center gap-2">
-           <div className={cn("p-0.5 rounded-sm", selectedOption?.color ? "bg-zinc-50 dark:bg-zinc-800" : "")}>
-                <SelectedIcon className={cn("h-3.5 w-3.5", selectedOption?.color)} />
+        <div className="flex items-center gap-2.5">
+           <div className={cn("p-0.5 rounded-sm bg-muted/50", selectedOption?.color)}>
+                <SelectedIcon className="h-3.5 w-3.5" />
            </div>
-           <span className="truncate">
+           <span className="truncate text-foreground">
                {selectedOption?.label || "Selecione a IA"}
            </span>
         </div>
       </SelectTrigger>
       
-      <SelectContent className="max-h-[300px]">
+      <SelectContent className="max-h-[400px]">
         {MODEL_OPTIONS.map((group) => (
             <div key={group.category}>
-                <div className="px-2 py-1.5 text-[10px] font-bold text-zinc-400 uppercase tracking-wider bg-zinc-50/50 dark:bg-zinc-900/50">
+                <div className="px-2 py-2 text-[10px] font-bold text-muted-foreground uppercase tracking-wider bg-muted/30">
                     {group.category}
                 </div>
                 {group.items.map((item) => (
-                    <SelectItem key={item.value} value={item.value} className="text-xs cursor-pointer focus:bg-indigo-50 dark:focus:bg-indigo-900/20 focus:text-indigo-900 dark:focus:text-indigo-100">
-                        <div className="flex items-center gap-2.5">
+                    <SelectItem 
+                        key={item.value} 
+                        value={item.value} 
+                        className="text-xs cursor-pointer focus:bg-primary/5 focus:text-primary pl-2"
+                    >
+                        <div className="flex items-center gap-2.5 w-full">
                             <item.icon className={cn("h-3.5 w-3.5", item.color)} />
-                            <span>{item.label}</span>
-                            {/* Check visual se estiver selecionado */}
-                            {value === item.value && <Check className="ml-auto h-3 w-3 text-indigo-600" />}
+                            <span className="flex-1">{item.label}</span>
                         </div>
                     </SelectItem>
                 ))}

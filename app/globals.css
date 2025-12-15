@@ -1,5 +1,6 @@
 @import "tailwindcss";
-@import "tw-animate-css";
+
+@plugin "tailwindcss-animate";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -94,8 +95,8 @@
   --accent: oklch(0.274 0.006 286.033);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
+  --border: oklch(0.274 0.006 286.033);
+  --input: oklch(0.274 0.006 286.033);
   --ring: oklch(0.552 0.016 285.938);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
@@ -108,7 +109,7 @@
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.274 0.006 286.033);
   --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-border: oklch(0.274 0.006 286.033);
   --sidebar-ring: oklch(0.552 0.016 285.938);
 }
 
@@ -121,64 +122,52 @@
   }
 }
 
-
-html,
-body {
-  height: 100%;
-}
-
-/* --- TEMAS DE CORES CORRIGIDOS (Compatível com Tailwind v4/Shadcn New York) --- */
-
-/* NOTA: Usamos hsl() explícito para sobrescrever o oklch do sistema.
-  Definimos cores para modo claro e modo escuro (.dark) para garantir contraste.
+/* TEMAS DINÂMICOS - CORREÇÃO PARA TAILWIND v4 
+   Aqui usamos hsl() ou oklch() completos, não apenas números.
 */
 
 /* TEMA AZUL (Padrão) */
-.theme-blue {
+[data-theme="theme-blue"] {
   --primary: hsl(221.2 83.2% 53.3%);
   --ring: hsl(221.2 83.2% 53.3%);
 }
-.dark .theme-blue {
-  --primary: hsl(217.2 91.2% 59.8%);
-  --ring: hsl(217.2 91.2% 59.8%);
-}
 
-/* TEMA VERDE (Foco/Produtividade) */
-.theme-green {
+/* TEMA VERDE */
+[data-theme="theme-green"] {
   --primary: hsl(142 76% 36%);
   --ring: hsl(142 76% 36%);
 }
-.dark .theme-green {
-  --primary: hsl(142 70% 50%); /* Verde mais claro no dark mode para leitura */
+.dark [data-theme="theme-green"] {
+  --primary: hsl(142 70% 50%);
   --ring: hsl(142 70% 50%);
 }
 
-/* TEMA LARANJA (Energia) */
-.theme-orange {
+/* TEMA LARANJA */
+[data-theme="theme-orange"] {
   --primary: hsl(24 95% 53%);
   --ring: hsl(24 95% 53%);
 }
-.dark .theme-orange {
+.dark [data-theme="theme-orange"] {
   --primary: hsl(24 100% 60%);
   --ring: hsl(24 100% 60%);
 }
 
-/* TEMA ROXO (Criatividade) */
-.theme-violet {
+/* TEMA ROXO */
+[data-theme="theme-violet"] {
   --primary: hsl(262 83% 58%);
   --ring: hsl(262 83% 58%);
 }
-.dark .theme-violet {
+.dark [data-theme="theme-violet"] {
   --primary: hsl(263 70% 65%);
   --ring: hsl(263 70% 65%);
 }
 
-/* TEMA ROSE (Elegância) */
-.theme-rose {
+/* TEMA ROSE */
+[data-theme="theme-rose"] {
   --primary: hsl(346 77% 49%);
   --ring: hsl(346 77% 49%);
 }
-.dark .theme-rose {
+.dark [data-theme="theme-rose"] {
   --primary: hsl(346 80% 65%);
   --ring: hsl(346 80% 65%);
 }

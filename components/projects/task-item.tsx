@@ -14,33 +14,31 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescri
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarIcon, Flag, Trash2, MoreVertical, Image as ImageIcon, X, LucideIcon, Clock, AlertCircle } from "lucide-react";
+import { CalendarIcon, Flag, Trash2, MoreVertical, Image as ImageIcon, X, AlertCircle, Clock, Save, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { CheckedState } from "@radix-ui/react-checkbox";
-
-interface PriorityInfo {
-    label: string;
-    color: string;
-    bgColor: string;
-    borderColor: string;
-}
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 
 interface TaskItemProps {
     task: Task; 
     viewMode: 'list' | 'compact'; 
 }
 
-const priorityConfig: Record<string, PriorityInfo> = {
-    HIGH: { label: "Alta", color: "text-red-700 dark:text-red-400", bgColor: "bg-red-50 dark:bg-red-950/30", borderColor: "border-red-200 dark:border-red-900" },
-    MEDIUM: { label: "Média", color: "text-amber-700 dark:text-amber-400", bgColor: "bg-amber-50 dark:bg-amber-950/30", borderColor: "border-amber-200 dark:border-amber-900" },
-    LOW: { label: "Baixa", color: "text-blue-700 dark:text-blue-400", bgColor: "bg-blue-50 dark:bg-blue-950/30", borderColor: "border-blue-200 dark:border-blue-900" },
+const PRIORITY_STYLES = {
+    HIGH: { label: "Alta", color: "text-red-600 bg-red-100 dark:bg-red-900/30 border-red-200 dark:border-red-800" },
+    MEDIUM: { label: "Média", color: "text-amber-600 bg-amber-100 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800" },
+    LOW: { label: "Baixa", color: "text-blue-600 bg-blue-100 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800" },
 };
 
-function MetadataRow({ label, children }: { label: string, children: React.ReactNode }) {
+function MetadataRow({ label, icon, children }: { label: string, icon: React.ReactNode, children: React.ReactNode }) {
     return (
-        <div className="flex items-center justify-between py-3 border-b border-zinc-100 dark:border-zinc-800 last:border-0">
-            <Label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">{label}</Label>
+        <div className="flex items-center justify-between py-4 border-b border-border last:border-0">
+            <div className="flex items-center gap-2 text-muted-foreground">
+                {icon}
+                <Label className="text-xs font-medium uppercase tracking-wider cursor-default">{label}</Label>
+            </div>
             <div className="flex items-center gap-2">{children}</div>
         </div>
     );
@@ -51,6 +49,7 @@ export function TaskItem({ task, viewMode }: TaskItemProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [isAlertOpen, setIsAlertOpen] = useState(false); 
     const [imageContent, setImageContent] = useState<string | null>(task.image);
+    const [isSaving, setIsSaving] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleToggle = (checked: CheckedState) => { 
@@ -90,6 +89,21 @@ export function TaskItem({ task, viewMode }: TaskItemProps) {
             }
         }
     };
+
+    const handleSubmit = async (formData: FormData) => {
+        setIsSaving(true);
+        if(imageContent) formData.set('image', imageContent); else formData.delete('image');
+        
+        try {
+            await updateTask(formData);
+            setIsOpen(false);
+            toast.success("Tarefa atualizada!");
+        } catch (error) {
+            toast.error("Erro ao salvar.");
+        } finally {
+            setIsSaving(false);
+        }
+    };
     
     const getDateLabel = (date: Date | null) => {
         if (!date) return null;
@@ -100,18 +114,18 @@ export function TaskItem({ task, viewMode }: TaskItemProps) {
 
     const isOverdue = task.dueDate && isPast(task.dueDate) && !isToday(task.dueDate) && !task.isDone;
     const dateLabel = getDateLabel(task.dueDate);
-    const priority = priorityConfig[task.priority] || priorityConfig.MEDIUM;
+    const priorityStyle = PRIORITY_STYLES[task.priority as keyof typeof PRIORITY_STYLES] || PRIORITY_STYLES.LOW;
 
     return (
         <div className={cn(
-            "group flex flex-col sm:flex-row bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden transition-all hover:border-indigo-300 dark:hover:border-indigo-700 hover:shadow-sm my-3 mx-3",
-            task.isDone ? "opacity-60 bg-zinc-50 dark:bg-zinc-950 border-transparent" : ""
+            "group flex flex-col sm:flex-row bg-card border border-border rounded-xl overflow-hidden transition-all hover:border-primary/50 hover:shadow-sm mb-3",
+            task.isDone ? "opacity-60 bg-muted/30 border-transparent" : ""
         )}>
             
-            {/* 1. MINIATURA DE IMAGEM (Apenas Lista) */}
+            {/* MINIATURA DE IMAGEM (Lista) */}
             {task.image && viewMode === 'list' && (
                  <div 
-                    className="w-full sm:w-32 h-32 sm:h-auto relative cursor-pointer group/image shrink-0 bg-zinc-100 dark:bg-zinc-950" 
+                    className="w-full sm:w-24 h-24 sm:h-auto relative cursor-pointer group/image shrink-0 bg-muted" 
                     onClick={() => setIsOpen(true)}
                 >
                     <img 
@@ -121,126 +135,124 @@ export function TaskItem({ task, viewMode }: TaskItemProps) {
                         loading="lazy" 
                     />
                     <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/image:opacity-100 transition-opacity flex items-center justify-center">
-                        <ImageIcon className="w-5 h-5 text-white drop-shadow-md" />
+                        <ImageIcon className="w-4 h-4 text-white drop-shadow-md" />
                     </div>
                 </div>
             )}
 
-            {/* 2. CONTEÚDO PRINCIPAL */}
+            {/* CONTEÚDO */}
             <div className={cn("flex flex-1 items-start gap-4 p-4", viewMode === 'compact' && 'py-3 items-center')}>
                 
                 <Checkbox 
                     checked={task.isDone} 
                     onCheckedChange={handleToggle}
-                    className="mt-1 h-5 w-5 rounded-full border-2 border-zinc-300 dark:border-zinc-600 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500 transition-all shadow-sm"
+                    className="mt-1 h-5 w-5 rounded-full border-2 border-muted-foreground/40 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500 transition-all"
                 />
                 
                 <div className="flex-1 min-w-0 cursor-pointer space-y-1.5" onClick={() => setIsOpen(true)}>
                     <div className="flex items-start justify-between gap-4">
                         <span className={cn(
-                            "font-medium text-sm sm:text-base leading-tight transition-all line-clamp-2",
-                            task.isDone && "line-through text-zinc-400 decoration-zinc-400"
+                            "font-medium text-sm sm:text-base leading-tight transition-all line-clamp-2 text-foreground",
+                            task.isDone && "line-through text-muted-foreground decoration-muted-foreground/50"
                         )}>
                             {task.title}
                         </span>
                     </div>
                     
-                    {/* Metadados (Data e Prioridade) */}
+                    {/* Metadados */}
                     <div className="flex flex-wrap items-center gap-2 h-5">
                         {dateLabel && viewMode === 'list' && (
-                            <span className={cn(
-                                "flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-md border",
+                            <Badge variant="outline" className={cn(
+                                "flex items-center gap-1.5 text-[10px] px-2 py-0 h-5 font-normal border",
                                 isOverdue 
-                                    ? "text-red-600 bg-red-50 border-red-100 dark:bg-red-900/20 dark:border-red-900" 
-                                    : "text-zinc-600 bg-zinc-50 border-zinc-200 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-400"
+                                    ? "text-red-600 bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-900" 
+                                    : "text-muted-foreground border-border"
                             )}>
                                 {isOverdue ? <AlertCircle className="h-3 w-3" /> : <CalendarIcon className="h-3 w-3" />} 
                                 {dateLabel}
-                            </span>
+                            </Badge>
                         )}
                         
                         {(task.priority === 'HIGH' || viewMode === 'list') && !task.isDone && (
-                            <span className={cn(
-                                "flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-md border uppercase tracking-wider",
-                                priority.color, priority.bgColor, priority.borderColor
+                            <Badge variant="outline" className={cn(
+                                "flex items-center gap-1 text-[10px] px-2 py-0 h-5 border font-semibold",
+                                priorityStyle.color
                             )}>
-                                <Flag className="h-3 w-3 fill-current" /> {priority.label}
-                            </span>
+                                <Flag className="h-3 w-3 fill-current" /> {priorityStyle.label}
+                            </Badge>
                         )}
                     </div>
                 </div>
 
-                {/* Botão de Opções (Hover) */}
-                <div className="hidden sm:block">
+                {/* Ações (Só aparece no Hover) */}
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity hidden sm:block">
                     <Sheet open={isOpen} onOpenChange={setIsOpen}>
                         <SheetTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
                                 <MoreVertical className="h-4 w-4" />
                             </Button>
                         </SheetTrigger>
                         
-                        {/* --- MODAL DE EDIÇÃO --- */}
-                        <SheetContent side="right" className="sm:max-w-md p-0 flex flex-col h-full bg-white dark:bg-zinc-950 border-l shadow-2xl">
+                        <SheetContent className="sm:max-w-md p-0 flex flex-col h-full border-l border-border bg-background">
                             
                             <SheetHeader className="sr-only">
-                                <SheetTitle>Editar</SheetTitle> 
-                                <SheetDescription>Detalhes da tarefa</SheetDescription>
+                                <SheetTitle>Editar Tarefa</SheetTitle> 
+                                <SheetDescription>Detalhes</SheetDescription>
                             </SheetHeader>
                             
-                            {/* Capa do Modal */}
-                            <div className="relative w-full bg-zinc-100 dark:bg-zinc-900 min-h-[200px] max-h-[250px] flex items-center justify-center border-b overflow-hidden group/header shrink-0">
+                            {/* Área da Imagem de Capa */}
+                            <div className="relative w-full bg-muted/30 min-h-[180px] max-h-[220px] flex items-center justify-center border-b border-border overflow-hidden shrink-0">
                                 {imageContent ? (
                                     <>
                                         <img src={imageContent} alt="Capa" className="w-full h-full object-cover" />
-                                        <div className="absolute top-4 right-4 flex gap-2">
-                                            <Button size="icon" variant="secondary" className="h-8 w-8 bg-white/80 backdrop-blur shadow-sm hover:bg-red-100 hover:text-red-600 transition-colors" onClick={() => setImageContent(null)}>
-                                                <X className="h-4 w-4" />
-                                            </Button>
-                                        </div>
+                                        <Button 
+                                            size="icon" 
+                                            variant="secondary" 
+                                            className="absolute top-4 right-4 h-8 w-8 bg-background/80 backdrop-blur shadow-sm hover:text-destructive" 
+                                            onClick={() => setImageContent(null)}
+                                        >
+                                            <X className="h-4 w-4" />
+                                        </Button>
                                     </>
                                 ) : (
                                     <div 
-                                        className="flex flex-col items-center gap-3 text-zinc-400 hover:text-indigo-600 transition-colors cursor-pointer w-full h-full justify-center p-8 bg-zinc-50/50 dark:bg-zinc-900/50 hover:bg-zinc-100 dark:hover:bg-zinc-800" 
+                                        className="flex flex-col items-center gap-3 text-muted-foreground hover:text-primary transition-colors cursor-pointer w-full h-full justify-center p-8 hover:bg-muted/50" 
                                         onClick={() => fileInputRef.current?.click()}
                                     >
-                                        <div className="p-4 bg-white dark:bg-zinc-800 rounded-full shadow-sm border border-zinc-100 dark:border-zinc-700">
+                                        <div className="p-4 bg-background rounded-full shadow-sm border border-border">
                                             <ImageIcon className="h-6 w-6" />
                                         </div>
-                                        <span className="text-xs font-semibold uppercase tracking-wide">Adicionar Imagem de Capa</span>
+                                        <span className="text-xs font-semibold uppercase tracking-wide">Adicionar Capa</span>
                                     </div>
                                 )}
                                 <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
                             </div>
 
-                            {/* Formulário */}
-                            <div className="flex-1 overflow-y-auto bg-white dark:bg-zinc-950" onPaste={handlePasteInModal} tabIndex={0}>
-                                <form id={`form-${task.id}`} action={async (fd) => {
-                                    if(imageContent) fd.set('image', imageContent); else fd.delete('image');
-                                    await updateTask(fd);
-                                    setIsOpen(false);
-                                    toast.success("Salvo!");
-                                }} className="p-6 space-y-6">
-                                    
+                            {/* Formulário de Edição */}
+                            <div className="flex-1 overflow-y-auto" onPaste={handlePasteInModal} tabIndex={0}>
+                                <form action={handleSubmit} id={`form-${task.id}`} className="p-6 space-y-6">
                                     <input type="hidden" name="id" value={task.id} />
                                     
+                                    {/* Título */}
                                     <div className="space-y-4">
                                          <Input 
                                             name="title" 
                                             defaultValue={task.title} 
                                             required 
-                                            className="text-xl font-bold bg-transparent border-0 px-0 focus-visible:ring-0 focus-visible:border-b-2 focus-visible:border-indigo-500 rounded-none h-auto placeholder:text-zinc-300 py-2" 
+                                            className="text-xl font-bold bg-transparent border-0 px-0 focus-visible:ring-0 focus-visible:border-b-2 focus-visible:border-primary rounded-none h-auto placeholder:text-muted-foreground py-2" 
                                             placeholder="Nome da tarefa..."
                                         />
                                     </div>
 
+                                    {/* Metadados */}
                                     <div className="space-y-1">
-                                        <MetadataRow label="Status">
+                                        <MetadataRow label="Status" icon={<div className="w-4 h-4 rounded-full border-2 border-muted-foreground/30" />}>
                                             <div className="flex items-center gap-2">
                                                 <Checkbox 
                                                     id={`status-modal-${task.id}`}
                                                     checked={task.isDone} 
                                                     onCheckedChange={handleToggle}
-                                                    className="h-5 w-5 rounded-full data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
+                                                    className="data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
                                                 />
                                                 <Label htmlFor={`status-modal-${task.id}`} className="text-sm font-medium cursor-pointer">
                                                     {task.isDone ? 'Concluída' : 'Pendente'}
@@ -248,9 +260,9 @@ export function TaskItem({ task, viewMode }: TaskItemProps) {
                                             </div>
                                         </MetadataRow>
                                         
-                                        <MetadataRow label="Prioridade">
+                                        <MetadataRow label="Prioridade" icon={<Flag className="h-4 w-4" />}>
                                             <Select name="priority" defaultValue={task.priority}>
-                                                <SelectTrigger className="w-[140px] h-9 text-xs"><SelectValue /></SelectTrigger>
+                                                <SelectTrigger className="w-[140px] h-8 text-xs bg-muted/30 border-border"><SelectValue /></SelectTrigger>
                                                 <SelectContent>
                                                     <SelectItem value="LOW">🔵 Baixa</SelectItem>
                                                     <SelectItem value="MEDIUM">🟡 Média</SelectItem>
@@ -259,51 +271,48 @@ export function TaskItem({ task, viewMode }: TaskItemProps) {
                                             </Select>
                                         </MetadataRow>
 
-                                        <MetadataRow label="Vencimento">
-                                            <div className="relative">
-                                                <Input 
-                                                    name="dueDate" 
-                                                    type="date" 
-                                                    className="w-auto h-9 text-xs pl-9"
-                                                    defaultValue={task.dueDate ? format(task.dueDate, "yyyy-MM-dd") : ""} 
-                                                />
-                                                <CalendarIcon className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
-                                            </div>
+                                        <MetadataRow label="Vencimento" icon={<CalendarIcon className="h-4 w-4" />}>
+                                            <Input 
+                                                name="dueDate" 
+                                                type="date" 
+                                                className="w-auto h-8 text-xs bg-muted/30 border-border"
+                                                defaultValue={task.dueDate ? format(new Date(task.dueDate), "yyyy-MM-dd") : ""} 
+                                            />
                                         </MetadataRow>
                                     </div>
                                     
-                                    <div className="rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800 p-6 text-center bg-zinc-50/50 dark:bg-zinc-900/50">
-                                        <p className="text-xs text-zinc-400">
-                                            Cole uma imagem aqui (<kbd className="font-mono bg-zinc-200 dark:bg-zinc-700 px-1 rounded">Ctrl+V</kbd>) para definir a capa.
+                                    {/* Área de Colagem */}
+                                    <div className="rounded-xl border border-dashed border-border p-6 text-center bg-muted/10">
+                                        <p className="text-xs text-muted-foreground">
+                                            Cole uma imagem aqui (<kbd className="font-mono bg-muted px-1 rounded text-foreground">Ctrl+V</kbd>) para definir a capa.
                                         </p>
                                     </div>
                                 </form>
                             </div>
 
                             {/* Rodapé */}
-                            <SheetFooter className="p-4 border-t bg-zinc-50/30 dark:bg-zinc-900/30 flex flex-row justify-between items-center sm:justify-between gap-4 shrink-0">
+                            <SheetFooter className="p-4 border-t border-border bg-muted/10 flex flex-row justify-between items-center sm:justify-between gap-4 shrink-0">
                                 <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
                                     <AlertDialogTrigger asChild>
-                                        <Button type="button" variant="ghost" size="sm" className="text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30">
+                                        <Button type="button" variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10">
                                             <Trash2 className="mr-2 h-4 w-4" /> Excluir
                                         </Button>
                                     </AlertDialogTrigger>
                                     <AlertDialogContent>
                                         <AlertDialogHeader>
                                             <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                                Esta ação não pode ser desfeita.
-                                            </AlertDialogDescription>
+                                            <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
                                         </AlertDialogHeader>
                                         <AlertDialogFooter>
                                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                            <AlertDialogAction onClick={handleDeleteConfirmed} className="bg-red-600 hover:bg-red-700">Sim, excluir</AlertDialogAction>
+                                            <AlertDialogAction onClick={handleDeleteConfirmed} className="bg-destructive hover:bg-destructive/90">Sim, excluir</AlertDialogAction>
                                         </AlertDialogFooter>
                                     </AlertDialogContent>
                                 </AlertDialog>
 
-                                <Button type="submit" form={`form-${task.id}`} className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-md px-8">
-                                    Salvar Alterações
+                                <Button type="submit" form={`form-${task.id}`} disabled={isSaving} className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm px-6">
+                                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                                    Salvar
                                 </Button>
                             </SheetFooter>
                         </SheetContent>

@@ -3,16 +3,17 @@
 import { StudySubject } from "@prisma/client";
 import { deleteSubject } from "@/app/(dashboard)/studies/actions";
 import { Button } from "@/components/ui/button";
-import { Plus, GitFork, BookOpen, Search, SortAsc, Filter, Loader2, Layers, ChevronRight } from "lucide-react";
+import { Plus, GitFork, BookOpen, Search, SortAsc, Filter, Layers, ChevronRight } from "lucide-react";
 import { useState, useMemo } from "react";
 import { toast } from "sonner"; 
 import { SubjectCard } from "./subject-card";
-import { SubjectFormDialog } from "./subject-form-dialog.tsx";
+import { SubjectFormDialog } from "./subject-form-dialog"; // Note: .tsx removed if using .jsx
 import { SubjectDetailsModal } from "./subject-details-modal";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from "next/link";
 import { Card, CardContent } from "../ui/card";
+import { cn } from "@/lib/utils";
 
 
 interface RichSubject extends StudySubject {
@@ -25,22 +26,23 @@ interface SubjectListProps {
 
 // Opções de Ordenação
 const SORT_OPTIONS = [
-    { value: 'title', label: 'Nome (A-Z)' },
     { value: 'totalMinutes', label: 'Mais Focado' },
+    { value: 'title', label: 'Nome (A-Z)' },
     { value: 'createdAt', label: 'Mais Recente' },
 ];
 
 export function SubjectGrid({ subjects }: SubjectListProps) {
     // --- ESTADOS DE CONTROLE GERAL ---
     const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
-    const [subjectToEdit, setSubjectToEdit] = useState<RichSubject | null>(null);
+    // ✅ O SubjectFormDialog é tipado no .jsx, mas aqui usamos a interface RichSubject
+    const [subjectToEdit, setSubjectToEdit] = useState<RichSubject | null>(null); 
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
     const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null); 
     
-    // ✅ NOVOS ESTADOS DE FILTRO E PESQUISA
+    // ✅ ESTADOS DE FILTRO E PESQUISA
     const [searchTerm, setSearchTerm] = useState('');
     const [sortBy, setSortBy] = useState('totalMinutes');
-    const [filterCategory, setFilterCategory] = useState('all'); // 'all' ou o nome da categoria
+    const [filterCategory, setFilterCategory] = useState('all'); 
 
     // --- FUNÇÕES DE INTERAÇÃO (CRUD) ---
 
@@ -55,7 +57,7 @@ export function SubjectGrid({ subjects }: SubjectListProps) {
     }
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Tem certeza que deseja deletar esta matéria e todos os seus registros?")) return;
+        if (!confirm("Tem certeza que deseja deletar esta matéria e todos os seus registros? Esta ação é irreversível.")) return;
         
         const toastId = toast.loading("Removendo matéria...");
         const result = await deleteSubject(id);
@@ -71,7 +73,7 @@ export function SubjectGrid({ subjects }: SubjectListProps) {
     
     const handleCloseForm = () => {
         setIsFormDialogOpen(false);
-        setSubjectToEdit(null);
+        setSubjectToEdit(null); // Limpa o estado de edição ao fechar
     }
     
     const handleCloseDetailsModal = () => {
@@ -93,7 +95,7 @@ export function SubjectGrid({ subjects }: SubjectListProps) {
             const term = searchTerm.toLowerCase();
             filtered = filtered.filter(sub => 
                 sub.title.toLowerCase().includes(term) || 
-                sub.category.toLowerCase().includes(term)
+                sub.category?.toLowerCase().includes(term)
             );
         }
 
@@ -119,8 +121,10 @@ export function SubjectGrid({ subjects }: SubjectListProps) {
             return 0;
         });
 
-        // 4. Agrupamento por Categoria (para o Select de filtro e visualização)
-        const categories = Array.from(new Set(subjects.map(s => s.category || 'Sem Categoria')));
+        // 4. Agrupamento de Categorias (para o Select de filtro)
+        // Garante que 'Sem Categoria' apareça para itens sem categoria definida
+        const categories = Array.from(new Set(subjects.map(s => s.category || 'Sem Categoria')))
+            .filter(cat => cat); // Remove qualquer valor nulo/vazio que possa ter passado
 
         return { list: filtered, categories };
 
@@ -139,7 +143,7 @@ export function SubjectGrid({ subjects }: SubjectListProps) {
                     Mapa de Matérias
                 </h3>
 
-                {/* Botão que inicia a Criação */}
+                {/* Botão Novo Nodo */}
                 <Button 
                     size="sm" 
                     className="gap-1 bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-500/30"
@@ -149,6 +153,7 @@ export function SubjectGrid({ subjects }: SubjectListProps) {
                 </Button>
             </div>
 
+            {/* Link Flashcards */}
             <Link href="/flashcards" className="block group">
                 <Card className="bg-gradient-to-br from-indigo-600 to-violet-600 border-none text-white hover:shadow-lg hover:shadow-indigo-500/20 transition-all cursor-pointer">
                     <CardContent className="p-5 flex items-center justify-between">
@@ -163,7 +168,7 @@ export function SubjectGrid({ subjects }: SubjectListProps) {
                 </Card>
             </Link>
 
-            {/* --- CONTROLES DE PESQUISA E FILTRO (Barra Dinâmica) --- */}
+            {/* --- CONTROLES DE PESQUISA E FILTRO --- */}
             <div className="flex flex-wrap gap-3 p-4 bg-zinc-800/60 rounded-xl border border-zinc-700">
                 
                 {/* Pesquisa */}
@@ -173,18 +178,18 @@ export function SubjectGrid({ subjects }: SubjectListProps) {
                         placeholder="Pesquisar por Título ou Categoria..." 
                         value={searchTerm} 
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 bg-zinc-900 border-zinc-700 focus:border-indigo-500"
+                        className="pl-10 bg-zinc-900 border-zinc-700 focus:border-indigo-500 h-10"
                     />
                 </div>
                 
                 {/* Filtro por Categoria */}
                 <Select value={filterCategory} onValueChange={setFilterCategory}>
-                    <SelectTrigger className="w-[180px] bg-zinc-900 border-zinc-700 text-zinc-300">
+                    <SelectTrigger className="w-full sm:w-[180px] bg-zinc-900 border-zinc-700 text-zinc-300 h-10">
                         <Filter className="h-4 w-4 mr-2 text-indigo-400" />
                         <SelectValue placeholder="Filtrar por Categoria" />
                     </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Todas as Categorias</SelectItem>
+                    <SelectContent className="bg-zinc-800 border-zinc-700">
+                        <SelectItem value="all">Todas as Categorias ({subjects.length})</SelectItem>
                         {uniqueCategories.map(cat => (
                             <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                         ))}
@@ -193,11 +198,11 @@ export function SubjectGrid({ subjects }: SubjectListProps) {
 
                 {/* Ordenação */}
                 <Select value={sortBy} onValueChange={setSortBy}>
-                    <SelectTrigger className="w-[180px] bg-zinc-900 border-zinc-700 text-zinc-300">
+                    <SelectTrigger className="w-full sm:w-[180px] bg-zinc-900 border-zinc-700 text-zinc-300 h-10">
                         <SortAsc className="h-4 w-4 mr-2 text-indigo-400" />
                         <SelectValue placeholder="Ordenar por" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-zinc-800 border-zinc-700">
                         {SORT_OPTIONS.map(opt => (
                             <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                         ))}
@@ -209,22 +214,32 @@ export function SubjectGrid({ subjects }: SubjectListProps) {
             {/* --- LISTA DE CARDS RICOS --- */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
                 
+                {/* Estado: Sem resultados após filtro */}
                 {finalSubjectList.length === 0 && subjects.length > 0 && (
-                     <div className="col-span-full py-12 text-center border-2 border-dashed border-zinc-700 rounded-xl bg-zinc-900/50 flex flex-col items-center justify-center">
-                         <Search className="h-10 w-10 text-zinc-700 mb-3" />
-                         <p className="text-zinc-500 font-semibold">Nenhuma matéria corresponde à pesquisa.</p>
-                         <p className="text-sm text-zinc-600">Tente ajustar seus filtros ou termos de busca.</p>
-                     </div>
+                    <div className="col-span-full py-12 text-center border-2 border-dashed border-zinc-700 rounded-xl bg-zinc-900/50 flex flex-col items-center justify-center">
+                        <Search className="h-10 w-10 text-zinc-700 mb-3" />
+                        <p className="text-zinc-500 font-semibold">Nenhuma matéria corresponde à pesquisa.</p>
+                        <p className="text-sm text-zinc-600">Tente ajustar seus filtros ou termos de busca.</p>
+                    </div>
                 )}
 
+                {/* Estado: Lista totalmente vazia */}
                 {subjects.length === 0 && (
                     <div className="col-span-full py-12 text-center border-2 border-dashed border-zinc-700 rounded-xl bg-zinc-900/50 flex flex-col items-center justify-center">
                         <BookOpen className="h-10 w-10 text-zinc-700 mb-3" />
                         <p className="text-zinc-500 font-semibold">Seu mapa de conhecimento está vazio.</p>
                         <p className="text-sm text-zinc-600">Comece adicionando seu primeiro *Nodo*!</p>
+                        <Button 
+                            variant="default" 
+                            className="mt-4 bg-indigo-600 hover:bg-indigo-700" 
+                            onClick={handleStartCreate}
+                        >
+                            <Plus className="h-4 w-4 mr-2" /> Criar Novo Nodo
+                        </Button>
                     </div>
                 )}
                 
+                {/* Renderização da lista filtrada */}
                 {finalSubjectList.map((sub) => (
                     <SubjectCard 
                         key={sub.id}
@@ -238,6 +253,7 @@ export function SubjectGrid({ subjects }: SubjectListProps) {
 
             {/* ✅ MODAIS DE AÇÃO */}
             <SubjectFormDialog
+                // A chave força a remountagem e reinicialização do estado
                 key={subjectToEdit?.id || 'create'} 
                 open={isFormDialogOpen}
                 onClose={handleCloseForm}

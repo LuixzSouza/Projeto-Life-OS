@@ -2,7 +2,35 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { fetchPluggyTransactions } from "@/lib/pluggy";
+import { fetchPluggyTransactions, createConnectToken, fetchPluggyAccounts } from "@/lib/pluggy";
+
+// Helper para garantir que números venham corretos do formulário
+const parseAmount = (value: FormDataEntryValue | null) => {
+  if (!value) return 0;
+  // Remove "R$", pontos de milhar e troca vírgula por ponto se necessário, ou apenas parseia
+  const stringValue = value.toString().replace(/[^\d.,-]/g, '').replace(',', '.');
+  const float = parseFloat(stringValue);
+  return isNaN(float) ? 0 : float;
+};
+
+// =========================================================
+// 0. GESTÃO DE USUÁRIO (SALÁRIO)
+// =========================================================
+
+export async function updateSalary(amount: number) {
+  // Pega o primeiro usuário (Adapte se tiver sistema de Auth com ID real)
+  const user = await prisma.user.findFirst();
+
+  if (user) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { salary: amount },
+    });
+    revalidatePath("/finance");
+    return { success: true };
+  }
+  return { success: false, error: "Usuário não encontrado" };
+}
 
 // =========================================================
 // 1. GESTÃO DE CARTEIRAS (CONTAS)
@@ -11,9 +39,10 @@ import { fetchPluggyTransactions } from "@/lib/pluggy";
 export async function createAccount(formData: FormData) {
   const name = formData.get("name") as string;
   const type = formData.get("type") as string;
-  const balance = parseFloat(formData.get("balance") as string) || 0;
+  const balance = parseAmount(formData.get("balance"));
   const color = formData.get("color") as string;
 
+  // Assumindo single user ou pegando o primeiro
   const user = await prisma.user.findFirst();
 
   await prisma.account.create({
@@ -26,7 +55,8 @@ export async function updateAccount(formData: FormData) {
   const id = formData.get("id") as string;
   const name = formData.get("name") as string;
   const color = formData.get("color") as string;
-  // O saldo geralmente não se edita diretamente aqui, apenas via transações, mas o nome/cor sim.
+  // Nota: O saldo não é atualizado por aqui para manter consistência do histórico,
+  // a menos que seja uma correção manual explícita (que não implementamos aqui).
 
   await prisma.account.update({
     where: { id },
@@ -49,25 +79,28 @@ export async function deleteAccount(id: string) {
 
 export async function createTransaction(formData: FormData) {
   const description = formData.get("description") as string;
-  const amount = parseFloat(formData.get("amount") as string);
+  const amount = parseAmount(formData.get("amount"));
   const type = formData.get("type") as string; // INCOME ou EXPENSE
   const accountId = formData.get("accountId") as string;
   const category = formData.get("category") as string;
+  const dateStr = formData.get("date") as string;
+  const date = dateStr ? new Date(dateStr) : new Date();
 
   if (!accountId || isNaN(amount)) throw new Error("Dados inválidos");
 
   await prisma.$transaction(async (tx) => {
       // 1. Cria transação
       await tx.transaction.create({
-        data: { description, amount, type, accountId, category, date: new Date() },
+        data: { description, amount, type, accountId, category, date },
       });
 
       // 2. Atualiza Saldo da Conta
       const account = await tx.account.findUnique({ where: { id: accountId } });
       if (account) {
+          const currentBalance = Number(account.balance);
           const newBalance = type === 'INCOME' 
-            ? Number(account.balance) + amount 
-            : Number(account.balance) - amount;
+            ? currentBalance + amount 
+            : currentBalance - amount;
           
           await tx.account.update({
               where: { id: accountId },
@@ -82,9 +115,11 @@ export async function createTransaction(formData: FormData) {
 export async function updateTransaction(formData: FormData) {
   const id = formData.get("id") as string;
   const description = formData.get("description") as string;
-  const newAmount = parseFloat(formData.get("amount") as string);
+  const newAmount = parseAmount(formData.get("amount"));
   const newType = formData.get("type") as string;
   const newCategory = formData.get("category") as string;
+  const dateStr = formData.get("date") as string;
+  const newDate = dateStr ? new Date(dateStr) : new Date();
 
   // Transação atômica para garantir consistência do saldo
   await prisma.$transaction(async (tx) => {
@@ -112,7 +147,7 @@ export async function updateTransaction(formData: FormData) {
       // 4. Atualizar a transação
       await tx.transaction.update({
           where: { id },
-          data: { description, amount: newAmount, type: newType, category: newCategory }
+          data: { description, amount: newAmount, type: newType, category: newCategory, date: newDate }
       });
   });
 
@@ -147,11 +182,11 @@ export async function deleteTransaction(id: string) {
 
 export async function createWishlist(formData: FormData) {
     const name = formData.get("name") as string;
-    const price = parseFloat(formData.get("price") as string);
-    const saved = parseFloat(formData.get("saved") as string) || 0;
+    const price = parseAmount(formData.get("price"));
+    const saved = parseAmount(formData.get("saved"));
     const imageUrl = formData.get("imageUrl") as string;
     const productUrl = formData.get("productUrl") as string;
-    const priority = formData.get("priority") as string;
+    const priority = (formData.get("priority") as string) || "MEDIUM";
 
     await prisma.wishlistItem.create({
         data: { 
@@ -165,11 +200,11 @@ export async function createWishlist(formData: FormData) {
 export async function updateWishlist(formData: FormData) {
     const id = formData.get("id") as string;
     const name = formData.get("name") as string;
-    const price = parseFloat(formData.get("price") as string);
-    const saved = parseFloat(formData.get("saved") as string); 
+    const price = parseAmount(formData.get("price"));
+    const saved = parseAmount(formData.get("saved")); 
     const imageUrl = formData.get("imageUrl") as string;
     const productUrl = formData.get("productUrl") as string;
-    const priority = formData.get("priority") as string;
+    const priority = (formData.get("priority") as string) || "MEDIUM";
 
     await prisma.wishlistItem.update({
         where: { id },
@@ -183,7 +218,7 @@ export async function updateWishlist(formData: FormData) {
 
 export async function addSavings(formData: FormData) {
     const id = formData.get("id") as string;
-    const amount = parseFloat(formData.get("amount") as string);
+    const amount = parseAmount(formData.get("amount"));
     
     const item = await prisma.wishlistItem.findUnique({ where: { id }});
     if(item) {
@@ -211,11 +246,12 @@ export async function deleteWishlist(id: string) {
 
 export async function createRecurring(formData: FormData) {
     const title = formData.get("title") as string;
-    const amount = parseFloat(formData.get("amount") as string);
+    const amount = parseAmount(formData.get("amount"));
     const dayOfMonth = parseInt(formData.get("dayOfMonth") as string);
+    const category = (formData.get("category") as string) || "Mensal";
     
     await prisma.recurringExpense.create({
-        data: { title, amount, dayOfMonth, category: "Mensal" }
+        data: { title, amount, dayOfMonth, category }
     });
     revalidatePath("/finance");
 }
@@ -223,12 +259,13 @@ export async function createRecurring(formData: FormData) {
 export async function updateRecurring(formData: FormData) {
     const id = formData.get("id") as string;
     const title = formData.get("title") as string;
-    const amount = parseFloat(formData.get("amount") as string);
+    const amount = parseAmount(formData.get("amount"));
     const dayOfMonth = parseInt(formData.get("dayOfMonth") as string);
+    const category = (formData.get("category") as string) || "Mensal";
 
     await prisma.recurringExpense.update({
         where: { id },
-        data: { title, amount, dayOfMonth }
+        data: { title, amount, dayOfMonth, category }
     });
     revalidatePath("/finance");
 }
@@ -238,61 +275,10 @@ export async function deleteRecurring(id: string) {
     revalidatePath("/finance");
 }
 
-export async function syncBankAccount(localAccountId: string) {
-  try {
-    // 1. Achar a conta no seu banco para pegar o ID externo
-    const account = await prisma.account.findUnique({ 
-        where: { id: localAccountId } 
-    });
-
-    if (!account?.externalId) throw new Error("Conta não conectada.");
-
-    // 2. Buscar dados na API da Pluggy
-    const externalTrans = await fetchPluggyTransactions(account.externalId);
-
-    // 3. Salvar no Prisma (Evitando duplicatas pelo ID da transação se tiver, ou hash)
-    let count = 0;
-    
-    for (const t of externalTrans) {
-      // Verifica se já existe essa transação (idealmente transaction teria um campo externalId também)
-      const exists = await prisma.transaction.findFirst({
-        where: { 
-            description: t.description, 
-            date: new Date(t.date),
-            amount: Math.abs(t.amount) // Pluggy manda negativo para saída, verifique seu padrão
-        }
-      });
-
-      if (!exists) {
-        await prisma.transaction.create({
-          data: {
-            accountId: localAccountId,
-            description: t.description,
-            amount: Math.abs(t.amount),
-            type: t.amount < 0 ? 'EXPENSE' : 'INCOME',
-            date: new Date(t.date),
-            category: t.category || "Geral" // Pluggy categoriza automaticamente!
-          }
-        });
-        count++;
-      }
-    }
-
-    revalidatePath("/finance");
-    return { success: true, message: `${count} novas transações importadas.` };
-
-  } catch (error) {
-    console.error(error);
-    return { success: false, message: "Erro na sincronização." };
-  }
-}
 
 // =========================================================
 // 5. INTEGRAÇÃO BANCÁRIA (PLUGGY)
 // =========================================================
-
-// Importe as funções do seu lib/pluggy (verifique se o caminho está correto)
-import { createConnectToken, fetchPluggyAccounts } from "@/lib/pluggy";
 
 export async function createConnectTokenAction() {
   try {
@@ -346,5 +332,54 @@ export async function linkAccountToPluggyAction(itemId: string) {
   } catch (error) {
     console.error("Erro ao vincular conta:", error);
     return { success: false, message: "Erro ao processar dados do banco." };
+  }
+}
+
+export async function syncBankAccount(localAccountId: string) {
+  try {
+    // 1. Achar a conta no seu banco para pegar o ID externo
+    const account = await prisma.account.findUnique({ 
+        where: { id: localAccountId } 
+    });
+
+    if (!account?.externalId) throw new Error("Conta não conectada.");
+
+    // 2. Buscar dados na API da Pluggy
+    const externalTrans = await fetchPluggyTransactions(account.externalId);
+
+    // 3. Salvar no Prisma
+    let count = 0;
+    
+    for (const t of externalTrans) {
+      // Verifica se já existe essa transação
+      const exists = await prisma.transaction.findFirst({
+        where: { 
+            description: t.description, 
+            date: new Date(t.date),
+            amount: Math.abs(t.amount) 
+        }
+      });
+
+      if (!exists) {
+        await prisma.transaction.create({
+          data: {
+            accountId: localAccountId,
+            description: t.description,
+            amount: Math.abs(t.amount),
+            type: t.amount < 0 ? 'EXPENSE' : 'INCOME',
+            date: new Date(t.date),
+            category: t.category || "Geral" 
+          }
+        });
+        count++;
+      }
+    }
+
+    revalidatePath("/finance");
+    return { success: true, message: `${count} novas transações importadas.` };
+
+  } catch (error) {
+    console.error(error);
+    return { success: false, message: "Erro na sincronização." };
   }
 }

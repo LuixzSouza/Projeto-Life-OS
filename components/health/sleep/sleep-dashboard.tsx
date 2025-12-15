@@ -1,35 +1,36 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { format, subDays, isSameDay, parseISO, startOfWeek, endOfWeek, eachDayOfInterval } from "date-fns";
+import { format, subDays, isSameDay, parseISO, eachDayOfInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
     Moon, Clock, Battery, BrainCircuit, Plus, Trash2, 
-    TrendingUp, TrendingDown, AlertCircle, CheckCircle2, BedDouble 
+    TrendingUp, TrendingDown, BedDouble, Loader2 
 } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, ReferenceLine } from "recharts";
-import { logMetric, deleteMetric } from "@/app/(dashboard)/health/actions"; // Reutilizando suas actions existentes
+import { logMetric, deleteMetric } from "@/app/(dashboard)/health/actions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 // Interface dos dados
 interface SleepEntry {
     id: string;
-    date: string; // ISO
+    date: string; // ISO String
     value: number; // Horas
 }
 
 export function SleepDashboard({ data }: { data: SleepEntry[] }) {
     const [isOpen, setIsOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     
-    // Meta de sono (Idealmente viria do banco de dados do usuário)
+    // Meta de sono (Padrão ouro)
     const SLEEP_GOAL = 8; 
 
     // --- CÁLCULOS E ESTATÍSTICAS ---
@@ -51,22 +52,21 @@ export function SleepDashboard({ data }: { data: SleepEntry[] }) {
     }, [last7Days]);
 
     // 2. Dívida de Sono (Sleep Debt) na semana
-    // Diferença entre o que deveria ter dormido (7 * Meta) e o real
     const sleepDebt = useMemo(() => {
-        // Consideramos apenas dias que têm registro para ser justo
         if (last7Days.length === 0) return 0;
         const totalNeeded = last7Days.length * SLEEP_GOAL;
         const totalSlept = last7Days.reduce((acc, item) => acc + item.value, 0);
         return parseFloat((totalNeeded - totalSlept).toFixed(1));
     }, [last7Days, SLEEP_GOAL]);
 
-    // 3. Preparar dados para o gráfico (Preenchendo dias vazios com 0)
+    // 3. Preparar dados para o gráfico (Preenchendo dias vazios)
     const chartData = useMemo(() => {
         const end = new Date();
         const start = subDays(end, 13); // Últimos 14 dias
         const interval = eachDayOfInterval({ start, end });
 
         return interval.map(date => {
+            // Ajuste de fuso horário local para comparação correta
             const entry = data.find(d => isSameDay(parseISO(d.date), date));
             return {
                 day: format(date, "dd/MM"),
@@ -80,15 +80,23 @@ export function SleepDashboard({ data }: { data: SleepEntry[] }) {
     // --- HANDLERS ---
     
     const handleSave = async (formData: FormData) => {
-        const hours = parseFloat(formData.get("value") as string);
-        if (isNaN(hours) || hours < 0 || hours > 24) {
-            toast.error("Insira um valor válido entre 0 e 24 horas.");
-            return;
-        }
+        setIsLoading(true);
+        try {
+            const hours = parseFloat(formData.get("value") as string);
+            
+            if (isNaN(hours) || hours <= 0 || hours > 24) {
+                toast.error("Insira um valor válido entre 0 e 24 horas.");
+                return;
+            }
 
-        await logMetric(formData);
-        toast.success("Sono registrado com sucesso! 💤");
-        setIsOpen(false);
+            await logMetric(formData);
+            toast.success("Sono registrado com sucesso! 💤");
+            setIsOpen(false);
+        } catch (error) {
+            toast.error("Erro ao salvar registro.");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleDelete = async (id: string) => {
@@ -112,12 +120,12 @@ export function SleepDashboard({ data }: { data: SleepEntry[] }) {
     };
 
     return (
-        <div className="space-y-6 pb-20">
+        <div className="space-y-6 pb-20 animate-in fade-in duration-500">
             
             {/* 1. HERO SECTION (KPIs) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Média Semanal */}
-                <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm relative overflow-hidden">
+                <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm relative overflow-hidden h-full flex flex-col justify-between">
                     <CardContent className="p-6">
                         <div className="flex justify-between items-start">
                             <div>
@@ -127,17 +135,17 @@ export function SleepDashboard({ data }: { data: SleepEntry[] }) {
                                     <span className="text-base font-medium text-zinc-400">h</span>
                                 </h2>
                             </div>
-                            <div className={`p-3 rounded-full ${averageSleep >= 7 ? 'bg-indigo-100 text-indigo-600' : 'bg-orange-100 text-orange-600'}`}>
+                            <div className={cn("p-3 rounded-full transition-colors", averageSleep >= 7 ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-300' : 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-300')}>
                                 <Clock className="h-6 w-6" />
                             </div>
                         </div>
                         <div className="mt-4 flex items-center gap-2">
                             {averageSleep >= SLEEP_GOAL ? (
-                                <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
+                                <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-300">
                                     <TrendingUp className="h-3 w-3 mr-1" /> Na meta
                                 </Badge>
                             ) : (
-                                <Badge variant="secondary" className="bg-orange-100 text-orange-700 hover:bg-orange-100">
+                                <Badge variant="secondary" className="bg-orange-100 text-orange-700 hover:bg-orange-100 dark:bg-orange-900/30 dark:text-orange-300">
                                     <TrendingDown className="h-3 w-3 mr-1" /> Abaixo da meta
                                 </Badge>
                             )}
@@ -147,10 +155,10 @@ export function SleepDashboard({ data }: { data: SleepEntry[] }) {
                 </Card>
 
                 {/* Dívida de Sono */}
-                <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm relative overflow-hidden group">
+                <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm relative overflow-hidden group h-full flex flex-col justify-between">
                     <div className={cn(
-                        "absolute top-0 right-0 w-24 h-24 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 transition-colors",
-                        sleepDebt > 2 ? "bg-red-500/20" : "bg-emerald-500/20"
+                        "absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 transition-colors opacity-50",
+                        sleepDebt > 2 ? "bg-red-500/30" : "bg-emerald-500/30"
                     )}></div>
                     <CardContent className="p-6 relative z-10">
                         <div className="flex justify-between items-start">
@@ -174,8 +182,11 @@ export function SleepDashboard({ data }: { data: SleepEntry[] }) {
                 </Card>
 
                 {/* Botão de Ação / Próxima Meta */}
-                <Card className="bg-indigo-600 border-indigo-500 shadow-lg shadow-indigo-500/20 text-white flex flex-col justify-center items-center text-center p-6 cursor-pointer hover:bg-indigo-700 transition-colors" onClick={() => setIsOpen(true)}>
-                    <div className="bg-white/20 p-4 rounded-full mb-3 backdrop-blur-sm">
+                <Card 
+                    className="bg-indigo-600 border-indigo-500 shadow-lg shadow-indigo-500/20 text-white flex flex-col justify-center items-center text-center p-6 cursor-pointer hover:bg-indigo-700 transition-all hover:scale-[1.02] active:scale-[0.98] h-full" 
+                    onClick={() => setIsOpen(true)}
+                >
+                    <div className="bg-white/20 p-4 rounded-full mb-3 backdrop-blur-sm shadow-inner">
                         <Plus className="h-8 w-8 text-white" />
                     </div>
                     <h3 className="font-bold text-lg">Registrar Noite</h3>
@@ -200,7 +211,7 @@ export function SleepDashboard({ data }: { data: SleepEntry[] }) {
                                         <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
                                     </linearGradient>
                                 </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e4e7" opacity={0.5} />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e4e4e7" opacity={0.3} />
                                 <XAxis 
                                     dataKey="day" 
                                     tick={{ fontSize: 12, fill: '#71717a' }} 
@@ -216,7 +227,7 @@ export function SleepDashboard({ data }: { data: SleepEntry[] }) {
                                     tickFormatter={(v) => `${v}h`}
                                 />
                                 <Tooltip 
-                                    content={({ active, payload, label }) => {
+                                    content={({ active, payload }) => {
                                         if (active && payload && payload.length) {
                                             const data = payload[0].payload;
                                             return (
@@ -236,7 +247,7 @@ export function SleepDashboard({ data }: { data: SleepEntry[] }) {
                                     }}
                                 />
                                 {/* Linha de Meta */}
-                                <ReferenceLine y={8} stroke="red" strokeDasharray="3 3" />
+                                <ReferenceLine y={8} stroke="#10b981" strokeDasharray="3 3" label={{ position: 'right',  value: 'Meta', fill: '#10b981', fontSize: 10 }} />
                                 
                                 <Area 
                                     type="monotone" 
@@ -252,7 +263,7 @@ export function SleepDashboard({ data }: { data: SleepEntry[] }) {
                 </Card>
 
                 {/* 3. INSIGHTS E HISTÓRICO RECENTE */}
-                <div className="space-y-6">
+                <div className="space-y-6 flex flex-col h-full">
                     
                     {/* Insight Card */}
                     <Card className="bg-indigo-50 dark:bg-indigo-900/10 border-indigo-100 dark:border-indigo-900">
@@ -274,13 +285,13 @@ export function SleepDashboard({ data }: { data: SleepEntry[] }) {
                     </Card>
 
                     {/* Histórico Recente (Lista) */}
-                    <Card className="flex-1 border-zinc-200 dark:border-zinc-800">
+                    <Card className="flex-1 border-zinc-200 dark:border-zinc-800 flex flex-col">
                         <CardHeader className="pb-3 border-b border-zinc-100 dark:border-zinc-800">
                             <CardTitle className="text-sm font-bold text-zinc-700 dark:text-zinc-300">
                                 Últimos Registros
                             </CardTitle>
                         </CardHeader>
-                        <ScrollArea className="h-[250px]">
+                        <ScrollArea className="flex-1 min-h-[200px]">
                             <div className="p-0">
                                 {data.slice().reverse().map((entry) => {
                                     const parsedDate = parseISO(entry.date);
@@ -289,7 +300,7 @@ export function SleepDashboard({ data }: { data: SleepEntry[] }) {
                                             <div className="flex items-center gap-3">
                                                 <div className={cn("w-1.5 h-10 rounded-full", getQualityBg(entry.value))}></div>
                                                 <div>
-                                                    <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200">
+                                                    <p className="text-sm font-bold text-zinc-800 dark:text-zinc-200 capitalize">
                                                         {format(parsedDate, "EEEE", { locale: ptBR })}
                                                     </p>
                                                     <p className="text-xs text-zinc-500">
@@ -304,6 +315,7 @@ export function SleepDashboard({ data }: { data: SleepEntry[] }) {
                                                 <button 
                                                     onClick={() => handleDelete(entry.id)}
                                                     className="text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    title="Excluir registro"
                                                 >
                                                     <Trash2 className="h-4 w-4" />
                                                 </button>
@@ -311,6 +323,12 @@ export function SleepDashboard({ data }: { data: SleepEntry[] }) {
                                         </div>
                                     )
                                 })}
+                                {data.length === 0 && (
+                                    <div className="flex flex-col items-center justify-center h-40 text-zinc-400 text-sm">
+                                        <Moon className="h-8 w-8 mb-2 opacity-20" />
+                                        Nenhum registro encontrado.
+                                    </div>
+                                )}
                             </div>
                         </ScrollArea>
                     </Card>
@@ -331,9 +349,9 @@ export function SleepDashboard({ data }: { data: SleepEntry[] }) {
                         
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label className="text-xs uppercase font-bold text-zinc-500">Qualidade (Auto)</Label>
+                                <Label className="text-xs uppercase font-bold text-zinc-500">Qualidade</Label>
                                 <div className="h-10 rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 flex items-center px-3 text-sm text-zinc-500">
-                                    Baseado nas horas
+                                    Automática
                                 </div>
                             </div>
                             <div className="space-y-2">
@@ -346,6 +364,7 @@ export function SleepDashboard({ data }: { data: SleepEntry[] }) {
                                         placeholder="0.0" 
                                         className="h-10 text-lg font-bold pl-3 pr-10"
                                         autoFocus
+                                        required
                                     />
                                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-zinc-400">h</span>
                                 </div>
@@ -360,8 +379,9 @@ export function SleepDashboard({ data }: { data: SleepEntry[] }) {
                         </div>
 
                         <DialogFooter>
-                            <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-11">
-                                Salvar Registro
+                            <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-11" disabled={isLoading}>
+                                {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                                {isLoading ? "Salvando..." : "Salvar Registro"}
                             </Button>
                         </DialogFooter>
                     </form>

@@ -10,28 +10,29 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Clock, BookOpen, Dumbbell, Home, Coffee, Briefcase, Sun, Plus, Pencil, Trash2, Wand2, Loader2, LucideIcon } from "lucide-react";
+import { Clock, BookOpen, Dumbbell, Home, Coffee, Briefcase, Sun, Plus, Pencil, Trash2, Wand2, Loader2, LucideIcon, CheckCircle2, Sparkles } from "lucide-react";
 import { seedRoutine, createRoutineItem, updateRoutineItem, deleteRoutineItem, resetRoutine } from "@/app/(dashboard)/agenda/actions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
-// 1. Tipagem e Configuração
+// Tipagem e Configuração
 type CategoryKey = 'health' | 'study' | 'work' | 'home' | 'leisure';
 
 interface CategoryStyle {
     label: string;
     icon: LucideIcon;
-    color: string;
+    colorClass: string; // Classe Tailwind para texto/bg
 }
 
 const CATEGORIES: Record<CategoryKey, CategoryStyle> = {
-    health: { label: "Saúde", icon: Dumbbell, color: "text-green-600 bg-green-50 border-green-200" },
-    study: { label: "Estudos", icon: BookOpen, color: "text-blue-600 bg-blue-50 border-blue-200" },
-    work: { label: "Trabalho", icon: Briefcase, color: "text-purple-600 bg-purple-50 border-purple-200" },
-    home: { label: "Casa", icon: Home, color: "text-orange-600 bg-orange-50 border-orange-200" },
-    leisure: { label: "Lazer", icon: Coffee, color: "text-pink-600 bg-pink-50 border-pink-200" },
+    health: { label: "Saúde", icon: Dumbbell, colorClass: "text-emerald-600 bg-emerald-500/10 border-emerald-500/20" },
+    study: { label: "Estudos", icon: BookOpen, colorClass: "text-blue-600 bg-blue-500/10 border-blue-500/20" },
+    work: { label: "Trabalho", icon: Briefcase, colorClass: "text-violet-600 bg-violet-500/10 border-violet-500/20" },
+    home: { label: "Casa", icon: Home, colorClass: "text-orange-600 bg-orange-500/10 border-orange-500/20" },
+    leisure: { label: "Lazer", icon: Coffee, colorClass: "text-pink-600 bg-pink-500/10 border-pink-500/20" },
 };
 
 const DAYS = [
@@ -48,11 +49,9 @@ export function RoutineManager({ items }: { items: RoutineItem[] }) {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
-    const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
-
-    // Dia da semana atual para abrir a aba certa (0 = Dom, 1 = Seg...)
-    const currentDayIndex = new Date().getDay();
-    // Mapeia index do JS (0=Dom) para nossos IDs
+    
+    // Dia atual para aba inicial
+    const currentDayIndex = new Date().getDay(); 
     const jsDayToId = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
     const defaultTab = jsDayToId[currentDayIndex];
 
@@ -70,65 +69,59 @@ export function RoutineManager({ items }: { items: RoutineItem[] }) {
         toast.success("Rotina zerada.");
         router.refresh();
         setIsLoading(false);
-        setIsResetDialogOpen(false);
     }
 
     return (
         <div className="flex flex-col h-full w-full">
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h3 className="text-lg font-semibold">Minha Rotina</h3>
-                    <p className="text-sm text-zinc-500">Planejamento diário.</p>
+                    <h3 className="text-lg font-semibold text-foreground">Minha Rotina</h3>
+                    <p className="text-sm text-muted-foreground">Hábitos e blocos de tempo recorrentes.</p>
                 </div>
                 <div className="flex gap-2">
                     {items.length > 0 && (
-                        <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+                        <AlertDialog>
                             <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="sm" title="Apagar tudo">
-                                    <Trash2 className="h-4 w-4 text-red-400" />
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10">
+                                    <Trash2 className="h-4 w-4" />
                                 </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                                 <AlertDialogHeader>
                                     <AlertDialogTitle>Zerar Rotina Completa?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        Isso apagará todos os blocos de todos os dias. Esta ação não pode ser desfeita.
-                                    </AlertDialogDescription>
+                                    <AlertDialogDescription>Isso apagará todos os blocos de todos os dias. Ação irreversível.</AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction onClick={handleReset} className="bg-red-600 hover:bg-red-700">
-                                        Sim, Zerar Tudo
-                                    </AlertDialogAction>
+                                    <AlertDialogAction onClick={handleReset} className="bg-destructive hover:bg-destructive/90">Zerar Tudo</AlertDialogAction>
                                 </AlertDialogFooter>
                             </AlertDialogContent>
                         </AlertDialog>
                     )}
-                    <Button size="sm" onClick={() => setIsDialogOpen(true)} className="gap-2">
+                    <Button size="sm" onClick={() => setIsDialogOpen(true)} className="h-8 gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
                         <Plus className="h-4 w-4" /> Novo Bloco
                     </Button>
                 </div>
             </div>
 
             {items.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-[300px] border-2 border-dashed rounded-xl bg-zinc-50/50">
-                    <Wand2 className="h-10 w-10 text-indigo-400 mb-4" />
-                    <p className="text-zinc-600 font-medium">Sua rotina está vazia.</p>
-                    <Button onClick={handleSeed} disabled={isLoading} className="mt-4">
-                        {isLoading ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : null}
-                        Importar Rotina Pronta
+                <div className="flex flex-col items-center justify-center h-[300px] border-2 border-dashed border-border rounded-xl bg-muted/10">
+                    <Wand2 className="h-10 w-10 text-primary mb-4 opacity-50" />
+                    <p className="text-muted-foreground font-medium mb-4">Sua rotina está vazia.</p>
+                    <Button onClick={handleSeed} disabled={isLoading} variant="outline">
+                        {isLoading ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Sparkles className="mr-2 h-4 w-4 text-primary" />}
+                        Gerar Rotina Padrão
                     </Button>
                 </div>
             ) : (
                 <Tabs defaultValue={defaultTab} className="flex-1 flex flex-col min-h-0 w-full">
-                    {/* Lista de Abas com Scroll Horizontal para caber todos os dias */}
                     <div className="w-full overflow-x-auto pb-2 scrollbar-thin">
-                        <TabsList className="w-full justify-start h-9 bg-transparent p-0 gap-2 min-w-max">
+                        <TabsList className="bg-muted p-1 h-9 w-full justify-start min-w-max">
                             {DAYS.map(day => (
                                 <TabsTrigger 
                                     key={day.id} 
                                     value={day.id}
-                                    className="data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 data-[state=active]:border-indigo-200 border border-transparent px-4 rounded-md text-zinc-500"
+                                    className="data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm px-4 h-7 text-xs"
                                 >
                                     {day.label}
                                 </TabsTrigger>
@@ -136,26 +129,24 @@ export function RoutineManager({ items }: { items: RoutineItem[] }) {
                         </TabsList>
                     </div>
 
-                    <div className="flex-1 border rounded-lg bg-white/50 dark:bg-zinc-900/50 min-h-[400px] relative overflow-hidden">
-                        {DAYS.map(day => {
-                            // Filtra itens para este dia específico
-                            const dayItems = items.filter(i => i.daysOfWeek.includes(day.id));
-                            return (
-                                <TabsContent key={day.id} value={day.id} className="h-full m-0 absolute inset-0">
-                                    <ScrollArea className="h-full p-4">
-                                        <RoutineList items={dayItems} />
-                                    </ScrollArea>
-                                </TabsContent>
-                            )
-                        })}
+                    <div className="flex-1 bg-card border border-border rounded-lg mt-2 min-h-[400px] relative overflow-hidden">
+                        {DAYS.map(day => (
+                            <TabsContent key={day.id} value={day.id} className="h-full m-0 absolute inset-0">
+                                <ScrollArea className="h-full p-4">
+                                    <RoutineList items={items.filter(i => i.daysOfWeek.includes(day.id))} />
+                                </ScrollArea>
+                            </TabsContent>
+                        ))}
                     </div>
                 </Tabs>
             )}
 
+            {/* Modal de Criação */}
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                <DialogContent>
+                <DialogContent className="sm:max-w-[500px]">
                     <DialogHeader>
-                        <DialogTitle>Adicionar à Rotina</DialogTitle>
+                        <DialogTitle>Novo Bloco de Rotina</DialogTitle>
+                        <DialogDescription>Defina uma atividade recorrente.</DialogDescription>
                     </DialogHeader>
                     <RoutineForm onClose={() => setIsDialogOpen(false)} />
                 </DialogContent>
@@ -164,41 +155,51 @@ export function RoutineManager({ items }: { items: RoutineItem[] }) {
     );
 }
 
+// Lista de Itens (Renderização)
 function RoutineList({ items }: { items: RoutineItem[] }) {
     const sortedItems = [...items].sort((a, b) => a.startTime.localeCompare(b.startTime));
 
     if (sortedItems.length === 0) {
-        return <div className="text-center py-10 text-zinc-400 text-sm">Nada agendado para este dia.</div>;
+        return (
+            <div className="flex flex-col items-center justify-center h-full py-20 text-muted-foreground opacity-60">
+                <Sun className="h-10 w-10 mb-2 stroke-1" />
+                <p className="text-sm">Dia livre!</p>
+            </div>
+        );
     }
 
     return (
-        <div className="space-y-3 relative pb-4">
-             <div className="absolute left-[19px] top-2 bottom-2 w-px bg-zinc-200 dark:bg-zinc-800 -z-10"></div>
+        <div className="space-y-3 relative pl-4 pb-4">
+             {/* Linha do Tempo Visual */}
+             <div className="absolute left-[23px] top-4 bottom-4 w-px bg-border -z-10"></div>
 
             {sortedItems.map((item) => {
-                const catKey = (item.category && CATEGORIES[item.category as CategoryKey]) 
-                    ? (item.category as CategoryKey) 
-                    : 'study';
-                
+                const catKey = (item.category && CATEGORIES[item.category as CategoryKey]) ? (item.category as CategoryKey) : 'study';
                 const style = CATEGORIES[catKey];
                 const Icon = style.icon;
 
                 return (
                     <EditRoutineDialog key={item.id} item={item}>
-                        <div className="group flex items-start gap-4 cursor-pointer hover:opacity-90 transition-opacity">
+                        <div className="group flex items-start gap-4 cursor-pointer hover:translate-x-1 transition-transform duration-200">
+                            
+                            {/* Ícone na Linha do Tempo */}
                             <div className="flex flex-col items-center mt-1">
-                                <div className={`p-2 rounded-full border shadow-sm z-10 bg-white dark:bg-zinc-950 ${style.color.replace('bg-', 'text-').replace('text-', 'border-')}`}>
+                                <div className={cn("p-2 rounded-full border z-10 bg-background shadow-sm transition-colors group-hover:border-primary/50", style.colorClass)}>
                                     <Icon className="h-4 w-4" />
                                 </div>
                             </div>
-                            <div className="flex-1 p-3 rounded-lg border bg-white dark:bg-zinc-900 shadow-sm flex flex-col gap-1">
-                                <div className="flex justify-between items-start">
-                                    <span className="font-bold text-sm text-zinc-800 dark:text-zinc-100">{item.title}</span>
-                                    <span className="text-[10px] font-mono bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded text-zinc-600 dark:text-zinc-400 border">
+
+                            {/* Conteúdo do Card */}
+                            <div className="flex-1 p-3 rounded-xl border border-border bg-card hover:bg-muted/40 hover:shadow-sm transition-all flex flex-col gap-1.5">
+                                <div className="flex justify-between items-center">
+                                    <span className="font-semibold text-sm text-foreground">{item.title}</span>
+                                    <Badge variant="outline" className="font-mono text-[10px] h-5 bg-muted/50 border-border text-muted-foreground">
                                         {item.startTime} - {item.endTime}
-                                    </span>
+                                    </Badge>
                                 </div>
-                                <p className="text-xs text-zinc-500 line-clamp-2">{item.description}</p>
+                                {item.description && (
+                                    <p className="text-xs text-muted-foreground line-clamp-2">{item.description}</p>
+                                )}
                             </div>
                         </div>
                     </EditRoutineDialog>
@@ -208,26 +209,31 @@ function RoutineList({ items }: { items: RoutineItem[] }) {
     )
 }
 
+// Dialog de Edição (Wrapper)
 function EditRoutineDialog({ item, children }: { item: RoutineItem, children: React.ReactNode }) {
     const [open, setOpen] = useState(false);
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>{children}</DialogTrigger>
-            <DialogContent>
-                <DialogHeader><DialogTitle>Editar Bloco</DialogTitle></DialogHeader>
+            <DialogContent className="sm:max-w-[500px]">
+                <DialogHeader>
+                    <DialogTitle>Editar Bloco</DialogTitle>
+                    <DialogDescription>Atualize os detalhes desta atividade.</DialogDescription>
+                </DialogHeader>
                 <RoutineForm item={item} onClose={() => setOpen(false)} />
             </DialogContent>
         </Dialog>
     )
 }
 
+// Formulário Unificado (Create/Edit)
 function RoutineForm({ item, onClose }: { item?: RoutineItem, onClose: () => void }) {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
     const [selectedDays, setSelectedDays] = useState<string[]>(
         item?.daysOfWeek ? item.daysOfWeek.split(',') : ['mon', 'tue', 'wed', 'thu', 'fri']
     );
-    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false); // Modal de delete
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
     const toggleDay = (dayId: string) => {
         if(selectedDays.includes(dayId)) setSelectedDays(selectedDays.filter(d => d !== dayId));
@@ -236,7 +242,7 @@ function RoutineForm({ item, onClose }: { item?: RoutineItem, onClose: () => voi
 
     const handleSubmit = async (formData: FormData) => {
         if (selectedDays.length === 0) {
-            toast.error("Selecione os dias da semana!");
+            toast.error("Selecione pelo menos um dia da semana!");
             return;
         }
         setIsLoading(true);
@@ -245,10 +251,10 @@ function RoutineForm({ item, onClose }: { item?: RoutineItem, onClose: () => voi
         try {
             if (item) {
                 await updateRoutineItem(formData);
-                toast.success("Atualizado!");
+                toast.success("Rotina atualizada!");
             } else {
                 await createRoutineItem(formData);
-                toast.success("Criado!");
+                toast.success("Bloco criado!");
             }
             router.refresh();
             onClose();
@@ -259,40 +265,46 @@ function RoutineForm({ item, onClose }: { item?: RoutineItem, onClose: () => voi
         }
     };
 
-    const handleDeleteConfirmed = async () => {
+    const handleDelete = async () => {
         setIsLoading(true);
         await deleteRoutineItem(item!.id);
-        toast.success("Apagado.");
+        toast.success("Removido da rotina.");
         router.refresh();
         setIsLoading(false);
-        setIsDeleteDialogOpen(false); // Fecha o alert
-        onClose(); // Fecha o modal principal
+        setIsDeleteDialogOpen(false);
+        onClose();
     }
 
     return (
-        <form action={handleSubmit} className="space-y-4">
+        <form action={handleSubmit} className="space-y-6 pt-2">
             {item && <input type="hidden" name="id" value={item.id} />}
             
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                    <Label>Início</Label>
-                    <Input type="time" name="startTime" defaultValue={item?.startTime || "07:00"} required />
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase">Início</Label>
+                    <div className="relative">
+                        <Clock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input type="time" name="startTime" defaultValue={item?.startTime || "07:00"} className="pl-9 bg-muted/30 border-border" required />
+                    </div>
                 </div>
                 <div className="space-y-2">
-                    <Label>Fim</Label>
-                    <Input type="time" name="endTime" defaultValue={item?.endTime || "08:00"} required />
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase">Fim</Label>
+                    <div className="relative">
+                        <Clock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input type="time" name="endTime" defaultValue={item?.endTime || "08:00"} className="pl-9 bg-muted/30 border-border" required />
+                    </div>
                 </div>
             </div>
 
             <div className="space-y-2">
-                <Label>O que fazer?</Label>
-                <Input name="title" defaultValue={item?.title} placeholder="Ex: Academia" required />
+                <Label className="text-xs font-semibold text-muted-foreground uppercase">Atividade</Label>
+                <Input name="title" defaultValue={item?.title} placeholder="Ex: Academia, Leitura, Trabalho Focado" className="bg-muted/30 border-border" required />
             </div>
 
             <div className="space-y-2">
-                <Label>Categoria</Label>
+                <Label className="text-xs font-semibold text-muted-foreground uppercase">Categoria</Label>
                 <Select name="category" defaultValue={item?.category || "study"}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="bg-muted/30 border-border"><SelectValue /></SelectTrigger>
                     <SelectContent>
                         <SelectItem value="health">Saúde / Treino</SelectItem>
                         <SelectItem value="study">Estudos</SelectItem>
@@ -303,35 +315,36 @@ function RoutineForm({ item, onClose }: { item?: RoutineItem, onClose: () => voi
                 </Select>
             </div>
 
-            <div className="space-y-2">
-                <Label>Repetir nos dias:</Label>
+            <div className="space-y-3">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase">Repetir em</Label>
                 <div className="flex flex-wrap gap-2">
                     {DAYS.map(day => (
                         <div 
                             key={day.id} 
                             onClick={(e) => { e.preventDefault(); toggleDay(day.id); }} 
-                            className={`cursor-pointer w-8 h-8 flex items-center justify-center rounded-full text-xs font-bold border transition-all select-none ${
+                            className={cn(
+                                "cursor-pointer w-9 h-9 flex items-center justify-center rounded-lg text-xs font-bold border transition-all select-none",
                                 selectedDays.includes(day.id) 
-                                ? "bg-indigo-600 text-white border-indigo-600 scale-105" 
-                                : "bg-zinc-100 text-zinc-400 hover:bg-zinc-200"
-                            }`}
+                                    ? "bg-primary text-primary-foreground border-primary shadow-sm" 
+                                    : "bg-muted text-muted-foreground border-transparent hover:bg-muted/80"
+                            )}
                         >
-                            {day.label.charAt(0)}
+                            {day.short.substring(0, 1)}
                         </div>
                     ))}
                 </div>
             </div>
 
             <div className="space-y-2">
-                <Label>Detalhes</Label>
-                <Textarea name="description" defaultValue={item?.description || ""} rows={2} />
+                <Label className="text-xs font-semibold text-muted-foreground uppercase">Notas (Opcional)</Label>
+                <Textarea name="description" defaultValue={item?.description || ""} rows={2} className="bg-muted/30 border-border resize-none" placeholder="Detalhes extras..." />
             </div>
 
-            <DialogFooter className="gap-2 pt-2 flex justify-between sm:justify-between w-full">
+            <DialogFooter className="gap-2 pt-4 border-t border-border flex sm:justify-between w-full">
                 {item && (
                     <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
                         <AlertDialogTrigger asChild>
-                            <Button type="button" variant="destructive" size="icon" disabled={isLoading}>
+                            <Button type="button" variant="destructive" size="icon" className="shrink-0" disabled={isLoading}>
                                 <Trash2 className="h-4 w-4" />
                             </Button>
                         </AlertDialogTrigger>
@@ -342,14 +355,17 @@ function RoutineForm({ item, onClose }: { item?: RoutineItem, onClose: () => voi
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction onClick={handleDeleteConfirmed} className="bg-red-600 hover:bg-red-700">Sim, Excluir</AlertDialogAction>
+                                <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">Excluir</AlertDialogAction>
                             </AlertDialogFooter>
                         </AlertDialogContent>
                     </AlertDialog>
                 )}
-                <Button type="submit" className="flex-1 bg-indigo-600 hover:bg-indigo-700 ml-auto" disabled={isLoading}>
-                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar"}
-                </Button>
+                <div className="flex gap-2 w-full justify-end">
+                    <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
+                    <Button type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90 min-w-[100px]" disabled={isLoading}>
+                        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar"}
+                    </Button>
+                </div>
             </DialogFooter>
         </form>
     )

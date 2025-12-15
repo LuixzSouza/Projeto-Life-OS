@@ -1,20 +1,66 @@
 "use client";
 
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, Legend } from "recharts";
+import { BookOpen } from "lucide-react";
 
-const COLORS = ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#3b82f6'];
+const COLORS = [
+  '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4'
+];
 
-// ✅ CORREÇÃO: Usamos 'string | number' em vez de 'any'.
-// Isso satisfaz o Recharts e o ESLint ao mesmo tempo.
 interface StudyData {
   name: string;
   value: number;
   [key: string]: string | number; 
 }
 
+// ✅ DEFINIÇÃO MANUAL DE TIPAGEM
+// O Recharts Pie Chart passa 'fill' diretamente no objeto do payload do tooltip
+interface StudyChartTooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    name: string;
+    value: number;
+    fill: string; // O Recharts adiciona isso automaticamente
+    payload: StudyData;
+  }>;
+}
+
+const CustomTooltip = ({ active, payload }: StudyChartTooltipProps) => {
+  if (active && payload && payload.length > 0) {
+    const data = payload[0];
+    
+    return (
+      <div className="rounded-lg border border-border bg-popover p-2 shadow-sm">
+        <div className="flex items-center gap-2 mb-1">
+          <div 
+            className="h-2 w-2 rounded-full" 
+            style={{ backgroundColor: data.fill }} 
+          />
+          <span className="text-[10px] uppercase text-muted-foreground font-semibold">
+            {data.name}
+          </span>
+        </div>
+        <span className="font-bold text-popover-foreground font-mono text-sm pl-4 block">
+          {data.value} min
+        </span>
+      </div>
+    );
+  }
+  return null;
+};
+
 export function StudyChart({ data }: { data: StudyData[] }) {
-  if (data.length === 0) {
-    return <div className="h-[200px] flex items-center justify-center text-zinc-400 text-sm bg-zinc-50/50 dark:bg-zinc-900/20 rounded-lg border border-dashed">Sem sessões registradas.</div>;
+  const isEmpty = data.length === 0 || data.every(d => d.value === 0);
+
+  if (isEmpty) {
+    return (
+      <div className="h-[220px] flex flex-col items-center justify-center text-muted-foreground text-sm bg-muted/20 rounded-lg border border-dashed border-border">
+        <div className="p-3 bg-muted rounded-full mb-2">
+            <BookOpen className="h-5 w-5 opacity-50" />
+        </div>
+        <p>Sem sessões registradas</p>
+      </div>
+    );
   }
 
   return (
@@ -24,25 +70,28 @@ export function StudyChart({ data }: { data: StudyData[] }) {
           data={data}
           cx="50%"
           cy="50%"
-          innerRadius={50}
-          outerRadius={75}
-          paddingAngle={4}
+          innerRadius={60}
+          outerRadius={80}
+          paddingAngle={5}
           dataKey="value"
-          stroke="none"
+          stroke="hsl(var(--card))"
+          strokeWidth={2}
         >
           {data.map((entry, index) => (
             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
           ))}
         </Pie>
-        <Tooltip 
-            contentStyle={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)', borderRadius: '8px', fontSize: '12px' }}
-            formatter={(value: number) => [`${value} min`, 'Duração']}
-        />
+        
+        <Tooltip content={<CustomTooltip />} cursor={false} />
+        
         <Legend 
-            verticalAlign="bottom" 
-            height={36} 
-            iconType="circle"
-            formatter={(value) => <span className="text-xs text-zinc-500 ml-1">{value}</span>}
+          verticalAlign="bottom" 
+          height={36} 
+          iconType="circle"
+          iconSize={8}
+          formatter={(value) => (
+            <span className="text-xs text-muted-foreground ml-1 font-medium">{value}</span>
+          )}
         />
       </PieChart>
     </ResponsiveContainer>

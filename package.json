@@ -6,9 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "tauri": "tauri",           
-    "tauri:dev": "tauri dev",   
-    "tauri:build": "tauri build", 
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
     "lint": "eslint",
     "db:migrate": "npx prisma migrate dev",
     "db:up": "echo 'Usando SQLite. O banco de dados é inicializado com npx prisma migrate dev.'"
@@ -52,6 +52,7 @@
     "remark-gfm": "^4.0.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
+    "tailwindcss-animate": "^1.0.7",
     "zod": "^4.1.13"
   },
   "devDependencies": {

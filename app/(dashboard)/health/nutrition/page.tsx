@@ -1,101 +1,112 @@
 import { prisma } from "@/lib/prisma";
-import { NutritionDashboard } from "@/components/health/nutrition-dashboard";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, CalendarDays } from "lucide-react";
-import Link from "next/link";
-import { redirect } from "next/navigation";
+import { NutritionDashboard } from "@/components/health/nutrition/nutrition-dashboard";
+import { PageHeader } from "@/components/ui/page-header";
+import { CalendarDays, AlertCircle } from "lucide-react";
+import { Metadata } from "next";
 
-// ✅ CORREÇÃO 1: Tipagem para Next.js 15 (searchParams é Promise)
+export const metadata: Metadata = {
+  title: "Nutrição | Health",
+  description: "Diário alimentar e macros.",
+};
+
 interface PageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
+// ✅ Interface Específica para Refeições Completas (Dia)
+interface SerializedMeal {
+  id: string;
+  date: string;
+  title: string;
+  calories: number; // ✅ Não pode ser null
+  type: string;
+  items: string;    // ✅ Adicionado (obrigatório no Dashboard)
+  protein?: number | null;
+  carbs?: number | null;
+  fat?: number | null;
+}
+
+// ✅ Interface Específica para Gráficos (Semana)
+interface SerializedWeekData {
+  date: string;
+  calories: number; // ✅ Não pode ser null
+  type: string;
+}
+
 export default async function NutritionPage(props: PageProps) {
-  // ✅ CORREÇÃO 1: Aguardar os parâmetros
-  const params = await props.searchParams;
-  
-  // 1. Extração segura da data
-  const dateParam = typeof params.date === 'string' ? params.date : undefined;
-  
-  // Se a data for inválida, usa hoje.
+  // ✅ Tipagem Correta na inicialização
+  let serializedDayMeals: SerializedMeal[] = [];
+  let serializedWeekMeals: SerializedWeekData[] = [];
   let selectedDate = new Date();
-  if (dateParam) {
-    const parsed = new Date(dateParam);
-    if (!isNaN(parsed.getTime())) {
-      selectedDate = parsed;
+  let hasError = false;
+
+  try {
+    const params = await props.searchParams;
+    const dateParam = typeof params.date === 'string' ? params.date : undefined;
+    
+    if (dateParam) {
+      const parsed = new Date(dateParam);
+      if (!isNaN(parsed.getTime())) selectedDate = parsed;
     }
-  }
 
-  // 2. Definir intervalo do dia (00:00 a 23:59)
-  const startOfDay = new Date(selectedDate);
-  startOfDay.setHours(0, 0, 0, 0);
-  
-  const endOfDay = new Date(selectedDate);
-  endOfDay.setHours(23, 59, 59, 999);
+    const startOfDay = new Date(selectedDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(selectedDate);
+    endOfDay.setHours(23, 59, 59, 999);
 
-  // 3. Buscar refeições do dia
-  const dayMeals = await prisma.meal.findMany({
-    where: {
-      date: {
-        gte: startOfDay,
-        lte: endOfDay,
-      },
-    },
-    orderBy: { date: "asc" },
-  });
+    const startOfWeek = new Date(selectedDate);
+    startOfWeek.setDate(selectedDate.getDate() - 6);
+    startOfWeek.setHours(0, 0, 0, 0);
 
-  // 4. Buscar resumo da semana
-  const startOfWeek = new Date(selectedDate);
-  startOfWeek.setDate(selectedDate.getDate() - 6);
-  startOfWeek.setHours(0, 0, 0, 0);
-  
-  const weekMeals = await prisma.meal.findMany({
-    where: {
-      date: {
-        gte: startOfWeek,
-        lte: endOfDay,
-      },
-    },
-    select: {
-      date: true,
-      calories: true,
-      type: true,
-    },
-  });
+    const [dayMeals, weekMeals] = await Promise.all([
+      prisma.meal.findMany({
+        where: { date: { gte: startOfDay, lte: endOfDay } },
+        orderBy: { date: "asc" },
+      }),
+      prisma.meal.findMany({
+        where: { date: { gte: startOfWeek, lte: endOfDay } },
+        select: { date: true, calories: true, type: true }, // Select otimizado
+      })
+    ]);
 
-  // ✅ CORREÇÃO 2: Serialização Limpa
-  // Removemos 'createdAt' e 'updatedAt' pois o modelo Meal usa apenas 'date'
-  const serializedDayMeals = dayMeals.map(m => ({
+    // ✅ Mapeamento seguro tratando nulos
+    serializedDayMeals = dayMeals.map(m => ({
       ...m,
       date: m.date.toISOString(),
-      // Removido createdAt para corrigir o erro de tipo
-  }));
+      calories: m.calories ?? 0, // Fallback se for null
+      items: m.items ?? "",      // Fallback se for null
+    }));
 
-  const serializedWeekMeals = weekMeals.map(m => ({
-      ...m,
-      date: m.date.toISOString()
-  }));
+    // ✅ Mapeamento seguro para semana
+    serializedWeekMeals = weekMeals.map(m => ({
+      date: m.date.toISOString(),
+      type: m.type,
+      calories: m.calories ?? 0, // Fallback se for null
+    }));
+
+  } catch (error) {
+    console.error("Erro ao carregar nutrição:", error);
+    hasError = true;
+  }
+
+  if (hasError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen text-zinc-500">
+        <AlertCircle className="h-10 w-10 mb-2" />
+        <p>Erro ao carregar dados nutricionais.</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-zinc-50/50 dark:bg-black p-6 md:p-8 space-y-8">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-            <Link href="/health">
-                <Button variant="ghost" size="icon" className="rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800">
-                    <ArrowLeft className="h-5 w-5" />
-                </Button>
-            </Link>
-            <div>
-                <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
-                    <CalendarDays className="h-6 w-6 text-green-600" /> Histórico Nutricional
-                </h1>
-                <p className="text-zinc-500 text-sm">Analise sua alimentação diária.</p>
-            </div>
-        </div>
-      </div>
-
-      {/* Componente Cliente */}
+    <div className="min-h-screen bg-zinc-50/50 dark:bg-black p-6 md:p-8">
+      <PageHeader 
+        title="Histórico Nutricional" 
+        description="Analise sua alimentação diária." 
+        icon={CalendarDays}
+        iconColor="text-green-600"
+      />
       <NutritionDashboard 
         initialDate={selectedDate.toISOString()} 
         meals={serializedDayMeals} 
