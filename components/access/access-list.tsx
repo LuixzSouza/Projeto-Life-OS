@@ -1,19 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { AccessItem } from "@prisma/client";
 import { Input } from "@/components/ui/input";
-import { Search, Shield } from "lucide-react";
+import { Search, Shield, X } from "lucide-react";
 import { AccessCard } from "./access-card";
 
 export function AccessList({ items }: { items: AccessItem[] }) {
     const [search, setSearch] = useState("");
 
-    const filteredItems = items.filter(item => 
-        item.title.toLowerCase().includes(search.toLowerCase()) ||
-        (item.username && item.username.toLowerCase().includes(search.toLowerCase())) ||
-        (item.category && item.category.toLowerCase().includes(search.toLowerCase()))
-    );
+    // Usar useMemo para evitar recomputação desnecessária
+    const filteredItems = useMemo(() => {
+        return items.filter(item => 
+            item.title.toLowerCase().includes(search.toLowerCase()) ||
+            (item.username && item.username.toLowerCase().includes(search.toLowerCase())) ||
+            (item.category && item.category.toLowerCase().includes(search.toLowerCase())) ||
+            (item.notes && item.notes.toLowerCase().includes(search.toLowerCase()))
+        );
+    }, [search, items]);
 
     return (
         <div className="space-y-6">
@@ -21,11 +25,20 @@ export function AccessList({ items }: { items: AccessItem[] }) {
             <div className="relative max-w-md mx-auto md:mx-0">
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
                 <Input 
-                    placeholder="Buscar acesso (nome, user, categoria)..." 
+                    placeholder="Buscar acesso (nome, user, categoria, notas)..." 
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     className="pl-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
                 />
+                {/* Botão para limpar a busca */}
+                {search && (
+                    <button 
+                        onClick={() => setSearch("")}
+                        className="absolute right-3 top-2.5 text-zinc-400 hover:text-zinc-600"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+                )}
             </div>
 
             {/* Grid */}

@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Scale, Activity, LucideIcon, ArrowRight, Utensils, AlertCircle } from "lucide-react";
+import { Scale, Activity, LucideIcon, ArrowRight, Utensils, AlertCircle, TrendingUp, Droplets, Zap, Moon } from "lucide-react";
 import Link from "next/link"; 
 
 // Componentes de Visualização
@@ -14,27 +14,45 @@ import { ActivityFeed } from "@/components/health/activity-feed";
 
 // Componente Cliente para Ações (Modais)
 import { HealthActions } from "@/components/health/health-actions";
+import { cn } from "@/lib/utils";
 
-// --- COMPONENTE AUXILIAR DE MÉTRICA ---
+// --- COMPONENTE AUXILIAR DE MÉTRICA (Refinado) ---
 interface SimpleMetricProps { 
     label: string; 
     value: string | number; 
     icon: LucideIcon; 
     unit: string;
-    trend?: "up" | "down" | "neutral"; 
+    description?: string;
 }
 
-function SimpleMetric({ label, value, icon: Icon, unit }: SimpleMetricProps) {
+function SimpleMetric({ label, value, icon: Icon, unit, description }: SimpleMetricProps) {
     return (
-        <Card className="border border-border bg-card shadow-sm p-4 flex items-center gap-4 h-full hover:bg-muted/50 transition-colors group">
-            <div className="p-3 bg-muted rounded-full text-muted-foreground group-hover:scale-110 group-hover:text-primary transition-all duration-300">
-                <Icon className="h-5 w-5" />
+        <Card className="relative overflow-hidden border-border/60 bg-card hover:border-primary/30 transition-all duration-300 shadow-sm hover:shadow-md group">
+            {/* Background Gradient Effect */}
+            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                <Icon className="w-24 h-24 text-primary -mr-4 -mt-4 transform rotate-12" />
             </div>
-            <div>
-                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-0.5">{label}</p>
-                <p className="text-2xl font-bold text-foreground">
-                    {value} <span className="text-xs font-normal text-muted-foreground">{unit}</span>
-                </p>
+
+            <div className="p-5 flex items-start justify-between relative z-10">
+                <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                        {label}
+                    </p>
+                    <div className="flex items-baseline gap-1">
+                        <span className="text-3xl font-bold text-foreground tracking-tight">
+                            {value}
+                        </span>
+                        <span className="text-sm font-medium text-muted-foreground">
+                            {unit}
+                        </span>
+                    </div>
+                    {description && (
+                        <p className="text-xs text-muted-foreground/80 mt-1">{description}</p>
+                    )}
+                </div>
+                <div className="p-3 bg-primary/10 rounded-xl text-primary ring-1 ring-primary/20 group-hover:scale-110 transition-transform duration-300">
+                    <Icon className="h-5 w-5" />
+                </div>
             </div>
         </Card>
     )
@@ -42,13 +60,13 @@ function SimpleMetric({ label, value, icon: Icon, unit }: SimpleMetricProps) {
 
 export default async function HealthPage() {
   try {
-      // 1. Definição de datas (Início do dia para filtros)
+      // 1. Definição de datas
       const today = new Date();
       today.setHours(0,0,0,0);
 
       // 2. Buscas Paralelas Otimizadas
       const [workouts, lastWeight, lastHeight, waterMetrics, lastSleep, meals] = await Promise.all([
-        prisma.workout.findMany({ orderBy: { date: 'desc' }, take: 10 }), // Limitado a 10 para performance
+        prisma.workout.findMany({ orderBy: { date: 'desc' }, take: 10 }),
         prisma.healthMetric.findFirst({ where: { type: "WEIGHT" }, orderBy: { date: 'desc' } }),
         prisma.healthMetric.findFirst({ where: { type: "HEIGHT" }, orderBy: { date: 'desc' } }),
         prisma.healthMetric.findMany({ 
@@ -67,84 +85,148 @@ export default async function HealthPage() {
       const waterTotal = waterMetrics.reduce((acc, item) => acc + item.value, 0);
 
       return (
-        <div className="min-h-screen bg-muted/20 p-6 md:p-8 space-y-8 pb-32 animate-in fade-in duration-500">
+        <div className="min-h-screen bg-background pb-20">
           
-          {/* --- HEADER & AÇÕES --- */}
-          <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b border-border pb-6">
-            <div>
-                <h1 className="text-3xl font-bold text-foreground tracking-tight">Health Center</h1>
-                <p className="text-muted-foreground mt-1 text-base">Painel de controle corporal e desempenho físico.</p>
+          {/* --- HEADER VISUAL COM GRADIENTE --- */}
+          <header className="border-b border-border/60 bg-gradient-to-b from-primary/5 to-background pt-10 pb-8 px-6 md:px-8">
+            <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div className="space-y-2">
+                    <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground flex items-center gap-3">
+                        <div className="p-2 bg-primary rounded-lg shadow-lg shadow-primary/25">
+                            <Activity className="h-6 w-6 text-primary-foreground" />
+                        </div>
+                        Health Center
+                    </h1>
+                    <p className="text-muted-foreground text-lg max-w-2xl">
+                        Monitoramento biométrico e análise de performance.
+                    </p>
+                </div>
+                
+                {/* Ações Globais */}
+                <div className="flex items-center gap-3">
+                    <HealthActions />
+                </div>
             </div>
-            
-            {/* Componente Cliente que gerencia os Modais de Treino/Corrida */}
-            <HealthActions />
           </header>
 
-          {/* --- GRID 1: COMPOSIÇÃO & METABOLISMO --- */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
-              <div className="lg:col-span-2 h-full">
-                 <BodySummaryCard weight={weight} height={height} />
-              </div>
-              <CaloriesCard weight={weight} height={height} />
-              <HydrationCard total={waterTotal} />
-          </div>
+          <main className="px-6 md:px-8 py-8 space-y-10 max-w-[1600px] mx-auto">
 
-          {/* --- GRID 2: DIÁRIO (SONO & NUTRIÇÃO) --- */}
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-              
-              {/* Coluna Esquerda: Métricas Rápidas */}
-              <div className="md:col-span-4 flex flex-col gap-4">
-                  <SleepCard value={lastSleep?.value || 0} />
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                      <SimpleMetric label="Peso Atual" value={weight} unit="kg" icon={Scale} />
-                      <SimpleMetric label="Treinos" value={workouts.length} unit="total" icon={Activity} />
-                  </div>
-              </div>
+            {/* --- SEÇÃO 1: VITAIS DO DIA --- */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-2 pb-2 border-b border-border/50">
+                    <div className="h-6 w-1 bg-primary rounded-full" />
+                    <h2 className="text-xl font-semibold text-foreground tracking-tight">Métricas Corporais</h2>
+                </div>
 
-              {/* Coluna Direita: Nutrição */}
-              <div className="md:col-span-8 h-full flex flex-col gap-4">
-                  <div className="flex justify-between items-end px-1">
-                      <h3 className="font-semibold text-foreground flex items-center gap-2 text-lg">
-                          <Utensils className="h-5 w-5 text-muted-foreground" /> Alimentação de Hoje
-                      </h3>
-                      <Link href="/health/nutrition" className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 font-medium transition-colors">
-                          Ver detalhes <ArrowRight className="h-3 w-3" />
-                      </Link>
-                  </div>
-                  
-                  {/* FoodLogger agora recebe os dados do servidor */}
-                  <FoodLogger meals={meals} />
-              </div>
-          </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="lg:col-span-2 h-full">
+                         <BodySummaryCard weight={weight} height={height} />
+                    </div>
+                    <div className="flex flex-col gap-6">
+                        <CaloriesCard weight={weight} height={height} />
+                        <HydrationCard total={waterTotal} />
+                    </div>
+                    <div className="flex flex-col gap-6">
+                        <SimpleMetric 
+                            label="Peso Atual" 
+                            value={weight} 
+                            unit="kg" 
+                            icon={Scale} 
+                            description="Último registro"
+                        />
+                        <SimpleMetric 
+                            label="Atividades" 
+                            value={workouts.length} 
+                            unit="total" 
+                            icon={TrendingUp} 
+                            description="Histórico completo"
+                        />
+                    </div>
+                </div>
+            </section>
 
-          {/* --- GRID 3: ATIVIDADES RECENTES --- */}
-          <div className="space-y-4 pt-4 border-t border-dashed border-border">
-              <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-                      <Activity className="h-5 w-5 text-muted-foreground" /> Últimas Atividades
-                  </h3>
-                  <div className="flex gap-2">
-                      <Link href="/health/gym">
-                          <Button variant="ghost" size="sm" className="text-xs hover:bg-muted">Ver Histórico</Button>
-                      </Link>
-                  </div>
-              </div>
-              <ActivityFeed initialWorkouts={workouts} />
-          </div>
+            {/* --- SEÇÃO 2: RECUPERAÇÃO & NUTRIÇÃO --- */}
+            <section className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+                
+                {/* Coluna Esquerda: Sono e Recuperação */}
+                <div className="md:col-span-4 space-y-6">
+                    <div className="flex items-center gap-2 pb-2 border-b border-border/50">
+                        <Moon className="h-5 w-5 text-primary" />
+                        <h2 className="text-lg font-semibold text-foreground">Recuperação</h2>
+                    </div>
+                    <SleepCard value={lastSleep?.value || 0} />
+                    
+                    {/* Exemplo de card de dicas ou stats adicionais para preencher espaço */}
+                    <Card className="bg-primary/5 border-primary/10 border shadow-none">
+                        <CardContent className="p-4 flex gap-4 items-center">
+                            <Zap className="h-8 w-8 text-primary" />
+                            <div>
+                                <p className="text-sm font-bold text-foreground">Consistência</p>
+                                <p className="text-xs text-muted-foreground">Mantenha a rotina para melhores resultados.</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
 
+                {/* Coluna Direita: Nutrição */}
+                <div className="md:col-span-8 space-y-6">
+                    <div className="flex justify-between items-end pb-2 border-b border-border/50">
+                        <div className="flex items-center gap-2">
+                            <Utensils className="h-5 w-5 text-primary" />
+                            <h2 className="text-lg font-semibold text-foreground">Alimentação de Hoje</h2>
+                        </div>
+                        <Link href="/health/nutrition">
+                            <Button variant="link" size="sm" className="h-auto p-0 text-primary font-semibold hover:text-primary/80">
+                                Ver Detalhes <ArrowRight className="h-4 w-4 ml-1" />
+                            </Button>
+                        </Link>
+                    </div>
+                    
+                    <div className="bg-card rounded-xl border border-border/60 shadow-sm p-1">
+                        <FoodLogger meals={meals} />
+                    </div>
+                </div>
+            </section>
+
+            {/* --- SEÇÃO 3: FEED DE ATIVIDADES --- */}
+            <section className="space-y-6">
+                <div className="flex justify-between items-center pb-2 border-b border-border/50">
+                    <div className="flex items-center gap-2">
+                        <Activity className="h-5 w-5 text-primary" />
+                        <h2 className="text-lg font-semibold text-foreground">Últimas Atividades</h2>
+                    </div>
+                    <Link href="/health/gym">
+                        <Button variant="outline" size="sm" className="text-xs font-medium bg-background hover:bg-accent hover:text-accent-foreground border-input">
+                            Histórico Completo
+                        </Button>
+                    </Link>
+                </div>
+                
+                <div className="bg-card/50 rounded-xl border border-border/60 shadow-sm backdrop-blur-[2px]">
+                    <ActivityFeed initialWorkouts={workouts} />
+                </div>
+            </section>
+
+          </main>
         </div>
       );
 
   } catch (error) {
-      console.error("Erro crítico no HealthPage:", error);
+      console.error("Critical Error in HealthPage:", error);
       return (
-          <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 text-center">
-              <AlertCircle className="h-10 w-10 text-destructive" />
-              <div>
-                  <h2 className="text-lg font-semibold">Erro ao carregar dados de saúde</h2>
-                  <p className="text-muted-foreground text-sm">Verifique sua conexão com o banco de dados.</p>
-              </div>
+          <div className="min-h-[60vh] flex flex-col items-center justify-center p-6 text-center space-y-4">
+            <div className="p-4 bg-destructive/10 rounded-full text-destructive">
+                <AlertCircle className="h-10 w-10" />
+            </div>
+            <div>
+                <h2 className="text-xl font-bold text-foreground">Sistema Indisponível</h2>
+                <p className="text-muted-foreground mt-2 max-w-md mx-auto">
+                    Não foi possível carregar seus dados de saúde no momento. Por favor, tente novamente mais tarde.
+                </p>
+            </div>
+            <Button variant="outline" onClick={() => window.location.reload()}>
+                Recarregar Página
+            </Button>
           </div>
       );
   }

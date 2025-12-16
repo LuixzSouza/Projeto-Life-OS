@@ -1,34 +1,69 @@
 "use client";
 
 import { useState } from "react";
+import { 
+  Search, Instagram, Linkedin, Phone, MapPin, 
+  Briefcase, Cake, Heart, Star, Users as UsersIcon, Link as LinkIcon,
+  Copy, Gift, MoreVertical, Pencil, Trash2, X
+} from "lucide-react";
+import { format, parseISO, differenceInYears, differenceInDays, setYear, addYears, isPast } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { toast } from "sonner";
+
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { 
-  Search, Instagram, Linkedin, Phone, MapPin, 
-  Briefcase, Cake, Heart, Star, Users as UsersIcon, Link as LinkIcon,
-  Copy, Gift, MoreVertical, Pencil, Trash2
-} from "lucide-react";
-import { differenceInYears, format, parseISO, differenceInDays, addYears, isPast, setYear } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { toast } from "sonner";
-import { cn } from "@/lib/utils";
-import { deleteFriend } from "@/app/(dashboard)/social/actions"; // Server Action
-import { FriendFormDialog, FriendData } from "./add-friend-dialog"; // Importe o Dialog criado anteriormente
 
+import { cn } from "@/lib/utils";
+import { deleteFriend } from "@/app/(dashboard)/social/actions";
+import { FriendFormDialog, FriendData } from "./add-friend-dialog";
+
+// --- Helpers de Data e Visual ---
+const getProximityBadge = (level?: string) => {
+  switch(level) {
+    case "FAMILY": 
+      return <Badge className="bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-200 gap-1"><Heart className="w-3 h-3 fill-purple-700" /> Família</Badge>;
+    case "CLOSE": 
+      return <Badge className="bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-200 gap-1"><Star className="w-3 h-3 fill-amber-700" /> Próximo</Badge>;
+    case "WORK": 
+      return <Badge className="bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200 gap-1"><Briefcase className="w-3 h-3" /> Trabalho</Badge>;
+    default: 
+      return <Badge variant="outline" className="text-zinc-500 bg-zinc-50 border-zinc-200 gap-1"><UsersIcon className="w-3 h-3" /> Conhecido</Badge>;
+  }
+};
+
+const calculateAge = (dateString: string | null | undefined) => {
+  if (!dateString) return null;
+  return differenceInYears(new Date(), parseISO(dateString));
+};
+
+const getDaysUntilBirthday = (dateString: string | null | undefined) => {
+    if (!dateString) return null;
+    const today = new Date();
+    const birthDate = parseISO(dateString);
+    let nextBirthday = setYear(birthDate, today.getFullYear());
+    
+    if (isPast(nextBirthday) && differenceInDays(today, nextBirthday) > 0) {
+        nextBirthday = addYears(nextBirthday, 1);
+    }
+    
+    const diff = differenceInDays(nextBirthday, today);
+    if (diff === 0) return "Hoje! 🎂";
+    return `Faltam ${diff} dias`;
+};
+
+// --- Componente Principal ---
 export function FriendList({ initialData }: { initialData: FriendData[] }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("ALL");
-  
-  // Estado para controlar qual amigo está sendo editado
   const [editingFriend, setEditingFriend] = useState<FriendData | null>(null);
 
-  // --- FILTRO ---
+  // Lógica de Filtro
   const filteredFriends = initialData.filter(friend => {
     const searchLower = search.toLowerCase();
     const matchesSearch = 
@@ -40,14 +75,11 @@ export function FriendList({ initialData }: { initialData: FriendData[] }) {
     return matchesSearch && matchesType;
   });
 
-  // --- ACTIONS ---
+  // Ações
   const handleDelete = async (id: string) => {
       const res = await deleteFriend(id); 
-      if (res.success) {
-          toast.success("Contato removido.");
-      } else {
-          toast.error("Erro ao remover.");
-      }
+      if (res.success) toast.success("Contato removido.");
+      else toast.error("Erro ao remover.");
   };
 
   const copyToClipboard = (text: string | null | undefined, label: string) => {
@@ -56,51 +88,21 @@ export function FriendList({ initialData }: { initialData: FriendData[] }) {
       toast.success(`${label} copiado!`);
   };
 
-  // --- HELPERS ---
-  const getProximityBadge = (level?: string) => {
-    switch(level) {
-      case "FAMILY": return <Badge className="bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-200"><Heart className="w-3 h-3 mr-1 fill-purple-700" /> Família</Badge>;
-      case "CLOSE": return <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-200"><Star className="w-3 h-3 mr-1 fill-emerald-700" /> Próximo</Badge>;
-      case "WORK": return <Badge className="bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200"><Briefcase className="w-3 h-3 mr-1" /> Trabalho</Badge>;
-      default: return <Badge variant="outline" className="text-zinc-500 bg-zinc-50 border-zinc-200"><UsersIcon className="w-3 h-3 mr-1" /> Conhecido</Badge>;
-    }
-  };
-
-  const calculateAge = (dateString: string | null | undefined) => {
-    if (!dateString) return null;
-    return differenceInYears(new Date(), parseISO(dateString));
-  };
-
-  const getDaysUntilBirthday = (dateString: string | null | undefined) => {
-      if (!dateString) return null;
-      const today = new Date();
-      const birthDate = parseISO(dateString);
-      let nextBirthday = setYear(birthDate, today.getFullYear());
-      
-      if (isPast(nextBirthday) && differenceInDays(today, nextBirthday) > 0) {
-          nextBirthday = addYears(nextBirthday, 1);
-      }
-      
-      const diff = differenceInDays(nextBirthday, today);
-      if (diff === 0) return "Hoje! 🎂";
-      return `Faltam ${diff} dias`;
-  };
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       
-      {/* Search Bar */}
-      <div className="flex flex-col sm:flex-row gap-4 bg-white dark:bg-zinc-900 p-4 rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-800">
+      {/* --- BARRA DE BUSCA E FILTROS --- */}
+      <div className="flex flex-col sm:flex-row gap-4 bg-card p-1 rounded-2xl border border-border/40 shadow-sm">
         <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
-                placeholder="Buscar amigo..." 
+                placeholder="Buscar por nome, apelido ou empresa..." 
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
+                className="pl-10 h-11 border-0 bg-transparent shadow-none focus-visible:ring-0"
             />
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0 scrollbar-hide">
+        <div className="flex items-center gap-1 p-1 bg-muted/20 rounded-xl">
             {[
                 { key: "ALL", label: "Todos" },
                 { key: "CLOSE", label: "Próximos" },
@@ -109,12 +111,12 @@ export function FriendList({ initialData }: { initialData: FriendData[] }) {
             ].map((f) => (
                 <Button 
                     key={f.key}
-                    variant={filter === f.key ? "default" : "outline"} 
+                    variant="ghost" 
                     size="sm" 
                     onClick={() => setFilter(f.key)}
                     className={cn(
-                        "rounded-full px-4 font-medium",
-                        filter === f.key ? "bg-zinc-900 text-white" : "text-zinc-600"
+                        "rounded-lg px-4 font-medium transition-all",
+                        filter === f.key ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
                     )}
                 >
                     {f.label}
@@ -123,11 +125,16 @@ export function FriendList({ initialData }: { initialData: FriendData[] }) {
         </div>
       </div>
 
-      {/* Grid */}
+      {/* --- GRID DE AMIGOS --- */}
       {filteredFriends.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-center border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl">
-              <UsersIcon className="h-10 w-10 text-zinc-300 mb-2" />
-              <p className="text-zinc-500 font-medium">Nenhum contato encontrado.</p>
+          <div className="flex flex-col items-center justify-center py-24 text-center border border-dashed border-border rounded-2xl bg-card/50">
+              <div className="p-4 bg-muted rounded-full mb-3">
+                <UsersIcon className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground">Nenhum contato encontrado</h3>
+              <p className="text-sm text-muted-foreground max-w-xs mt-1">
+                Tente ajustar sua busca ou adicione uma nova conexão.
+              </p>
           </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -139,18 +146,19 @@ export function FriendList({ initialData }: { initialData: FriendData[] }) {
                 return (
                     <Dialog key={friend.id}>
                         <DialogTrigger asChild>
-                            <Card className="group cursor-pointer hover:shadow-lg transition-all border-zinc-200 hover:border-indigo-300 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden relative">
-                                <div className={cn("absolute top-0 left-0 w-full h-1", 
+                            <Card className="group cursor-pointer hover:shadow-lg transition-all border-border/60 hover:border-primary/30 bg-card overflow-hidden relative">
+                                {/* Faixa de Cor por Proximidade */}
+                                <div className={cn("absolute top-0 left-0 w-full h-1.5", 
                                     friend.proximity === "FAMILY" ? "bg-purple-500" : 
-                                    friend.proximity === "CLOSE" ? "bg-emerald-500" : 
+                                    friend.proximity === "CLOSE" ? "bg-amber-500" : 
                                     friend.proximity === "WORK" ? "bg-blue-500" : "bg-zinc-300"
                                 )}></div>
 
-                                <CardContent className="p-5 pt-6">
-                                    <div className="flex justify-between items-start mb-4">
-                                        <Avatar className="h-16 w-16 border-4 border-white dark:border-zinc-950 shadow-sm bg-zinc-100">
+                                <CardContent className="p-6 pt-8">
+                                    <div className="flex justify-between items-start mb-5">
+                                        <Avatar className="h-16 w-16 border-4 border-background shadow-md">
                                             <AvatarImage src={friend.imageUrl || undefined} className="object-cover" />
-                                            <AvatarFallback className="bg-gradient-to-br from-indigo-100 to-white text-indigo-700 font-bold text-xl">
+                                            <AvatarFallback className="bg-primary/10 text-primary font-bold text-xl">
                                                 {initials}
                                             </AvatarFallback>
                                         </Avatar>
@@ -158,27 +166,27 @@ export function FriendList({ initialData }: { initialData: FriendData[] }) {
                                     </div>
                                     
                                     <div className="space-y-1">
-                                        <h3 className="font-bold text-lg text-zinc-900 dark:text-zinc-100 leading-tight truncate">{friend.name}</h3>
+                                        <h3 className="font-bold text-lg text-foreground leading-tight truncate pr-2">{friend.name}</h3>
                                         {friend.nickname && (
-                                            <p className="text-sm text-indigo-600 dark:text-indigo-400 font-medium">&quot;{friend.nickname}&quot;</p>
+                                            <p className="text-sm text-primary font-medium">&quot;{friend.nickname}&quot;</p>
                                         )}
                                         
                                         {(friend.jobTitle || friend.company) ? (
-                                            <p className="text-xs text-zinc-500 mt-2 flex items-center gap-1.5 truncate">
-                                                <Briefcase className="h-3 w-3 shrink-0" />
+                                            <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1.5 truncate">
+                                                <Briefcase className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
                                                 <span className="truncate">
-                                                    {friend.jobTitle} {friend.jobTitle && friend.company && "na"} <span className="font-semibold text-zinc-700 dark:text-zinc-300">{friend.company}</span>
+                                                    {friend.jobTitle} {friend.jobTitle && friend.company && "•"} <span className="font-medium text-foreground">{friend.company}</span>
                                                 </span>
                                             </p>
                                         ) : (
-                                            <p className="text-xs text-zinc-400 mt-2 italic">Sem info profissional</p>
+                                            <p className="text-xs text-muted-foreground/50 mt-3 italic">Sem info profissional</p>
                                         )}
                                     </div>
 
-                                    {/* Botões Rápidos */}
-                                    <div className="mt-5 pt-4 border-t border-dashed border-zinc-100 dark:border-zinc-800 flex gap-2">
+                                    {/* Ações Rápidas (Hover) */}
+                                    <div className="mt-6 pt-4 border-t border-dashed border-border flex gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-300">
                                         {friend.phone && (
-                                            <Button size="icon" variant="ghost" className="h-9 w-9 text-green-600 bg-green-50 hover:bg-green-100 rounded-full" onClick={(e) => {
+                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 bg-green-50 hover:bg-green-100 rounded-lg" onClick={(e) => {
                                                 e.stopPropagation();
                                                 if(friend.phone) window.open(`https://wa.me/${friend.phone.replace(/\D/g, '')}`, '_blank');
                                             }}>
@@ -186,7 +194,7 @@ export function FriendList({ initialData }: { initialData: FriendData[] }) {
                                             </Button>
                                         )}
                                         {friend.instagram && (
-                                            <Button size="icon" variant="ghost" className="h-9 w-9 text-pink-600 bg-pink-50 hover:bg-pink-100 rounded-full" onClick={(e) => {
+                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-pink-600 bg-pink-50 hover:bg-pink-100 rounded-lg" onClick={(e) => {
                                                 e.stopPropagation();
                                                 if(friend.instagram) window.open(`https://instagram.com/${friend.instagram.replace('@', '')}`, '_blank');
                                             }}>
@@ -194,7 +202,7 @@ export function FriendList({ initialData }: { initialData: FriendData[] }) {
                                             </Button>
                                         )}
                                         {friend.linkedin && (
-                                            <Button size="icon" variant="ghost" className="h-9 w-9 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-full" onClick={(e) => {
+                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg" onClick={(e) => {
                                                 e.stopPropagation();
                                                 if(friend.linkedin) window.open(friend.linkedin, '_blank');
                                             }}>
@@ -206,108 +214,121 @@ export function FriendList({ initialData }: { initialData: FriendData[] }) {
                             </Card>
                         </DialogTrigger>
                         
-                        {/* --- MODAL DE DETALHES COM MENU DE AÇÕES --- */}
-                        <DialogContent className="max-w-md rounded-2xl p-0 overflow-hidden bg-zinc-50 dark:bg-zinc-950 border-0 max-h-[90vh] overflow-y-auto">
+                        {/* --- DETALHES DO AMIGO --- */}
+                        <DialogContent className="max-w-md p-0 overflow-hidden bg-background border-border shadow-2xl rounded-3xl">
                             
-                            {/* Header Visual */}
-                            <div className="bg-gradient-to-r from-zinc-100 to-zinc-200 dark:from-zinc-900 dark:to-zinc-800 p-6 pt-8 pb-12 relative">
-                                
-                                {/* Título Oculto para Acessibilidade */}
-                                <DialogHeader className="sr-only">
-                                    <DialogTitle>Perfil de {friend.name}</DialogTitle>
-                                    <DialogDescription>Detalhes completos do contato.</DialogDescription>
-                                </DialogHeader>
+                            {/* ✅ CORREÇÃO: Header Oculto para Acessibilidade */}
+                            <DialogHeader className="sr-only">
+                                <DialogTitle>Perfil de {friend.name}</DialogTitle>
+                                <DialogDescription>Detalhes e informações de contato.</DialogDescription>
+                            </DialogHeader>
 
-                                {/* BOTÃO DE AÇÕES (CRUD) */}
-                                <div className="absolute h-auto w-auto top-4 left-4 flex gap-2 items-center z-20 cursor-pointer">
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full bg-white/50 hover:bg-white text-zinc-700">
-                                                <MoreVertical className="h-4 w-4" />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" className="w-40">
-                                            <DropdownMenuItem onClick={() => setEditingFriend(friend)}>
-                                                <Pencil className="h-4 w-4 mr-2" /> Editar
-                                            </DropdownMenuItem>
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-600 focus:text-red-600 focus:bg-red-50">
-                                                        <Trash2 className="h-4 w-4 mr-2" /> Excluir
-                                                    </DropdownMenuItem>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader>
-                                                        <AlertDialogTitle>Excluir contato?</AlertDialogTitle>
-                                                        <AlertDialogDescription>Esta ação é irreversível.</AlertDialogDescription>
-                                                    </AlertDialogHeader>
-                                                    <AlertDialogFooter>
-                                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                        <AlertDialogAction onClick={() => friend.id && handleDelete(friend.id)} className="bg-red-600 hover:bg-red-700">Confirmar</AlertDialogAction>
-                                                    </AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
-                                </div>
+                            <div className="relative">
+                                {/* Botão de Fechar Custom (Visual) */}
+                                <DialogTrigger asChild>
+                                    <button className="absolute top-4 right-4 z-50 p-2 bg-black/20 hover:bg-black/40 text-white rounded-full transition-colors backdrop-blur-sm">
+                                        <X className="h-4 w-4" />
+                                    </button>
+                                </DialogTrigger>
 
-                                <div className="flex flex-col items-center text-center gap-3 relative z-10">
-                                    <Avatar className="h-28 w-28 border-4 border-white dark:border-zinc-950 shadow-xl">
+                                {/* Cover com Gradiente */}
+                                <div className="bg-gradient-to-br from-primary/20 via-primary/5 to-background p-8 pt-12 pb-16 relative text-center">
+                                    
+                                    {/* Menu de Ações (CRUD) */}
+                                    <div className="absolute top-4 left-4 z-20">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full bg-white/40 hover:bg-white/60 text-foreground backdrop-blur-md">
+                                                    <MoreVertical className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="start" className="w-48">
+                                                <DropdownMenuItem onClick={() => setEditingFriend(friend)}>
+                                                    <Pencil className="h-4 w-4 mr-2" /> Editar Perfil
+                                                </DropdownMenuItem>
+                                                <AlertDialog>
+                                                    <AlertDialogTrigger asChild>
+                                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                                                            <Trash2 className="h-4 w-4 mr-2" /> Excluir Contato
+                                                        </DropdownMenuItem>
+                                                    </AlertDialogTrigger>
+                                                    <AlertDialogContent>
+                                                        <AlertDialogHeader>
+                                                            <AlertDialogTitle>Excluir {friend.name}?</AlertDialogTitle>
+                                                            <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
+                                                        </AlertDialogHeader>
+                                                        <AlertDialogFooter>
+                                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                            <AlertDialogAction onClick={() => friend.id && handleDelete(friend.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Confirmar</AlertDialogAction>
+                                                        </AlertDialogFooter>
+                                                    </AlertDialogContent>
+                                                </AlertDialog>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+
+                                    <Avatar className="h-32 w-32 border-4 border-background shadow-2xl mx-auto mb-4">
                                         <AvatarImage src={friend.imageUrl || undefined} className="object-cover" />
-                                        <AvatarFallback className="bg-white text-zinc-900 font-black text-3xl">{initials}</AvatarFallback>
+                                        <AvatarFallback className="bg-background text-foreground font-black text-4xl">{initials}</AvatarFallback>
                                     </Avatar>
-                                    <div>
-                                        <h2 className="text-2xl font-bold text-zinc-900 dark:text-white leading-tight">{friend.name}</h2>
-                                        {friend.nickname && <p className="text-indigo-600 dark:text-indigo-400 font-medium text-lg">&quot;{friend.nickname}&quot;</p>}
-                                        <div className="flex justify-center mt-2">{getProximityBadge(friend.proximity)}</div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Conteúdo */}
-                            <div className="p-6 space-y-6 -mt-6 bg-white dark:bg-zinc-950 rounded-t-3xl relative z-20 shadow-lg">
-                                
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="bg-zinc-50 dark:bg-zinc-900 p-3 rounded-xl border border-zinc-100 dark:border-zinc-800">
-                                        <p className="text-[10px] text-zinc-400 font-bold uppercase mb-1">Aniversário</p>
-                                        <div className="flex items-center gap-2 text-sm font-semibold">
-                                            <Cake className="h-4 w-4 text-pink-500" />
-                                            {friend.birthday ? `${format(parseISO(friend.birthday), "dd/MM")} (${age})` : "-"}
-                                        </div>
-                                        {daysUntil && <Badge variant="secondary" className="mt-1.5 text-[10px] h-5 bg-pink-100 text-pink-600">{daysUntil}</Badge>}
-                                    </div>
-                                    <div className="bg-zinc-50 dark:bg-zinc-900 p-3 rounded-xl border border-zinc-100 dark:border-zinc-800">
-                                        <p className="text-[10px] text-zinc-400 font-bold uppercase mb-1">Ideia de Presente</p>
-                                        <div className="flex items-start gap-2 text-sm text-zinc-600 dark:text-zinc-300">
-                                            <Gift className="h-4 w-4 text-purple-500 mt-0.5 shrink-0" />
-                                            <span className="italic leading-tight text-xs">{friend.giftIdeas || "Nada anotado"}</span>
-                                        </div>
-                                    </div>
+                                    
+                                    <h2 className="text-2xl font-bold text-foreground leading-tight">{friend.name}</h2>
+                                    {friend.nickname && <p className="text-primary font-medium text-lg mt-1">&quot;{friend.nickname}&quot;</p>}
+                                    <div className="flex justify-center mt-3">{getProximityBadge(friend.proximity)}</div>
                                 </div>
 
-                                <div onClick={() => copyToClipboard(friend.pixKey, "Pix")} className="group flex items-center justify-between p-3 rounded-xl bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/30 cursor-pointer hover:bg-green-100 transition-colors">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-green-200 dark:bg-green-900/50 rounded-full text-green-700"><LinkIcon className="h-4 w-4" /></div>
-                                        <div>
-                                            <p className="text-[10px] text-green-700/70 font-bold uppercase">Chave Pix</p>
-                                            <p className="text-sm font-mono font-bold text-green-800 truncate max-w-[180px]">{friend.pixKey || "Não cadastrada"}</p>
+                                {/* Info Grid */}
+                                <div className="p-6 space-y-6 -mt-8 bg-background rounded-t-3xl relative z-10">
+                                    
+                                    {/* Datas & Presentes */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="bg-secondary/30 p-4 rounded-2xl border border-border/50">
+                                            <p className="text-[10px] text-muted-foreground font-bold uppercase mb-1">Aniversário</p>
+                                            <div className="flex items-center gap-2 text-sm font-semibold">
+                                                <Cake className="h-4 w-4 text-pink-500" />
+                                                {friend.birthday ? `${format(parseISO(friend.birthday), "dd/MM")} (${age})` : "-"}
+                                            </div>
+                                            {daysUntil && <Badge variant="secondary" className="mt-2 text-[10px] bg-pink-100 text-pink-700 hover:bg-pink-200">{daysUntil}</Badge>}
+                                        </div>
+                                        <div className="bg-secondary/30 p-4 rounded-2xl border border-border/50">
+                                            <p className="text-[10px] text-muted-foreground font-bold uppercase mb-1">Presente</p>
+                                            <div className="flex items-start gap-2 text-sm text-foreground">
+                                                <Gift className="h-4 w-4 text-purple-500 mt-0.5 shrink-0" />
+                                                <span className="italic leading-tight text-xs text-muted-foreground">{friend.giftIdeas || "Sem ideias"}</span>
+                                            </div>
                                         </div>
                                     </div>
-                                    {friend.pixKey && <Copy className="h-4 w-4 text-green-600 opacity-50 group-hover:opacity-100" />}
-                                </div>
 
-                                <div className="space-y-2">
-                                    <p className="text-xs text-zinc-500 font-bold uppercase flex items-center gap-2"><MapPin className="h-3 w-3" /> Memória & Notas</p>
-                                    <div className="p-4 bg-yellow-50/50 dark:bg-yellow-900/10 border border-yellow-100 rounded-xl text-sm text-zinc-700 italic leading-relaxed min-h-[80px]">
-                                        {friend.notes ? `"${friend.notes}"` : "Nenhuma nota adicionada."}
+                                    {/* Pix */}
+                                    {friend.pixKey && (
+                                        <div onClick={() => copyToClipboard(friend.pixKey, "Pix")} className="group flex items-center justify-between p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/50 cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-emerald-200 dark:bg-emerald-900 rounded-full text-emerald-800 dark:text-emerald-300"><LinkIcon className="h-4 w-4" /></div>
+                                                <div>
+                                                    <p className="text-[10px] text-emerald-700 dark:text-emerald-400 font-bold uppercase">Chave Pix</p>
+                                                    <p className="text-sm font-mono font-bold text-emerald-900 dark:text-emerald-100 truncate max-w-[200px]">{friend.pixKey}</p>
+                                                </div>
+                                            </div>
+                                            <Copy className="h-4 w-4 text-emerald-600 dark:text-emerald-400 opacity-50 group-hover:opacity-100" />
+                                        </div>
+                                    )}
+
+                                    {/* Notas */}
+                                    <div className="space-y-2">
+                                        <p className="text-xs text-muted-foreground font-bold uppercase flex items-center gap-2"><MapPin className="h-3 w-3" /> Notas & Local</p>
+                                        <div className="p-4 bg-yellow-50/50 dark:bg-yellow-900/10 border border-yellow-100 dark:border-yellow-900/30 rounded-2xl text-sm text-foreground italic leading-relaxed min-h-[80px]">
+                                            {friend.notes ? `"${friend.notes}"` : "Nenhuma nota adicionada."}
+                                            {friend.address && <div className="mt-2 pt-2 border-t border-yellow-200/50 not-italic text-xs text-muted-foreground flex gap-1"><MapPin className="h-3 w-3"/> {friend.address}</div>}
+                                        </div>
                                     </div>
-                                </div>
 
-                                {friend.phone && (
-                                    <Button className="w-full h-12 text-base font-bold bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-500/20 rounded-xl" onClick={() => { if(friend.phone) window.open(`https://wa.me/${friend.phone.replace(/\D/g, '')}`, '_blank'); }}>
-                                        <Phone className="h-5 w-5 mr-2" /> WhatsApp
-                                    </Button>
-                                )}
+                                    {/* Call to Action */}
+                                    {friend.phone && (
+                                        <Button className="w-full h-12 text-base font-bold bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-600/20 rounded-xl" onClick={() => { if(friend.phone) window.open(`https://wa.me/${friend.phone.replace(/\D/g, '')}`, '_blank'); }}>
+                                            <Phone className="h-5 w-5 mr-2" /> Iniciar Conversa
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
                         </DialogContent>
                     </Dialog>
@@ -316,7 +337,7 @@ export function FriendList({ initialData }: { initialData: FriendData[] }) {
         </div>
       )}
 
-      {/* MODAL DE EDIÇÃO (Controlado pelo state editingFriend) */}
+      {/* MODAL DE EDIÇÃO */}
       <FriendFormDialog 
           mode="edit"
           open={!!editingFriend}

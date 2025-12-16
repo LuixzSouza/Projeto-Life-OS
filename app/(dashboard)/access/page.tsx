@@ -1,36 +1,58 @@
 import { prisma } from "@/lib/prisma";
 import { LockKeyhole } from "lucide-react";
 import { AccessDialog } from "@/components/access/access-dialog";
-import { AccessList } from "@/components/access/access-list"; // <--- Novo
+import { AccessList } from "@/components/access/access-list";
 
 export default async function AccessPage() {
   const items = await prisma.accessItem.findMany({
-    orderBy: { title: 'asc' }
+    orderBy: { title: "asc" },
   });
 
   return (
-    <div className="min-h-screen bg-gray-50/30 dark:bg-black p-6 md:p-10 space-y-8">
-      
-      {/* Header */}
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-zinc-900 dark:text-white tracking-tight flex items-center gap-3">
-                <div className="p-2 bg-zinc-900 dark:bg-white text-white dark:text-black rounded-lg shadow-lg shadow-zinc-500/20">
-                    <LockKeyhole className="h-6 w-6" />
-                </div>
+    <section className="min-h-screen bg-muted/30 dark:bg-background px-6 py-8 md:px-10 md:py-12 space-y-10">
+      {/* HEADER */}
+      <header className="flex flex-col gap-6 border-b border-border pb-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          {/* TÍTULO */}
+          <div className="flex items-start gap-4">
+            <div className="h-12 w-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shadow-sm">
+              <LockKeyhole className="h-6 w-6" />
+            </div>
+
+            <div>
+              <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
                 Cofre de Senhas
-            </h1>
-            <p className="text-zinc-500 mt-1 ml-14">Acessos criptografados (AES-256).</p>
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Gerencie seus acessos com criptografia de nível militar (AES-256)
+              </p>
+            </div>
           </div>
-          
-          <div className="flex gap-3 w-full md:w-auto">
-              <AccessDialog />
+
+          {/* AÇÕES */}
+          <div className="flex items-center gap-3">
+            <AccessDialog />
           </div>
+        </div>
+
+        {/* INFO BAR */}
+        <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+          <span className="flex items-center gap-2">
+            🔐 Dados criptografados localmente
+          </span>
+          <span className="flex items-center gap-2">
+            ⚡ Acesso rápido e seguro
+          </span>
+          <span className="flex items-center gap-2">
+            🧠 Ideal para uso pessoal ou profissional
+          </span>
+        </div>
       </header>
 
-      {/* Lista com Busca Integrada */}
-      <AccessList items={items} />
-
-    </div>
+      {/* CONTEÚDO */}
+      <main className="space-y-6">
+        <AccessList items={items} />
+      </main>
+    </section>
   );
 }

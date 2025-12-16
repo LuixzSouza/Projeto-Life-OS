@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useState, useRef } from "react";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger, DialogHeader, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,16 +9,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
-    Shirt, Tag, DollarSign, Ruler, UploadCloud, 
-    Camera, X, Loader2, Layers, Check, Footprints, Watch,
-    Palette, Link as LinkIcon, Search, Globe, Image as ImageIcon, Sparkles
+    Shirt, Tag, Layers, Check, Footprints, Watch,
+    Search, Image as ImageIcon, Sparkles, UploadCloud, X, Loader2, Link as LinkIcon
 } from "lucide-react";
 import { toast } from "sonner";
 import { createWardrobeItem, updateWardrobeItem } from "@/app/(dashboard)/wardrobe/actions";
 import { cn } from "@/lib/utils";
 
 // --- TIPAGEM ESTRITA ---
-type WardrobeStatus = "IN_CLOSET" | "LAUNDRY" | "LENT" | "REPAIR" | "DONATED";
+export type WardrobeStatus = "IN_CLOSET" | "LAUNDRY" | "LENT" | "REPAIR" | "DONATED";
 
 export type WardrobeItemData = {
     id?: string;
@@ -48,7 +47,7 @@ interface WardrobeFormDialogProps {
     onOpenChange?: (open: boolean) => void;
 }
 
-// Opções de Configuração
+// --- CONSTANTES ---
 const CATEGORY_OPTIONS = [
     { value: "TOP", label: "Parte de Cima", icon: Shirt },
     { value: "BOTTOM", label: "Parte de Baixo", icon: Layers },
@@ -57,14 +56,14 @@ const CATEGORY_OPTIONS = [
 ];
 
 const COLOR_PALETTE = [
-    { name: "Preto", hex: "#000000", border: "border-zinc-500" },
-    { name: "Branco", hex: "#FFFFFF", border: "border-zinc-300" },
-    { name: "Cinza", hex: "#808080", border: "border-zinc-500" },
-    { name: "Azul", hex: "#2563eb", border: "border-blue-600" },
-    { name: "Vermelho", hex: "#dc2626", border: "border-red-600" },
-    { name: "Verde", hex: "#16a34a", border: "border-green-600" },
-    { name: "Beige", hex: "#F5F5DC", border: "border-yellow-200" },
-    { name: "Roxo", hex: "#7c3aed", border: "border-violet-600" },
+    { name: "Preto", hex: "#000000", class: "bg-black border-border" },
+    { name: "Branco", hex: "#FFFFFF", class: "bg-white border-border" },
+    { name: "Cinza", hex: "#808080", class: "bg-gray-500 border-transparent" },
+    { name: "Azul", hex: "#2563eb", class: "bg-blue-600 border-transparent" },
+    { name: "Vermelho", hex: "#dc2626", class: "bg-red-600 border-transparent" },
+    { name: "Verde", hex: "#16a34a", class: "bg-green-600 border-transparent" },
+    { name: "Beige", hex: "#F5F5DC", class: "bg-[#F5F5DC] border-yellow-200" },
+    { name: "Roxo", hex: "#7c3aed", class: "bg-violet-600 border-transparent" },
 ];
 
 const MOCK_CLOTHING_API: { term: string; items: SearchResultItem[] }[] = [
@@ -82,6 +81,7 @@ const MOCK_CLOTHING_API: { term: string; items: SearchResultItem[] }[] = [
     ]}
 ];
 
+// --- COMPONENTE PRINCIPAL ---
 export function WardrobeFormDialog({ mode = "create", initialData, trigger, open, onOpenChange }: WardrobeFormDialogProps) {
     const [internalOpen, setInternalOpen] = useState(false);
     const isOpen = open !== undefined ? open : internalOpen;
@@ -90,17 +90,27 @@ export function WardrobeFormDialog({ mode = "create", initialData, trigger, open
 
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            <DialogTrigger asChild>
-                {trigger || (
-                    <Button className="bg-violet-600 hover:bg-violet-700 text-white gap-2 shadow-lg h-10 px-6 rounded-lg font-medium transition-all">
-                        <Shirt className="h-4 w-4" /> Adicionar Peça
-                    </Button>
-                )}
-            </DialogTrigger>
             
-            {/* MODAL GIGANTE (ESTÚDIO) */}
-            <DialogContent className="max-w-6xl w-[95vw] h-[90vh] p-0 gap-0 bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden flex flex-col md:flex-row shadow-2xl">
-                <DialogTitle className="sr-only">Editor de Guarda-Roupa</DialogTitle>
+            {/* ✅ CORREÇÃO: Condição para renderizar o gatilho.
+                Só mostra o botão padrão se NÃO tiver trigger customizado E estiver no modo 'create'.
+            */}
+            {(trigger || mode === "create") && (
+                <DialogTrigger asChild>
+                    {trigger || (
+                        <Button className="gap-2 shadow-lg shadow-primary/20 font-semibold transition-all active:scale-95 bg-primary hover:bg-primary/90 text-primary-foreground" size="lg">
+                            <Shirt className="h-4 w-4" /> Adicionar Peça
+                        </Button>
+                    )}
+                </DialogTrigger>
+            )}
+            
+            <DialogContent className="max-w-6xl w-[95vw] h-[90vh] p-0 gap-0 bg-background border-border/50 rounded-2xl overflow-hidden flex flex-col md:flex-row shadow-2xl">
+                {/* Header acessível oculto */}
+                <DialogHeader className="sr-only">
+                    <DialogTitle>Editor de Guarda-Roupa</DialogTitle>
+                    <DialogDescription>Adicione ou edite peças do seu armário</DialogDescription>
+                </DialogHeader>
+
                 {isOpen && (
                     <WardrobeFormInner 
                         key={formKey} 
@@ -115,10 +125,11 @@ export function WardrobeFormDialog({ mode = "create", initialData, trigger, open
     );
 }
 
+// --- SUBCOMPONENTE LÓGICO ---
 function WardrobeFormInner({ mode, initialData, onSuccess, onCancel }: { mode: string, initialData?: WardrobeItemData, onSuccess: () => void, onCancel: () => void }) {
     const [isLoading, setIsLoading] = useState(false);
     
-    // Form States
+    // States
     const [name, setName] = useState(initialData?.name || "");
     const [category, setCategory] = useState(initialData?.category || "TOP");
     const [brand, setBrand] = useState(initialData?.brand || "");
@@ -135,7 +146,7 @@ function WardrobeFormInner({ mode, initialData, onSuccess, onCancel }: { mode: s
     
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Image Handlers
+    // Handlers
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -150,7 +161,6 @@ function WardrobeFormInner({ mode, initialData, onSuccess, onCancel }: { mode: s
                 const ctx = canvas.getContext("2d");
                 if (!ctx) return;
                 
-                // Compressão
                 const maxSize = 1000; 
                 let width = img.width; let height = img.height;
                 if (width > height) { if (width > maxSize) { height *= maxSize / width; width = maxSize; } } 
@@ -173,7 +183,6 @@ function WardrobeFormInner({ mode, initialData, onSuccess, onCancel }: { mode: s
         });
         
         if (results.length === 0) {
-            // Fallback genérico para demo
             results = [
                 { name: "Item Genérico", img: "https://images.unsplash.com/photo-1562157873-818bc0726f68?w=500&q=80", cat: "TOP", brand: "Generic" },
                 { name: "Peça Exemplo", img: "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=500&q=80", cat: "BOTTOM", brand: "Example" }
@@ -227,63 +236,65 @@ function WardrobeFormInner({ mode, initialData, onSuccess, onCancel }: { mode: s
     return (
         <>
             {/* --- LADO ESQUERDO: STUDIO VISUAL (50%) --- */}
-            <div className="w-full md:w-1/2 bg-zinc-100 dark:bg-zinc-900 border-b md:border-b-0 md:border-r border-zinc-200 dark:border-zinc-800 flex flex-col relative h-full">
+            <div className="w-full md:w-1/2 bg-muted/20 border-b md:border-b-0 md:border-r border-border/60 flex flex-col relative h-full">
                 
-                {/* Abas de Origem da Imagem (Flutuante no topo) */}
-                <div className="absolute top-4 left-4 right-4 z-10">
+                {/* Abas de Origem da Imagem */}
+                <div className="absolute top-6 left-6 right-6 z-10">
                     <Tabs defaultValue="upload" className="w-full">
-                        <TabsList className="w-full grid grid-cols-3 bg-white/80 dark:bg-black/80 backdrop-blur-md shadow-sm border border-zinc-200 dark:border-zinc-800">
-                            <TabsTrigger value="upload" className="text-xs">Upload</TabsTrigger>
-                            <TabsTrigger value="web" className="text-xs">Buscar Web</TabsTrigger>
-                            <TabsTrigger value="url" className="text-xs">Link URL</TabsTrigger>
+                        <TabsList className="w-full grid grid-cols-3 bg-background/80 backdrop-blur-md shadow-sm border border-border/50">
+                            <TabsTrigger value="upload" className="text-xs font-medium">Upload</TabsTrigger>
+                            <TabsTrigger value="web" className="text-xs font-medium">Buscar Web</TabsTrigger>
+                            <TabsTrigger value="url" className="text-xs font-medium">Link URL</TabsTrigger>
                         </TabsList>
 
-                        <TabsContent value="upload" className="mt-0 hidden" /> {/* Hidden content, handled below */}
+                        <TabsContent value="upload" className="mt-0 hidden" /> 
                         
-                        {/* Conteúdo da Busca Web (Sobreposto) */}
-                        <TabsContent value="web" className="mt-2 bg-white dark:bg-zinc-950 p-3 rounded-lg shadow-xl border border-zinc-200 dark:border-zinc-800 animate-in slide-in-from-top-2">
+                        <TabsContent value="web" className="mt-3 bg-background/95 backdrop-blur-xl p-4 rounded-xl shadow-xl border border-border animate-in slide-in-from-top-2">
                             <div className="flex gap-2 mb-3">
                                 <Input 
                                     placeholder="Ex: Nike, Vestido..." 
                                     value={searchQuery} 
                                     onChange={(e) => setSearchQuery(e.target.value)} 
                                     onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                                    className="h-9 text-sm"
+                                    className="h-9 text-sm bg-muted/30"
                                 />
-                                <Button size="sm" onClick={handleSearch}><Search className="h-4 w-4" /></Button>
+                                <Button size="sm" onClick={handleSearch} className="h-9 w-9 p-0 bg-primary hover:bg-primary/90"><Search className="h-4 w-4" /></Button>
                             </div>
-                            <ScrollArea className="h-48">
-                                <div className="grid grid-cols-3 gap-2">
+                            <ScrollArea className="h-56">
+                                <div className="grid grid-cols-3 gap-2 pr-3">
                                     {searchResults.map((item, idx) => (
-                                        <div key={idx} onClick={() => selectSearchResult(item)} className="aspect-square relative rounded-md overflow-hidden cursor-pointer hover:ring-2 ring-violet-500">
+                                        <div key={idx} onClick={() => selectSearchResult(item)} className="aspect-square relative rounded-lg overflow-hidden cursor-pointer hover:ring-2 ring-primary transition-all">
                                             {/* eslint-disable-next-line @next/next/no-img-element */}
                                             <img src={item.img} alt={item.name} className="w-full h-full object-cover" />
                                         </div>
                                     ))}
-                                    {searchResults.length === 0 && <p className="col-span-3 text-center text-xs text-zinc-400 py-4">Digite para buscar</p>}
+                                    {searchResults.length === 0 && <p className="col-span-3 text-center text-xs text-muted-foreground py-8">Digite para buscar referências</p>}
                                 </div>
                             </ScrollArea>
                         </TabsContent>
 
-                        <TabsContent value="url" className="mt-2 bg-white dark:bg-zinc-950 p-3 rounded-lg shadow-xl border border-zinc-200 dark:border-zinc-800 animate-in slide-in-from-top-2">
+                        <TabsContent value="url" className="mt-3 bg-background/95 backdrop-blur-xl p-4 rounded-xl shadow-xl border border-border animate-in slide-in-from-top-2">
                             <div className="flex gap-2">
-                                <Input placeholder="https://..." value={imageUrlInput} onChange={(e) => setImageUrlInput(e.target.value)} className="h-9 text-sm" />
-                                <Button size="sm" onClick={() => setPreviewImage(imageUrlInput)}>Ok</Button>
+                                <div className="relative flex-1">
+                                    <LinkIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                    <Input placeholder="https://..." value={imageUrlInput} onChange={(e) => setImageUrlInput(e.target.value)} className="h-9 text-sm pl-9 bg-muted/30" />
+                                </div>
+                                <Button size="sm" onClick={() => setPreviewImage(imageUrlInput)} className="h-9">Ok</Button>
                             </div>
                         </TabsContent>
                     </Tabs>
                 </div>
 
                 {/* Área Principal de Imagem */}
-                <div className="flex-1 flex items-center justify-center bg-zinc-200 dark:bg-black/50 relative group">
+                <div className="flex-1 flex items-center justify-center relative group bg-[url('https://grainy-gradients.vercel.app/noise.svg')] bg-repeat opacity-90">
                     {previewImage ? (
                         <>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={previewImage} alt="Preview" className="w-full h-full object-contain p-8 md:p-12" />
+                            <img src={previewImage} alt="Preview" className="w-full h-full object-contain p-8 md:p-12 transition-transform duration-500 group-hover:scale-105" />
                             <Button 
                                 variant="destructive" 
                                 size="icon" 
-                                className="absolute bottom-6 right-6 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                                className="absolute bottom-8 right-8 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-all scale-90 group-hover:scale-100"
                                 onClick={() => setPreviewImage("")}
                             >
                                 <X className="h-4 w-4" />
@@ -291,14 +302,14 @@ function WardrobeFormInner({ mode, initialData, onSuccess, onCancel }: { mode: s
                         </>
                     ) : (
                         <div 
-                            className="text-center p-10 cursor-pointer hover:scale-105 transition-transform"
+                            className="flex flex-col items-center justify-center p-12 cursor-pointer transition-all hover:scale-105 opacity-60 hover:opacity-100"
                             onClick={() => fileInputRef.current?.click()}
                         >
-                            <div className="w-24 h-24 bg-zinc-300 dark:bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <ImageIcon className="h-10 w-10 text-zinc-500" />
+                            <div className="w-24 h-24 bg-background border-2 border-dashed border-border rounded-full flex items-center justify-center mb-4 shadow-sm group-hover:border-primary/50 group-hover:bg-primary/5 transition-colors">
+                                <UploadCloud className="h-8 w-8 text-muted-foreground group-hover:text-primary" />
                             </div>
-                            <h3 className="font-semibold text-zinc-600 dark:text-zinc-400">Nenhuma imagem</h3>
-                            <p className="text-xs text-zinc-500 mt-1">Clique para fazer upload</p>
+                            <h3 className="font-semibold text-foreground">Adicionar Foto</h3>
+                            <p className="text-xs text-muted-foreground mt-1">Upload ou arraste aqui</p>
                         </div>
                     )}
                     <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
@@ -306,52 +317,52 @@ function WardrobeFormInner({ mode, initialData, onSuccess, onCancel }: { mode: s
             </div>
 
             {/* --- LADO DIREITO: DADOS DO ITEM (50%) --- */}
-            <div className="w-full md:w-1/2 bg-white dark:bg-zinc-950 flex flex-col h-full">
+            <div className="w-full md:w-1/2 bg-background flex flex-col h-full">
                 <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8">
                     
                     {/* Header do Form */}
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between pb-6 border-b border-border/40">
                         <div>
-                            <h2 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+                            <h2 className="text-2xl font-bold tracking-tight text-foreground">
                                 {mode === "create" ? "Nova Peça" : "Editar Detalhes"}
                             </h2>
-                            <p className="text-sm text-zinc-500">Adicione informações para catalogar.</p>
+                            <p className="text-sm text-muted-foreground mt-1">Adicione informações para catalogar seu item.</p>
                         </div>
-                        <div className="h-10 w-10 bg-violet-100 dark:bg-violet-900/30 rounded-full flex items-center justify-center text-violet-600 dark:text-violet-400">
-                            <Tag className="h-5 w-5" />
+                        <div className="h-12 w-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary ring-1 ring-primary/20">
+                            <Tag className="h-6 w-6" />
                         </div>
                     </div>
 
                     <form id="wardrobe-form" onSubmit={handleSubmit} className="space-y-8">
                         
-                        {/* 1. Nome & Status */}
-                        <div className="grid gap-6">
+                        {/* 1. Nome & Categorias */}
+                        <div className="space-y-6">
                             <div className="space-y-2">
-                                <Label className="text-xs font-bold text-zinc-500 uppercase">Nome do Item</Label>
+                                <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Nome do Item</Label>
                                 <Input 
                                     value={name} onChange={(e) => setName(e.target.value)} 
                                     placeholder="Ex: Jaqueta Jeans Vintage" 
-                                    className="h-12 text-lg bg-zinc-50 dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
+                                    className="h-12 text-lg bg-muted/20 border-border/50 focus:bg-background transition-colors"
                                     required
                                 />
                             </div>
                             
                             <div className="space-y-2">
-                                <Label className="text-xs font-bold text-zinc-500 uppercase">Categoria</Label>
+                                <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Categoria</Label>
                                 <div className="grid grid-cols-4 gap-3">
                                     {CATEGORY_OPTIONS.map((cat) => (
                                         <div 
                                             key={cat.value} 
                                             onClick={() => setCategory(cat.value)}
                                             className={cn(
-                                                "cursor-pointer flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all hover:bg-zinc-50 dark:hover:bg-zinc-900",
+                                                "cursor-pointer flex flex-col items-center justify-center p-3 rounded-xl border transition-all duration-200",
                                                 category === cat.value 
-                                                    ? "border-violet-600 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300" 
-                                                    : "border-zinc-100 dark:border-zinc-800 text-zinc-400"
+                                                    ? "border-primary bg-primary/5 text-primary ring-1 ring-primary/20" 
+                                                    : "border-border bg-card text-muted-foreground hover:bg-muted/50 hover:border-border/80"
                                             )}
                                         >
-                                            <cat.icon className="h-6 w-6 mb-1" />
-                                            <span className="text-[10px] font-bold uppercase">{cat.label}</span>
+                                            <cat.icon className="h-5 w-5 mb-1.5" />
+                                            <span className="text-[9px] font-bold uppercase">{cat.label}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -359,34 +370,34 @@ function WardrobeFormInner({ mode, initialData, onSuccess, onCancel }: { mode: s
                         </div>
 
                         {/* 2. Detalhes Específicos */}
-                        <div className="space-y-4 pt-4 border-t border-zinc-100 dark:border-zinc-900">
-                            <h3 className="text-sm font-semibold flex items-center gap-2 text-zinc-800 dark:text-zinc-200">
-                                <Sparkles className="h-4 w-4 text-amber-500" /> Detalhes
+                        <div className="space-y-4 pt-2">
+                            <h3 className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                                <Sparkles className="h-4 w-4 text-primary" /> Detalhes Técnicos
                             </h3>
                             
                             <div className="grid grid-cols-2 gap-5">
                                 <div className="space-y-2">
-                                    <Label className="text-xs text-zinc-500">Marca</Label>
-                                    <Input value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="Ex: Zara" className="bg-zinc-50 dark:bg-zinc-900" />
+                                    <Label className="text-xs text-muted-foreground">Marca</Label>
+                                    <Input value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="Ex: Zara" className="bg-muted/20" />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-xs text-zinc-500">Tamanho</Label>
-                                    <Input value={size} onChange={(e) => setSize(e.target.value)} placeholder="M / 42" className="bg-zinc-50 dark:bg-zinc-900" />
+                                    <Label className="text-xs text-muted-foreground">Tamanho</Label>
+                                    <Input value={size} onChange={(e) => setSize(e.target.value)} placeholder="M / 42" className="bg-muted/20" />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-xs text-zinc-500">Preço (R$)</Label>
-                                    <Input type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0.00" className="bg-zinc-50 dark:bg-zinc-900" />
+                                    <Label className="text-xs text-muted-foreground">Preço (R$)</Label>
+                                    <Input type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0.00" className="bg-muted/20" />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-xs text-zinc-500">Estado Atual</Label>
+                                    <Label className="text-xs text-muted-foreground">Estado Atual</Label>
                                     <Select value={status} onValueChange={(val) => setStatus(val as WardrobeStatus)}>
-                                        <SelectTrigger className="bg-zinc-50 dark:bg-zinc-900"><SelectValue /></SelectTrigger>
+                                        <SelectTrigger className="bg-muted/20 border-border/50"><SelectValue /></SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="IN_CLOSET">🟢 Disponível</SelectItem>
-                                            <SelectItem value="LAUNDRY">🔵 Lavando</SelectItem>
-                                            <SelectItem value="LENT">🟡 Emprestado</SelectItem>
-                                            <SelectItem value="REPAIR">🔴 Conserto</SelectItem>
-                                            <SelectItem value="DONATED">⚪ Doado</SelectItem>
+                                            <SelectItem value="IN_CLOSET"><span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-emerald-500"/>Disponível</span></SelectItem>
+                                            <SelectItem value="LAUNDRY"><span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-blue-500"/>Lavando</span></SelectItem>
+                                            <SelectItem value="LENT"><span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-amber-500"/>Emprestado</span></SelectItem>
+                                            <SelectItem value="REPAIR"><span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-500"/>Conserto</span></SelectItem>
+                                            <SelectItem value="DONATED"><span className="flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-zinc-400"/>Doado</span></SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -394,30 +405,29 @@ function WardrobeFormInner({ mode, initialData, onSuccess, onCancel }: { mode: s
                         </div>
 
                         {/* 3. Cor */}
-                        <div className="space-y-3">
-                            <Label className="text-xs font-bold text-zinc-500 uppercase">Cor Principal</Label>
-                            <div className="flex flex-wrap gap-3">
+                        <div className="space-y-3 pt-2">
+                            <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Cor Principal</Label>
+                            <div className="flex flex-wrap gap-3 items-center">
                                 {COLOR_PALETTE.map((c) => (
                                     <div 
                                         key={c.hex} 
                                         onClick={() => setColor(c.hex)}
                                         className={cn(
-                                            "h-8 w-8 rounded-full cursor-pointer flex items-center justify-center transition-all hover:scale-110 shadow-sm border",
-                                            c.border,
-                                            color === c.hex ? "ring-2 ring-violet-500 ring-offset-2 dark:ring-offset-zinc-950 scale-110" : ""
+                                            "h-9 w-9 rounded-full cursor-pointer flex items-center justify-center transition-all hover:scale-110 shadow-sm border",
+                                            c.class,
+                                            color === c.hex ? "ring-2 ring-primary ring-offset-2 ring-offset-background scale-110" : "opacity-80 hover:opacity-100"
                                         )}
-                                        style={{ backgroundColor: c.hex }}
                                         title={c.name}
                                     >
                                         {color === c.hex && <Check className={cn("h-4 w-4", c.hex === "#FFFFFF" ? "text-black" : "text-white")} />}
                                     </div>
                                 ))}
-                                <div className="flex-1 min-w-[100px]">
+                                <div className="flex-1 min-w-[100px] ml-2">
                                     <Input 
                                         value={color} 
                                         onChange={(e) => setColor(e.target.value)} 
-                                        placeholder="Código Hex..." 
-                                        className="h-8 text-xs bg-zinc-50 dark:bg-zinc-900"
+                                        placeholder="#HEX..." 
+                                        className="h-9 text-xs font-mono bg-muted/20 uppercase"
                                     />
                                 </div>
                             </div>
@@ -427,10 +437,10 @@ function WardrobeFormInner({ mode, initialData, onSuccess, onCancel }: { mode: s
                 </div>
 
                 {/* Footer Fixo */}
-                <div className="p-6 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50 flex justify-between items-center shrink-0">
-                    <Button type="button" variant="ghost" onClick={onCancel}>Cancelar</Button>
-                    <Button form="wardrobe-form" type="submit" disabled={isLoading} className="bg-violet-600 hover:bg-violet-700 text-white min-w-[140px] h-11 rounded-xl font-semibold shadow-lg shadow-violet-500/20">
-                        {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Salvar no Closet"}
+                <div className="p-6 border-t border-border/40 bg-muted/10 flex justify-between items-center shrink-0 backdrop-blur-sm">
+                    <Button type="button" variant="ghost" onClick={onCancel} className="hover:bg-muted">Cancelar</Button>
+                    <Button form="wardrobe-form" type="submit" disabled={isLoading} className="bg-primary hover:bg-primary/90 text-primary-foreground min-w-[160px] h-11 rounded-xl font-semibold shadow-lg shadow-primary/20">
+                        {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : (mode === 'create' ? "Salvar no Closet" : "Salvar Alterações")}
                     </Button>
                 </div>
             </div>

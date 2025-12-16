@@ -45,7 +45,7 @@ function RichTextDisplay({ text, isDark = false, compact = false }: { text: stri
         }
         return (
             <p key={i} className={cn(
-                "whitespace-pre-wrap leading-relaxed", 
+                "whitespace-pre-wrap leading-relaxed text-center", 
                 isDark ? "text-indigo-100" : "text-zinc-700 dark:text-zinc-300",
                 compact ? "line-clamp-3 text-xs" : ""
             )}>
@@ -228,9 +228,9 @@ export function StudySession({ deck, cards: initialCards }: StudySessionProps) {
       <div className="max-w-2xl mx-auto p-6 flex flex-col items-center justify-center min-h-[80vh] text-center space-y-8 animate-in zoom-in-95 duration-500">
         <div className="space-y-2">
             <div className="inline-block p-4 rounded-full bg-zinc-100 dark:bg-zinc-800 mb-4">
-                {score >= 70 ? <Sparkles className="h-10 w-10 text-yellow-500" /> : <BrainCircuit className="h-10 w-10 text-indigo-500" />}
+                {score >= 70 ? <Sparkles className="h-10 w-10 text-yellow-500" /> : <BrainCircuit className="h-10 w-10 text-primary" />}
             </div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-white bg-clip-text text-transparent">
                 {score >= 90 ? "Dominado! 🚀" : score >= 70 ? "Muito Bom! 👏" : "Continue Praticando! 💪"}
             </h1>
             <p className="text-zinc-500 font-medium">
@@ -255,15 +255,15 @@ export function StudySession({ deck, cards: initialCards }: StudySessionProps) {
 
         <div className="flex flex-col gap-3 w-full max-w-sm pt-4">
             {wrongCards.length > 0 && (
-                <Button onClick={restartWrong} size="lg" className="w-full bg-orange-600 hover:bg-orange-700 h-14 shadow-md">
+                <Button onClick={restartWrong} size="lg" className="w-full bg-primary hover:bg-primary/80 cursor-pointer h-14 shadow-md">
                     <RotateCw className="mr-2 h-5 w-5" /> Revisar Erros ({wrongCards.length})
                 </Button>
             )}
-            <Button onClick={restartFull} variant="outline" size="lg" className="w-full h-12">
+            <Button onClick={restartFull} variant="outline" size="lg" className="w-full h-12 cursor-pointer">
                 <Repeat className="mr-2 h-4 w-4" /> Recomeçar Baralho
             </Button>
             <Link href="/flashcards" className="w-full">
-                <Button variant="ghost" className="w-full text-zinc-500">Sair para Menu</Button>
+                <Button variant="ghost" className="w-full text-zinc-500 cursor-pointer">Sair para Menu</Button>
             </Link>
         </div>
       </div>
@@ -333,7 +333,7 @@ export function StudySession({ deck, cards: initialCards }: StudySessionProps) {
             </div>
         </div>
 
-        <Progress value={progress} className="h-1.5 mb-6 bg-zinc-100 dark:bg-zinc-800" indicatorClassName={mode === 'smart' ? "bg-green-500" : "bg-indigo-600"} />
+        <Progress value={progress} className="h-1.5 mb-6 bg-zinc-100 dark:bg-zinc-800" indicatorClassName={mode === 'smart' ? "bg-green-500" : "bg-primary"} />
 
         {/* ÁREA PRINCIPAL (Centralizada) */}
         {/* Adicionei 'items-center' e 'justify-center' para garantir o centro no Flip */}
@@ -357,9 +357,9 @@ export function StudySession({ deck, cards: initialCards }: StudySessionProps) {
                             className="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-6 text-center overflow-y-auto backface-hidden"
                             style={{ backfaceVisibility: 'hidden', transform: 'rotateY(0deg)' }}
                         >
-                            <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mb-3">Pergunta</p>
+                            <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-3">Pergunta</p>
                             <div className="text-xl md:text-3xl font-bold text-zinc-800 dark:text-zinc-100 leading-tight w-full flex justify-center">
-                                <div className="max-w-2xl w-full">
+                                <div className="max-w-2xl w-full flex justify-center text-center">
                                     <RichTextDisplay text={currentCard.term} />
                                 </div>
                             </div>
@@ -373,10 +373,10 @@ export function StudySession({ deck, cards: initialCards }: StudySessionProps) {
 
                         {/* VERSO (Apenas Modo Flip) */}
                         <div 
-                            className="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-6 text-center bg-indigo-50 dark:bg-indigo-950/20 rounded-2xl overflow-y-auto backface-hidden"
+                            className="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-6 text-center bg-indigo-50 dark:bg-primary/5 rounded-2xl overflow-y-auto backface-hidden"
                             style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
                         >
-                            <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-3">Resposta</p>
+                            <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-3">Resposta</p>
                             <div className="text-lg md:text-2xl font-medium text-zinc-700 dark:text-zinc-200 w-full flex justify-center">
                                 <div className="max-w-2xl w-full">
                                     <RichTextDisplay text={currentCard.definition} isDark={true} />
@@ -432,7 +432,7 @@ export function StudySession({ deck, cards: initialCards }: StudySessionProps) {
                         {!isFlipped ? (
                             <Button 
                                 size="lg" 
-                                className="w-full max-w-sm h-14 text-lg font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/20" 
+                                className="w-full max-w-sm h-14 text-lg font-semibold rounded-xl bg-primary hover:bg-primary/80 shadow-lg shadow-primary-500/20 cursor-pointer" 
                                 onClick={() => setIsFlipped(true)}
                             >
                                 Mostrar Resposta
@@ -442,7 +442,7 @@ export function StudySession({ deck, cards: initialCards }: StudySessionProps) {
                                 <Button 
                                     size="lg" 
                                     variant="outline" 
-                                    className="flex-1 h-14 text-lg font-bold border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950/30"
+                                    className="flex-1 h-14 text-lg font-bold border-red-200 text-red-600 cursor-pointer hover:bg-red-50 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-950/30"
                                     onClick={() => handleFlipResponse(false)}
                                 >
                                     <XCircle className="mr-2 h-5 w-5" /> Errei
@@ -450,7 +450,7 @@ export function StudySession({ deck, cards: initialCards }: StudySessionProps) {
                                 
                                 <Button 
                                     size="lg" 
-                                    className="flex-1 h-14 text-lg font-bold bg-green-600 hover:bg-green-700 text-white shadow-md shadow-green-600/20"
+                                    className="flex-1 h-14 text-lg font-bold bg-primary hover:bg-primary/80 cursor-pointer text-white shadow-md shadow-green-600/20"
                                     onClick={() => handleFlipResponse(true)}
                                 >
                                     <CheckCircle className="mr-2 h-5 w-5" /> Acertei

@@ -166,7 +166,7 @@ export function SiteEditor({ site }: { site: SiteWithPages }) {
             
             {/* SIDEBAR DO EDITOR */}
             <aside className="w-64 flex flex-col gap-2 shrink-0">
-                <Tabs value={activeTab} onValueChange={setActiveTab} orientation="vertical" className="h-full flex flex-col">
+                <Tabs value={activeTab} onValueChange={setActiveTab} orientation="vertical" className="h-full flex flex-col p-6">
                     
                     <div className="font-semibold text-xs text-zinc-500 uppercase tracking-wider mb-2 px-2">Páginas</div>
                     <ScrollArea className="flex-1 pr-3">

@@ -1,6 +1,6 @@
 "use client";
 
-import { ShoppingBag, Wallet, Receipt, AlertCircle, TrendingUp, Plus } from "lucide-react";
+import { ShoppingBag, Wallet, Receipt, AlertCircle, TrendingUp, Plus, BarChart3 } from "lucide-react";
 import { RecurringCard, TransactionList } from "@/components/finance/finance-ui";
 import { TransactionDialog } from "@/components/finance/transaction-dialog"; 
 import { WishlistDialog } from "@/components/finance/wishlist/wishlist-dialog";       
@@ -82,6 +82,12 @@ export function FinanceDashboard({
                         <span className="hidden sm:inline">Investimentos</span>
                       </Button>
                     </Link>
+                    <Link href="/finance/market">
+                      <Button variant="outline" size="sm" className="gap-2 rounded-lg border-dashed hover:border-primary/60 hover:bg-primary/5 transition">
+                          <BarChart3 className="h-4 w-4 text-primary" />
+                          <span className="hidden sm:inline">Bolsa & Mercado</span>
+                      </Button>
+                  </Link>
                   <TransactionDialog accounts={accounts} />
               </div>
           </div>

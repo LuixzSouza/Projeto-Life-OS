@@ -32,7 +32,6 @@ const sidebarItems = [
   { label: "Conexões", icon: Users, href: "/social" },
   { label: "Closet", icon: Shirt, href: "/wardrobe" },
   { label: "Configurações", icon: Settings, href: "/settings" },
-  { label: "Setup", icon: Settings, href: "/setup" },
 ];
 
 interface SidebarProps {

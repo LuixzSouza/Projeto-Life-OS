@@ -64,7 +64,7 @@ export function BankConnector() {
             <Button 
                 onClick={handleStartConnection} 
                 disabled={isLoading} 
-                className="gap-2 bg-purple-600 hover:bg-purple-700 text-white shadow-sm"
+                className="gap-2 bg-primary hover:bg-primary/70 text-white shadow-sm cursor-pointer"
             >
                 {isLoading ? <Loader2 className="animate-spin h-4 w-4" /> : <Link2 className="h-4 w-4" />}
                 Conectar Conta Bancária

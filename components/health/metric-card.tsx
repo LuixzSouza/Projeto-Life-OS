@@ -14,7 +14,9 @@ interface MetricCardProps {
     direction: "up" | "down" | "neutral";
     label?: string; // ex: "vs mês passado"
   };
-  colorClass?: string; // Ex: "text-blue-500" e "bg-blue-50"
+  // Opcional: Permite sobrescrever a cor padrão (primary) se necessário, 
+  // mas o padrão agora é automático via CSS Variables.
+  iconClassName?: string; 
   isLoading?: boolean;
   onClick?: () => void;
 }
@@ -26,31 +28,47 @@ export function MetricCard({
   subtitle, 
   icon: Icon, 
   trend, 
-  colorClass = "text-zinc-900 dark:text-zinc-100",
+  iconClassName,
   isLoading = false,
   onClick
 }: MetricCardProps) {
 
-  // Helper para renderizar a tendência
+  // Configuração visual das tendências
   const renderTrend = () => {
     if (!trend) return null;
 
     const trendConfig = {
-      up: { icon: TrendingUp, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
-      down: { icon: TrendingDown, color: "text-red-600 dark:text-red-400", bg: "bg-red-50 dark:bg-red-900/20" },
-      neutral: { icon: Minus, color: "text-zinc-500", bg: "bg-zinc-100 dark:bg-zinc-800" },
+      up: { 
+        icon: TrendingUp, 
+        style: "text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20" 
+      },
+      down: { 
+        icon: TrendingDown, 
+        style: "text-red-600 dark:text-red-400 bg-red-500/10 border-red-500/20" 
+      },
+      neutral: { 
+        icon: Minus, 
+        style: "text-muted-foreground bg-muted border-transparent" 
+      },
     };
 
     const config = trendConfig[trend.direction];
     const TrendIcon = config.icon;
 
     return (
-      <div className="flex items-center gap-2 mt-2">
-        <span className={cn("text-xs font-medium px-1.5 py-0.5 rounded flex items-center gap-1", config.color, config.bg)}>
+      <div className="flex items-center gap-2 mt-3">
+        <span className={cn(
+          "text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border",
+          config.style
+        )}>
           <TrendIcon className="h-3 w-3" />
           {trend.value}
         </span>
-        {trend.label && <span className="text-xs text-muted-foreground">{trend.label}</span>}
+        {trend.label && (
+          <span className="text-xs text-muted-foreground font-medium truncate">
+            {trend.label}
+          </span>
+        )}
       </div>
     );
   };
@@ -59,37 +77,55 @@ export function MetricCard({
     <Card 
       onClick={onClick}
       className={cn(
-        "border border-border bg-card shadow-sm transition-all duration-200",
-        onClick && "cursor-pointer hover:border-zinc-300 dark:hover:border-zinc-700 hover:shadow-md active:scale-[0.98]"
+        "group relative overflow-hidden border-border/60 bg-card transition-all duration-300",
+        // Efeitos de Hover Premium
+        "hover:shadow-md hover:border-primary/30",
+        onClick && "cursor-pointer active:scale-[0.99]"
       )}
     >
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground tracking-wide uppercase text-[10px]">
+      {/* Gradiente de Fundo Sutil no Hover */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
+        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
           {title}
         </CardTitle>
-        {/* Ícone com fundo suave baseado na cor passada */}
-        <div className={cn("p-2 rounded-full opacity-90", colorClass.replace("text-", "bg-").replace("500", "100"), "dark:bg-opacity-10")}>
-           <Icon className={cn("h-4 w-4", colorClass)} />
+        
+        {/* Container do Ícone Moderno */}
+        <div className={cn(
+          "p-2.5 rounded-xl transition-transform duration-300 group-hover:scale-110",
+          "bg-primary/10 text-primary ring-1 ring-primary/20",
+          iconClassName // Permite override se necessário, mas o padrão é primary
+        )}>
+           <Icon className="h-4 w-4" />
         </div>
       </CardHeader>
       
-      <CardContent>
+      <CardContent className="relative z-10">
         {isLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-8 w-24" />
-            <Skeleton className="h-3 w-32" />
+          <div className="space-y-3 mt-1">
+            <Skeleton className="h-8 w-24 rounded-lg bg-muted/50" />
+            <Skeleton className="h-4 w-32 rounded-lg bg-muted/50" />
           </div>
         ) : (
           <>
-            <div className="text-2xl font-bold flex items-baseline gap-1 text-foreground">
-              {value} 
-              {unit && <span className="text-sm font-normal text-muted-foreground">{unit}</span>}
+            <div className="flex items-baseline gap-1 mt-1">
+              <span className="text-3xl font-bold tracking-tight text-foreground">
+                {value}
+              </span>
+              {unit && (
+                <span className="text-sm font-medium text-muted-foreground/80">
+                  {unit}
+                </span>
+              )}
             </div>
             
             {renderTrend()}
             
             {subtitle && !trend && (
-              <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+              <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                {subtitle}
+              </p>
             )}
           </>
         )}

@@ -20,10 +20,12 @@ import { createJob, deleteJob, updateJob } from "@/app/(dashboard)/projects/acti
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+// IMPORT THE NEW COMPONENT HERE (Adjust path as needed)
+import { ResumeBuilder } from "./resume/resume-builder"; 
 
 type StatusConfig = {
     label: string;
-    colorClass: string; // Tailwind class
+    colorClass: string; 
     progress: number;
     icon: React.ElementType;
 };
@@ -273,13 +275,13 @@ export function JobTracker({ jobs }: { jobs: JobApplication[] }) {
                     <Card className="bg-yellow-500/5 border-yellow-500/20 shadow-sm">
                         <CardContent className="p-4 flex flex-col items-center justify-center text-center">
                             <span className="text-3xl font-black text-yellow-600">{interviews}</span>
-                            <span className="text-[10px] font-bold text-yellow-500 uppercase tracking-widest mt-1">Entrevistas</span>
+                            <span className="text-xs font-bold text-yellow-500 uppercase tracking-widest mt-1">Entrevistas</span>
                         </CardContent>
                     </Card>
                     <Card className="bg-emerald-500/5 border-emerald-500/20 shadow-sm">
                         <CardContent className="p-4 flex flex-col items-center justify-center text-center">
                             <span className="text-3xl font-black text-emerald-600">{offers}</span>
-                            <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mt-1">Conquistas</span>
+                            <span className="text-xs font-bold text-emerald-500 uppercase tracking-widest mt-1">Conquistas</span>
                         </CardContent>
                     </Card>
                 </div>
@@ -331,16 +333,25 @@ export function JobTracker({ jobs }: { jobs: JobApplication[] }) {
 
     return (
         <Tabs defaultValue="jobs" className="w-full h-full flex flex-col">
-            <div className="flex justify-center mb-6 shrink-0">
+            <div className="flex justify-center mb-6 shrink-0 print:hidden"> {/* Hide on Print */}
                 <TabsList className="bg-muted p-1 rounded-full border border-border h-auto">
                     <TabsTrigger value="jobs" className="rounded-full px-6 py-1.5 text-xs font-medium">Vagas de Emprego</TabsTrigger>
                     <TabsTrigger value="freela" className="rounded-full px-6 py-1.5 text-xs font-medium">Freelas & Projetos</TabsTrigger>
+                    {/* NEW TAB TRIGGER */}
+                    <TabsTrigger value="resume" className="rounded-full px-6 py-1.5 text-xs font-medium flex items-center gap-2">
+                        <FileText className="h-3.5 w-3.5" /> Meu Currículo
+                    </TabsTrigger>
                 </TabsList>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-1 min-h-0">
-                <TabsContent value="jobs" className="mt-0 focus-visible:ring-0 pb-6">{renderContent('JOB')}</TabsContent>
-                <TabsContent value="freela" className="mt-0 focus-visible:ring-0 pb-6">{renderContent('FREELANCE')}</TabsContent>
+            <div className="flex-1 overflow-y-auto px-1 min-h-0 print:overflow-visible">
+                <TabsContent value="jobs" className="mt-0 focus-visible:ring-0 pb-6 print:hidden">{renderContent('JOB')}</TabsContent>
+                <TabsContent value="freela" className="mt-0 focus-visible:ring-0 pb-6 print:hidden">{renderContent('FREELANCE')}</TabsContent>
+                
+                {/* NEW TAB CONTENT */}
+                <TabsContent value="resume" className="mt-0 focus-visible:ring-0 pb-6 h-full">
+                    <ResumeBuilder />
+                </TabsContent>
             </div>
         </Tabs>
     );

@@ -5,9 +5,13 @@ import { Meal } from "@prisma/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Utensils, Trash2, Plus, Leaf, Pizza, Coffee, Flame, Check, Pencil, ChefHat, ArrowRight, Search, Activity, Droplets, Wheat, X } from "lucide-react";
+import { 
+    Utensils, Trash2, Plus, Leaf, Pizza, Coffee, Flame, Check, 
+    Pencil, ChefHat, ArrowRight, Search, Activity, Droplets, Wheat, X, 
+    AlertCircle, Sparkles
+} from "lucide-react";
 import { logMeal, updateMeal, deleteMeal } from "@/app/(dashboard)/health/actions";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +21,10 @@ import { FoodSelector } from "./food-selector";
 import { FoodItem } from "@/lib/food-db";
 import { cn } from "@/lib/utils";
 
-// --- COMPONENTE PRINCIPAL (DASHBOARD DIÁRIO) ---
+// --- TIPOS E UTILITÁRIOS ---
+type MealType = "HEALTHY" | "NEUTRAL" | "TRASH";
+
+// --- COMPONENTE PRINCIPAL ---
 export function FoodLogger({ meals }: { meals: Meal[] }) {
     const todayMeals = meals.filter(m => new Date(m.date).toDateString() === new Date().toDateString());
     
@@ -25,59 +32,55 @@ export function FoodLogger({ meals }: { meals: Meal[] }) {
     const totalCals = todayMeals.reduce((acc, m) => acc + (m.calories || 0), 0);
     const dailyGoal = 2500; 
     const progressPercentage = Math.min((totalCals / dailyGoal) * 100, 100);
-    
-    // Cores dinâmicas para a barra de progresso
-    const progressColor = totalCals > dailyGoal 
-        ? "bg-red-500 shadow-[0_0_15px_rgba(239,68,68,0.6)]" 
-        : totalCals > (dailyGoal * 0.9) 
-            ? "bg-yellow-500" 
-            : "bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.4)]";
-
-    const handleDelete = async (id: string) => {
-        if(confirm("Tem certeza que deseja remover esta refeição?")) {
-            await deleteMeal(id);
-            toast.success("Refeição removida.");
-        }
-    }
+    const remaining = Math.max(dailyGoal - totalCals, 0);
+    const isOverLimit = totalCals > dailyGoal;
 
     return (
-        <Card className="border-0 shadow-xl bg-white dark:bg-zinc-900 h-full flex flex-col overflow-hidden relative ring-1 ring-zinc-100 dark:ring-zinc-800">
-            {/* Header */}
-            <div className="p-6 pb-4 relative z-10 bg-gradient-to-b from-white to-zinc-50/50 dark:from-zinc-900 dark:to-zinc-900/50">
+        <Card className="border-border/60 shadow-sm bg-card h-full flex flex-col overflow-hidden relative group">
+            
+            {/* Header com Resumo */}
+            <div className="p-6 pb-2 bg-gradient-to-b from-muted/30 to-background border-b border-border/40 relative z-10">
                 <div className="flex justify-between items-start mb-6">
                     <div>
-                        <h3 className="text-base font-bold text-zinc-800 dark:text-zinc-100 flex items-center gap-2">
-                            <div className="p-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 rounded-lg">
+                        <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                            <div className="p-1.5 bg-primary/10 text-primary rounded-lg">
                                 <Utensils className="h-4 w-4" /> 
                             </div>
                             Diário Alimentar
                         </h3>
-                        <p className="text-xs text-zinc-500 mt-1 pl-1">Hoje, {new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })}</p>
+                        <p className="text-xs text-muted-foreground mt-1 pl-1">
+                            Hoje, {new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })}
+                        </p>
                     </div>
                     <MealFormDialog />
                 </div>
 
                 {/* Painel de Metas */}
-                <div className="bg-white dark:bg-zinc-950 rounded-2xl p-4 border border-zinc-200 dark:border-zinc-800 shadow-sm">
-                    <div className="flex justify-between items-end mb-3">
+                <div className="space-y-3">
+                    <div className="flex justify-between items-end">
                         <div>
-                            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Consumido Hoje</span>
-                            <div className="flex items-baseline gap-1 mt-0.5">
-                                <span className="text-3xl font-black text-zinc-900 dark:text-white">{totalCals}</span>
-                                <span className="text-sm font-medium text-zinc-400">kcal</span>
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Consumido</span>
+                            <div className="flex items-baseline gap-1.5 mt-0.5">
+                                <span className={cn("text-3xl font-black tracking-tight", isOverLimit ? "text-destructive" : "text-foreground")}>
+                                    {totalCals}
+                                </span>
+                                <span className="text-sm font-medium text-muted-foreground">kcal</span>
                             </div>
                         </div>
                         <div className="text-right">
-                            <span className="text-xs text-zinc-400 font-medium">Meta: {dailyGoal}</span>
-                            <p className={`text-xs font-bold ${totalCals > dailyGoal ? 'text-red-500' : 'text-emerald-600'}`}>
-                                {Math.round(dailyGoal - totalCals)} restantes
+                            <span className="text-xs text-muted-foreground font-medium">Meta: {dailyGoal}</span>
+                            <p className={cn("text-xs font-bold", isOverLimit ? "text-destructive" : "text-primary")}>
+                                {isOverLimit ? `+${Math.abs(remaining)} excesso` : `${remaining} restantes`}
                             </p>
                         </div>
                     </div>
                     
-                    <div className="h-3 w-full bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden border border-zinc-100 dark:border-zinc-800/50">
+                    <div className="h-2.5 w-full bg-secondary rounded-full overflow-hidden shadow-inner">
                         <div 
-                            className={`h-full rounded-full transition-all duration-1000 ease-out ${progressColor}`} 
+                            className={cn(
+                                "h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(0,0,0,0.1)]",
+                                isOverLimit ? "bg-destructive" : "bg-primary"
+                            )} 
                             style={{ width: `${progressPercentage}%` }}
                         />
                     </div>
@@ -85,50 +88,14 @@ export function FoodLogger({ meals }: { meals: Meal[] }) {
             </div>
 
             {/* Lista Scrollável */}
-            <CardContent className="p-0 flex-1 relative bg-zinc-50/50 dark:bg-black/40">
-                <div className="absolute inset-0 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-200 dark:scrollbar-thumb-zinc-800 p-2">
+            <CardContent className="p-0 flex-1 relative bg-muted/10">
+                <div className="absolute inset-0 overflow-y-auto custom-scrollbar p-3">
                     {todayMeals.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full text-zinc-400 gap-3 min-h-[150px]">
-                             <Leaf className="h-8 w-8 opacity-20" />
-                             <p className="text-xs font-medium">Nenhum registro hoje.</p>
-                        </div>
+                        <EmptyState />
                     ) : (
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                             {todayMeals.map(meal => (
-                                <div key={meal.id} className="group flex items-center justify-between p-3 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200/50 dark:border-zinc-800 shadow-sm hover:shadow-md transition-all hover:border-emerald-500/30">
-                                    <div className="flex items-center gap-3 overflow-hidden flex-1">
-                                        <div className={`
-                                            w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-lg shadow-inner
-                                            ${meal.type === 'HEALTHY' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20' : 
-                                              meal.type === 'TRASH' ? 'bg-red-50 text-red-600 dark:bg-red-900/20' : 
-                                              'bg-amber-50 text-amber-600 dark:bg-amber-900/20'}
-                                        `}>
-                                            {getMealEmoji(meal.title, meal.type)}
-                                        </div>
-                                        
-                                        <div className="min-w-0 flex-1">
-                                            <p className="text-sm font-bold text-zinc-800 dark:text-zinc-100 truncate">{meal.title}</p>
-                                            <p className="text-xs text-zinc-500 truncate">{meal.items || "Sem descrição"}</p>
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="flex items-center gap-3 shrink-0">
-                                        <Badge variant="secondary" className="font-mono font-bold bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border-0">
-                                            {meal.calories}
-                                        </Badge>
-                                        
-                                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <MealFormDialog meal={meal}>
-                                                <button className="p-1.5 text-zinc-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors">
-                                                    <Pencil className="h-3.5 w-3.5" />
-                                                </button>
-                                            </MealFormDialog>
-                                            <button onClick={() => handleDelete(meal.id)} className="p-1.5 text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors">
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
+                                <MealCard key={meal.id} meal={meal} />
                             ))}
                         </div>
                     )}
@@ -138,14 +105,75 @@ export function FoodLogger({ meals }: { meals: Meal[] }) {
     );
 }
 
-function getMealEmoji(title: string, type: string) {
-    if (title.includes('Café')) return "☕";
-    if (type === 'TRASH') return "🍕";
-    if (title.includes('Treino') || title.includes('Whey')) return "💪";
-    return "🥗";
+// --- SUBCOMPONENTES ---
+
+function EmptyState() {
+    return (
+        <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3 min-h-[200px] opacity-60">
+             <div className="p-4 bg-muted rounded-full">
+                <Leaf className="h-8 w-8 text-muted-foreground" />
+             </div>
+             <div className="text-center">
+                <p className="text-sm font-semibold text-foreground">Diário vazio</p>
+                <p className="text-xs">Registre sua primeira refeição do dia.</p>
+             </div>
+        </div>
+    )
 }
 
-// --- MODAL DE REFEIÇÃO (LAYOUT OTIMIZADO) ---
+function MealCard({ meal }: { meal: Meal }) {
+    
+    const handleDelete = async () => {
+        // Em um app real, use um Toast com Undo ou um Alert Dialog. 
+        // `confirm` bloqueia a thread, mas é aceitável para MVP.
+        if(confirm("Remover esta refeição?")) {
+            await deleteMeal(meal.id);
+            toast.success("Refeição removida.");
+        }
+    }
+
+    const typeConfig = {
+        HEALTHY: { bg: "bg-primary/10", text: "text-primary", icon: Leaf },
+        NEUTRAL: { bg: "bg-orange-500/10", text: "text-orange-600 dark:text-orange-400", icon: Coffee },
+        TRASH: { bg: "bg-destructive/10", text: "text-destructive", icon: Pizza },
+    }[meal.type as MealType] || { bg: "bg-muted", text: "text-muted-foreground", icon: Utensils };
+
+    const Icon = typeConfig.icon;
+
+    return (
+        <div className="group flex items-center justify-between p-3.5 bg-card rounded-xl border border-border/60 shadow-sm hover:shadow-md hover:border-primary/20 transition-all duration-300">
+            <div className="flex items-center gap-4 overflow-hidden flex-1">
+                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors", typeConfig.bg, typeConfig.text)}>
+                    <Icon className="h-5 w-5" />
+                </div>
+                
+                <div className="min-w-0 flex-1 space-y-0.5">
+                    <p className="text-sm font-bold text-foreground truncate leading-none">{meal.title}</p>
+                    <p className="text-xs text-muted-foreground truncate font-medium">{meal.items || "Sem descrição"}</p>
+                </div>
+            </div>
+            
+            <div className="flex items-center gap-3 shrink-0">
+                <Badge variant="secondary" className="font-mono font-bold bg-muted/50 text-foreground border-border/50">
+                    {meal.calories} kcal
+                </Badge>
+                
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-2 group-hover:translate-x-0 duration-200">
+                    <MealFormDialog meal={meal}>
+                        <button className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors">
+                            <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                    </MealFormDialog>
+                    <button onClick={handleDelete} className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors">
+                        <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// --- MODAL DE REFEIÇÃO ---
 function MealFormDialog({ meal, children }: { meal?: Meal, children?: React.ReactNode }) {
     const [open, setOpen] = useState(false);
     const [selectedItems, setSelectedItems] = useState<FoodItem[]>([]);
@@ -156,7 +184,7 @@ function MealFormDialog({ meal, children }: { meal?: Meal, children?: React.Reac
     const [title, setTitle] = useState(meal?.title || "Almoço");
     const [type, setType] = useState(meal?.type || "HEALTHY");
 
-    // Lógica de Dados Derivados (Memoizada)
+    // Lógica Derivada
     const calculatedCalories = useMemo(() => 
         selectedItems.reduce((acc, item) => acc + item.calories, 0), 
     [selectedItems]);
@@ -164,28 +192,27 @@ function MealFormDialog({ meal, children }: { meal?: Meal, children?: React.Reac
     const generatedDescription = useMemo(() => {
         if (selectedItems.length === 0) return "";
         const counts: Record<string, number> = {};
-        selectedItems.forEach(item => {
-            counts[item.name] = (counts[item.name] || 0) + 1;
-        });
+        selectedItems.forEach(item => counts[item.name] = (counts[item.name] || 0) + 1);
         return Object.entries(counts)
             .map(([name, count]) => count > 1 ? `${count}x ${name}` : name)
             .join(", ");
     }, [selectedItems]);
 
-    // Lógica Híbrida
     const isUsingSelector = selectedItems.length > 0;
     const finalDescription = isUsingSelector ? generatedDescription : description;
     const finalCalories = isUsingSelector ? calculatedCalories : calories;
 
+    // Detecção automática de tipo baseada em caloria média (Regra de Negócio Exemplo)
     const detectedType = useMemo(() => {
         if (!isUsingSelector) return type;
         const avgCal = calculatedCalories / selectedItems.length;
-        return avgCal > 300 ? "TRASH" : "HEALTHY";
+        return avgCal > 350 ? "TRASH" : "HEALTHY";
     }, [isUsingSelector, type, calculatedCalories, selectedItems.length]);
 
     const handleOpenChange = (newOpen: boolean) => {
         setOpen(newOpen);
         if (!newOpen && !meal) {
+            // Reset delay para animação
             setTimeout(() => {
                 setSelectedItems([]);
                 setDescription("");
@@ -203,8 +230,8 @@ function MealFormDialog({ meal, children }: { meal?: Meal, children?: React.Reac
     }
 
     const handleSubmit = async () => {
-        if (!finalDescription && !isUsingSelector) {
-            toast.error("Adicione alimentos ou descreva a refeição.");
+        if (!finalDescription && !isUsingSelector && finalCalories === 0) {
+            toast.error("Preencha os dados da refeição.");
             return;
         }
 
@@ -214,79 +241,84 @@ function MealFormDialog({ meal, children }: { meal?: Meal, children?: React.Reac
         formData.append("items", finalDescription);
         formData.append("calories", finalCalories.toString());
 
-        if (meal) {
-            formData.append("id", meal.id);
-            await updateMeal(formData);
-            toast.success("Refeição atualizada!");
-        } else {
-            await logMeal(formData);
-            toast.success("Refeição registrada!");
+        try {
+            if (meal) {
+                formData.append("id", meal.id);
+                await updateMeal(formData);
+                toast.success("Refeição atualizada!");
+            } else {
+                await logMeal(formData);
+                toast.success("Refeição registrada!");
+            }
+            handleClear();
+            handleOpenChange(false);
+        } catch (e) {
+            toast.error("Erro ao salvar.");
         }
-        
-        handleClear();
-        handleOpenChange(false);
     }
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
                 {children ? children : (
-                    <Button size="sm" className="bg-zinc-900 hover:bg-zinc-800 text-white gap-2 shadow-md hover:shadow-lg transition-all dark:bg-white dark:text-black dark:hover:bg-zinc-200">
+                    <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-md gap-2 font-semibold">
                         <Plus className="h-4 w-4" /> Registrar
                     </Button>
                 )}
             </DialogTrigger>
             
-            {/* MODAL RESPONSIVO (Split View em Desktop, Stack em Mobile) */}
-            <DialogContent className="sm:max-w-[90vw] md:max-w-[1100px] h-[90vh] p-0 gap-0 overflow-hidden bg-zinc-50 dark:bg-zinc-950 border-0 shadow-2xl flex flex-col md:flex-row">
+            <DialogContent className="sm:max-w-[95vw] md:max-w-[1100px] h-[92vh] p-0 gap-0 bg-background border-border shadow-2xl flex flex-col md:flex-row overflow-hidden rounded-xl">
                 
                 {/* --- LADO ESQUERDO: SELETOR (MERCADO) --- */}
-                <div className="w-full md:w-[60%] flex flex-col border-b md:border-b-0 md:border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 h-1/2 md:h-full relative">
-                    <div className="p-4 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center bg-white/50 backdrop-blur-sm z-10 sticky top-0">
-                        <h2 className="font-bold flex items-center gap-2 text-lg text-zinc-800 dark:text-white">
-                            <Search className="h-5 w-5 text-emerald-500" /> Selecionar Alimentos
+                <div className="w-full md:w-[60%] flex flex-col border-b md:border-b-0 md:border-r border-border bg-muted/10 h-[45%] md:h-full relative">
+                    <div className="p-4 border-b border-border flex justify-between items-center bg-background/80 backdrop-blur-md z-10 sticky top-0">
+                        <h2 className="font-bold flex items-center gap-2 text-lg text-foreground">
+                            <div className="p-1.5 bg-primary/10 rounded-md text-primary">
+                                <Search className="h-4 w-4" /> 
+                            </div>
+                            Selecionar Alimentos
                         </h2>
                     </div>
-                    {/* Container Scrollável do Seletor */}
+                    
                     <div className="flex-1 overflow-hidden relative">
-                         <div className="absolute inset-0 p-2 overflow-y-auto">
+                         <div className="absolute inset-0 p-2 overflow-y-auto custom-scrollbar">
                             <FoodSelector onSelectionChange={setSelectedItems} />
                          </div>
                     </div>
                 </div>
 
-                {/* --- LADO DIREITO: FICHA TÉCNICA (RESUMO) --- */}
-                <div className="w-full md:w-[40%] flex flex-col h-1/2 md:h-full bg-zinc-50 dark:bg-zinc-950/50">
+                {/* --- LADO DIREITO: FICHA TÉCNICA --- */}
+                <div className="w-full md:w-[40%] flex flex-col h-[55%] md:h-full bg-card shadow-[inset_10px_0_20px_-10px_rgba(0,0,0,0.02)]">
                     
                     {/* Header da Ficha */}
-                    <div className="p-6 pb-4 bg-white dark:bg-zinc-900 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-start">
+                    <div className="p-6 pb-4 border-b border-border flex justify-between items-start bg-background/50">
                         <div>
-                            <DialogTitle className="text-xl flex items-center gap-2 font-bold text-zinc-800 dark:text-zinc-100">
-                                <ChefHat className="h-6 w-6 text-zinc-400" />
+                            <DialogTitle className="text-xl flex items-center gap-2 font-bold text-foreground">
+                                <div className="p-1.5 bg-primary/10 rounded-md text-primary">
+                                    <ChefHat className="h-5 w-5" />
+                                </div>
                                 {meal ? "Editar Prato" : "Novo Prato"}
                             </DialogTitle>
-                            <DialogDescription className="text-xs mt-1">
-                                Revise os detalhes antes de salvar.
+                            <DialogDescription className="text-xs mt-1 text-muted-foreground">
+                                Revise os macros e detalhes.
                             </DialogDescription>
                         </div>
-                        {/* Botão Limpar Rápido */}
                         {(finalDescription || finalCalories > 0) && (
-                            <Button variant="ghost" size="sm" onClick={handleClear} className="h-8 text-xs text-red-500 hover:text-red-600 hover:bg-red-50">
+                            <Button variant="ghost" size="sm" onClick={handleClear} className="h-8 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive">
                                 <X className="h-3 w-3 mr-1" /> Limpar
                             </Button>
                         )}
                     </div>
 
-                    {/* Formulário com Scroll */}
-                    <ScrollArea className="flex-1 px-6">
+                    <ScrollArea className="flex-1 px-6 bg-background">
                         <div className="space-y-6 py-6">
                             
-                            {/* Inputs de Categoria */}
+                            {/* Inputs Principais */}
                             <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1.5">
-                                    <Label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Horário</Label>
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Momento</Label>
                                     <Select value={title} onValueChange={setTitle}>
-                                        <SelectTrigger className="bg-white dark:bg-zinc-900 border-zinc-200 h-9 text-sm"><SelectValue /></SelectTrigger>
+                                        <SelectTrigger className="h-10 bg-muted/20 border-border focus:ring-primary/20"><SelectValue /></SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="Café da Manhã">☕ Café da Manhã</SelectItem>
                                             <SelectItem value="Almoço">🥗 Almoço</SelectItem>
@@ -297,71 +329,60 @@ function MealFormDialog({ meal, children }: { meal?: Meal, children?: React.Reac
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                <div className="space-y-1.5">
-                                    <Label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Qualidade</Label>
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Classificação</Label>
                                     <Select value={isUsingSelector && !meal ? detectedType : type} onValueChange={setType}>
-                                        <SelectTrigger className="bg-white dark:bg-zinc-900 border-zinc-200 h-9 text-sm"><SelectValue /></SelectTrigger>
+                                        <SelectTrigger className="h-10 bg-muted/20 border-border focus:ring-primary/20"><SelectValue /></SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="HEALTHY">✅ Saudável</SelectItem>
                                             <SelectItem value="NEUTRAL">⚖️ Neutro</SelectItem>
-                                            <SelectItem value="TRASH">🍔 Lixo</SelectItem>
+                                            <SelectItem value="TRASH">🍔 Off-Plan</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
                             </div>
 
-                            {/* Card de Resumo (Estilo Ticket) */}
-                            <div className="bg-white dark:bg-zinc-900 p-5 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm relative overflow-hidden group hover:shadow-md transition-all">
-                                <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-500"></div>
-                                
-                                <div className="flex justify-between items-start mb-6">
+                            {/* Card de Resumo (Calorias) */}
+                            <div className="bg-gradient-to-br from-muted/30 to-background p-5 rounded-xl border border-border relative overflow-hidden group hover:border-primary/30 transition-all">
+                                <div className="flex justify-between items-start mb-6 relative z-10">
                                     <div className="space-y-1">
-                                        <Label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Total Calórico</Label>
+                                        <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Energia Total</Label>
                                         <div className="flex items-center gap-2">
                                             <Input 
                                                 type="number" 
                                                 value={finalCalories}
                                                 onChange={(e) => setCalories(Number(e.target.value))}
                                                 readOnly={isUsingSelector}
-                                                className="h-12 text-4xl font-black text-zinc-900 dark:text-white border-none p-0 bg-transparent w-40 focus-visible:ring-0 placeholder:text-zinc-200"
+                                                className="h-12 text-4xl font-black text-foreground border-none p-0 bg-transparent w-40 focus-visible:ring-0 placeholder:text-muted/50 tracking-tighter"
                                                 placeholder="0"
                                             />
-                                            <span className="text-base font-medium text-zinc-400 mt-2">kcal</span>
+                                            <span className="text-sm font-bold text-muted-foreground mt-2">kcal</span>
                                         </div>
                                     </div>
-                                    <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-full group-hover:scale-110 transition-transform">
-                                        <Flame className="h-6 w-6 text-emerald-500" />
+                                    <div className="p-3 bg-primary/10 rounded-full text-primary">
+                                        <Flame className="h-6 w-6" />
                                     </div>
                                 </div>
 
-                                {/* Macros Simulados (Visual) */}
-                                <div className="flex gap-2 mb-6">
-                                    <div className="flex-1 bg-zinc-50 dark:bg-zinc-800 p-2 rounded-lg text-center border border-zinc-100 dark:border-zinc-700">
-                                        <Activity className="h-3 w-3 mx-auto mb-1 text-blue-500" />
-                                        <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400">Carb</span>
-                                    </div>
-                                    <div className="flex-1 bg-zinc-50 dark:bg-zinc-800 p-2 rounded-lg text-center border border-zinc-100 dark:border-zinc-700">
-                                        <Wheat className="h-3 w-3 mx-auto mb-1 text-amber-500" />
-                                        <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400">Prot</span>
-                                    </div>
-                                    <div className="flex-1 bg-zinc-50 dark:bg-zinc-800 p-2 rounded-lg text-center border border-zinc-100 dark:border-zinc-700">
-                                        <Droplets className="h-3 w-3 mx-auto mb-1 text-red-500" />
-                                        <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400">Gord</span>
-                                    </div>
+                                {/* Macros Visuais (Simulado para UI) */}
+                                <div className="flex gap-2 mb-6 relative z-10">
+                                    <MacroBadge label="Carb" icon={Wheat} color="text-blue-500" bg="bg-blue-500/10" />
+                                    <MacroBadge label="Prot" icon={Activity} color="text-emerald-500" bg="bg-emerald-500/10" />
+                                    <MacroBadge label="Gord" icon={Droplets} color="text-amber-500" bg="bg-amber-500/10" />
                                 </div>
 
-                                <div className="space-y-2 pt-4 border-t border-dashed border-zinc-200 dark:border-zinc-800">
-                                    <Label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Descrição</Label>
+                                <div className="space-y-2 pt-4 border-t border-border/50 relative z-10">
+                                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Conteúdo</Label>
                                     <Input 
                                         value={finalDescription}
                                         onChange={(e) => setDescription(e.target.value)}
                                         readOnly={isUsingSelector}
-                                        placeholder="Descreva sua refeição..."
-                                        className="bg-zinc-50 dark:bg-zinc-950 border-zinc-100 dark:border-zinc-800 font-medium h-10 text-sm focus-visible:ring-emerald-500"
+                                        placeholder="Ex: Arroz, feijão e frango..."
+                                        className="bg-background/80 border-border font-medium h-10 text-sm focus-visible:ring-primary/20"
                                     />
                                     {isUsingSelector && (
-                                        <p className="text-[10px] text-emerald-600 flex items-center gap-1 mt-1 font-medium animate-in fade-in slide-in-from-top-1">
-                                            <Check className="h-3 w-3" /> Calculado automaticamente.
+                                        <p className="text-[10px] text-primary flex items-center gap-1 mt-1 font-medium animate-in fade-in">
+                                            <Sparkles className="h-3 w-3" /> Calculado automaticamente via seleção.
                                         </p>
                                     )}
                                 </div>
@@ -370,18 +391,27 @@ function MealFormDialog({ meal, children }: { meal?: Meal, children?: React.Reac
                     </ScrollArea>
 
                     {/* Footer Fixo */}
-                    <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 mt-auto shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-20">
+                    <div className="p-6 border-t border-border bg-background z-20">
                         <Button 
                             onClick={handleSubmit} 
-                            disabled={(!finalDescription && !isUsingSelector)}
-                            className="w-full h-12 text-lg font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.01] active:scale-[0.99]"
+                            disabled={(!finalDescription && !isUsingSelector && finalCalories === 0)}
+                            className="w-full h-12 text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 transition-all active:scale-[0.99]"
                         >
-                            {meal ? "Salvar Alterações" : "Confirmar Refeição"} <ArrowRight className="ml-2 h-5 w-5" />
+                            {meal ? "Salvar Alterações" : "Confirmar Registro"} <ArrowRight className="ml-2 h-5 w-5" />
                         </Button>
                     </div>
 
                 </div>
             </DialogContent>
         </Dialog>
+    )
+}
+
+function MacroBadge({ label, icon: Icon, color, bg }: { label: string, icon: React.ElementType, color: string, bg: string }) {
+    return (
+        <div className={cn("flex-1 p-2 rounded-lg text-center border border-transparent hover:border-border transition-all cursor-default", bg)}>
+            <Icon className={cn("h-3.5 w-3.5 mx-auto mb-1", color)} />
+            <span className={cn("text-[10px] font-bold opacity-80", color)}>{label}</span>
+        </div>
     )
 }

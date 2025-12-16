@@ -81,7 +81,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
     });
     
     return (
-        <div className="flex flex-col p-4 md:p-6 gap-4 bg-muted/20 h-[calc(100vh-4rem)] overflow-hidden animate-in fade-in duration-500">
+        <div className="flex flex-col p-4 md:p-6 gap-4 bg-muted/20 min-h-[calc(100vh-4rem)] overflow-hidden animate-in fade-in duration-500">
             
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
                 <div>

@@ -1,143 +1,420 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { SavedLink } from "@prisma/client";
+import Link from "next/link";
+import { toast } from "sonner";
+
 import { createLink, deleteLink } from "@/app/(dashboard)/links/actions";
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Globe, Trash2, ExternalLink, ImageIcon, LayoutGrid } from "lucide-react";
-import { useState } from "react";
-import { toast } from "sonner";
 import { Card } from "@/components/ui/card";
-import Link from "next/link";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
+
+import {
+  Plus,
+  Globe,
+  Trash2,
+  ExternalLink,
+  ImageIcon,
+  Search,
+  Copy,
+  ArrowUpDown,
+  Eye,
+} from "lucide-react";
+
+/**
+ * LinkGrid
+ *
+ * - mantém todas as funcionalidades anteriores (criar link via Dialog,
+ *   abrir em nova aba ao clicar no card)
+ * - adiciona: pesquisa, filtro por categoria, ordenação, preview modal,
+ *   copiar URL e confirmação de exclusão via modal (sem alert())
+ * - sem usar `any`, usando o tipo SavedLink do Prisma
+ */
 
 export function LinkGrid({ links }: { links: SavedLink[] }) {
-    const [isDialogOpen, setIsDialogOpen] = useState(false);
+  // UI state
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-    async function handleCreate(formData: FormData) {
-        const result = await createLink(formData);
-        if (result.success) {
-            toast.success(result.message);
-            setIsDialogOpen(false);
-        } else {
-            toast.error(result.message);
-        }
+  // filtros e ordenação
+  const [query, setQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"new" | "old" | "title">("new");
+
+  // preview / confirm dialogs
+  const [previewLink, setPreviewLink] = useState<SavedLink | null>(null);
+  const [deletingLink, setDeletingLink] = useState<SavedLink | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // derive category list
+  const categories = useMemo(() => {
+    const setC = new Set<string>();
+    links.forEach((l) => {
+      if (l.category && l.category.trim()) setC.add(l.category);
+    });
+    return Array.from(setC).sort();
+  }, [links]);
+
+  // filtered + sorted list
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+
+    const list = links.filter((l) => {
+      if (categoryFilter !== "all" && (l.category ?? "Geral") !== categoryFilter) return false;
+      if (!q) return true;
+      const inTitle = l.title?.toLowerCase().includes(q);
+      const inDesc = l.description?.toLowerCase().includes(q);
+      const inUrl = l.url?.toLowerCase().includes(q);
+      return Boolean(inTitle || inDesc || inUrl);
+    });
+
+    if (sortBy === "title") {
+      list.sort((a, b) => (a.title || "").localeCompare(b.title || ""));
+    } else if (sortBy === "old") {
+      list.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    } else {
+      // new
+      list.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     }
 
-    async function handleDelete(id: string, e: React.MouseEvent) {
-        e.preventDefault(); // Evita abrir o link ao deletar
-        if (!confirm("Remover este link?")) return;
-        const result = await deleteLink(id);
-        if (result.success) toast.success("Link removido.");
+    return list;
+  }, [links, query, categoryFilter, sortBy]);
+
+  // create handler (form action)
+  async function handleCreate(formData: FormData) {
+    const toastId = toast.loading("Criando link...");
+    try {
+      const result = await createLink(formData);
+      toast.dismiss(toastId);
+      if (result.success) {
+        toast.success(result.message);
+        setIsCreateOpen(false);
+      } else {
+        toast.error(result.message || "Erro ao criar link.");
+      }
+    } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("Erro ao criar link.");
     }
+  }
 
-    return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold flex items-center gap-2 text-zinc-800 dark:text-zinc-100">
-                    <Globe className="h-6 w-6 text-indigo-500" /> Biblioteca de Links
-                </h2>
-                
-                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button className="bg-indigo-600 hover:bg-indigo-700 gap-2">
-                            <Plus className="h-4 w-4" /> Novo Link
-                        </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Adicionar Recurso</DialogTitle>
-                        </DialogHeader>
-                        <form action={handleCreate} className="space-y-4">
-                            <div className="space-y-2">
-                                <Label>Título</Label>
-                                <Input name="title" placeholder="Ex: Vercel Dashboard" required />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>URL de Destino</Label>
-                                <Input name="url" placeholder="https://..." required type="url" />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Descrição (Meta Description)</Label>
-                                <Input name="description" placeholder="Para que serve este link?" />
-                            </div>
-                            <div className="space-y-2">
-                                <Label>URL da Imagem (Capa)</Label>
-                                <Input name="imageUrl" placeholder="https://..." />
-                                <p className="text-[10px] text-zinc-500">Cole o link de uma imagem para ficar bonito.</p>
-                            </div>
-                            <div className="space-y-2">
-                                <Label>Categoria</Label>
-                                <Input name="category" placeholder="Ex: Design, Dev, Utilitários" />
-                            </div>
-                            <DialogFooter>
-                                <Button type="submit">Salvar</Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                </Dialog>
-            </div>
+  // delete with modal confirm
+  async function confirmDelete() {
+    if (!deletingLink) return;
+    setIsDeleting(true);
+    const id = deletingLink.id;
+    try {
+      const toastId = toast.loading("Removendo link...");
+      const result = await deleteLink(id);
+      toast.dismiss(toastId);
+      if (result.success) {
+        toast.success(result.message || "Link removido.");
+      } else {
+        toast.error(result.message || "Erro ao remover link.");
+      }
+    } catch {
+      toast.error("Erro ao remover link.");
+    } finally {
+      setIsDeleting(false);
+      setDeletingLink(null);
+    }
+  }
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {links.length === 0 && (
-                    <div className="col-span-full py-16 text-center border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl">
-                        <LayoutGrid className="h-10 w-10 text-zinc-300 mx-auto mb-3" />
-                        <p className="text-zinc-500">Sua biblioteca está vazia.</p>
-                    </div>
-                )}
+  // copy URL util
+  async function copyToClipboard(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("URL copiada");
+    } catch {
+      toast.error("Não foi possível copiar");
+    }
+  }
 
-                {links.map((link) => (
-                    <Link href={link.url} key={link.id} target="_blank" className="group">
-                        <Card className="overflow-hidden hover:shadow-xl hover:shadow-indigo-500/10 hover:border-indigo-500/50 transition-all duration-300 h-full flex flex-col bg-white dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
-                            
-                            {/* ÁREA DA IMAGEM (OG IMAGE STYLE) */}
-                            <div className="h-32 w-full bg-zinc-100 dark:bg-zinc-900 relative overflow-hidden border-b border-zinc-100 dark:border-zinc-800">
-                                {link.imageUrl ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img 
-                                        src={link.imageUrl} 
-                                        alt={link.title} 
-                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                    />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-zinc-300 dark:text-zinc-700">
-                                        <ImageIcon className="h-10 w-10" />
-                                    </div>
-                                )}
-                                
-                                {/* Overlay de Hover com Icone de Link */}
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                    <ExternalLink className="text-white drop-shadow-md h-8 w-8" />
-                                </div>
-                            </div>
+  return (
+    <div className="space-y-6">
+      {/* header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shadow-sm">
+            <Globe className="h-5 w-5" />
+          </div>
 
-                            {/* CONTEÚDO */}
-                            <div className="p-4 flex flex-col flex-1">
-                                <div className="flex justify-between items-start">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-500 mb-1">
-                                        {link.category || "Geral"}
-                                    </span>
-                                    <button 
-                                        onClick={(e) => handleDelete(link.id, e)}
-                                        className="text-zinc-300 hover:text-red-500 transition-colors"
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </button>
-                                </div>
-                                
-                                <h3 className="font-bold text-zinc-800 dark:text-zinc-100 line-clamp-1 group-hover:text-indigo-600 transition-colors">
-                                    {link.title}
-                                </h3>
-                                
-                                <p className="text-sm text-zinc-500 mt-1 line-clamp-2 leading-relaxed">
-                                    {link.description || link.url}
-                                </p>
-                            </div>
-                        </Card>
-                    </Link>
-                ))}
-            </div>
+          <div>
+            <h2 className="text-2xl font-bold text-foreground flex items-center gap-2">
+              Biblioteca de Links
+            </h2>
+            <p className="text-sm text-muted-foreground">Guarde recursos úteis e abra rapidamente.</p>
+          </div>
         </div>
-    );
+
+        <div className="flex gap-3 items-center w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-none">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Pesquisar por título, descrição ou URL..."
+              className="pl-10 pr-3"
+            />
+          </div>
+
+          <Select value={categoryFilter} onValueChange={(v) => setCategoryFilter(v)}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as categorias</SelectItem>
+              {categories.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as "new" | "old" | "title")}>
+            <SelectTrigger className="w-36">
+              <div className="flex items-center gap-2">
+                <ArrowUpDown className="h-4 w-4" />
+                <SelectValue />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="new">Mais recentes</SelectItem>
+              <SelectItem value="old">Mais antigas</SelectItem>
+              <SelectItem value="title">A - Z</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" /> Novo Link
+              </Button>
+            </DialogTrigger>
+
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Criar novo link</DialogTitle>
+              </DialogHeader>
+
+              <form action={handleCreate} className="space-y-4 mt-2">
+                <div className="grid grid-cols-1 gap-3">
+                  <div>
+                    <Label>Título</Label>
+                    <Input name="title" placeholder="Ex: Vercel Dashboard" required />
+                  </div>
+
+                  <div>
+                    <Label>URL</Label>
+                    <Input name="url" placeholder="https://..." required type="url" />
+                  </div>
+
+                  <div>
+                    <Label>Descrição</Label>
+                    <Input name="description" placeholder="Breve descrição (opcional)" />
+                  </div>
+
+                  <div>
+                    <Label>Imagem (capa)</Label>
+                    <Input name="imageUrl" placeholder="https://..." />
+                  </div>
+
+                  <div>
+                    <Label>Categoria</Label>
+                    <Input name="category" placeholder="Ex: Dev, Design, Utilitários" />
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button type="submit" className="w-full">
+                    Salvar recurso
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      {/* grid */}
+      <ScrollArea className="max-h-[65vh]">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-2">
+          {filtered.length === 0 && (
+            <div className="col-span-full border-2 border-dashed border-border rounded-2xl p-12 text-center bg-muted">
+              <div className="mx-auto w-20 h-20 rounded-lg bg-primary/5 flex items-center justify-center mb-4">
+                <ImageIcon className="h-8 w-8 text-primary" />
+              </div>
+              <p className="text-muted-foreground">Nenhum link encontrado.</p>
+              <p className="text-sm text-muted-foreground mt-2">Altere os filtros ou adicione um novo recurso.</p>
+            </div>
+          )}
+
+          {filtered.map((linkItem) => (
+            <div key={linkItem.id} className="group">
+              <Link href={linkItem.url} target="_blank" className="block">
+                <Card className="h-full overflow-hidden transition-shadow hover:shadow-lg border-border bg-card">
+                  <div className="h-36 w-full bg-zinc-100 dark:bg-zinc-900 overflow-hidden relative">
+                    {linkItem.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={linkItem.imageUrl}
+                        alt={linkItem.title || "cover"}
+                        className="object-cover w-full h-full transition-transform group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                        <ImageIcon className="h-10 w-10" />
+                      </div>
+                    )}
+
+                    <div className="absolute inset-0 flex items-start justify-end p-3 pointer-events-none">
+                      <div className="pointer-events-auto flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setPreviewLink(linkItem);
+                          }}
+                          title="Visualizar"
+                          className="bg-white/70 hover:bg-white/90"
+                        >
+                          <Eye className="h-4 w-4 text-primary" />
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            copyToClipboard(linkItem.url);
+                          }}
+                          title="Copiar URL"
+                          className="bg-white/70 hover:bg-white/90"
+                        >
+                          <Copy className="h-4 w-4 text-primary" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 flex flex-col gap-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <Badge className="text-primary bg-primary/5 border border-primary/10">
+                        {linkItem.category || "Geral"}
+                      </Badge>
+
+                      <div className="flex items-center gap-2">
+                        <Tooltip>
+                          <ExternalLink className="h-4 w-4 text-muted-foreground" aria-label="Abrir em nova aba" />
+                        </Tooltip>
+
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setDeletingLink(linkItem);
+                          }}
+                          aria-label="Excluir link"
+                          className="text-zinc-400 hover:text-red-500"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <h3 className="font-semibold text-foreground line-clamp-1 group-hover:text-primary transition-colors">
+                      {linkItem.title}
+                    </h3>
+
+                    <p className="text-sm text-muted-foreground line-clamp-2">{linkItem.description || linkItem.url}</p>
+
+                    <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{new Date(linkItem.createdAt).toLocaleDateString()}</span>
+                      <span className="font-mono truncate max-w-[40%]">{new URL(linkItem.url).hostname.replace("www.", "")}</span>
+                    </div>
+                  </div>
+                </Card>
+              </Link>
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+
+      {/* Preview dialog */}
+      <Dialog open={!!previewLink} onOpenChange={() => setPreviewLink(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{previewLink?.title}</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="w-full h-52 bg-zinc-100 dark:bg-zinc-900 rounded overflow-hidden">
+              {previewLink?.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={previewLink.imageUrl} alt={previewLink.title || "cover"} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                  <ImageIcon className="h-10 w-10" />
+                </div>
+              )}
+            </div>
+
+            <p className="text-sm text-foreground">{previewLink?.description || "Sem descrição."}</p>
+
+            <div className="flex gap-2">
+              <Button
+                onClick={() => {
+                  if (!previewLink) return;
+                  window.open(previewLink.url, "_blank");
+                }}
+                className="flex-1"
+              >
+                Abrir
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => previewLink && copyToClipboard(previewLink.url)}
+              >
+                Copiar URL
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!deletingLink} onOpenChange={() => setDeletingLink(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remover recurso</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Deseja remover <strong>{deletingLink?.title}</strong> da sua biblioteca? Esta ação não pode ser desfeita.
+            </p>
+
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" onClick={() => setDeletingLink(null)}>Cancelar</Button>
+              <Button variant="destructive" onClick={confirmDelete} disabled={isDeleting}>
+                {isDeleting ? "Removendo..." : "Confirmar remoção"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
 }

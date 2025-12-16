@@ -3,39 +3,50 @@ import { Star } from "lucide-react";
 import { EntertainmentBoard } from "@/components/entertainment/entertainment-board";
 import { AddMediaDialog } from "@/components/entertainment/add-media-dialog";
 
-// Esta função DEVE ser async para buscar dados do banco
+/* -------------------------------------------------------------------------- */
+/*                                   PAGE                                     */
+/* -------------------------------------------------------------------------- */
+/* Server Component — responsável apenas por buscar dados e estruturar layout */
+
 export default async function EntertainmentPage() {
-  // Busca tudo de uma vez, ordenado por criação
+  // Busca todos os itens ordenados por criação (mais recentes primeiro)
   const items = await prisma.mediaItem.findMany({
-    orderBy: { createdAt: 'desc' }
+    orderBy: { createdAt: "desc" },
   });
 
   return (
-    <div className="max-w-7xl mx-auto p-6 md:p-10 pb-20 space-y-8">
+    <div className="max-w-7xl mx-auto p-6 md:p-10 pb-20 space-y-10">
       
-      {/* Header Estático */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-6">
-        <div className="flex items-center gap-3">
-            <div className="h-12 w-12 bg-rose-100 dark:bg-rose-900/20 rounded-2xl flex items-center justify-center text-rose-600 shadow-sm">
-                <Star className="h-6 w-6 fill-current" />
-            </div>
-            <div>
-                <h1 className="text-3xl font-extrabold text-zinc-900 dark:text-white tracking-tight">
-                    Entretenimento
-                </h1>
-                <p className="text-zinc-500 text-sm font-medium">
-                    Gerencie seus filmes, jogos e músicas.
-                </p>
-            </div>
-        </div>
+      {/* ------------------------------------------------------------------ */}
+      {/* HEADER                                                              */}
+      {/* ------------------------------------------------------------------ */}
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-border pb-6">
         
-        {/* O Dialog de adicionar fica aqui ou dentro do Board, você escolhe. 
-            Coloquei aqui para ficar visível no header. */}
-        <AddMediaDialog />
-      </div>
+        <div className="flex items-center gap-4">
+          {/* Ícone */}
+          <div className="h-12 w-12 rounded-2xl flex items-center justify-center bg-primary/10 text-primary shadow-sm">
+            <Star className="h-6 w-6 fill-current" />
+          </div>
 
-      {/* O Board Interativo (Client Component) assume o controle aqui */}
-      {/* Passamos os dados do servidor (items) como prop inicial */}
+          {/* Título */}
+          <div>
+            <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
+              Entretenimento
+            </h1>
+            <p className="text-sm font-medium text-muted-foreground">
+              Gerencie seus filmes, jogos e músicas.
+            </p>
+          </div>
+        </div>
+
+        {/* Ação principal */}
+        <AddMediaDialog />
+      </header>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* BOARD (Client Component)                                            */}
+      {/* ------------------------------------------------------------------ */}
+      {/* O board assume toda a interação, filtros e estados */}
       <EntertainmentBoard initialItems={items} />
 
     </div>
