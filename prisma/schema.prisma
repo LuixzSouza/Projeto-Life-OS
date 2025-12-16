@@ -31,6 +31,7 @@ model User {
   friends         Friend[]
   wardrobe        WardrobeItem[] 
   stats           UserStats?
+  settings        Settings?
 }
 
 model UserStats {
@@ -320,6 +321,13 @@ model Settings {
   aiPersona   String?  
   aiUsage     String?  
 
+  userId          String? @unique // Relação 1:1: um Settings pertence a um User (ID)
+  user            User?   @relation(fields: [userId], references: [id])
+
+  tmdbApiKey      String? @map("tmdb_api_key")
+  rawgApiKey      String? @map("rawg_api_key")
+  pluggyClientId  String? @map("pluggy_client_id")
+  pluggySecret    String? @map("pluggy_client_secret")
   openaiKey   String?  
   groqKey     String?  
   googleKey   String?  
@@ -387,6 +395,7 @@ model AccessItem {
   category  String
   notes     String?  
 
+  client    String?  @map("client_name")
   userId    String?
   user      User?    @relation(fields: [userId], references: [id])
 

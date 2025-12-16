@@ -528,7 +528,7 @@ export async function updateSettings(formData: FormData) {
     const bio = formData.get("bio") as string;
     const avatarUrl = formData.get("avatarUrl") as string;
     const accentColor = formData.get("accentColor") as string;
-    const coverUrl = formData.get("coverUrl") as string
+    const coverUrl = formData.get("coverUrl") as string;
 
     const user = await prisma.user.findFirst();
     const settings = await prisma.settings.findFirst();
@@ -536,23 +536,23 @@ export async function updateSettings(formData: FormData) {
     if (user) {
         await prisma.user.update({
             where: { id: user.id },
-            data: { name, email, bio, avatarUrl, coverUrl: coverUrl, }
+            data: { name, email, bio, avatarUrl, coverUrl: coverUrl } // ✅ coverUrl está aqui
         });
     } else {
-        // Fallback create se não existir user (incomum mas possível em dev)
-         await prisma.user.create({
-            data: { name, email, bio, avatarUrl, password: 'admin' }
+        // Fallback create se não existir user
+        await prisma.user.create({
+            data: { name, email, bio, avatarUrl, password: 'admin', coverUrl: coverUrl }
         });
     }
 
     if (settings) {
         await prisma.settings.update({
             where: { id: settings.id },
-            data: { accentColor }
+            data: { accentColor } // O updateSettings só deve alterar o accentColor
         });
     } else {
         await prisma.settings.create({
-             data: { accentColor }
+            data: { accentColor }
         });
     }
 
@@ -663,4 +663,56 @@ export async function listDirectories(currentPath: string) {
     console.error("Erro ao ler pasta:", error);
     return { success: false, error: "Acesso negado ou pasta inválida." };
   }
+}
+
+// ============================================================================
+// 8. CONFIGURAÇÃO DE INTEGRAÇÕES (APIs)
+// ============================================================================
+export async function updateApiKeys(formData: FormData) {
+    // Integrações de Conteúdo
+    const tmdbApiKey = formData.get("tmdbApiKey") as string;
+    const rawgApiKey = formData.get("rawgApiKey") as string;
+    
+    // Integrações Financeiras
+    const pluggyClientId = formData.get("pluggyClientId") as string;
+    const pluggyClientSecret = formData.get("pluggyClientSecret") as string;
+
+    const existingSettings = await prisma.settings.findFirst();
+
+    // Cria um objeto de dados para atualização, incluindo apenas as chaves que foram preenchidas.
+    // Isso evita apagar chaves existentes se o usuário deixar o campo em branco.
+    const dataToUpdate = {
+        ...(tmdbApiKey && { tmdbApiKey }),
+        ...(rawgApiKey && { rawgApiKey }),
+        ...(pluggyClientId && { pluggyClientId }),
+        ...(pluggyClientSecret && { pluggyClientSecret }),
+    };
+
+    // Caso o usuário queira remover a chave (limpar o campo), precisamos tratar o campo vazio.
+    // Para simplificar, assumimos que preencher campos vazios deve manter a chave existente,
+    // ou você precisa de um checkbox "remover chave" no formulário.
+    // Para este caso, vamos atualizar TUDO, assumindo que se o campo vier vazio, o usuário quer limpar a chave.
+    
+    const finalData = {
+        tmdbApiKey: tmdbApiKey || null,
+        rawgApiKey: rawgApiKey || null,
+        pluggyClientId: pluggyClientId || null,
+        pluggyClientSecret: pluggyClientSecret || null,
+    }
+
+
+    if (existingSettings) {
+        await prisma.settings.update({
+            where: { id: existingSettings.id },
+            data: finalData
+        });
+    } else {
+        // Se não existir settings, cria com os dados fornecidos
+        await prisma.settings.create({
+            data: finalData
+        });
+    }
+
+    revalidatePath("/settings");
+    return { success: true, message: "Chaves de API salvas com sucesso!" };
 }

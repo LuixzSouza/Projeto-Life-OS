@@ -3,59 +3,89 @@
 import { useState, useMemo } from "react";
 import { AccessItem } from "@prisma/client";
 import { Input } from "@/components/ui/input";
-import { Search, Shield, X } from "lucide-react";
+import { Search, Shield, X, Briefcase } from "lucide-react";
 import { AccessCard } from "./access-card";
+import { cn } from "@/lib/utils";
 
-export function AccessList({ items }: { items: AccessItem[] }) {
+// --- NOVA INTERFACE ---
+interface AccessListProps {
+    items: AccessItem[];
+    // ✅ PROPRIEDADE ADICIONADA PARA O ERRO DE TIPAGEM
+    showClientBadge?: boolean; 
+}
+
+export function AccessList({ items, showClientBadge = false }: AccessListProps) {
     const [search, setSearch] = useState("");
 
-    // Usar useMemo para evitar recomputação desnecessária
     const filteredItems = useMemo(() => {
+        const lowerSearch = search.toLowerCase();
+        
         return items.filter(item => 
-            item.title.toLowerCase().includes(search.toLowerCase()) ||
-            (item.username && item.username.toLowerCase().includes(search.toLowerCase())) ||
-            (item.category && item.category.toLowerCase().includes(search.toLowerCase())) ||
-            (item.notes && item.notes.toLowerCase().includes(search.toLowerCase()))
+            item.title.toLowerCase().includes(lowerSearch) ||
+            (item.username && item.username.toLowerCase().includes(lowerSearch)) ||
+            (item.category && item.category.toLowerCase().includes(lowerSearch)) ||
+            (item.notes && item.notes.toLowerCase().includes(lowerSearch)) ||
+            (item.client && item.client.toLowerCase().includes(lowerSearch))
         );
     }, [search, items]);
 
+    const isSearching = search.length > 0;
+    const noResults = isSearching && filteredItems.length === 0;
+    const cofferEmpty = items.length === 0;
+
     return (
         <div className="space-y-6">
-            {/* Barra de Busca */}
-            <div className="relative max-w-md mx-auto md:mx-0">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
+            {/* Barra de Busca (Mantida igual) */}
+            <div className="relative max-w-lg mx-auto md:mx-0">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
-                    placeholder="Buscar acesso (nome, user, categoria, notas)..." 
+                    placeholder="Buscar acesso (título, usuário, cliente, categoria)..." 
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="pl-9 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800"
+                    className="pl-10 bg-background border-border/60 shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:border-primary/50"
                 />
-                {/* Botão para limpar a busca */}
+                
                 {search && (
                     <button 
                         onClick={() => setSearch("")}
-                        className="absolute right-3 top-2.5 text-zinc-400 hover:text-zinc-600"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1 rounded-full hover:bg-muted/50"
                     >
                         <X className="h-4 w-4" />
                     </button>
                 )}
             </div>
 
-            {/* Grid */}
-            {filteredItems.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl">
-                    <Shield className="h-12 w-12 text-zinc-300 mb-4" />
-                    <h3 className="text-lg font-semibold text-zinc-600 dark:text-zinc-400">
-                        {items.length === 0 ? "Seu cofre está vazio" : "Nenhum resultado encontrado"}
+            {/* Contador de Resultados */}
+            {isSearching && !noResults && (
+                <p className="text-sm text-muted-foreground ml-1">
+                    Encontrados <strong className="text-foreground">{filteredItems.length}</strong> {filteredItems.length === 1 ? 'item' : 'itens'}
+                </p>
+            )}
+
+            {/* Grid ou Empty State */}
+            {cofferEmpty || noResults ? (
+                <div className={cn(
+                    "flex flex-col items-center justify-center py-20 border-2 border-dashed rounded-2xl bg-muted/10",
+                    cofferEmpty ? "border-primary/30" : "border-border/60"
+                )}>
+                    <Shield className={cn("h-12 w-12 mb-4", cofferEmpty ? "text-primary/70" : "text-muted-foreground/50")} />
+                    <h3 className="text-xl font-semibold text-foreground">
+                        {cofferEmpty ? "Seu Cofre está Vazio" : "Sem Resultados"}
                     </h3>
-                    <p className="text-zinc-400 text-sm">
-                        {items.length === 0 ? "Adicione sua primeira senha para começar." : `Não encontramos nada com "${search}"`}
+                    <p className="text-muted-foreground mt-1 text-sm max-w-md text-center">
+                        {cofferEmpty 
+                            ? "Adicione seu primeiro acesso seguro para começar a proteger seus dados." 
+                            : `Não encontramos nenhum item que corresponda à busca por "${search}". Tente simplificar a pesquisa.`
+                        }
                     </p>
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {filteredItems.map(item => (
-                        <AccessCard key={item.id} item={item} />
+                        // No AccessCard, a badge do cliente é renderizada se item.client existir.
+                        // Não precisamos passar showClientBadge para o AccessCard, mas ele é útil
+                        // para o controle de renderização aqui na lista.
+                        <AccessCard key={item.id} item={item} /> 
                     ))}
                 </div>
             )}
