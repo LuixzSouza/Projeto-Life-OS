@@ -1,47 +1,105 @@
 // components/ui/dialog-context.tsx
-import React, { createContext, useContext, useState, useCallback } from 'react';
+"use client"
 
-interface DialogContextType {
-    clickPosition: { x: number; y: number };
-    captureClick: (event: React.MouseEvent | MouseEvent) => void;
+import * as React from "react"
+
+/* -------------------------------------------------------------------------------------------------
+ * Types
+ * -----------------------------------------------------------------------------------------------*/
+
+interface ClickPosition {
+  x: number
+  y: number
 }
 
-const DialogContext = createContext<DialogContextType | undefined>(undefined);
-
-export function useDialogClick() {
-    const context = useContext(DialogContext);
-    if (!context) {
-        throw new Error('useDialogClick must be used within a DialogProvider');
-    }
-    return context;
+interface DialogContextValue {
+  clickPosition: ClickPosition
+  captureClick: (event: React.MouseEvent | MouseEvent) => void
 }
 
-export function DialogProvider({ children }: { children: React.ReactNode }) {
-    // ✅ CORREÇÃO AQUI: Inicializa com 0 ou um valor seguro
-    const [clickPosition, setClickPosition] = useState({ x: 0, y: 0 }); 
+/* -------------------------------------------------------------------------------------------------
+ * Context
+ * -----------------------------------------------------------------------------------------------*/
 
-    // ✅ NOVO: Atualiza a posição inicial APENAS NO CLIENTE
-    React.useEffect(() => {
-        // Define o ponto inicial como o centro da tela assim que o componente monta no cliente
-        setClickPosition({ 
-            x: window.innerWidth / 2, 
-            y: window.innerHeight / 2 
-        });
-    }, []); // Executa apenas uma vez na montagem do cliente
+const DialogContext = React.createContext<DialogContextValue | null>(null)
 
-    const captureClick = React.useCallback((event: React.MouseEvent | MouseEvent) => {
-        setClickPosition({
-            x: event.clientX,
-            y: event.clientY,
-        });
-    }, []);
+/* -------------------------------------------------------------------------------------------------
+ * Hook
+ * -----------------------------------------------------------------------------------------------*/
 
-    return (
-        <DialogContext.Provider value={{ clickPosition, captureClick }}>
-            {children}
-        </DialogContext.Provider>
-    );
+export function useDialogClick(): DialogContextValue {
+  const context = React.useContext(DialogContext)
+
+  if (!context) {
+    throw new Error("useDialogClick must be used within a DialogProvider")
+  }
+
+  return context
 }
 
-// ⚠️ Lembre-se de envolver seu layout principal com <DialogProvider> 
-// (ex: no seu arquivo `app/layout.tsx`)
+/* -------------------------------------------------------------------------------------------------
+ * Provider
+ * -----------------------------------------------------------------------------------------------*/
+
+interface DialogProviderProps {
+  children: React.ReactNode
+}
+
+export function DialogProvider({ children }: DialogProviderProps) {
+  /**
+   * Estado inicial seguro para SSR
+   * Evita hydration mismatch
+   */
+  const [clickPosition, setClickPosition] = React.useState<ClickPosition>({
+    x: 0,
+    y: 0,
+  })
+
+  /**
+   * Define o ponto inicial no centro da viewport
+   * Executa apenas no cliente
+   */
+  React.useEffect(() => {
+    setClickPosition({
+      x: window.innerWidth / 2,
+      y: window.innerHeight / 2,
+    })
+  }, [])
+
+  /**
+   * Captura posição do clique para animações, transições e origem visual
+   */
+  const captureClick = React.useCallback(
+    (event: React.MouseEvent | MouseEvent) => {
+      setClickPosition({
+        x: event.clientX,
+        y: event.clientY,
+      })
+    },
+    []
+  )
+
+  /**
+   * Memoização do valor do contexto
+   * Evita re-renders desnecessários
+   */
+  const value = React.useMemo(
+    () => ({
+      clickPosition,
+      captureClick,
+    }),
+    [clickPosition, captureClick]
+  )
+
+  return (
+    <DialogContext.Provider value={value}>
+      {children}
+    </DialogContext.Provider>
+  )
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * Usage
+ * -----------------------------------------------------------------------------------------------*/
+// Envolva seu layout principal com <DialogProvider />
+// Ex: app/layout.tsx

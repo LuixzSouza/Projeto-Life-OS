@@ -56,11 +56,12 @@ export function FinanceDashboard({
     <div className="min-h-screen bg-muted/20 relative overflow-hidden animate-in fade-in duration-500">
       <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 via-transparent to-transparent pointer-events-none -z-10" />
 
-      <div className="relative p-6 md:p-10 space-y-10 pb-32 max-w-[1600px] mx-auto">
+      <div className="relative mx-auto">
       
+        
         {/* SEÇÃO 1: HEADER & KPI */}
         <section className="space-y-8">
-          <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6">
+          <div className="border-b border-border/60 bg-gradient-to-b from-primary/5 to-background pt-10 pb-8 px-6 md:px-8 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6">
               <div>
                   <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
                     Gestão Financeira <TrendingUp className="h-6 w-6 text-primary" />
@@ -102,7 +103,7 @@ export function FinanceDashboard({
         </section>
 
         {/* SEÇÃO 2: CARTEIRAS */}
-        <section className="space-y-4">
+        <section className="space-y-4 px-6 md:px-8 py-8 space-y-10 max-w-[1600px] mx-auto">
             <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
                   <Wallet className="h-5 w-5 text-muted-foreground" /> Minhas Contas
@@ -135,66 +136,68 @@ export function FinanceDashboard({
             )}
         </section>
 
-        <div className="h-px w-full bg-border" />
+        <div className="h-px w-full bg-border " />
 
         {/* SEÇÃO 3: DASHBOARD PRINCIPAL */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
-            
-            {/* Extrato */}
-            <div className="xl:col-span-2 space-y-4">
-               <div className="flex items-center justify-between">
-                   <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                      <Receipt className="h-5 w-5 text-muted-foreground" /> Histórico Recente
-                   </h3>
-                   <Link href="/finance/transactions">
-                        <Button variant="link" size="sm" className="h-auto p-0 text-muted-foreground">Ver tudo</Button>
-                   </Link>
-               </div>
-               
-               {transactions.length > 0 ? (
-                  <div className="min-h-[500px] rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-                      <TransactionList transactions={transactions} />
-                  </div>
-               ) : (
-                  <EmptyState icon={Receipt} title="Sem movimentações" description="Suas receitas e despesas aparecerão aqui." className="h-[400px]" />
-               )}
-            </div>
+        <section className="px-6 md:px-8 py-8 space-y-10 max-w-[1600px] mx-auto">
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
+              
+              {/* Extrato */}
+              <div className="xl:col-span-2 space-y-4">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                        <Receipt className="h-5 w-5 text-muted-foreground" /> Histórico Recente
+                    </h3>
+                    <Link href="/finance/transactions">
+                          <Button variant="link" size="sm" className="h-auto p-0 text-muted-foreground">Ver tudo</Button>
+                    </Link>
+                </div>
+                
+                {transactions.length > 0 ? (
+                    <div className="min-h-[500px] rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+                        <TransactionList transactions={transactions} />
+                    </div>
+                ) : (
+                    <EmptyState icon={Receipt} title="Sem movimentações" description="Suas receitas e despesas aparecerão aqui." className="h-[400px]" />
+                )}
+              </div>
 
-            {/* Custos Fixos */}
-            <div className="space-y-4 sticky top-6">
-               <div className="flex items-center justify-between">
-                   <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                      <AlertCircle className="h-5 w-5 text-muted-foreground" /> Custos Fixos
-                   </h3>
-                   {/* ✅ Botão de Adicionar Recorrente no Header */}
-                   <RecurringDialog />
-               </div>
+              {/* Custos Fixos */}
+              <div className="space-y-4 sticky top-6">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                        <AlertCircle className="h-5 w-5 text-muted-foreground" /> Custos Fixos
+                    </h3>
+                    {/* ✅ Botão de Adicionar Recorrente no Header */}
+                    <RecurringDialog />
+                </div>
 
-               {recurring.length > 0 ? (
-                  <RecurringCard total={totalRecurring} items={recurring} />
-               ) : (
-                  <EmptyState 
-                    icon={AlertCircle} 
-                    title="Sem custos fixos" 
-                    description="Adicione assinaturas e contas mensais." 
-                    className="h-[300px]"
-                    action={
-                        /* ✅ Botão de Adicionar Recorrente no Empty State */
-                        <RecurringDialog 
-                            trigger={
-                                <Button variant="outline" size="sm">
-                                    Adicionar Fixo
-                                </Button>
-                            }
-                        />
-                    }
-                  />
-               )}
-            </div>
-        </div>
+                {recurring.length > 0 ? (
+                    <RecurringCard total={totalRecurring} items={recurring} />
+                ) : (
+                    <EmptyState 
+                      icon={AlertCircle} 
+                      title="Sem custos fixos" 
+                      description="Adicione assinaturas e contas mensais." 
+                      className="h-[300px]"
+                      action={
+                          /* ✅ Botão de Adicionar Recorrente no Empty State */
+                          <RecurringDialog 
+                              trigger={
+                                  <Button variant="outline" size="sm">
+                                      Adicionar Fixo
+                                  </Button>
+                              }
+                          />
+                      }
+                    />
+                )}
+              </div>
+          </div>
+        </section>
 
         {/* SEÇÃO 4: WISHLIST */}
-        <section className="space-y-6 pt-10 border-t border-dashed border-border">
+        <section className="space-y-6 pt-10 border-t border-dashed border-border px-6 md:px-8 py-8 space-y-10 max-w-[1600px] mx-auto">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                   <h3 className="text-xl font-bold flex items-center gap-2 text-foreground">

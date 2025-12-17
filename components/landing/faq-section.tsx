@@ -1,129 +1,214 @@
-// components/landing/faq-section.tsx
 "use client";
 
-import { useState } from "react";
-import { Plus, Minus, MessageCircle, Mail, Database, BrainCircuit, Smartphone, Package, Code } from "lucide-react";
+import { useState, ReactNode } from "react";
+import { 
+  Plus, Minus, MessageCircle, Mail, Package, 
+  ImageIcon
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 
-const FAQS = [
+// --- 1. DADOS (Com as imagens reais) ---
+
+interface FAQItem {
+    id: string;
+    q: string;
+    a: string;
+    visual: ReactNode; 
+}
+
+const FAQS: FAQItem[] = [
   { 
-    q: "O Life OS é grátis? Preciso de uma conta na nuvem?", 
-    a: "O projeto é totalmente Open Source e **gratuito**. Não é necessário criar contas externas ou pagar assinaturas. A arquitetura 'Local-First' garante que você rode o sistema 100% no seu computador, com privacidade total e sem depender de servidores de terceiros." 
+    id: "free",
+    q: "O Life OS é grátis? Preciso de uma conta?", 
+    a: "Totalmente **Open Source (MIT)** e gratuito. Sem assinaturas, sem logins externos. A arquitetura Local-First garante que o sistema é seu para sempre.",
+    // Use 'sizes' para otimização responsiva
+    visual: <Image src="/faqs/faq1.webp" alt="Dashboard Open Source" fill className="object-cover" sizes="(max-width: 768px) 100vw, 450px" priority />
   },
   { 
-    q: "Onde meus dados financeiros e de projetos são armazenados?", 
-    a: "Seus dados são salvos em um arquivo **SQLite** (`.db`) no seu dispositivo. Você tem controle total sobre este arquivo e pode movê-lo para um HD Externo ou pasta sincronizada (Google Drive/Dropbox) diretamente pela área de Configurações, garantindo portabilidade e backup sem a nossa intervenção." 
+    id: "data",
+    q: "Onde meus dados ficam salvos?", 
+    a: "Em um arquivo **SQLite** (`life_os.db`) na sua máquina. Você pode copiar esse arquivo para um HD Externo ou Dropbox para fazer backup. Seus dados, suas regras.",
+    visual: <Image src="/faqs/faq2.webp" alt="Arquivo SQLite Local" fill className="object-cover" sizes="(max-width: 768px) 100vw, 450px" />
   },
   { 
-    q: "Como funciona a Inteligência Artificial Híbrida?", 
-    a: "O sistema suporta duas vias: 1) **Local e Gratuita:** Integre com o Ollama para rodar modelos como Llama 3 no seu PC (privacidade máxima). 2) **Nuvem e Performance:** Conecte suas próprias chaves de API (OpenAI, Groq, Google) para usar modelos de alta performance. Você decide o balanço entre privacidade e poder de processamento." 
+    id: "ai",
+    q: "Como funciona a IA Híbrida?", 
+    a: "Você escolhe: use **Ollama** para rodar modelos localmente (privacidade total) ou conecte sua API da **OpenAI/Groq** para máxima performance na nuvem.",
+    visual: <Image src="/faqs/faq3.webp" alt="Seletor de IA Híbrida" fill className="object-cover" sizes="(max-width: 768px) 100vw, 450px" />
   },
   { 
-    q: "Preciso baixar um aplicativo na App Store ou Play Store?", 
-    a: "Não. O Life OS foi desenvolvido como um PWA (Progressive Web App). Você o acessa pelo navegador (`localhost:3000`) e pode adicioná-lo à tela inicial do seu celular (iOS/Android). Ele funciona como um app nativo, com ícone próprio e capacidade de rodar offline." 
+    id: "pwa",
+    q: "Existe aplicativo para celular?", 
+    a: "É um **PWA (Progressive Web App)**. Acesse `localhost:3000` no celular, clique em 'Adicionar à Tela Inicial' e use como um app nativo, inclusive offline.",
+    visual: <Image src="/faqs/faq4.webp" alt="Interface PWA Mobile" fill className="object-cover" sizes="(max-width: 768px) 100vw, 450px" />
   },
   { 
-    q: "O que é o 'Neural Sync' que automatiza os módulos?", 
-    a: "O Neural Sync é o motor de contextualização interno. Ele usa a IA para analisar correlações entre seus módulos. Por exemplo, se você registrar um nível baixo de energia no módulo de Saúde, o sistema pode sugerir automaticamente mover tarefas de alta prioridade (do módulo de Projetos) para a agenda do dia seguinte." 
+    id: "sync",
+    q: "O que é o 'Neural Sync'?", 
+    a: "É o motor que conecta os módulos. Se você dormiu pouco (Módulo Saúde), o sistema sugere adiar tarefas complexas (Módulo Projetos). Tudo automático.",
+    visual: <Image src="/faqs/faq5.webp" alt="Motor Neural Sync" fill className="object-cover" sizes="(max-width: 768px) 100vw, 450px" />
   },
   { 
-    q: "O Life OS pode ser usado para gerenciar clientes (devs, freelancers)?", 
-    a: "Sim. A seção **Cofre de Senhas** e os módulos de **Projetos** e **Gerenciamento de Sites (CMS)** foram desenhados para suportar fluxos profissionais. Você pode isolar credenciais de cliente e monitorar o status de diferentes projetos de forma organizada." 
+    id: "clients",
+    q: "Serve para gerenciar clientes?", 
+    a: "Sim. Com o Cofre de Senhas e o CMS integrados, você isola credenciais de clientes e gerencia múltiplos projetos profissionais com segurança.",
+    visual: <Image src="/faqs/faq6.webp" alt="Gestão de Clientes e Cofre" fill className="object-cover" sizes="(max-width: 768px) 100vw, 450px" />
   },
   { 
-    q: "Eu preciso saber programar para instalar o Life OS?", 
-    a: "Sim, para a versão atual. Como o projeto é Open Source e Self-Hosted (auto-hospedado), é necessário ter Node.js, Git e saber executar comandos básicos no Terminal. Estamos focando em documentação detalhada (o 'Guia de Setup' acima) para facilitar o processo para desenvolvedores e entusiastas." 
+    id: "dev",
+    q: "Preciso saber programar?", 
+    a: "Sim, atualmente requer Node.js, Git e Terminal. Estamos trabalhando em documentação detalhada para tornar a instalação acessível.",
+    visual: <Image src="/faqs/faq7.webp" alt="Terminal de Instalação" fill className="object-cover" sizes="(max-width: 768px) 100vw, 450px" />
   },
 ];
 
-export default function FAQSection() {
-  const [openIndex, setOpenIndex] = useState<number | null>(0); // Primeiro item aberto por padrão
+// --- 2. COMPONENTE PRINCIPAL ---
+
+export default function FAQSectionWithImages() {
+  const [openIndex, setOpenIndex] = useState<number>(0);
 
   return (
-    <section className="py-24 px-6 bg-[#09090b] border-t border-white/5 relative overflow-hidden">
+    <section id="faq" className="py-24 px-6 bg-[#09090b] border-t border-white/5 relative overflow-hidden">
       
-      {/* Background Glow sutil */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-indigo-500/5 blur-[100px] rounded-full pointer-events-none" />
+      {/* Background Decorativo */}
+      <div className="absolute right-0 top-1/4 w-[400px] h-[400px] bg-indigo-600/5 blur-[120px] rounded-full pointer-events-none" />
 
-      <div className="max-w-4xl mx-auto relative z-10">
+      <div className="max-w-6xl mx-auto relative z-10">
         
+        {/* Header */}
         <div className="text-center mb-16">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900 border border-white/10 text-zinc-400 text-[10px] font-bold uppercase tracking-widest mb-4">
-              <MessageCircle className="h-3 w-3 text-indigo-400" /> Transparência Total
+            <MessageCircle className="h-3 w-3 text-indigo-400" /> Transparência Total
           </div>
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Perguntas Frequentes</h2>
-          <p className="text-zinc-400 max-w-2xl mx-auto">Tudo o que você precisa saber sobre a arquitetura Local-First, privacidade e requisitos de uso do Life OS.</p>
-        </div>
-        
-        <div className="space-y-4">
-          {FAQS.map((item, i) => {
-            const isOpen = openIndex === i;
-            return (
-              <div 
-                key={i} 
-                className={cn(
-                    "border rounded-2xl overflow-hidden transition-all duration-300",
-                    isOpen 
-                        ? "bg-zinc-900 border-indigo-500/50 shadow-[0_0_25px_rgba(99,102,241,0.1)]" 
-                        : "bg-zinc-900/50 border-white/10 hover:border-white/20"
-                )}
-              >
-                <button 
-                  onClick={() => setOpenIndex(isOpen ? null : i)}
-                  className="w-full flex items-center justify-between p-5 text-left transition-colors"
-                >
-                  <span className={cn("font-semibold text-lg", isOpen ? "text-white" : "text-zinc-300")}>
-                    {item.q}
-                  </span>
-                  <div className={cn(
-                      "p-1 rounded-full transition-colors shrink-0",
-                      isOpen ? "bg-indigo-500 text-white" : "bg-zinc-800 text-zinc-500"
-                  )}>
-                    {isOpen ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-                  </div>
-                </button>
-                
-                <AnimatePresence>
-                  {isOpen && (
-                    <motion.div 
-                      initial={{ height: 0, opacity: 0 }} 
-                      animate={{ height: "auto", opacity: 1 }} 
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.3, ease: "easeInOut" }}
-                      className="overflow-hidden"
-                    >
-                      <div className="p-5 pt-0 text-base text-zinc-400 leading-relaxed border-t border-white/10">
-                        {item.a}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )
-          })}
+          <p className="text-zinc-400 max-w-2xl mx-auto">
+            Arquitetura Local-First, privacidade e requisitos técnicos explicados.
+          </p>
         </div>
 
-        {/* --- CARD DE CONTATO EXTRA --- */}
-        <div className="mt-20 p-8 rounded-3xl bg-gradient-to-br from-zinc-900 to-black border border-indigo-500/20 text-center shadow-xl shadow-indigo-500/10">
-            <h3 className="text-2xl font-bold text-white mb-2 tracking-tight">Pronto para assumir o controle?</h3>
-            <p className="text-zinc-400 mb-6 max-w-lg mx-auto">
-                Se você ainda tem dúvidas sobre contribuição, arquitetura ou quer reportar um bug, use os canais abaixo.
-            </p>
-            <div className="flex flex-col sm:flex-row justify-center gap-4">
-                <a 
-                    href="mailto:luiz.anttoniodesouza004@gmail.com" 
-                    className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-indigo-500 text-white font-bold hover:bg-indigo-600 transition-colors shadow-lg shadow-indigo-500/30"
+        {/* Layout Grid: Esquerda (Texto) | Direita (Imagem Sticky) */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_450px] gap-10 items-center">
+
+          {/* --- ESQUERDA: LISTA DE PERGUNTAS (ACCORDION) --- */}
+          <div className="space-y-3">
+            {FAQS.map((item, i) => {
+              const isOpen = openIndex === i;
+              return (
+                <div
+                  key={i}
+                  className={cn(
+                    "border rounded-xl overflow-hidden transition-all duration-300",
+                    isOpen
+                      ? "bg-zinc-900 border-indigo-500/30 shadow-[0_0_20px_-5px_rgba(99,102,241,0.1)]"
+                      : "bg-zinc-900/30 border-white/5 hover:border-white/10"
+                  )}
                 >
-                    <Mail className="h-4 w-4" /> Contato Direto
-                </a>
-                <a 
-                    href="#" 
-                    className="flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-zinc-800 text-white font-bold border border-zinc-700 hover:bg-zinc-700 transition-colors"
-                >
-                    <Package className="h-4 w-4" /> Repositório (GitHub)
-                </a>
+                  <button
+                    onClick={() => setOpenIndex(isOpen ? -1 : i)}
+                    className="w-full flex items-center justify-between p-5 text-left transition-colors group"
+                  >
+                    <span className={cn("font-medium text-base pr-4 leading-tight", isOpen ? "text-white" : "text-zinc-400 group-hover:text-zinc-300")}>
+                      {item.q}
+                    </span>
+                    <div className={cn(
+                      "p-1 rounded-full transition-all shrink-0",
+                      isOpen ? "bg-indigo-500 text-white rotate-0" : "bg-zinc-800 text-zinc-500 -rotate-90"
+                    )}>
+                      {isOpen ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+                    </div>
+                  </button>
+
+                  <AnimatePresence initial={false}>
+                    {isOpen && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3, ease: "easeInOut" }}
+                        className="overflow-hidden"
+                      >
+                        <div className="p-5 pt-0 text-sm text-zinc-400 leading-relaxed border-t border-white/5">
+                            <div dangerouslySetInnerHTML={{ __html: item.a }} />
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
+            
+            {/* Bloco de Contato Rápido */}
+            <div className="pt-6 flex gap-3 flex-wrap">
+                 <a href="mailto:luiz.anttoniodesouza004@gmail.com" className="inline-flex items-center gap-2 text-xs font-medium text-zinc-500 hover:text-white transition-colors">
+                    <Mail className="h-3 w-3" /> Reportar Bug
+                 </a>
+                 <a href="#" className="inline-flex items-center gap-2 text-xs font-medium text-zinc-500 hover:text-white transition-colors">
+                    <Package className="h-3 w-3" /> Acessar GitHub
+                 </a>
             </div>
+          </div>
+
+          {/* --- DIREITA: ÁREA VISUAL (JANELA DE APP STICKY) --- */}
+          <div className="hidden lg:block sticky top-24 h-[420px]">
+            <div className="w-full h-full rounded-2xl bg-[#0F0F10] border border-white/10 shadow-2xl overflow-hidden flex flex-col relative group">
+                
+                {/* Header da Janela (Estilo Mac/Browser) */}
+                <div className="h-10 bg-zinc-900/90 backdrop-blur border-b border-white/5 flex items-center px-4 gap-2 shrink-0 justify-between z-20">
+                    <div className="flex gap-1.5">
+                        <div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/50" />
+                        <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" />
+                        <div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" />
+                    </div>
+                    <div className="text-[10px] text-zinc-600 font-mono font-bold uppercase tracking-widest flex items-center gap-2">
+                        <ImageIcon className="h-3 w-3" /> System Viewer
+                    </div>
+                    <div className="w-8" />
+                </div>
+
+                {/* Container da Imagem */}
+                <div className="flex-1 relative overflow-hidden bg-zinc-950">
+                    <AnimatePresence mode="wait">
+                        <motion.div
+                            // A chave muda baseada no index, forçando a re-renderização e animação
+                            key={openIndex} 
+                            initial={{ opacity: 0, scale: 0.98 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 1.02 }}
+                            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }} // Curva de animação suave
+                            className="absolute inset-0"
+                        >
+                            {/* Renderiza a imagem ou um estado vazio */}
+                            {openIndex >= 0 && openIndex < FAQS.length 
+                                ? (
+                                    // Usando 'fill' e 'object-cover' para a imagem preencher o container
+                                    <div className="w-full h-full relative bg-black">
+                                        {FAQS[openIndex].visual}
+                                    </div>
+                                )
+                                : (
+                                    <div className="h-full flex flex-col items-center justify-center text-zinc-700 gap-3">
+                                        <div className="h-12 w-12 rounded-full bg-zinc-900 flex items-center justify-center">
+                                            <MessageCircle className="h-6 w-6 opacity-20" />
+                                        </div>
+                                        <p className="text-sm font-medium">Selecione uma pergunta</p>
+                                    </div>
+                                )
+                            }
+                        </motion.div>
+                    </AnimatePresence>
+                    
+                    {/* Borda interna sutil para acabamento */}
+                    <div className="absolute inset-0 pointer-events-none border border-white/5 rounded-b-2xl" />
+                </div>
+
+            </div>
+            
+            {/* Glow / Reflexo abaixo da janela */}
+            <div className="absolute -bottom-6 left-10 right-10 h-10 bg-indigo-500/20 blur-2xl rounded-full opacity-50" />
+          </div>
+
         </div>
 
       </div>

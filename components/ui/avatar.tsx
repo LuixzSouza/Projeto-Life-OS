@@ -5,6 +5,10 @@ import * as AvatarPrimitive from "@radix-ui/react-avatar"
 
 import { cn } from "@/lib/utils"
 
+/* -------------------------------------------------------------------------------------------------
+ * Root
+ * -----------------------------------------------------------------------------------------------*/
+
 function Avatar({
   className,
   ...props
@@ -14,12 +18,19 @@ function Avatar({
       data-slot="avatar"
       className={cn(
         "relative flex size-8 shrink-0 overflow-hidden rounded-full",
+        "border border-border",
+        "bg-[linear-gradient(135deg,var(--primary)/12,transparent)]",
+        "shadow-sm",
         className
       )}
       {...props}
     />
   )
 }
+
+/* -------------------------------------------------------------------------------------------------
+ * Image
+ * -----------------------------------------------------------------------------------------------*/
 
 function AvatarImage({
   className,
@@ -28,11 +39,19 @@ function AvatarImage({
   return (
     <AvatarPrimitive.Image
       data-slot="avatar-image"
-      className={cn("aspect-square size-full", className)}
+      className={cn(
+        "aspect-square size-full object-cover",
+        "transition-opacity duration-200",
+        className
+      )}
       {...props}
     />
   )
 }
+
+/* -------------------------------------------------------------------------------------------------
+ * Fallback
+ * -----------------------------------------------------------------------------------------------*/
 
 function AvatarFallback({
   className,
@@ -42,7 +61,10 @@ function AvatarFallback({
     <AvatarPrimitive.Fallback
       data-slot="avatar-fallback"
       className={cn(
-        "bg-muted flex size-full items-center justify-center rounded-full",
+        "flex size-full items-center justify-center rounded-full",
+        "bg-[linear-gradient(135deg,var(--primary)/20,var(--primary)/5)]",
+        "text-primary font-medium text-xs",
+        "select-none",
         className
       )}
       {...props}
@@ -50,4 +72,8 @@ function AvatarFallback({
   )
 }
 
-export { Avatar, AvatarImage, AvatarFallback }
+export {
+  Avatar,
+  AvatarImage,
+  AvatarFallback,
+}

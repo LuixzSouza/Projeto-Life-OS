@@ -176,7 +176,7 @@ export function ChatInterface({
     };
 
     return (
-        <div className="flex flex-col h-full relative">
+        <div className="flex flex-col flex-1 relative">
             
             {/* MARCA D'ÁGUA COLORIDA (Baseada na IA atual) */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden">

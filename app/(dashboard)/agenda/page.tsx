@@ -83,12 +83,10 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
     const sortedGroupKeys = Object.keys(groupedEvents); 
 
     return (
-        <div className="min-h-screen bg-muted/30 p-6 md:p-10 animate-in fade-in duration-500">
-            <div className="max-w-7xl mx-auto space-y-8">
-                
-                {/* Cabeçalho */}
-                <AgendaHeader isSpecificDate={isSpecificDate} date={selectedDate} />
+        <div className="min-h-screen bg-background pb-24 animate-in fade-in duration-500">
+            <AgendaHeader isSpecificDate={isSpecificDate} date={selectedDate} />
 
+            <div className="px-6 md:px-8 py-8 space-y-10 max-w-[1600px] mx-auto" >
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                     
                     {/* --- SIDEBAR (Calendário e Infos) --- */}
@@ -131,9 +129,9 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
                                                     {format(nextUpEvent.startTime, 'HH:mm')}
                                                 </p>
                                                 {nextUpEvent.location && (
-                                                     <p className="text-xs text-muted-foreground flex items-center gap-1 truncate max-w-[120px]">
+                                                    <p className="text-xs text-muted-foreground flex items-center gap-1 truncate max-w-[120px]">
                                                         <MapPin className="h-3 w-3" /> {nextUpEvent.location}
-                                                     </p>
+                                                    </p>
                                                 )}
                                             </div>
                                         </div>

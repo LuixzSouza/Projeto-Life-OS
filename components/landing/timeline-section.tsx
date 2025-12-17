@@ -1,81 +1,109 @@
 // components/landing/timeline-section.tsx
 "use client";
 
-import { Sun, Coffee, Briefcase, Moon, PenTool } from "lucide-react";
+import { 
+  Sun, 
+  BrainCircuit, 
+  Wallet, 
+  Moon, 
+  CheckCircle2, 
+  LineChart 
+} from "lucide-react";
 import { motion } from "framer-motion";
 
-const TIMELINE = [
+// Tipagem para os itens da timeline
+interface TimelineItem {
+  time: string;
+  icon: React.ElementType;
+  color: string;
+  module: string;
+  title: string;
+  desc: string;
+}
+
+const TIMELINE: TimelineItem[] = [
   { 
-    time: "07:30", 
+    time: "07:00", 
     icon: Sun, 
-    title: "Input Matinal", 
-    desc: "Você acorda e registra rapidamente como foi sua noite. Baseado no seu input de energia, o sistema sugere a carga de tarefas ideal para hoje." 
+    color: "text-amber-400",
+    module: "HEALTH & DASHBOARD",
+    title: "Sincronização Biológica", 
+    desc: "O dia começa com o registro de sono e humor (HealthMetric). O sistema calcula sua 'Bateria Social' e ajusta a dificuldade das tarefas sugeridas no Dashboard." 
   },
   { 
-    time: "09:00", 
-    icon: Briefcase, 
-    title: "Gestão de Foco", 
-    desc: "No módulo de Projetos, você seleciona a prioridade do dia. O Timer Pomodoro é ativado para garantir 2 horas de trabalho sem interrupções." 
+    time: "09:30", 
+    icon: BrainCircuit, 
+    color: "text-indigo-400",
+    module: "PROJECTS & FOCUS",
+    title: "Deep Work Block", 
+    desc: "Hora de focar. Você seleciona uma Tarefa de Alta Prioridade vinculada a um Projeto Ativo. O Timer Pomodoro inicia e o status muda para 'Em Foco'." 
   },
   { 
-    time: "18:00", 
-    icon: Coffee, 
-    title: "Registro de Hábitos", 
-    desc: "Fim do expediente. Hora de marcar o 'check' nos hábitos (Leitura, Treino) e atualizar o status das tarefas no Kanban." 
+    time: "14:00", 
+    icon: Wallet, 
+    color: "text-emerald-400",
+    module: "FINANCE",
+    title: "Gestão de Ativos", 
+    desc: "Pausa para o almoço e atualização financeira. Registro rápido de despesas (Transaction) e verificação do saldo das contas e meta do Wishlist." 
   },
   { 
-    time: "22:00", 
+    time: "21:00", 
     icon: Moon, 
-    title: "Review Diário", 
-    desc: "Você lança os gastos do dia no Financeiro e escreve no Diário. O sistema compila tudo e gera seu gráfico de produtividade do dia." 
+    color: "text-purple-400",
+    module: "AI & JOURNAL",
+    title: "Fechamento Inteligente", 
+    desc: "A IA (AiChat) analisa tudo o que foi feito, gasto e monitorado. Ela gera um resumo no seu Diário e sugere a preparação para amanhã." 
   },
 ];
 
 export default function TimelineSection() {
   return (
-    <section className="py-32 px-6 border-t border-white/5 bg-[#09090b]">
-      <div className="max-w-4xl mx-auto">
+    <section id="routine" className="py-32 px-6 border-t border-white/5 bg-[#050505] relative overflow-hidden">
+      
+      {/* Background Decorativo */}
+      <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-indigo-900/5 to-transparent pointer-events-none" />
+
+      <div className="max-w-4xl mx-auto relative z-10">
         
-        <div className="text-center mb-16">
-          <h2 className="text-3xl font-bold text-white mb-4">Sua rotina, organizada.</h2>
-          <p className="text-zinc-400 max-w-lg mx-auto">
-            O Life OS não faz o trabalho por você, mas garante que você tenha clareza total sobre onde está investindo seu tempo e dinheiro.
-          </p>
+        {/* Cabeçalho da Seção */}
+        <div className="text-center mb-20 space-y-4">
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-800/50 border border-white/5 text-zinc-400 text-xs font-mono uppercase tracking-widest"
+          >
+            <LineChart className="h-3 w-3" /> Life OS Routine
+          </motion.div>
+          
+          <motion.h2 
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="text-3xl md:text-4xl font-bold text-white"
+          >
+            Um dia na vida do seu <span className="text-indigo-400">Sistema Operacional</span>
+          </motion.h2>
+          
+          <motion.p 
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="text-zinc-400 max-w-lg mx-auto text-lg leading-relaxed"
+          >
+            Da hora que acorda até ir dormir, cada interação alimenta seu banco de dados local, gerando inteligência real sobre sua vida.
+          </motion.p>
         </div>
 
         <div className="relative">
-          {/* Linha Vertical Conectora */}
-          <div className="absolute left-[27px] top-0 bottom-0 w-0.5 bg-gradient-to-b from-zinc-800 via-indigo-900/50 to-zinc-800" />
+          {/* Linha Vertical Conectora (Trilha) */}
+          <div className="absolute left-[27px] top-4 bottom-4 w-[2px] bg-zinc-800 rounded-full">
+             {/* Efeito de preenchimento ao rolar (Opcional, mas dá um toque premium) */}
+             <div className="absolute top-0 w-full h-full bg-gradient-to-b from-indigo-500/50 via-purple-500/20 to-zinc-800 opacity-30" />
+          </div>
 
-          <div className="space-y-16">
+          <div className="space-y-12">
             {TIMELINE.map((item, i) => (
-              <motion.div 
-                key={i}
-                initial={{ opacity: 0, x: -20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ margin: "-100px" }}
-                transition={{ duration: 0.5, delay: i * 0.1 }}
-                className="relative flex gap-8 group"
-              >
-                {/* Ícone na Linha (Timeline Marker) */}
-                <div className="relative z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-zinc-900 border border-zinc-800 shadow-xl transition-colors duration-500 group-hover:border-indigo-500/50 group-hover:bg-zinc-800">
-                  <div className="absolute inset-0 bg-indigo-500/10 rounded-full blur-md opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                  <item.icon className="h-6 w-6 text-zinc-400 group-hover:text-indigo-400 transition-colors duration-300" />
-                </div>
-
-                {/* Conteúdo */}
-                <div className="pt-1">
-                  <span className="text-xs font-mono text-indigo-500 font-bold tracking-widest uppercase mb-1 block">
-                    {item.time}
-                  </span>
-                  <h3 className="text-xl font-bold text-white mb-3 group-hover:text-indigo-200 transition-colors">
-                    {item.title}
-                  </h3>
-                  <p className="text-zinc-400 leading-relaxed max-w-lg text-sm border-l-2 border-zinc-800 pl-4 group-hover:border-zinc-700 transition-colors">
-                    {item.desc}
-                  </p>
-                </div>
-              </motion.div>
+              <TimelineCard key={i} item={item} index={i} />
             ))}
           </div>
         </div>
@@ -83,4 +111,48 @@ export default function TimelineSection() {
       </div>
     </section>
   );
+}
+
+// Componente Extraído para Limpeza e Tipagem
+function TimelineCard({ item, index }: { item: TimelineItem; index: number }) {
+    return (
+        <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ margin: "-50px" }}
+            transition={{ duration: 0.5, delay: index * 0.1 }}
+            className="relative flex gap-8 group"
+        >
+            {/* Ícone / Marcador na Timeline */}
+            <div className="relative z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#09090b] border border-zinc-800 shadow-lg transition-all duration-300 group-hover:border-zinc-700 group-hover:scale-110 group-hover:shadow-[0_0_20px_-5px_rgba(99,102,241,0.3)]">
+                <div className={`absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-10 transition-opacity duration-300 ${item.color.replace('text-', 'bg-')}`} />
+                <item.icon className={`h-6 w-6 transition-colors duration-300 ${item.color} opacity-80 group-hover:opacity-100`} />
+            </div>
+
+            {/* Card de Conteúdo */}
+            <div className="flex-1 pt-1.5">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-2">
+                    {/* Hora */}
+                    <span className="text-sm font-mono text-white/90 font-bold bg-zinc-800/50 px-2 py-0.5 rounded border border-white/5">
+                        {item.time}
+                    </span>
+                    
+                    {/* Badge do Módulo */}
+                    <span className="text-[10px] uppercase tracking-widest font-bold text-zinc-500 flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3" /> {item.module}
+                    </span>
+                </div>
+
+                {/* Card visual */}
+                <div className="p-5 rounded-xl border border-white/5 bg-zinc-900/20 hover:bg-zinc-900/40 transition-colors group-hover:border-white/10">
+                    <h3 className="text-xl font-bold text-white mb-2 group-hover:text-indigo-100 transition-colors">
+                        {item.title}
+                    </h3>
+                    <p className="text-zinc-400 text-sm leading-relaxed">
+                        {item.desc}
+                    </p>
+                </div>
+            </div>
+        </motion.div>
+    )
 }

@@ -4,26 +4,71 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
+/* -------------------------------------------------------------------------------------------------
+ * Variants
+ * -----------------------------------------------------------------------------------------------*/
+
 const badgeVariants = cva(
-  "inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden",
+  [
+    "inline-flex items-center justify-center gap-1",
+    "w-fit shrink-0 whitespace-nowrap rounded-full",
+    "px-2 py-0.5 text-xs font-medium",
+    "border transition-[color,background-color,box-shadow]",
+    "overflow-hidden",
+    "[&>svg]:size-3 [&>svg]:pointer-events-none",
+    "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+    "aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40",
+  ].join(" "),
   {
     variants: {
       variant: {
-        default:
-          "border-transparent bg-primary text-primary-foreground [a&]:hover:bg-primary/90",
+        primary:
+          [
+            "border-transparent",
+            "bg-[linear-gradient(135deg,var(--primary),var(--primary)/70)]",
+            "text-primary-foreground",
+            "shadow-sm",
+            "[a&]:hover:opacity-90",
+          ].join(" "),
+
         secondary:
-          "border-transparent bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90",
+          [
+            "border-transparent",
+            "bg-secondary",
+            "text-secondary-foreground",
+            "[a&]:hover:bg-secondary/90",
+          ].join(" "),
+
         destructive:
-          "border-transparent bg-destructive text-white [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
+          [
+            "border-transparent",
+            "bg-destructive",
+            "text-white",
+            "shadow-sm",
+            "[a&]:hover:bg-destructive/90",
+            "focus-visible:ring-destructive/30",
+            "dark:bg-destructive/60",
+          ].join(" "),
+
         outline:
-          "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
+          [
+            "border-border",
+            "text-foreground",
+            "bg-transparent",
+            "[a&]:hover:bg-accent",
+            "[a&]:hover:text-accent-foreground",
+          ].join(" "),
       },
     },
     defaultVariants: {
-      variant: "default",
+      variant: "primary",
     },
   }
 )
+
+/* -------------------------------------------------------------------------------------------------
+ * Component
+ * -----------------------------------------------------------------------------------------------*/
 
 function Badge({
   className,
@@ -31,7 +76,9 @@ function Badge({
   asChild = false,
   ...props
 }: React.ComponentProps<"span"> &
-  VariantProps<typeof badgeVariants> & { asChild?: boolean }) {
+  VariantProps<typeof badgeVariants> & {
+    asChild?: boolean
+  }) {
   const Comp = asChild ? Slot : "span"
 
   return (
@@ -43,4 +90,7 @@ function Badge({
   )
 }
 
-export { Badge, badgeVariants }
+export {
+  Badge,
+  badgeVariants,
+}

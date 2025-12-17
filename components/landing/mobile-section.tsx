@@ -446,7 +446,7 @@ export function SetupGuide() {
   };
 
   return (
-    <section className="py-24 md:py-32 px-4 sm:px-6 bg-[#050505] border-t border-white/5 relative overflow-hidden">
+    <section id="config" className="py-24 md:py-32 px-4 sm:px-6 bg-[#050505] border-t border-white/5 relative overflow-hidden">
       
       {/* Background: Grid Tático com gradiente */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:60px_60px] opacity-10 pointer-events-none" />

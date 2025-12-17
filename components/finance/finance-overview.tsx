@@ -92,138 +92,202 @@ export function FinanceOverview({
     if (!isMounted) return <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-[220px] animate-pulse bg-muted/10 rounded-xl" />;
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            
-            {/* --- CARD 1: PATRIMÔNIO --- */}
-            <Card className="md:col-span-1 bg-zinc-900 text-white border-zinc-800 shadow-2xl relative overflow-hidden group">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-primary/20 transition-all duration-1000"></div>
+        <div className="px-6 md:px-8 py-8 space-y-10 max-w-[1600px] mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+            {/* ---------------------------------------------------------------- */}
+            {/* CARD 1 — PATRIMÔNIO                                              */}
+            {/* ---------------------------------------------------------------- */}
+            <Card className="relative overflow-hidden group rounded-xl border-border bg-card shadow-sm transition-all hover:shadow-lg">
                 
-                <CardContent className="p-6 h-full flex flex-col justify-between relative z-10">
-                    <div className="flex justify-between items-start">
-                        <div className="p-2.5 bg-white/5 rounded-xl backdrop-blur-md border border-white/10 shadow-inner">
-                            <Wallet className="h-5 w-5 text-zinc-100" />
-                        </div>
-                        <div className="flex flex-col items-end">
-                            <span className="flex h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_10px_#10b981]"></span>
-                        </div>
+                {/* Glow / Background */}
+                <div className="pointer-events-none absolute inset-0">
+                <div className="absolute -top-24 -right-24 h-64 w-64 rounded-full bg-primary/20 blur-3xl opacity-60 transition-opacity duration-700 group-hover:opacity-90" />
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/[0.08] via-transparent to-transparent" />
+                </div>
+
+                <CardContent className="relative z-10 p-6 h-full flex flex-col justify-between">
+                
+                {/* Header */}
+                <div className="flex justify-between items-start">
+                    <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/20 shadow-inner backdrop-blur-sm">
+                    <Wallet className="h-5 w-5 text-primary" />
                     </div>
 
-                    <div className="space-y-1 mt-6">
-                        <p className="text-zinc-400 text-[10px] font-bold uppercase tracking-widest">Patrimônio Líquido</p>
-                        <h2 className="text-3xl font-mono font-bold tracking-tight truncate text-white drop-shadow-md">
-                            {formatMoney(totalBalance)}
-                        </h2>
-                    </div>
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.6)]" />
+                </div>
+
+                {/* Conteúdo */}
+                <div className="space-y-1 mt-6">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                    Patrimônio Líquido
+                    </p>
+
+                    <h2 className="text-3xl font-mono font-bold tracking-tight truncate text-foreground">
+                    {formatMoney(totalBalance)}
+                    </h2>
+                </div>
+
                 </CardContent>
             </Card>
 
-            {/* --- CARD 2: FLUXO & CONFIGURAÇÃO --- */}
-            <Card className="bg-card border-border shadow-sm">
+            {/* ---------------------------------------------------------------- */}
+            {/* CARD 2 — FLUXO MENSAL                                            */}
+            {/* ---------------------------------------------------------------- */}
+            <Card className="rounded-xl border-border bg-card shadow-sm transition-all hover:shadow-lg">
                 <CardContent className="p-6 h-full flex flex-col justify-between">
-                    <div className="flex justify-between items-center mb-2">
-                        <h3 className="font-semibold text-sm text-muted-foreground flex items-center gap-2">
-                            <TrendingUp className="h-4 w-4" /> Fluxo Mensal
-                        </h3>
-                        {hasSalary && committedPercent > 60 && (
-                            <span className="px-2 py-0.5 bg-red-500/10 text-red-600 text-[10px] font-bold rounded-full flex items-center gap-1 border border-red-500/20">
-                                <AlertTriangle className="h-3 w-3" /> Comprometido
-                            </span>
-                        )}
+                
+                {/* Header */}
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+                    <TrendingUp className="h-4 w-4" />
+                    Fluxo Mensal
+                    </h3>
+
+                    {hasSalary && committedPercent > 60 && (
+                    <span className="flex items-center gap-1 rounded-full border border-red-500/20 bg-red-500/10 px-2 py-0.5 text-[10px] font-bold text-red-600 dark:text-red-400">
+                        <AlertTriangle className="h-3 w-3" />
+                        Comprometido
+                    </span>
+                    )}
+                </div>
+
+                <div className="space-y-4">
+
+                    {/* Renda Bruta */}
+                    <div className="flex justify-between items-center text-sm">
+                    <span className="text-xs text-muted-foreground">Renda Bruta</span>
+
+                    {isEditing ? (
+                        <div className="flex items-center gap-1 animate-in fade-in slide-in-from-right-2">
+                        <Input
+                            autoFocus
+                            type="text"
+                            value={tempSalary}
+                            onChange={(e) => setTempSalary(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && handleSaveSalary()}
+                            className="h-7 w-24 px-2 py-0 text-right text-xs font-mono bg-background border-input"
+                            placeholder="0.00"
+                        />
+                        <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-emerald-500 hover:bg-emerald-500/10"
+                            onClick={handleSaveSalary}
+                            disabled={isPending}
+                        >
+                            {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                        </Button>
+                        <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-red-500 hover:bg-red-500/10"
+                            onClick={() => setIsEditing(false)}
+                        >
+                            <X className="h-3.5 w-3.5" />
+                        </Button>
+                        </div>
+                    ) : (
+                        <div
+                        className="group flex items-center gap-2 cursor-pointer"
+                        onClick={() => setIsEditing(true)}
+                        >
+                        <span className="font-bold text-foreground border-b border-dashed border-transparent group-hover:border-muted-foreground/50">
+                            {formatMoney(grossSalary || 0)}
+                        </span>
+                        <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                    )}
                     </div>
 
-                    <div className="space-y-4">
-                        {/* Linha da Renda (Editável) */}
-                        <div className="flex justify-between items-center text-sm">
-                            <span className="text-muted-foreground text-xs">Renda Bruta</span>
-                            
-                            {isEditing ? (
-                                <div className="flex items-center gap-1 animate-in fade-in slide-in-from-right-2">
-                                    <Input 
-                                        autoFocus
-                                        type="text" 
-                                        value={tempSalary} 
-                                        onChange={(e) => setTempSalary(e.target.value)}
-                                        onKeyDown={(e) => e.key === "Enter" && handleSaveSalary()}
-                                        className="h-7 w-24 text-right px-2 py-0 text-xs font-mono bg-background border-input"
-                                        placeholder="0.00"
-                                    />
-                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-emerald-500 hover:bg-emerald-500/10" onClick={handleSaveSalary} disabled={isPending}>
-                                        {isPending ? <Loader2 className="h-3 w-3 animate-spin"/> : <Check className="h-3.5 w-3.5" />}
-                                    </Button>
-                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500 hover:bg-red-500/10" onClick={() => setIsEditing(false)}>
-                                        <X className="h-3.5 w-3.5" />
-                                    </Button>
-                                </div>
-                            ) : (
-                                <div className="flex items-center gap-2 group cursor-pointer" onClick={() => setIsEditing(true)}>
-                                    <span className="font-bold text-foreground border-b border-dashed border-transparent group-hover:border-muted-foreground/50 transition-colors">
-                                        {formatMoney(grossSalary || 0)}
-                                    </span>
-                                    <Pencil className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Linha dos Gastos Fixos */}
-                        <div className="flex justify-between items-center text-sm">
-                            <span className="text-muted-foreground text-xs">Custos Fixos</span>
-                            <span className="font-bold text-red-600 dark:text-red-400">-{formatMoney(totalRecurring)}</span>
-                        </div>
-
-                        {/* Barra de Progresso */}
-                        <div className="space-y-2 pt-1">
-                            <div className="flex justify-between text-[10px] font-medium text-muted-foreground">
-                                <span>Comprometido: {Math.round(committedPercent)}%</span>
-                                <span>Status: <span className={health.text}>{health.label}</span></span>
-                            </div>
-                            <Progress 
-                                value={committedPercent} 
-                                className="h-2 bg-secondary" 
-                                indicatorClassName={health.color} 
-                            />
-                        </div>
+                    {/* Custos Fixos */}
+                    <div className="flex justify-between items-center text-sm">
+                    <span className="text-xs text-muted-foreground">Custos Fixos</span>
+                    <span className="font-bold text-red-600 dark:text-red-400">
+                        -{formatMoney(totalRecurring)}
+                    </span>
                     </div>
+
+                    {/* Progresso */}
+                    <div className="space-y-2 pt-1">
+                    <div className="flex justify-between text-[10px] font-medium text-muted-foreground">
+                        <span>Comprometido: {Math.round(committedPercent)}%</span>
+                        <span>
+                        Status: <span className={health.text}>{health.label}</span>
+                        </span>
+                    </div>
+
+                    <Progress
+                        value={committedPercent}
+                        className="h-2 bg-secondary"
+                        indicatorClassName={health.color}
+                    />
+                    </div>
+
+                </div>
                 </CardContent>
             </Card>
 
-            {/* --- CARD 3: LIVRE PARA GASTAR --- */}
-            <Card className={cn(
-                "bg-card border-border shadow-sm relative overflow-hidden transition-colors",
+            {/* ---------------------------------------------------------------- */}
+            {/* CARD 3 — LIVRE PARA GASTAR                                       */}
+            {/* ---------------------------------------------------------------- */}
+            <Card
+                className={cn(
+                "relative overflow-hidden rounded-xl border-border bg-card shadow-sm transition-all hover:shadow-lg",
                 !hasSalary && "opacity-60 grayscale"
-            )}>
-                {/* Faixa de cor no topo */}
-                <div className={cn("absolute top-0 left-0 w-full h-1", health.color)} />
-                
+                )}
+            >
+                {/* Indicador de status */}
+                <div className={cn("absolute top-0 left-0 h-1 w-full", health.color)} />
+
                 <CardContent className="p-6 h-full flex flex-col justify-between">
-                    <div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <div className={cn("p-1.5 rounded-md", hasSalary ? "bg-emerald-500/10 text-emerald-600" : "bg-zinc-100 text-zinc-500")}>
-                                <PiggyBank className="h-4 w-4" />
-                            </div>
-                            <span className={cn("text-sm font-bold uppercase tracking-wide", hasSalary ? "text-emerald-600" : "text-muted-foreground")}>
-                                Livre para Gastar
-                            </span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-                            {hasSalary 
-                                ? "O que sobra do seu salário líquido após pagar todas as contas fixas." 
-                                : "Defina sua renda bruta ao lado para calcular seu potencial de gastos."}
-                        </p>
+
+                <div>
+                    <div className="flex items-center gap-2 mb-1">
+                    <div
+                        className={cn(
+                        "p-1.5 rounded-md",
+                        hasSalary
+                            ? "bg-emerald-500/10 text-emerald-600"
+                            : "bg-muted text-muted-foreground"
+                        )}
+                    >
+                        <PiggyBank className="h-4 w-4" />
                     </div>
 
-                    <div className="mt-4">
-                        <h3 className="text-3xl font-bold text-foreground tracking-tight">
-                            {formatMoney(freeToSpend)}
-                        </h3>
-                        {hasSalary && (
-                            <p className="text-[10px] text-muted-foreground mt-1 uppercase font-semibold tracking-wider">
-                                Renda Líquida Estimada: {formatMoney(netSalary)}
-                            </p>
+                    <span
+                        className={cn(
+                        "text-sm font-bold uppercase tracking-wide",
+                        hasSalary ? "text-emerald-600" : "text-muted-foreground"
                         )}
+                    >
+                        Livre para Gastar
+                    </span>
                     </div>
+
+                    <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                    {hasSalary
+                        ? "O que sobra do seu salário líquido após pagar todas as contas fixas."
+                        : "Defina sua renda bruta ao lado para calcular seu potencial de gastos."}
+                    </p>
+                </div>
+
+                <div className="mt-4">
+                    <h3 className="text-3xl font-bold tracking-tight text-foreground">
+                    {formatMoney(freeToSpend)}
+                    </h3>
+
+                    {hasSalary && (
+                    <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Renda Líquida Estimada: {formatMoney(netSalary)}
+                    </p>
+                    )}
+                </div>
+
                 </CardContent>
             </Card>
 
+            </div>
         </div>
     );
 }

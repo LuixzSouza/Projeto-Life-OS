@@ -42,7 +42,7 @@ const FeatureCard = ({ icon: Icon, title, desc, color, delay }: FeatureProps) =>
 
 export default function TechnicalSection() {
     return (
-        <section className="py-32 px-6 bg-[#09090b] border-t border-white/5 relative overflow-hidden">
+        <section id="privacy" className="py-32 px-6 bg-[#09090b] border-t border-white/5 relative overflow-hidden">
             
             {/* Background Effects */}
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-[500px] bg-emerald-500/5 blur-[120px] rounded-full pointer-events-none" />

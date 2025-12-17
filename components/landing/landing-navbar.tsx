@@ -24,6 +24,9 @@ export default function LandingNavbar({ authState }: NavbarProps) {
         { label: "Módulos", href: "#modules" },
         { label: "Inteligência", href: "#ai" },
         { label: "Privacidade", href: "#privacy" },
+        { label: "Rotina", href: "#routiny" },
+        { label: "Configurando", href: "#config" },
+        { label: "Dúvidas", href: "#faq" },
     ];
 
     // Lógica do Botão Principal (CTA)
