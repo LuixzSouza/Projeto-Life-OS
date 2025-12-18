@@ -125,7 +125,7 @@ export async function deleteWorkout(id: string): Promise<ActionResponse> {
 
 
 // =========================================================
-// 2. GERENCIAMENTO DE MÉTRICAS (METRICS)
+// 2. GERENCIAMENTO DE MÉTRICAS (METRICS - LEGADO/GENÉRICO)
 // =========================================================
 
 export async function logMetric(formData: FormData): Promise<ActionResponse> {
@@ -139,10 +139,6 @@ export async function logMetric(formData: FormData): Promise<ActionResponse> {
 
     const value = parseFloat(valueRaw.toString());
 
-    // Opcional: Se for peso ou altura, verificar se já existe registro HOJE e atualizar
-    // para não poluir o banco com 50 registros no mesmo dia.
-    // Mas para histórico detalhado, criar sempre um novo é ok.
-    
     await prisma.healthMetric.create({
       data: { 
         type, 
@@ -249,5 +245,75 @@ export async function deleteMeal(id: string): Promise<ActionResponse> {
     return { success: true, message: "Refeição removida." };
   } catch (error) {
     return { success: false, message: "Erro ao deletar refeição." };
+  }
+}
+
+// =========================================================
+// 4. MEDIDAS CORPORAIS COMPLETAS (SNAPSHOT)
+// =========================================================
+
+// app/(dashboard)/health/actions.ts
+
+export async function saveBodyMeasurements(formData: FormData): Promise<ActionResponse> {
+  try {
+    const getFloat = (key: string) => {
+      const val = formData.get(key);
+      return val && val.toString().trim() !== "" ? parseFloat(val.toString()) : null;
+    };
+
+    // Dados Obrigatórios
+    const weight = getFloat("weight");
+    const height = getFloat("height");
+    const gender = formData.get("gender") as string;
+    const activity = getFloat("activityFactor") || 1.2;
+    
+    // --- NOVO: Captura a data de nascimento ---
+    const birthDateString = formData.get("birthDate") as string;
+    // Converte string "YYYY-MM-DD" para objeto Date do Javascript
+    const birthDate = birthDateString ? new Date(birthDateString) : null;
+
+    if (!weight || !height) {
+      return { success: false, message: "Peso e Altura são obrigatórios." };
+    }
+
+    // Criar o registro completo
+    await prisma.bodyMeasurement.create({
+      data: {
+        weight,
+        height,
+        gender: gender || "MALE",
+        activity,
+        birthDate, // <--- Salvando no banco!
+        
+        // Medidas
+        neck: getFloat("neck"),
+        waist: getFloat("waist"),
+        hip: getFloat("hip"),
+        shoulders: getFloat("shoulders"),
+        chest: getFloat("chest"),
+        armLeft: getFloat("armLeft"),
+        armRight: getFloat("armRight"),
+        forearmLeft: getFloat("forearmLeft"),
+        forearmRight: getFloat("forearmRight"),
+        thighLeft: getFloat("thighLeft"),
+        thighRight: getFloat("thighRight"),
+        calfLeft: getFloat("calfLeft"),
+        calfRight: getFloat("calfRight"),
+        
+        // userId: session.user.id (Se tiver auth)
+      }
+    });
+
+    // Backup para gráficos simples
+    await prisma.healthMetric.create({
+      data: { type: "WEIGHT", value: weight, date: new Date() }
+    });
+
+    revalidatePath("/health");
+    return { success: true, message: "Medidas salvas com sucesso!" };
+
+  } catch (error) {
+    console.error("Erro ao salvar medidas:", error);
+    return { success: false, message: "Erro ao salvar no banco de dados." };
   }
 }

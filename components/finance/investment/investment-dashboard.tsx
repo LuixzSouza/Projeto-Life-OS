@@ -34,19 +34,6 @@ export function InvestmentDashboard({ initialMarketData }: InvestmentDashboardPr
 
     return (
         <div className="space-y-10 pb-24 animate-in fade-in duration-700">
-            
-            {/* HEADER & HERO SECTION */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-border/40 pb-6">
-                <div>
-                    <h2 className="text-3xl font-black tracking-tight flex items-center gap-3 text-foreground">
-                        <Sparkles className="h-8 w-8 text-primary fill-primary/20" />
-                        Simulador de Riqueza
-                    </h2>
-                    <p className="text-muted-foreground mt-2 text-lg max-w-2xl leading-relaxed">
-                        Utilize os indicadores atuais do mercado (Selic <strong>{selicRate}%</strong>, IPCA <strong>{ipcaRate}%</strong>) para projetar seu futuro financeiro com precisão.
-                    </p>
-                </div>
-            </div>
 
             {/* KPI CARDS (Strategic Summary) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

@@ -58,6 +58,9 @@ function SimpleMetric({ label, value, icon: Icon, unit, description }: SimpleMet
     )
 }
 
+// Impede cache estático para garantir dados frescos
+export const dynamic = 'force-dynamic';
+
 export default async function HealthPage() {
   try {
       // 1. Definição de datas
@@ -65,10 +68,20 @@ export default async function HealthPage() {
       today.setHours(0,0,0,0);
 
       // 2. Buscas Paralelas Otimizadas
-      const [workouts, lastWeight, lastHeight, waterMetrics, lastSleep, meals] = await Promise.all([
+      const [
+        workouts, 
+        lastBodySnapshot, // Busca o registro completo mais recente
+        lastWeightLegacy, // Fallback para peso antigo
+        waterMetrics, 
+        lastSleep, 
+        meals
+      ] = await Promise.all([
         prisma.workout.findMany({ orderBy: { date: 'desc' }, take: 10 }),
+        // Busca principal de medidas
+        prisma.bodyMeasurement.findFirst({ orderBy: { date: 'desc' } }),
+        // Busca legado (caso não tenha snapshot novo ainda)
         prisma.healthMetric.findFirst({ where: { type: "WEIGHT" }, orderBy: { date: 'desc' } }),
-        prisma.healthMetric.findFirst({ where: { type: "HEIGHT" }, orderBy: { date: 'desc' } }),
+        
         prisma.healthMetric.findMany({ 
             where: { type: "WATER", date: { gte: today } } 
         }),
@@ -79,9 +92,21 @@ export default async function HealthPage() {
         })
       ]);
 
-      // 3. Processamento de Dados
-      const weight = lastWeight?.value || 0;
-      const height = lastHeight?.value || 0;
+      // 3. Processamento Inteligente de Dados
+      // Prioriza o snapshot novo, mas usa o legado se necessário
+      const weight = lastBodySnapshot?.weight || lastWeightLegacy?.value || 0;
+      const height = lastBodySnapshot?.height || 0;
+      
+      // Dados extras para passar ao card de resumo (para não perder contexto ao editar)
+      const gender = (lastBodySnapshot?.gender as "MALE" | "FEMALE") || 'MALE';
+      const age = 25; // TODO: Pegar do user profile
+      const activityFactor = lastBodySnapshot?.activity || 1.2;
+      
+      // Medidas para preservar no card de edição rápida
+      const waist = lastBodySnapshot?.waist || 0;
+      const neck = lastBodySnapshot?.neck || 0;
+      const hip = lastBodySnapshot?.hip || 0;
+
       const waterTotal = waterMetrics.reduce((acc, item) => acc + item.value, 0);
 
       return (
@@ -120,10 +145,22 @@ export default async function HealthPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     <div className="lg:col-span-2 h-full">
-                         <BodySummaryCard weight={weight} height={height} />
+                         {/* Card Inteligente com dados preservados */}
+                         <BodySummaryCard 
+                            weight={weight} 
+                            height={height} 
+                            gender={gender as "MALE" | "FEMALE" | undefined}
+                            age={age}
+                            // Passamos dados ocultos para manter histórico
+                            waist={waist}
+                            neck={neck}
+                            hip={hip}
+                            activityFactor={activityFactor}
+                         />
                     </div>
                     <div className="flex flex-col gap-6">
-                        <CaloriesCard weight={weight} height={height} />
+                        {/* Agora o cartão de calorias usa os dados corretos de TDEE/BMR se disponíveis no body-math */}
+                        <CaloriesCard weight={weight} height={height} age={age} gender={gender} />
                         <HydrationCard total={waterTotal} />
                     </div>
                     <div className="flex flex-col gap-6">
@@ -132,14 +169,14 @@ export default async function HealthPage() {
                             value={weight} 
                             unit="kg" 
                             icon={Scale} 
-                            description="Último registro"
+                            description="Último registro consolidado"
                         />
                         <SimpleMetric 
                             label="Atividades" 
                             value={workouts.length} 
                             unit="total" 
                             icon={TrendingUp} 
-                            description="Histórico completo"
+                            description="Histórico recente"
                         />
                     </div>
                 </div>
@@ -156,7 +193,6 @@ export default async function HealthPage() {
                     </div>
                     <SleepCard value={lastSleep?.value || 0} />
                     
-                    {/* Exemplo de card de dicas ou stats adicionais para preencher espaço */}
                     <Card className="bg-primary/5 border-primary/10 border shadow-none">
                         <CardContent className="p-4 flex gap-4 items-center">
                             <Zap className="h-8 w-8 text-primary" />
@@ -224,9 +260,12 @@ export default async function HealthPage() {
                     Não foi possível carregar seus dados de saúde no momento. Por favor, tente novamente mais tarde.
                 </p>
             </div>
-            <Button variant="outline" onClick={() => window.location.reload()}>
-                Recarregar Página
-            </Button>
+            {/* Botão de recarregar via link para forçar re-render do servidor */}
+            <Link href="/health">
+                <Button variant="outline">
+                    Recarregar Página
+                </Button>
+            </Link>
           </div>
       );
   }

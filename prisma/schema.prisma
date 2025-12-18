@@ -32,6 +32,7 @@ model User {
   wardrobe        WardrobeItem[] 
   stats           UserStats?
   settings        Settings?
+  bodyMeasurements BodyMeasurement[]
 }
 
 model UserStats {
@@ -257,6 +258,43 @@ model HealthMetric {
   type  String
   value Float
   date  DateTime @default(now())
+}
+
+model BodyMeasurement {
+  id        String   @id @default(uuid())
+  date      DateTime @default(now())
+
+  // Dados Básicos
+  weight    Float
+  height    Float
+  gender    String   
+  activity  Float    @default(1.2) // Adicionar valor padrão 
+  birthDate DateTime?
+
+  // Circunferências
+  neck      Float?
+  waist     Float?
+  hip       Float?
+  
+  // Superiores
+  shoulders Float?
+  chest     Float?
+  armLeft   Float?
+  armRight  Float?
+  forearmLeft  Float?
+  forearmRight Float?
+
+  // Inferiores
+  thighLeft    Float?
+  thighRight   Float?
+  calfLeft     Float?
+  calfRight    Float?
+
+  // Relacionamento
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade) // Adicionei Cascade para limpar se o usuário for deletado
+
+  @@index([date])
 }
 
 // --- MÓDULO NUTRIÇÃO ---

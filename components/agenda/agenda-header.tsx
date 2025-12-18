@@ -137,7 +137,7 @@ export function AgendaHeader({ isSpecificDate, date }: AgendaHeaderProps) {
                  Voltar para Hoje
                </Button>
              </Link>
-          )}
+          )} 
 
           {/* Separador */}
           <div className="h-6 w-px bg-border/60 hidden md:block" />
