@@ -54,7 +54,7 @@ export function AgendaHeader({ isSpecificDate, date }: AgendaHeaderProps) {
 
   return (
     // ESTILO RESTAURADO CONFORME SOLICITADO + Sticky para UX
-    <header className="sticky top-0 z-30 flex flex-col gap-6 border-b border-border/60 bg-gradient-to-b from-primary/5 to-background pt-10 pb-8 px-6 md:px-8 backdrop-blur-sm">
+    <header className="relative z-30 flex flex-col gap-6 border-b border-border/60 bg-gradient-to-b from-primary/5 to-background pt-10 pb-8 px-6 md:px-8 backdrop-blur-sm">
       
       {/* 1. Linha Superior: Título, Saudação e Botão de Ação */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">

@@ -21,6 +21,7 @@ import {
   Hash,
   Save,
   Loader2,
+  FolderTree,
 } from "lucide-react";
 
 import { toast } from "sonner";
@@ -34,22 +35,24 @@ import {
 } from "@/components/ui/select";
 
 /* -------------------------------------------------------------------------- */
-/*                                    TYPES                                   */
+/* TYPES                                                                      */
 /* -------------------------------------------------------------------------- */
 
 interface Subject {
   id: string;
   title: string;
-  category: string;
+  category: string | null;
   difficulty: number;
   goalMinutes: number;
   icon?: string | null;
+  parentId?: string | null;
 }
 
 interface SubjectFormDialogProps {
   open: boolean;
   onClose: () => void;
   currentSubject?: Subject | null;
+  potentialParents?: Subject[]; 
 }
 
 interface ActionResult {
@@ -58,7 +61,7 @@ interface ActionResult {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                 CONSTANTS                                  */
+/* CONSTANTS                                                                  */
 /* -------------------------------------------------------------------------- */
 
 const DIFFICULTY_OPTIONS = [
@@ -73,13 +76,14 @@ const minutesToHours = (minutes: number) => minutes / 60;
 const hoursToMinutes = (hours: number) => Math.round(hours * 60);
 
 /* -------------------------------------------------------------------------- */
-/*                                COMPONENT                                   */
+/* COMPONENT                                                                  */
 /* -------------------------------------------------------------------------- */
 
 export function SubjectFormDialog({
   open,
   onClose,
   currentSubject,
+  potentialParents = [], 
 }: SubjectFormDialogProps) {
   const isEditing = Boolean(currentSubject);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -89,12 +93,13 @@ export function SubjectFormDialog({
   const [category, setCategory] = useState("");
   const [difficulty, setDifficulty] = useState("3");
   const [icon, setIcon] = useState("");
+  const [parentId, setParentId] = useState<string>("root"); 
 
   const [goalMinutes, setGoalMinutes] = useState("3600");
   const [goalHours, setGoalHours] = useState(60);
 
   /* ------------------------------------------------------------------------ */
-  /*                    SYNC PROPS → STATE (EDIT FIX)                          */
+  /* SYNC PROPS → STATE                                                       */
   /* ------------------------------------------------------------------------ */
 
   useEffect(() => {
@@ -102,33 +107,37 @@ export function SubjectFormDialog({
 
     if (currentSubject) {
       setTitle(currentSubject.title);
-      setCategory(currentSubject.category);
+      setCategory(currentSubject.category || "");
       setDifficulty(String(currentSubject.difficulty));
       setGoalMinutes(String(currentSubject.goalMinutes));
       setGoalHours(minutesToHours(currentSubject.goalMinutes));
       setIcon(currentSubject.icon ?? "");
+      setParentId(currentSubject.parentId ?? "root");
     } else {
+      // Reset para criação
       setTitle("");
       setCategory("");
       setDifficulty("3");
       setGoalMinutes("3600");
       setGoalHours(60);
       setIcon("");
+      setParentId("root");
     }
   }, [open, currentSubject]);
 
   /* ------------------------------------------------------------------------ */
-  /*                                HANDLERS                                  */
+  /* HANDLERS                                                                 */
   /* ------------------------------------------------------------------------ */
 
-  const handleGoalHoursChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const hours = Number(e.target.value) || 0;
-    const clamped = Math.min(Math.max(hours, 1), 1000);
+  const handleGoalHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const hours = Number(e.target.value); // Removemos o || 0 para permitir digitar e apagar
+    const validHours = isNaN(hours) ? 0 : hours;
+    
+    // Permitir até 10000 horas
+    const clamped = Math.min(Math.max(validHours, 0), 10000); 
 
     setGoalHours(clamped);
-    setGoalMinutes(String(hoursToMinutes(clamped)));
+    if (clamped > 0) setGoalMinutes(String(hoursToMinutes(clamped)));
   };
 
   const handleSubmit = useCallback(
@@ -138,23 +147,34 @@ export function SubjectFormDialog({
 
       const parsedGoalMinutes = Number(goalMinutes);
 
-      if (
-        !title.trim() ||
-        !category.trim() ||
-        Number.isNaN(parsedGoalMinutes) ||
-        parsedGoalMinutes <= 0
-      ) {
-        toast.error("Preencha corretamente todos os campos.");
+      // Validação básica
+      if (!title.trim()) {
+        toast.error("O nome do assunto é obrigatório.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (Number.isNaN(parsedGoalMinutes) || parsedGoalMinutes <= 0) {
+        toast.error("Defina uma meta de horas maior que zero.");
         setIsSubmitting(false);
         return;
       }
 
       const formData = new FormData();
-      formData.set("title", title);
-      formData.set("category", category);
+      formData.set("title", title.trim());
+      formData.set("category", category.trim()); 
       formData.set("difficulty", difficulty);
-      formData.set("goalMinutes", goalMinutes);
-      formData.set("icon", icon);
+      formData.set("goalMinutes", String(parsedGoalMinutes));
+      formData.set("icon", icon.trim());
+      
+      // ✅ CORREÇÃO CRÍTICA:
+      // O Zod schema aceita UUID ou string vazia "". 
+      // Se não enviarmos nada, o formData retorna null, que o Zod rejeita.
+      if (parentId && parentId !== "root") {
+        formData.set("parentId", parentId);
+      } else {
+        formData.set("parentId", ""); // Envia string vazia para indicar "sem pai"
+      }
 
       if (isEditing && currentSubject) {
         formData.set("id", currentSubject.id);
@@ -162,7 +182,7 @@ export function SubjectFormDialog({
 
       const action = isEditing ? updateSubject : createSubject;
       const toastId = toast.loading(
-        isEditing ? `Atualizando ${title}...` : "Criando nodo..."
+        isEditing ? `Atualizando ${title}...` : "Criando tópico..."
       );
 
       try {
@@ -178,7 +198,8 @@ export function SubjectFormDialog({
             id: toastId,
           });
         }
-      } catch {
+      } catch (err) {
+        console.error(err);
         toast.error("Erro de conexão com o servidor.", { id: toastId });
       } finally {
         setIsSubmitting(false);
@@ -190,55 +211,110 @@ export function SubjectFormDialog({
       difficulty,
       goalMinutes,
       icon,
+      parentId,
       isEditing,
       currentSubject,
       onClose,
     ]
   );
 
+  // Filtra para evitar que um tópico seja pai dele mesmo
+  const availableParents = potentialParents.filter(
+    (p) => p.id !== currentSubject?.id
+  );
+
   /* ------------------------------------------------------------------------ */
-  /*                                   JSX                                    */
+  /* JSX                                                                      */
   /* ------------------------------------------------------------------------ */
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md bg-card border-border">
         <DialogHeader>
-          <DialogTitle className="text-primary">
+          <DialogTitle className="text-primary flex items-center gap-2">
+            {isEditing ? <div className="p-1 bg-primary/10 rounded"><Hash className="w-4 h-4"/></div> : <div className="p-1 bg-primary/10 rounded"><FolderTree className="w-4 h-4"/></div>}
             {isEditing
               ? `Editar: ${title}`
-              : "Criar Novo Nodo de Conhecimento"}
+              : "Novo Tópico de Estudo"}
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="mt-2 space-y-6">
-          {/* TITLE + CATEGORY */}
-          <div className="grid grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} className="mt-2 space-y-5">
+          
+          {/* TITLE & PARENT (Hierarquia) */}
+          <div className="space-y-4">
             <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase text-muted-foreground">
-                Nome do Assunto
-              </Label>
-              <Input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ex: React Query"
-              />
+                <Label className="text-xs font-semibold uppercase text-muted-foreground">
+                  Título do Tópico <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Ex: React Query, Cálculo I, Inglês..."
+                  autoFocus
+                  required
+                />
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase text-muted-foreground">
-                Nodo Pai (Categoria)
-              </Label>
-              <Input
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                placeholder="Ex: Front-end"
-              />
+            <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label className="flex items-center gap-1 text-xs font-semibold uppercase text-muted-foreground">
+                      <FolderTree className="h-3 w-3" />
+                      Pertence a...
+                    </Label>
+                    <Select value={parentId} onValueChange={setParentId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um pai" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="root">-- Raiz (Sem pai) --</SelectItem>
+                        {availableParents.map((parent) => (
+                          <SelectItem key={parent.id} value={parent.id}>
+                            {parent.icon ? `${parent.icon} ` : ""}{parent.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                </div>
+
+                <div className="space-y-2">
+                    <Label className="text-xs font-semibold uppercase text-muted-foreground">
+                      Categoria (Tag)
+                    </Label>
+                    <Input
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      placeholder="Ex: Tecnologia"
+                    />
+                </div>
             </div>
           </div>
 
-          {/* DIFFICULTY + GOAL */}
+          <div className="h-px bg-border/50" />
+
+          {/* META & DIFICULDADE */}
           <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1 text-xs font-semibold uppercase text-muted-foreground">
+                <Target className="h-3 w-3" />
+                Meta (Horas) <span className="text-red-500">*</span>
+              </Label>
+              <div className="relative">
+                  <Input
+                    type="number"
+                    min={1}
+                    value={goalHours}
+                    onChange={handleGoalHoursChange}
+                    className="font-bold text-primary pr-8"
+                    required
+                  />
+                  <span className="absolute right-3 top-2.5 text-xs text-muted-foreground font-bold">h</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground text-right">
+                {goalMinutes} min totais
+              </p>
+            </div>
+
             <div className="space-y-2">
               <Label className="flex items-center gap-1 text-xs font-semibold uppercase text-muted-foreground">
                 <Gauge className="h-3 w-3" />
@@ -257,53 +333,42 @@ export function SubjectFormDialog({
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="space-y-2">
-              <Label className="flex items-center gap-1 text-xs font-semibold uppercase text-muted-foreground">
-                <Target className="h-3 w-3" />
-                Meta (Horas)
-              </Label>
-              <Input
-                type="number"
-                min={1}
-                value={goalHours}
-                onChange={handleGoalHoursChange}
-                className="font-bold text-primary"
-              />
-              <p className="text-[10px] text-muted-foreground text-right">
-                Convertido: {goalMinutes} minutos
-              </p>
-            </div>
           </div>
 
           {/* ICON */}
           <div className="space-y-2">
             <Label className="flex items-center gap-1 text-xs font-semibold uppercase text-muted-foreground">
               <Hash className="h-3 w-3" />
-              Ícone (opcional)
+              Ícone (Emoji)
             </Label>
-            <Input
-              value={icon}
-              onChange={(e) => setIcon(e.target.value)}
-              placeholder="⚛️"
-            />
+            <div className="flex gap-2">
+                <Input
+                  value={icon}
+                  onChange={(e) => setIcon(e.target.value)}
+                  placeholder="⚛️"
+                  className="flex-1"
+                />
+                <div className="w-10 h-10 flex items-center justify-center bg-secondary rounded border text-lg shrink-0">
+                    {icon || "?"}
+                </div>
+            </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="pt-2">
             <Button type="button" variant="ghost" onClick={onClose}>
               Cancelar
             </Button>
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="shadow-md shadow-primary/20 hover:bg-primary/90"
+              className="shadow-md shadow-primary/20 hover:bg-primary/90 min-w-[140px]"
             >
               {isSubmitting ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Save className="mr-2 h-4 w-4" />
               )}
-              {isEditing ? "Salvar Alterações" : "Adicionar ao Mapa"}
+              {isEditing ? "Salvar" : "Criar Tópico"}
             </Button>
           </DialogFooter>
         </form>

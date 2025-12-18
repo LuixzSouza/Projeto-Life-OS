@@ -1,37 +1,25 @@
 "use client";
 
+import { useState } from "react";
+import Link from "next/link";
 import { FlashcardDeck, StudySubject } from "@prisma/client";
 import { createDeck, deleteDeck } from "@/app/(dashboard)/flashcards/actions";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-  DialogFooter,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Plus,
-  Layers,
-  Trash2,
-  PlayCircle,
-  Edit3,
-  Link as LinkIcon,
-  Zap,
-  BrainCircuit,
-  Timer,
-  AlertCircle,
-  MoreVertical,
-  GraduationCap,
-  ArrowBigLeft,
-} from "lucide-react";
-import { useState } from "react";
-import { toast } from "sonner";
 import {
   Card,
   CardContent,
@@ -41,7 +29,6 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import Link from "next/link";
 import {
   Select,
   SelectContent,
@@ -58,13 +45,33 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+import {
+  Plus,
+  Layers,
+  Trash2,
+  PlayCircle,
+  Edit3,
+  Link as LinkIcon,
+  Zap,
+  BrainCircuit,
+  MoreVertical,
+  GraduationCap,
+  BookOpen,
+  FolderTree,
+} from "lucide-react";
+
 /* -------------------------------------------------------------------------- */
-/*                                    TYPES                                   */
+/* TYPES                                                                      */
 /* -------------------------------------------------------------------------- */
 
 type DeckWithCount = FlashcardDeck & {
   cards: { id: string }[];
-  studySubject?: { title: string; color: string } | null;
+  studySubject?: { 
+    id: string; 
+    title: string; 
+    color?: string | null; 
+    icon?: string | null 
+  } | null;
 };
 
 interface DeckGridProps {
@@ -73,16 +80,16 @@ interface DeckGridProps {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                                 COMPONENT                                  */
+/* COMPONENT                                                                  */
 /* -------------------------------------------------------------------------- */
 
 export function DeckGrid({ decks, subjects = [] }: DeckGridProps) {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>("");
-
   const [title, setTitle] = useState("");
-  const [category, setCategory] = useState("");
-
+  const [description, setDescription] = useState("");
+  
+  // Modal de Estudo
   const [studyDeck, setStudyDeck] = useState<DeckWithCount | null>(null);
 
   /* ------------------------------- ACTIONS -------------------------------- */
@@ -90,10 +97,8 @@ export function DeckGrid({ decks, subjects = [] }: DeckGridProps) {
   const handleSubjectSelect = (subjectId: string) => {
     setSelectedSubjectId(subjectId);
     const subject = subjects.find((s) => s.id === subjectId);
-
-    if (subject) {
-      setCategory(subject.category || "Geral");
-      if (!title) setTitle(subject.title);
+    if (subject && !title) {
+      setTitle(subject.title); // Sugere o nome da matéria
     }
   };
 
@@ -109,7 +114,7 @@ export function DeckGrid({ decks, subjects = [] }: DeckGridProps) {
       toast.success(result.message, { id: toastId });
       setIsCreateDialogOpen(false);
       setTitle("");
-      setCategory("");
+      setDescription("");
       setSelectedSubjectId("");
     } else {
       toast.error(result.message, { id: toastId });
@@ -117,7 +122,7 @@ export function DeckGrid({ decks, subjects = [] }: DeckGridProps) {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Esta ação é irreversível. Deseja continuar?")) return;
+    if (!confirm("Tem certeza? Todos os cartões serão perdidos.")) return;
 
     const toastId = toast.loading("Removendo baralho...");
     const result = await deleteDeck(id);
@@ -128,108 +133,82 @@ export function DeckGrid({ decks, subjects = [] }: DeckGridProps) {
   }
 
   /* ------------------------------------------------------------------------ */
-  /*                                   JSX                                    */
+  /* JSX                                                                      */
   /* ------------------------------------------------------------------------ */
 
   return (
-    <div className="space-y-10 pb-24">
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-border pb-6">
-        <div className="space-y-4">
-          <Link href="/studies" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition">
-            <ArrowBigLeft className="h-5 w-5" />
-            Voltar
-          </Link>
-
-          <div className="space-y-2">
-            <h2 className="text-3xl font-extrabold flex items-center gap-3">
-              <span className="p-2 rounded-xl bg-primary/10 text-primary">
-                <Layers className="h-6 w-6" />
-              </span>
-              Biblioteca de Flashcards
+    <div className="space-y-8">
+      {/* TOOLBAR */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 px-6 md:px-8">
+        <div>
+            <h2 className="text-xl font-bold flex items-center gap-2">
+                <Layers className="h-5 w-5 text-primary" />
+                Meus Baralhos
             </h2>
-
-            <p className="text-sm text-muted-foreground max-w-lg">
-              Organize seus baralhos e estude usando{" "}
-              <strong className="text-primary">
-                repetição espaçada
-              </strong>
-              .
+            <p className="text-sm text-muted-foreground">
+                {decks.length} coleção{decks.length !== 1 && "ões"} de estudo
             </p>
-          </div>
         </div>
 
-        {/* CREATE */}
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
-            <Button size="lg" className="gap-2 shadow-primary/20">
+            <Button size="lg" className="gap-2 shadow-lg shadow-primary/20">
               <Plus className="h-5 w-5" />
-              Criar Baralho
+              Novo Baralho
             </Button>
           </DialogTrigger>
 
-          <DialogContent>
+          <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Novo Baralho</DialogTitle>
+              <DialogTitle>Criar Baralho</DialogTitle>
               <DialogDescription>
-                Crie um novo conjunto de estudos.
+                Organize seus flashcards por tema ou matéria.
               </DialogDescription>
             </DialogHeader>
 
-            <form action={handleCreate} className="space-y-4 mt-2">
-              <div className="space-y-2 rounded-xl border border-dashed border-border bg-muted p-4">
-                <Label className="text-xs uppercase font-bold text-muted-foreground flex items-center gap-2">
-                  <LinkIcon className="h-3 w-3" />
-                  Vincular Matéria
-                </Label>
+            <form action={handleCreate} className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label>Título</Label>
+                <Input
+                  name="title"
+                  placeholder="Ex: Vocabulário Inglês"
+                  required
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
+              </div>
 
+              <div className="space-y-2">
+                <Label>Matéria (Opcional)</Label>
                 <Select value={selectedSubjectId} onValueChange={handleSubjectSelect}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione uma matéria..." />
+                    <SelectValue placeholder="Vincular a um tópico..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Sem vínculo</SelectItem>
+                    <SelectItem value="none">-- Sem vínculo --</SelectItem>
                     {subjects.map((s) => (
                       <SelectItem key={s.id} value={s.id}>
-                        {s.title}
+                        {s.icon ? `${s.icon} ` : ""}{s.title}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Título</Label>
-                  <Input
-                    name="title"
-                    required
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Categoria</Label>
-                  <Input
-                    name="category"
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                  />
-                </div>
-              </div>
-
               <div className="space-y-2">
                 <Label>Descrição</Label>
                 <Textarea
                   name="description"
+                  placeholder="Do que se trata este baralho?"
                   className="resize-none h-24"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
                 />
               </div>
 
               <DialogFooter>
                 <Button type="submit" className="w-full">
-                  Criar Baralho
+                  Criar
                 </Button>
               </DialogFooter>
             </form>
@@ -238,137 +217,192 @@ export function DeckGrid({ decks, subjects = [] }: DeckGridProps) {
       </div>
 
       {/* GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {decks.map((deck) => (
-          <Card
-            key={deck.id}
-            className="group relative overflow-hidden transition-all hover:shadow-lg hover:shadow-primary/10"
-          >
-            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-transparent via-primary to-transparent opacity-0 group-hover:opacity-100 transition" />
-
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div className="flex gap-2">
-                  <Badge variant="secondary">{deck.category}</Badge>
-                  {deck.studySubject && (
-                    <Badge variant="outline" className="text-primary">
-                      Vinculado
-                    </Badge>
-                  )}
+      <div className="px-6 md:px-8">
+        {decks.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed border-border/60 rounded-xl bg-muted/10">
+                <div className="bg-background p-4 rounded-full shadow-sm mb-4">
+                    <BrainCircuit className="h-8 w-8 text-muted-foreground/50" />
                 </div>
+                <h3 className="text-lg font-semibold text-foreground">Sua biblioteca está vazia</h3>
+                <p className="text-muted-foreground max-w-sm text-center mt-1">
+                    Crie seu primeiro baralho para começar a usar a repetição espaçada.
+                </p>
+                <Button variant="outline" className="mt-6" onClick={() => setIsCreateDialogOpen(true)}>
+                    Criar agora
+                </Button>
+            </div>
+        ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {decks.map((deck) => (
+                <Card
+                key={deck.id}
+                className="group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-primary/50 flex flex-col"
+                >
+                {/* Visual Header Strip */}
+                <div 
+                    className="absolute inset-x-0 top-0 h-1.5 transition-all duration-500 opacity-80 group-hover:opacity-100"
+                    style={{ 
+                        background: deck.studySubject?.color 
+                            ? deck.studySubject.color 
+                            : "linear-gradient(to right, hsl(var(--primary)), hsl(var(--primary)/0.5))" 
+                    }} 
+                />
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Opções</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <Link href={`/flashcards/${deck.id}/edit`}>
-                      <DropdownMenuItem>
-                        <Edit3 className="h-4 w-4 mr-2" />
-                        Editar
-                      </DropdownMenuItem>
-                    </Link>
-                    <DropdownMenuItem
-                      className="text-destructive"
-                      onClick={() => handleDelete(deck.id)}
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Excluir
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+                <CardHeader className="pb-3 pt-6">
+                    <div className="flex justify-between items-start gap-2">
+                        {/* Tags */}
+                        <div className="flex flex-wrap gap-2 mb-2">
+                            {deck.studySubject ? (
+                                <Badge variant="outline" className="gap-1 pl-1 pr-2 py-0 h-6 border-primary/20 bg-primary/5 text-primary">
+                                    <div className="w-4 h-4 rounded-full bg-background flex items-center justify-center text-[10px] border border-primary/20">
+                                        {deck.studySubject.icon || <LinkIcon className="w-2.5 h-2.5" />}
+                                    </div>
+                                    <span className="truncate max-w-[100px]">{deck.studySubject.title}</span>
+                                </Badge>
+                            ) : (
+                                <Badge variant="secondary" className="gap-1 h-6 bg-muted text-muted-foreground">
+                                    <FolderTree className="w-3 h-3" /> Geral
+                                </Badge>
+                            )}
+                        </div>
 
-              <CardTitle className="mt-2 group-hover:text-primary transition">
-                {deck.title}
-              </CardTitle>
+                        {/* Menu */}
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 text-muted-foreground/50 hover:text-foreground">
+                                <MoreVertical className="h-4 w-4" />
+                            </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <Link href={`/flashcards/${deck.id}/edit`}>
+                                <DropdownMenuItem className="cursor-pointer">
+                                <Edit3 className="h-4 w-4 mr-2" />
+                                Editar Baralho
+                                </DropdownMenuItem>
+                            </Link>
+                            <DropdownMenuItem
+                                className="text-destructive focus:text-destructive cursor-pointer"
+                                onClick={() => handleDelete(deck.id)}
+                            >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Excluir
+                            </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
 
-              <CardDescription className="line-clamp-2">
-                {deck.description || "Sem descrição."}
-              </CardDescription>
-            </CardHeader>
+                    <CardTitle className="text-lg leading-tight group-hover:text-primary transition-colors">
+                    {deck.title}
+                    </CardTitle>
 
-            <CardContent>
-              <div className="flex justify-between items-center rounded-lg border bg-muted p-3 text-sm">
-                <span className="flex items-center gap-2">
-                  <Layers className="h-4 w-4 text-primary" />
-                  {deck.cards.length} cartões
-                </span>
-                {deck.cards.length > 0 && (
-                  <span className="h-2 w-2 rounded-full bg-green-500" />
-                )}
-              </div>
-            </CardContent>
-                <CardFooter>
+                    <CardDescription className="line-clamp-2 min-h-[40px] text-xs">
+                    {deck.description || "Sem descrição definida para este baralho."}
+                    </CardDescription>
+                </CardHeader>
+
+                <CardContent className="pb-3 flex-1">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/30 p-2 rounded-lg border border-border/50">
+                        <Layers className="h-4 w-4 text-primary/70" />
+                        <span className="font-medium text-foreground">{deck.cards.length}</span>
+                        <span>cartões</span>
+                    </div>
+                </CardContent>
+
+                <CardFooter className="pt-0">
                     <Button
-                        className="w-full gap-2"
+                        className={cn(
+                            "w-full gap-2 transition-all",
+                            deck.cards.length > 0 ? "shadow-md shadow-primary/10" : "opacity-80"
+                        )}
+                        variant={deck.cards.length > 0 ? "default" : "secondary"}
                         onClick={() => {
-                        if (deck.cards.length === 0) {
-                            // Redireciona diretamente para a página de edição de cartões se não houver cartões
-                            window.location.href = `/flashcards/${deck.id}/edit`; 
-                        } else {
-                            // Inicia o estudo se houver cartões
-                            setStudyDeck(deck);
-                        }
+                            if (deck.cards.length === 0) {
+                                window.location.href = `/flashcards/${deck.id}/edit`; 
+                            } else {
+                                setStudyDeck(deck);
+                            }
                         }}
-                        disabled={deck.cards.length === 0}
                     >
-                        <PlayCircle className="h-5 w-5" />
-                        {deck.cards.length > 0 ? "Praticar" : "Adicionar Cartões"}
+                        {deck.cards.length > 0 ? (
+                            <>
+                                <PlayCircle className="h-4 w-4" /> Praticar Agora
+                            </>
+                        ) : (
+                            <>
+                                <Plus className="h-4 w-4" /> Adicionar Cartões
+                            </>
+                        )}
                     </Button>
                 </CardFooter>
-          </Card>
-        ))}
+                </Card>
+            ))}
+            </div>
+        )}
       </div>
 
       {/* STUDY MODAL */}
       <Dialog open={!!studyDeck} onOpenChange={(o) => !o && setStudyDeck(null)}>
-        <DialogContent className="sm:max-w-3xl p-0 overflow-hidden">
-          <div className="p-8">
-            <DialogHeader>
-              <DialogTitle className="text-3xl flex items-center gap-3">
-                <BrainCircuit className="h-8 w-8 text-primary" />
-                Central de Estudo
-              </DialogTitle>
-              <DialogDescription>
-                Escolha a melhor estratégia.
-              </DialogDescription>
-            </DialogHeader>
-          </div>
+        <DialogContent className="sm:max-w-2xl p-0 overflow-hidden gap-0 border-0 shadow-2xl">
+            
+            {/* Header com gradiente */}
+            <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-background p-8 border-b">
+                <DialogHeader>
+                    <DialogTitle className="text-2xl flex items-center gap-3">
+                        <div className="p-2 bg-background rounded-xl shadow-sm">
+                            <BrainCircuit className="h-6 w-6 text-primary" />
+                        </div>
+                        Central de Estudo
+                    </DialogTitle>
+                    <DialogDescription className="text-base">
+                        Você vai estudar <strong>{studyDeck?.title}</strong>. Escolha sua estratégia:
+                    </DialogDescription>
+                </DialogHeader>
+            </div>
 
-          <div className="grid md:grid-cols-2 border-t">
-            <Link
-              href={`/flashcards/${studyDeck?.id}/study?mode=cram`}
-              className="p-8 hover:bg-destructive/5 transition"
-            >
-              <Zap className="h-8 w-8 text-destructive mb-4" />
-              <h3 className="font-bold text-xl">Modo Prova</h3>
-              <p className="text-sm text-muted-foreground mt-2">
-                Revisão rápida e intensiva.
-              </p>
-            </Link>
+            <div className="grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-border">
+                {/* Modo Prova */}
+                <Link
+                    href={`/flashcards/${studyDeck?.id}/study?mode=cram`}
+                    className="group p-6 hover:bg-muted/30 transition-colors flex flex-col gap-3"
+                >
+                    <div className="flex items-center gap-3 mb-1">
+                        <div className="p-2 rounded-lg bg-orange-500/10 text-orange-600 group-hover:bg-orange-500/20 transition-colors">
+                            <Zap className="h-5 w-5" />
+                        </div>
+                        <h3 className="font-bold text-lg text-foreground">Modo Prova</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                        Ignora o agendamento e revisa tudo agora. Ideal para provas amanhã.
+                    </p>
+                </Link>
 
-            <Link
-              href={`/flashcards/${studyDeck?.id}/study?mode=smart`}
-              className="p-8 hover:bg-primary/5 transition"
-            >
-              <GraduationCap className="h-8 w-8 text-primary mb-4" />
-              <h3 className="font-bold text-xl">Modo Memória</h3>
-              <p className="text-sm text-muted-foreground mt-2">
-                Algoritmo inteligente de longo prazo.
-              </p>
-            </Link>
-          </div>
+                {/* Modo Memória */}
+                <Link
+                    href={`/flashcards/${studyDeck?.id}/study?mode=smart`}
+                    className="group p-6 hover:bg-muted/30 transition-colors flex flex-col gap-3 relative overflow-hidden"
+                >
+                    <div className="absolute top-0 right-0 p-1.5 bg-primary text-[10px] font-bold text-primary-foreground rounded-bl-xl shadow-sm">
+                        RECOMENDADO
+                    </div>
+                    <div className="flex items-center gap-3 mb-1">
+                        <div className="p-2 rounded-lg bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors">
+                            <GraduationCap className="h-5 w-5" />
+                        </div>
+                        <h3 className="font-bold text-lg text-foreground">Modo Memória</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
+                        Usa o algoritmo de <strong>Repetição Espaçada</strong>. Estude apenas o que está prestes a esquecer.
+                    </p>
+                </Link>
+            </div>
 
-          <div className="p-4 border-t text-center">
-            <Button variant="ghost" onClick={() => setStudyDeck(null)}>
-              Cancelar
-            </Button>
-          </div>
+            <div className="p-4 bg-muted/20 border-t flex justify-end">
+                <Button variant="ghost" onClick={() => setStudyDeck(null)}>
+                    Cancelar
+                </Button>
+            </div>
         </DialogContent>
       </Dialog>
     </div>

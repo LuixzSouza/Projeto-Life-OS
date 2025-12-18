@@ -7,7 +7,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// --- MÓDULO USUÁRIO E ESTATÍSTICAS ---
+// =========================================================
+// MÓDULO 1: USUÁRIO E ESTATÍSTICAS
+// =========================================================
 
 model User {
   id              String   @id @default(uuid())
@@ -23,7 +25,7 @@ model User {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  // Relacionamentos
+  // Relacionamentos Gerais
   accounts        Account[]
   projects        Project[]
   jobApplications JobApplication[]
@@ -45,26 +47,181 @@ model UserStats {
   lastStudyDate    DateTime?
   dailyGoalMinutes Int       @default(60)
   
-  badges           String?   // JSON string: ["MASTER_FOCUS", "21_DAY_STREAK"]
+  badges           String?   
   
   updatedAt        DateTime  @updatedAt
 }
 
-// --- MÓDULO FLASHCARDS ---
+// =========================================================
+// MÓDULO 2: ESTUDOS (COMPATÍVEL + UPGRADE)
+// =========================================================
+
+// Tipos de Conteúdo (Novo)
+model ContentType {
+  id        String         @id @default(uuid())
+  name      String         @unique 
+  icon      String?        
+  color     String?
+  createdAt DateTime       @default(now())
+  
+  contents  StudyContent[]
+}
+
+// MANTIDO O NOME 'StudySubject' PARA NÃO QUEBRAR SEU CÓDIGO
+// Mas adicionamos a hierarquia (Parent/Child) aqui dentro
+model StudySubject {
+  id          String   @id @default(uuid())
+  title       String
+  
+  // --- Upgrade de Hierarquia ---
+  parentId    String?  
+  parent      StudySubject?   @relation("SubjectHierarchy", fields: [parentId], references: [id])
+  children    StudySubject[]  @relation("SubjectHierarchy")
+  
+  // Metadados
+  description String?
+  category    String?  
+  color       String?  @default("blue")
+  icon        String?
+  difficulty  Int      @default(3)
+  status      String   @default("ACTIVE") 
+  
+  goalMinutes Int      @default(3600) 
+
+  // Relacionamentos
+  contents    StudyContent[]
+  sessions    StudySession[] // Mantido o relacionamento com sessões
+  decks       FlashcardDeck[]
+  notes       StudyNote[]
+  goals       LearningGoal[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Conteúdos específicos (Novo)
+model StudyContent {
+  id          String      @id @default(uuid())
+  title       String
+  
+  typeId      String
+  type        ContentType @relation(fields: [typeId], references: [id])
+  
+  url         String?     
+  duration    Int?        
+  author      String?     
+  source      String?     
+  
+  isCompleted Boolean     @default(false)
+  progress    Float       @default(0) 
+  
+  // Relacionado ao Subject
+  subjectId   String
+  subject     StudySubject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  
+  notes       StudyNote[]
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+// Sessões de Estudo (COMPATÍVEL)
+model StudySession {
+  id              String      @id @default(uuid())
+  durationMinutes Int
+  date            DateTime    @default(now())
+  
+  focusLevel      Int         @default(3) 
+  notesRaw        String?     
+  
+  // MANTIDO 'subject' E 'subjectId' PARA O CÓDIGO ANTIGO FUNCIONAR
+  subjectId       String
+  subject         StudySubject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  
+  notes           StudyNote[] 
+}
+
+// Sistema de Anotações (Novo e Conectado)
+model StudyNote {
+  id           String        @id @default(uuid())
+  title        String
+  content      String        
+  summary      String?       
+  
+  tags         String?       
+  isFavorite   Boolean       @default(false)
+  
+  // Conexões
+  subjectId    String?
+  subject      StudySubject? @relation(fields: [subjectId], references: [id])
+  
+  contentId    String?
+  studyContent StudyContent? @relation(fields: [contentId], references: [id])
+  
+  sessionId    String?
+  session      StudySession? @relation(fields: [sessionId], references: [id])
+  
+  lastReviewed DateTime?
+  reviewCount  Int           @default(0)
+  
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+// Objetivos de Aprendizado (Novo)
+model LearningGoal {
+  id          String         @id @default(uuid())
+  title       String
+  description String?
+  
+  targetDate  DateTime?
+  status      String         @default("IN_PROGRESS") 
+  priority    Int            @default(3) 
+  
+  subjectId   String?
+  subject     StudySubject?  @relation(fields: [subjectId], references: [id])
+  
+  tasks       LearningTask[]
+  
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model LearningTask {
+  id          String       @id @default(uuid())
+  title       String
+  isDone      Boolean      @default(false)
+  orderIndex  Int          @default(0)
+  
+  goalId      String
+  goal        LearningGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  
+  createdAt   DateTime     @default(now())
+}
+
+// =========================================================
+// MÓDULO 3: FLASHCARDS (COMPATÍVEL)
+// =========================================================
 
 model FlashcardDeck {
-  id             String        @id @default(uuid())
-  title          String        
-  description    String?       
-  category       String?       
+  id             String      @id @default(uuid())
+  title          String      
+  description    String?     
   
+  algorithm      String      @default("LEITNER") 
+  isPublic       Boolean     @default(false)
+  shareCode      String?     @unique
+  
+  masteredCount  Int         @default(0)
+  
+  // MANTIDO relacionamento com Subject
   studySubjectId String?
   studySubject   StudySubject? @relation(fields: [studySubjectId], references: [id])
 
   cards          Flashcard[]
 
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 }
 
 model Flashcard {
@@ -74,8 +231,12 @@ model Flashcard {
   imageUrl     String?       
   
   box          Int           @default(1) 
+  easeFactor   Float         @default(2.5) 
+  interval     Int           @default(0)   
+  
   nextReview   DateTime?     
   lastReviewed DateTime?     
+  reviewCount  Int           @default(0)
 
   deckId       String
   deck         FlashcardDeck @relation(fields: [deckId], references: [id], onDelete: Cascade)
@@ -83,8 +244,9 @@ model Flashcard {
   createdAt    DateTime      @default(now())
 }
 
-
-// --- MÓDULO FINANCEIRO ---
+// =========================================================
+// MÓDULO 4: FINANCEIRO
+// =========================================================
 
 model Account {
   id           String        @id @default(uuid())
@@ -110,7 +272,7 @@ model Transaction {
   id          String   @id @default(uuid())
   description String
   amount      Decimal
-  type        String   // INCOME, EXPENSE
+  type        String   
   category    String
   date        DateTime @default(now())
 
@@ -146,41 +308,9 @@ model WishlistItem {
   createdAt  DateTime @default(now())
 }
 
-// --- MÓDULO ESTUDOS ---
-
-model StudySubject {
-  id          String         @id @default(uuid())
-  title       String
-  category    String
-
-  icon        String?
-  difficulty  Int            @default(3)
-  goalMinutes Int            @default(3600)
-
-  color       String         @default("blue")
-  sessions    StudySession[]
-  createdAt   DateTime       @default(now())
-  decks       FlashcardDeck[]
-}
-
-model StudySession {
-  id              String       @id @default(uuid())
-  durationMinutes Int
-  notes           String?      
-  date            DateTime     @default(now())
-
-  focusLevel      Int          @default(3)
-  tags            String?      // JSON string
-  
-  // SQLite não tem ENUM nativo, usamos String e validamos na app se necessário
-  type            String       @default("LEITURA") // LEITURA, VIDEO, EXERCICIO...
-
-  subjectId       String
-  subject         StudySubject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-}
-
-
-// --- MÓDULO PROJETOS & TAREFAS ---
+// =========================================================
+// MÓDULO 5: PROJETOS & TAREFAS
+// =========================================================
 
 model Project {
   id          String   @id @default(uuid())
@@ -211,7 +341,9 @@ model Task {
   createdAt DateTime @default(now())
 }
 
-// --- MÓDULO VAGAS (JOB TRACKER) ---
+// =========================================================
+// MÓDULO 6: JOB TRACKER
+// =========================================================
 
 model JobApplication {
   id           String   @id @default(uuid())
@@ -232,7 +364,9 @@ model JobApplication {
   user         User?    @relation(fields: [userId], references: [id])
 }
 
-// --- MÓDULO SAÚDE ---
+// =========================================================
+// MÓDULO 7: SAÚDE & CORPO
+// =========================================================
 
 model Workout {
   id          String   @id @default(uuid())
@@ -264,19 +398,16 @@ model BodyMeasurement {
   id        String   @id @default(uuid())
   date      DateTime @default(now())
 
-  // Dados Básicos
   weight    Float
   height    Float
   gender    String   
-  activity  Float    @default(1.2) // Adicionar valor padrão 
+  activity  Float    @default(1.2) 
   birthDate DateTime?
 
-  // Circunferências
   neck      Float?
   waist     Float?
   hip       Float?
   
-  // Superiores
   shoulders Float?
   chest     Float?
   armLeft   Float?
@@ -284,20 +415,16 @@ model BodyMeasurement {
   forearmLeft  Float?
   forearmRight Float?
 
-  // Inferiores
   thighLeft    Float?
   thighRight   Float?
   calfLeft     Float?
   calfRight    Float?
 
-  // Relacionamento
   userId    String?
-  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade) // Adicionei Cascade para limpar se o usuário for deletado
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade) 
 
   @@index([date])
 }
-
-// --- MÓDULO NUTRIÇÃO ---
 
 model Meal {
   id       String   @id @default(uuid())
@@ -308,7 +435,9 @@ model Meal {
   date     DateTime @default(now())
 }
 
-// --- MÓDULO AGENDA ---
+// =========================================================
+// MÓDULO 8: AGENDA & ROTINA
+// =========================================================
 
 model Event {
   id          String    @id @default(uuid())
@@ -320,7 +449,7 @@ model Event {
   category    String    @default("general")
 
   location    String?
-  color       String    @default("#6366f1")
+  color       String?   @default("#6366f1")
   emailAlert  Boolean   @default(true)
 
   projectId   String?
@@ -342,49 +471,52 @@ model RoutineItem {
   createdAt   DateTime @default(now())
 }
 
-// --- MÓDULO CONFIGURAÇÕES ---
+// =========================================================
+// MÓDULO 9: CONFIGURAÇÕES & SISTEMA
+// =========================================================
 
 model Settings {
-  id          String   @id @default(uuid())
-  theme       String   @default("system")
-  accentColor String   @default("zinc")
-  language    String   @default("pt-BR")
+  id              String   @id @default(uuid())
+  theme           String   @default("system")
+  accentColor     String   @default("zinc")
+  language        String   @default("pt-BR")
 
-  currency    String   @default("BRL") // BRL, USD, EUR
-  workStart   String   @default("09:00") // Início do dia produtivo
-  workEnd     String   @default("18:00") // Fim do dia produtivo
+  currency        String   @default("BRL") 
+  workStart       String   @default("09:00") 
+  workEnd         String   @default("18:00") 
 
-  aiProvider  String   @default("ollama")
-  aiModel     String   @default("llama3")
-  aiPersona   String?  
-  aiUsage     String?  
+  aiProvider      String   @default("ollama")
+  aiModel         String   @default("llama3")
+  aiPersona       String?  
+  aiUsage         String?  
 
-  userId          String? @unique // Relação 1:1: um Settings pertence a um User (ID)
-  user            User?   @relation(fields: [userId], references: [id])
+  userId          String?  @unique 
+  user            User?    @relation(fields: [userId], references: [id])
 
-  tmdbApiKey      String? @map("tmdb_api_key")
-  rawgApiKey      String? @map("rawg_api_key")
-  pluggyClientId  String? @map("pluggy_client_id")
-  pluggySecret    String? @map("pluggy_client_secret")
-  openaiKey   String?  
-  groqKey     String?  
-  googleKey   String?  
+  tmdbApiKey      String?  @map("tmdb_api_key")
+  rawgApiKey      String?  @map("rawg_api_key")
+  pluggyClientId  String?  @map("pluggy_client_id")
+  pluggySecret    String?  @map("pluggy_client_secret")
+  openaiKey       String?  
+  groqKey         String?  
+  googleKey       String?  
   
-  // Caminho do armazenamento (para o monitoramento de disco)
-  storagePath String?  @default("D:/LifeOS_Data")
+  storagePath     String?  @default("D:/LifeOS_Data")
 
-  updatedAt   DateTime @updatedAt
+  updatedAt       DateTime @updatedAt
   onboardingCompleted Boolean @default(false)
 }
 
-// --- MÓDULO CMS ---
+// =========================================================
+// MÓDULO 10: CMS & OUTROS
+// =========================================================
 
 model ManagedSite {
-  id        String     @id @default(uuid())
+  id        String    @id @default(uuid())
   name      String
   url       String?
-  apiKey    String     @unique @default(uuid())
-  createdAt DateTime   @default(now())
+  apiKey    String    @unique @default(uuid())
+  createdAt DateTime  @default(now())
 
   pages     SitePage[]
 }
@@ -393,14 +525,10 @@ model SitePage {
   id        String      @id @default(uuid())
   slug      String
   content   String      
-
   siteId    String
   site      ManagedSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
-
   updatedAt DateTime    @updatedAt
 }
-
-// --- MÓDULO IA ---
 
 model AiChat {
   id        String      @id @default(uuid())
@@ -413,16 +541,12 @@ model AiMessage {
   id        String   @id @default(uuid())
   role      String
   content   String   
-
   provider  String?  
   model     String?  
-
   chatId    String
   chat      AiChat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 }
-
-// --- MÓDULO ACESSOS (VAULT) ---
 
 model AccessItem {
   id        String   @id @default(uuid())
@@ -432,11 +556,9 @@ model AccessItem {
   url       String?
   category  String
   notes     String?  
-
   client    String?  @map("client_name")
   userId    String?
   user      User?    @relation(fields: [userId], references: [id])
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -448,7 +570,6 @@ model SavedLink {
   description String?  
   imageUrl    String?  
   category    String?  
-  
   isFavorite  Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -460,17 +581,12 @@ model MediaItem {
   title      String
   subtitle   String?  
   coverUrl   String?  
-  
   rating     Int      @default(0) 
   category   String?  
-  
   externalId String?  
-  
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }
-
-// --- MÓDULO SOCIAL (AMIGOS) ---
 
 model Friend {
   id        String    @id @default(cuid())
@@ -478,54 +594,40 @@ model Friend {
   nickname  String?   
   email     String?
   phone     String?   
-  
   birthday  DateTime?
-  
   instagram String?
   linkedin  String?
   twitter   String?
   jobTitle  String?   
   company   String?   
-  
   proximity String    @default("CASUAL") 
   pixKey    String?   
   address   String?   
   notes     String?   
-
   imageUrl  String?   
   giftIdeas String?   
-  
   userId    String
   user      User      @relation(fields: [userId], references: [id])
-  
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 }
 
-// --- MÓDULO WARDROBE (ROUPAS) ---
-
 model WardrobeItem {
   id         String   @id @default(uuid())
   name       String   
-  
   imageUrl   String?  
   brand      String?  
   color      String?  
   size       String?  
-  
   category   String   
   season     String?  
-  
   price      Decimal? 
   wearCount  Int      @default(0) 
   lastWorn   DateTime? 
-  
   isFavorite Boolean  @default(false)
-  status     String   @default("IN_CLOSET") // Convertido de Enum para String
-
+  status     String   @default("IN_CLOSET") 
   userId     String
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }

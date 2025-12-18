@@ -1,17 +1,23 @@
 import { prisma } from "@/lib/prisma";
-import { createCard, deleteCard } from "../../actions";
+import { createCard } from "../../actions"; // deleteCard não é mais necessário aqui diretamente
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft,
   Plus,
-  Trash2,
   PlayCircle,
   Layers,
+  Sparkles,
+  ArrowRight,
+  Library,
+  BookOpen
 } from "lucide-react";
 import Link from "next/link";
+import { FlashcardItem } from "@/components/flashcards/flashcard-item"; // IMPORT NOVO
 
 /* Tipagem correta para App Router */
 interface DeckEditPageProps {
@@ -22,7 +28,11 @@ export default async function DeckEditPage({ params }: DeckEditPageProps) {
   const { id: deckId } = await params;
 
   if (!deckId) {
-    return <div className="p-6 text-muted-foreground">ID inválido.</div>;
+    return (
+        <div className="min-h-screen flex items-center justify-center bg-background">
+            <div className="text-muted-foreground">ID do baralho inválido.</div>
+        </div>
+    );
   }
 
   const deck = await prisma.flashcardDeck.findUnique({
@@ -31,171 +41,200 @@ export default async function DeckEditPage({ params }: DeckEditPageProps) {
       cards: {
         orderBy: { createdAt: "desc" },
       },
+      studySubject: {
+        select: { title: true, color: true, icon: true },
+      },
     },
   });
 
   if (!deck) {
     return (
-      <div className="flex flex-col items-center justify-center h-[50vh] gap-4">
-        <p className="text-muted-foreground">Baralho não encontrado.</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background gap-6 text-center px-4">
+        <div className="bg-muted/30 p-6 rounded-3xl ring-1 ring-border/50">
+            <Layers className="h-12 w-12 text-muted-foreground/50" />
+        </div>
+        <div className="space-y-2">
+            <h2 className="text-2xl font-bold tracking-tight">Baralho não encontrado</h2>
+            <p className="text-muted-foreground max-w-sm">
+                O baralho que você está procurando pode ter sido excluído ou não existe mais.
+            </p>
+        </div>
         <Link href="/flashcards">
-          <Button variant="outline">Voltar</Button>
+          <Button variant="outline" className="gap-2">
+            <ArrowLeft className="h-4 w-4" /> Voltar para a biblioteca
+          </Button>
         </Link>
       </div>
     );
   }
 
-  /* Server Actions */
+  /* Server Action de Adicionar (Inline) */
   async function addCardAction(formData: FormData) {
     "use server";
     await createCard(deckId, formData);
   }
 
-  async function deleteCardAction(formData: FormData) {
-    "use server";
-    const cardId = formData.get("cardId") as string;
-    await deleteCard(cardId, deckId);
-  }
-
   const hasCards = deck.cards.length > 0;
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-8 pb-24">
-      {/* HEADER */}
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Link href="/flashcards">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
+    <div className="min-h-screen bg-background pb-24">
+      
+      {/* ================= HEADER ================= */}
+      <header className="border-b border-border/60 bg-gradient-to-b from-primary/5 to-background pt-10 pb-8 px-6 md:px-8">
+        <div className="max-w-[1600px] mx-auto flex flex-col gap-6 animate-in fade-in duration-500">
+            
+            <div className="flex items-center gap-2">
+                <Link href="/flashcards">
+                    <Button variant="ghost" size="sm" className="pl-0 text-muted-foreground hover:text-primary transition-colors">
+                        <ArrowLeft className="h-4 w-4 mr-1" />
+                        Voltar para Biblioteca
+                    </Button>
+                </Link>
+            </div>
 
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Layers className="h-6 w-6 text-primary" />
-              {deck.title}
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {deck.cards.length} cartão(ões)
-            </p>
-          </div>
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+                <div className="flex items-start gap-5">
+                    <div className="h-14 w-14 rounded-2xl flex shrink-0 items-center justify-center bg-primary/10 text-primary shadow-sm ring-1 ring-primary/10">
+                        <Library className="h-7 w-7" />
+                    </div>
+
+                    <div className="space-y-1">
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
+                                {deck.title}
+                            </h1>
+                            {deck.studySubject && (
+                                <Badge variant="outline" className="text-primary border-primary/20 bg-primary/5 gap-1.5 py-1 px-2.5">
+                                    {deck.studySubject.icon && <span>{deck.studySubject.icon}</span>}
+                                    {deck.studySubject.title}
+                                </Badge>
+                            )}
+                        </div>
+                        <p className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
+                            <Layers className="h-4 w-4 text-primary/60" />
+                            {deck.cards.length} {deck.cards.length === 1 ? 'cartão' : 'cartões'} neste baralho
+                        </p>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-3 pt-2">
+                    {hasCards && (
+                        <Link href={`/flashcards/${deck.id}/study`}>
+                            <Button size="lg" className="gap-2 shadow-lg shadow-primary/20 rounded-xl font-bold transition-transform hover:scale-[1.02]">
+                                <PlayCircle className="h-5 w-5 fill-current" />
+                                Estudar Agora
+                            </Button>
+                        </Link>
+                    )}
+                </div>
+            </div>
         </div>
-
-        <Link
-          href={
-            hasCards
-              ? `/flashcards/${deck.id}/study`
-              : `/flashcards/${deck.id}/edit`
-          }
-        >
-          <Button
-            className="gap-2"
-            variant={hasCards ? "default" : "secondary"}
-          >
-            <PlayCircle className="h-4 w-4" />
-            {hasCards ? "Iniciar Estudo" : "Adicionar Cartões"}
-          </Button>
-        </Link>
       </header>
 
-      {/* FORMULÁRIO */}
-      <Card className="border-dashed bg-muted/30">
-        <CardContent className="p-6 space-y-4">
-          <h3 className="font-semibold flex items-center gap-2 text-primary">
-            <Plus className="h-4 w-4" />
-            Novo Cartão
-          </h3>
+      {/* ================= CONTENT ================= */}
+      <main className="px-6 md:px-8 py-8 space-y-10 max-w-[1600px] mx-auto">
+        <div className="grid lg:grid-cols-[400px_1fr] gap-8 items-start">
+            
+            {/* COLUNA ESQUERDA: FORMULÁRIO (Sticky) */}
+            <aside className="lg:sticky lg:top-8 order-2 lg:order-1 space-y-6">
+                <Card className="border-primary/20 shadow-lg shadow-primary/5 overflow-hidden">
+                    <div className="h-1.5 w-full bg-gradient-to-r from-primary via-primary/60 to-primary/20" />
+                    
+                    <CardHeader className="pb-4 border-b border-border/40 bg-muted/20">
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                            <Plus className="h-5 w-5 text-primary" />
+                            Novo Cartão
+                        </CardTitle>
+                    </CardHeader>
+                    
+                    <CardContent className="pt-6">
+                        <form action={addCardAction} className="space-y-5">
+                            <div className="space-y-2">
+                                <Label className="text-xs font-bold uppercase text-muted-foreground tracking-wider ml-1">
+                                    Frente (Pergunta)
+                                </Label>
+                                <Input
+                                    name="term"
+                                    placeholder="Ex: O que é useState?"
+                                    required
+                                    className="bg-background focus:ring-primary/20 border-border/60 font-medium"
+                                />
+                            </div>
 
-          <form action={addCardAction} className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase text-muted-foreground">
-                  Frente
-                </label>
-                <Input
-                  name="term"
-                  placeholder="Pergunta ou termo"
-                  required
-                />
-              </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs font-bold uppercase text-muted-foreground tracking-wider ml-1">
+                                    Verso (Resposta)
+                                </Label>
+                                <Textarea
+                                    name="definition"
+                                    placeholder="Ex: Um hook do React para gerenciar estado..."
+                                    required
+                                    className="min-h-[120px] resize-none bg-background focus:ring-primary/20 border-border/60 leading-relaxed"
+                                />
+                            </div>
 
-              <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase text-muted-foreground">
-                  Verso
-                </label>
-                <Textarea
-                  name="definition"
-                  placeholder="Resposta ou definição"
-                  required
-                  className="min-h-[90px] resize-none"
-                />
-              </div>
-            </div>
+                            <Button type="submit" className="w-full font-semibold shadow-sm" variant="secondary">
+                                Adicionar à pilha <ArrowRight className="ml-2 h-4 w-4 opacity-50" />
+                            </Button>
+                        </form>
+                    </CardContent>
+                </Card>
 
-            <div className="flex justify-end">
-              <Button type="submit">Adicionar cartão</Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+                {!hasCards && (
+                    <div className="p-5 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border border-blue-100 dark:border-blue-900/30">
+                        <div className="flex gap-3">
+                            <div className="p-2 bg-background rounded-lg shadow-sm h-fit">
+                                <Sparkles className="h-5 w-5 text-blue-500" />
+                            </div>
+                            <div className="space-y-1">
+                                <h4 className="font-semibold text-sm text-blue-700 dark:text-blue-300">Dica de Ouro</h4>
+                                <p className="text-xs text-blue-600/80 dark:text-blue-400/80 leading-relaxed">
+                                    Mantenha os cartões simples. Um conceito por cartão facilita a memorização ativa e torna a revisão mais eficiente.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </aside>
 
-      {/* LISTA DE CARTÕES */}
-      <section className="space-y-3">
-        {deck.cards.map((card, index) => (
-          <div
-            key={card.id}
-            className="group flex flex-col md:flex-row gap-4 p-4 rounded-xl border bg-card hover:border-primary/40 transition"
-          >
-            {/* Índice */}
-            <div className="md:w-12 text-xs font-mono text-muted-foreground">
-              #{deck.cards.length - index}
-            </div>
+            {/* COLUNA DIREITA: LISTA INTERATIVA */}
+            <section className="space-y-6 order-1 lg:order-2">
+                <div className="flex items-center justify-between pb-2 border-b border-border/40">
+                    <h3 className="text-lg font-bold flex items-center gap-2">
+                        <Layers className="h-5 w-5 text-primary" />
+                        Cartões do Baralho
+                    </h3>
+                    <Badge variant="secondary" className="px-3">
+                        Total: {deck.cards.length}
+                    </Badge>
+                </div>
 
-            {/* Conteúdo */}
-            <div className="flex-1 grid md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-[10px] uppercase font-semibold text-muted-foreground">
-                  Frente
-                </p>
-                <p className="font-medium">{card.term}</p>
-              </div>
-
-              <div className="md:border-l md:pl-4">
-                <p className="text-[10px] uppercase font-semibold text-muted-foreground">
-                  Verso
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {card.definition}
-                </p>
-              </div>
-            </div>
-
-            {/* Deletar */}
-            <form action={deleteCardAction}>
-              <input type="hidden" name="cardId" value={card.id} />
-              <Button
-                type="submit"
-                size="icon"
-                variant="ghost"
-                className="text-muted-foreground hover:text-destructive opacity-100 md:opacity-0 group-hover:opacity-100"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </form>
-          </div>
-        ))}
-
-        {/* Empty State */}
-        {!hasCards && (
-          <div className="py-16 text-center border-dashed border rounded-xl">
-            <Layers className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-            <p className="font-medium">Nenhum cartão ainda</p>
-            <p className="text-sm text-muted-foreground">
-              Crie seu primeiro cartão usando o formulário acima.
-            </p>
-          </div>
-        )}
-      </section>
+                {deck.cards.length === 0 ? (
+                    <div className="py-24 text-center border-2 border-dashed border-border/60 rounded-3xl bg-muted/5 flex flex-col items-center justify-center animate-in zoom-in-95 duration-500">
+                        <div className="bg-muted/50 p-6 rounded-full mb-4 ring-1 ring-border">
+                            <BookOpen className="h-10 w-10 text-muted-foreground/40" />
+                        </div>
+                        <h3 className="text-xl font-bold text-foreground">Baralho Vazio</h3>
+                        <p className="text-sm text-muted-foreground max-w-xs mt-2 leading-relaxed">
+                            Este baralho precisa de conteúdo. Use o formulário para adicionar seu primeiro flashcard.
+                        </p>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        {deck.cards.map((card, index) => (
+                            <FlashcardItem
+                                key={card.id}
+                                card={card}
+                                index={index}
+                                total={deck.cards.length}
+                                deckId={deckId}
+                            />
+                        ))}
+                    </div>
+                )}
+            </section>
+        </div>
+      </main>
     </div>
   );
 }
