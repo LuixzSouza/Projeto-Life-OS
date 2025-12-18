@@ -121,7 +121,6 @@ export function FinanceDashboard({
                  title="Nenhuma conta conectada"
                  description="Adicione sua primeira conta bancária ou carteira manual para começar."
                  action={
-                    /* ✅ Correção: Usando o AccountDialog com estado controlado ou trigger direto */
                     <AccountDialog 
                         open={isAccountOpen} 
                         onOpenChange={setIsAccountOpen} 

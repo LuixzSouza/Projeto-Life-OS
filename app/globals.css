@@ -7,8 +7,12 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  
+  /* Fontes Modernas */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+
+  /* Sidebar */
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -17,11 +21,15 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
+
+  /* Charts & Data Visualization */
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
+
+  /* System Colors */
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -38,37 +46,59 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+
+  /* Radius System */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
 }
 
+/* -----------------------------------------------------------------------
+  BASE VARIABLES (OKLCH High Precision)
+  -----------------------------------------------------------------------
+*/
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
+  --radius: 0.75rem; /* Arredondamento mais moderno (12px) */
+  
+  /* Light Mode - Clean & Crisp */
+  --background: oklch(0.99 0 0); /* Branco puro mas suave */
   --foreground: oklch(0.141 0.005 285.823);
+  
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.141 0.005 285.823);
+  
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.141 0.005 285.823);
+  
   --primary: oklch(0.21 0.006 285.885);
   --primary-foreground: oklch(0.985 0 0);
+  
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.21 0.006 285.885);
+  
   --muted: oklch(0.967 0.001 286.375);
   --muted-foreground: oklch(0.552 0.016 285.938);
+  
   --accent: oklch(0.967 0.001 286.375);
   --accent-foreground: oklch(0.21 0.006 285.885);
+  
   --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+
   --border: oklch(0.92 0.004 286.32);
   --input: oklch(0.92 0.004 286.32);
   --ring: oklch(0.705 0.015 286.067);
+  
+  /* Data Viz Colors */
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
+  
+  /* Sidebar Specifics */
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.141 0.005 285.823);
   --sidebar-primary: oklch(0.21 0.006 285.885);
@@ -80,94 +110,186 @@
 }
 
 .dark {
-  --background: oklch(0.141 0.005 285.823);
+  /* Dark Mode - Deep & Professional */
+  --background: oklch(0.10 0.002 240); /* Preto levemente azulado para profundidade */
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.21 0.006 285.885);
+  
+  --card: oklch(0.14 0.004 285);
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.21 0.006 285.885);
+  
+  --popover: oklch(0.14 0.004 285);
   --popover-foreground: oklch(0.985 0 0);
+  
   --primary: oklch(0.92 0.004 286.32);
   --primary-foreground: oklch(0.21 0.006 285.885);
-  --secondary: oklch(0.274 0.006 286.033);
+  
+  --secondary: oklch(0.20 0.006 286);
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.274 0.006 286.033);
-  --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.274 0.006 286.033);
+  
+  --muted: oklch(0.20 0.006 286);
+  --muted-foreground: oklch(0.65 0.015 286);
+  
+  --accent: oklch(0.20 0.006 286);
   --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(0.274 0.006 286.033);
-  --input: oklch(0.274 0.006 286.033);
-  --ring: oklch(0.552 0.016 285.938);
+  
+  --destructive: oklch(0.396 0.141 25.723);
+  --destructive-foreground: oklch(0.985 0 0);
+  
+  --border: oklch(0.20 0.006 286);
+  --input: oklch(0.20 0.006 286);
+  --ring: oklch(0.40 0.016 285);
+  
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.21 0.006 285.885);
+  
+  --sidebar: oklch(0.12 0.004 285);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.274 0.006 286.033);
+  --sidebar-accent: oklch(0.20 0.006 286);
   --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(0.274 0.006 286.033);
-  --sidebar-ring: oklch(0.552 0.016 285.938);
+  --sidebar-border: oklch(0.20 0.006 286);
+  --sidebar-ring: oklch(0.40 0.016 285);
 }
 
+/* -----------------------------------------------------------------------
+  GLOBAL BASE STYLES
+  -----------------------------------------------------------------------
+*/
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    @apply bg-background text-foreground antialiased selection:bg-primary/20 selection:text-primary;
+    font-feature-settings: "rlig" 1, "calt" 1; /* Melhor legibilidade */
+  }
+
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
+
+  /* PREMIUM SCROLLBARS 
+    Fina, discreta e integrada ao tema.
+  */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/20 rounded-full transition-colors;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/40;
   }
 }
 
-/* TEMAS DINÂMICOS - CORREÇÃO PARA TAILWIND v4 
-   Aqui usamos hsl() ou oklch() completos, não apenas números.
+/* -----------------------------------------------------------------------
+  ENTERPRISE UTILITIES
+  -----------------------------------------------------------------------
+*/
+@layer utilities {
+  /* Glassmorphism: Efeito de vidro fosco premium */
+  .glass {
+    @apply bg-background/60 backdrop-blur-xl border border-border/50;
+  }
+
+  .glass-card {
+    @apply bg-card/50 backdrop-blur-md border border-border/60 shadow-sm;
+  }
+
+  /* Text Gradients: Texto com gradiente baseado na cor primária */
+  .text-gradient-primary {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60;
+  }
+
+  /* Subtle Backgrounds: Fundos sutis para destaque */
+  .bg-gradient-subtle {
+    @apply bg-gradient-to-br from-primary/5 via-transparent to-transparent;
+  }
+
+  /* Premium Borders: Bordas que brilham suavemente no topo */
+  .border-premium {
+    @apply border-t-primary/20 border-x-border/50 border-b-border/50;
+  }
+  
+  /* Hide Scrollbar but keep functionality */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* -----------------------------------------------------------------------
+  DYNAMIC THEMES (Converted to OKLCH for consistency)
+  -----------------------------------------------------------------------
+  Estas classes redefinem as variáveis CSS quando o data-theme é aplicado.
 */
 
-/* TEMA AZUL (Padrão) */
+/* TEMA AZUL (Default Enterprise Blue) */
 [data-theme="theme-blue"] {
-  --primary: hsl(221.2 83.2% 53.3%);
-  --ring: hsl(221.2 83.2% 53.3%);
+  --primary: oklch(0.55 0.20 260); /* Azul vibrante mas profissional */
+  --ring: oklch(0.55 0.20 260);
+  --sidebar-primary: oklch(0.55 0.20 260);
+}
+.dark [data-theme="theme-blue"] {
+  --primary: oklch(0.65 0.18 260);
+  --ring: oklch(0.65 0.18 260);
 }
 
-/* TEMA VERDE */
+/* TEMA VERDE (Emerald/Growth) */
 [data-theme="theme-green"] {
-  --primary: hsl(142 76% 36%);
-  --ring: hsl(142 76% 36%);
+  --primary: oklch(0.55 0.18 145); /* Verde esmeralda rico */
+  --ring: oklch(0.55 0.18 145);
+  --sidebar-primary: oklch(0.55 0.18 145);
 }
 .dark [data-theme="theme-green"] {
-  --primary: hsl(142 70% 50%);
-  --ring: hsl(142 70% 50%);
+  --primary: oklch(0.65 0.15 145);
+  --ring: oklch(0.65 0.15 145);
 }
 
-/* TEMA LARANJA */
+/* TEMA LARANJA (Sunset/Warm) */
 [data-theme="theme-orange"] {
-  --primary: hsl(24 95% 53%);
-  --ring: hsl(24 95% 53%);
+  --primary: oklch(0.60 0.18 35); /* Laranja queimado sofisticado */
+  --ring: oklch(0.60 0.18 35);
+  --sidebar-primary: oklch(0.60 0.18 35);
 }
 .dark [data-theme="theme-orange"] {
-  --primary: hsl(24 100% 60%);
-  --ring: hsl(24 100% 60%);
+  --primary: oklch(0.70 0.16 35);
+  --ring: oklch(0.70 0.16 35);
 }
 
-/* TEMA ROXO */
+/* TEMA ROXO (Violet/Creative) */
 [data-theme="theme-violet"] {
-  --primary: hsl(262 83% 58%);
-  --ring: hsl(262 83% 58%);
+  --primary: oklch(0.55 0.22 280); /* Roxo profundo */
+  --ring: oklch(0.55 0.22 280);
+  --sidebar-primary: oklch(0.55 0.22 280);
 }
 .dark [data-theme="theme-violet"] {
-  --primary: hsl(263 70% 65%);
-  --ring: hsl(263 70% 65%);
+  --primary: oklch(0.70 0.18 280);
+  --ring: oklch(0.70 0.18 280);
 }
 
-/* TEMA ROSE */
+/* TEMA ROSE (Berry/Modern) */
 [data-theme="theme-rose"] {
-  --primary: hsl(346 77% 49%);
-  --ring: hsl(346 77% 49%);
+  --primary: oklch(0.55 0.20 350); /* Rosa avermelhado elegante */
+  --ring: oklch(0.55 0.20 350);
+  --sidebar-primary: oklch(0.55 0.20 350);
 }
 .dark [data-theme="theme-rose"] {
-  --primary: hsl(346 80% 65%);
-  --ring: hsl(346 80% 65%);
+  --primary: oklch(0.70 0.18 350);
+  --ring: oklch(0.70 0.18 350);
 }

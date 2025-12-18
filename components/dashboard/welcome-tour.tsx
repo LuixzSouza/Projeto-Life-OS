@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect, useCallback } from "react";
 import { completeOnboarding } from "@/app/actions";
-import { Wallet, CheckSquare, BrainCircuit, ArrowRight, Check, Sparkles, X, ChevronRight, ChevronLeft, Rocket } from "lucide-react";
+import { Wallet, CheckSquare, BrainCircuit, Sparkles, X, ChevronRight, ChevronLeft, Rocket } from "lucide-react";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 // Configuração dos Slides
 const SLIDES = [
@@ -44,9 +44,27 @@ const SLIDES = [
 ];
 
 export function WelcomeTour() {
-    const [open, setOpen] = useState(true);
+    // Começa fechado para evitar "flash" de conteúdo incorreto e erros de hidratação
+    const [open, setOpen] = useState(false);
     const [currentSlide, setCurrentSlide] = useState(0);
     const [direction, setDirection] = useState(0);
+
+    // CORREÇÃO DO ERRO:
+    // Movemos a verificação para um efeito, mas usamos setTimeout para quebrar
+    // o ciclo síncrono de renderização.
+    useEffect(() => {
+        const hasSeenTour = localStorage.getItem("life-os-tour-completed");
+        
+        if (!hasSeenTour) {
+            // setTimeout com 0ms joga a execução para o final da pilha de eventos,
+            // evitando o aviso de "setState in effect" e renderização em cascata.
+            const timer = setTimeout(() => {
+                setOpen(true);
+            }, 0);
+            
+            return () => clearTimeout(timer);
+        }
+    }, []);
 
     // Variáveis para o efeito de Tilt 3D
     const x = useMotionValue(0);
@@ -58,8 +76,8 @@ export function WelcomeTour() {
         const rect = event.currentTarget.getBoundingClientRect();
         const centerX = rect.left + rect.width / 2;
         const centerY = rect.top + rect.height / 2;
-        x.set((event.clientX - centerX) / 4); // Suavidade do tilt X
-        y.set((event.clientY - centerY) / 4); // Suavidade do tilt Y
+        x.set((event.clientX - centerX) / 4);
+        y.set((event.clientY - centerY) / 4);
     };
 
     const handleMouseLeave = () => {
@@ -67,16 +85,19 @@ export function WelcomeTour() {
         y.set(0);
     };
 
-    // 1. Definir handleFinish PRIMEIRO (Resolve o erro)
     const handleFinish = useCallback(async () => {
         setOpen(false);
-        // Pequeno delay para a animação de saída
-        setTimeout(async () => {
+        // Persistência local imediata
+        localStorage.setItem("life-os-tour-completed", "true");
+        
+        // Persistência no banco (Server Action)
+        try {
             await completeOnboarding();
-        }, 300);
+        } catch (error) {
+            console.error("Falha ao salvar onboarding no servidor:", error);
+        }
     }, []);
 
-    // 2. Definir handleNext (Depende de handleFinish)
     const handleNext = useCallback(() => {
         if (currentSlide < SLIDES.length - 1) {
             setDirection(1);
@@ -93,10 +114,10 @@ export function WelcomeTour() {
         }
     }, [currentSlide]);
 
-    // Navegação por Teclado
     useEffect(() => {
+        if (!open) return; // Só escuta teclado se estiver aberto
+
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (!open) return;
             if (e.key === "ArrowRight") handleNext();
             if (e.key === "ArrowLeft") handlePrev();
             if (e.key === "Escape") handleFinish();
@@ -113,7 +134,7 @@ export function WelcomeTour() {
     return (
         <div className="fixed inset-0 w-full min-h-[100vh] z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-500">
             
-            {/* GLOW DE FUNDO (AMBIENT LIGHT) */}
+            {/* GLOW DE FUNDO */}
             <motion.div 
                 animate={{ 
                     opacity: [0.4, 0.6, 0.4],
@@ -137,7 +158,7 @@ export function WelcomeTour() {
                 onMouseLeave={handleMouseLeave}
                 className="relative z-10 w-full max-w-[500px] bg-card/90 dark:bg-zinc-950/90 border border-white/20 dark:border-white/10 rounded-[2rem] shadow-2xl overflow-hidden backdrop-blur-xl"
             >
-                {/* Efeito de Brilho no Card (Glass Reflection) */}
+                {/* Efeito de Brilho */}
                 <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent pointer-events-none" />
 
                 <button 
