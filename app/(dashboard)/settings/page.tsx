@@ -1,59 +1,84 @@
-// SettingsPage.tsx (Código completo e final)
 import { prisma } from "@/lib/prisma";
 import { getStorageStats } from "./actions";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, Database, Upload, Shield, BrainCircuit, User, Server, Plug } from "lucide-react"; // ✅ Adicionei Plug e Server
-import Link from "next/link";
+import { Database, Shield, BrainCircuit, User, Plug, Wrench } from "lucide-react";
 import path from "path";
 import { cn } from "@/lib/utils";
 import { getDatabasePath } from "@/lib/db-config";
+import os from "os";
 
-// 1. IMPORTAR OS COMPONENTES NOVOS E EXISTENTES
+// --- Importação dos Componentes ---
 import AppearanceForm from "@/components/settings/appearance-form"; 
-import { RestoreBackupForm, FactoryResetButton } from "@/components/settings/settings-actions";
+import { FactoryResetButton, RestoreBackupForm } from "@/components/settings/settings-actions";
 import { AIConfigForm } from "@/components/settings/ai-config-form";
 import { StorageAnalytics } from "@/components/settings/storage-analytics";
 import { SecurityForm } from "@/components/settings/security-form";
 import { StorageLocationForm } from "@/components/settings/storage-location-form";
-import APIIntegrationsForm from "@/components/settings/api-integrations-form"; // ✅ NOVO COMPONENTE
+import APIIntegrationsForm from "@/components/settings/api-integrations-form";
+import { BackupManager } from "@/components/settings/backup-manager";
+import { SystemInfoCard } from "@/components/settings/system-info-card"; // ✅ Info do Sistema
+import { MaintenancePanel } from "@/components/settings/maintenance-panel"; // ✅ Manutenção (VACUUM)
+import { SelectiveExport } from "@/components/settings/selective-export"; // ✅ Exportação Seletiva
 
 export default async function SettingsPage() {
-    // Busca de Dados do Servidor
+    // 1. Busca Dados do Usuário
     const user = await prisma.user.findFirst();
-    const settings = await prisma.settings.findFirst(); // Contém todas as chaves de API
+    const settings = await prisma.settings.findFirst();
     
-    const dbFullPath = getDatabasePath(); 
+    // 2. Resolve Caminho do Banco
+    const rawDbPath = getDatabasePath();
+    const dbFullPath = rawDbPath || path.join(process.cwd(), 'life_os.db'); 
     const dbFolder = path.dirname(dbFullPath);
     
-    // Se a action retornar erro, usamos um fallback
+    // 3. Histórico de Backups
+    const backupHistory = await prisma.backupLog.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 20
+    });
+
+    // 4. Estatísticas de Armazenamento (Com Fallback Seguro)
     let stats;
     try {
         stats = await getStorageStats();
     } catch (e) {
-        stats = { totalItems: 0, breakdown: [] };
+        // Fallback corrigido para bater com a interface TypeScript
+        stats = { 
+            totalItems: 0, 
+            totalSize: "0 B", 
+            breakdown: [], 
+            disk: null 
+        };
     }
+
+    // 5. Informações do Ambiente (Servidor)
+    const systemInfo = {
+        cwd: process.cwd(),
+        platform: os.platform() + " " + os.release(),
+        nodeVersion: process.version,
+        memory: Math.round(process.memoryUsage().rss / 1024 / 1024) + " MB",
+        uptime: Math.floor(process.uptime()) + "s"
+    };
 
     return (
         <div className="min-h-screen bg-muted/30 p-6 md:p-10 space-y-8 animate-in fade-in duration-500">
             
-            {/* HEADER */}
+            {/* HEADER DA PÁGINA */}
             <div className="flex flex-col gap-1 pb-6 border-b border-border">
                 <h1 className="text-3xl font-bold tracking-tight text-foreground">Configurações</h1>
                 <p className="text-muted-foreground">Gerencie suas preferências, dados e integrações.</p>
             </div>
 
-            <Tabs defaultValue="profile" className="w-full space-y-8">
+            <Tabs defaultValue="system" className="w-full space-y-8">
                 
-                {/* NAVEGAÇÃO SUPERIOR */}
+                {/* BARRA DE NAVEGAÇÃO (TABS) */}
                 <div className="overflow-x-auto pb-2">
                     <TabsList className="bg-transparent h-12 p-0 gap-6 w-full justify-start min-w-max">
                     {[
                         { value: "profile", icon: User, label: "Perfil & Aparência" },
                         { value: "intelligence", icon: BrainCircuit, label: "Inteligência Artificial" },
                         { value: "integrations", icon: Plug, label: "Integrações & APIs" }, 
-                        { value: "system", icon: Database, label: "Dados & Backup" },
+                        { value: "system", icon: Database, label: "Dados & Sistema" },
                         { value: "security", icon: Shield, label: "Segurança" },
                     ].map((tab) => (
                         <TabsTrigger 
@@ -72,19 +97,115 @@ export default async function SettingsPage() {
                     </TabsList>
                 </div>
 
-                {/* 1. PERFIL E VISUAL */}
+                {/* === ABA 1: DADOS E SISTEMA (POWER USER) === */}
+                <TabsContent value="system" className="space-y-8 focus-visible:outline-none">
+                    
+                    {/* A. Monitoramento e Localização */}
+                    <div className="grid gap-6 md:grid-cols-12">
+                        <div className="md:col-span-4 space-y-4">
+                            <div>
+                                <h3 className="text-lg font-medium text-foreground">Ambiente</h3>
+                                <p className="text-sm text-muted-foreground">Monitoramento do servidor e arquivos.</p>
+                            </div>
+                            <div className="h-auto pt-2">
+                                <SystemInfoCard info={systemInfo} />
+                            </div>
+                        </div>
+
+                        <div className="md:col-span-8 space-y-6">
+                            <Card className="border-border shadow-sm bg-card">
+                                <CardContent className="p-6">
+                                    <StorageLocationForm currentPath={dbFolder} /> 
+                                    <div className="my-6 h-px bg-border" />
+                                    <StorageAnalytics stats={stats} />
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </div>
+
+                    {/* B. Manutenção Técnica (VACUUM & CHECK) */}
+                    <div className="grid gap-6 md:grid-cols-12 pt-6 border-t border-border">
+                        <div className="md:col-span-4">
+                            <h3 className="text-lg font-medium text-foreground flex items-center gap-2">
+                                <Wrench className="h-4 w-4" /> Manutenção
+                            </h3>
+                            <p className="text-sm text-muted-foreground">
+                                Ferramentas para otimizar performance e verificar integridade.
+                            </p>
+                        </div>
+                        <div className="md:col-span-8">
+                            <MaintenancePanel />
+                        </div>
+                    </div>
+
+                    {/* C. Snapshots (Backups Locais) */}
+                    <div className="grid gap-6 md:grid-cols-12 pt-6 border-t border-border">
+                        <div className="md:col-span-4">
+                            <h3 className="text-lg font-medium text-foreground">Snapshots</h3>
+                            <p className="text-sm text-muted-foreground">
+                                Pontos de restauração salvos automaticamente na pasta do sistema.
+                            </p>
+                        </div>
+                        <div className="md:col-span-8">
+                            <BackupManager history={backupHistory} />
+                        </div>
+                    </div>
+
+                    {/* D. Migração (Exportar/Importar JSON) */}
+                    <div className="grid gap-6 md:grid-cols-12 pt-6 border-t border-border">
+                        <div className="md:col-span-4">
+                            <h3 className="text-lg font-medium text-foreground">Migração de Dados</h3>
+                            <p className="text-sm text-muted-foreground">
+                                Exporte partes específicas ou transfira dados via arquivo JSON.
+                            </p>
+                        </div>
+                        <div className="md:col-span-8">
+                            <div className="grid md:grid-cols-2 gap-4 h-full">
+                                {/* Exportação Seletiva (Novo) */}
+                                <SelectiveExport /> 
+                                
+                                {/* Importação */}
+                                <Card className="border-border shadow-sm bg-card h-full">
+                                    <CardContent className="p-6">
+                                        <RestoreBackupForm /> 
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* E. Zona de Perigo */}
+                    <div className="grid gap-6 md:grid-cols-12 pt-6 border-t border-border">
+                        <div className="md:col-span-4">
+                            <h3 className="text-lg font-medium text-destructive">Zona de Perigo</h3>
+                        </div>
+                        <div className="md:col-span-8">
+                            <Card className="border border-destructive/30 bg-destructive/5">
+                                <CardContent className="p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                                    <div>
+                                        <h4 className="text-sm font-bold text-destructive">Reset de Fábrica</h4>
+                                        <p className="text-xs text-muted-foreground">Apaga TUDO. Irreversível.</p>
+                                    </div>
+                                    <FactoryResetButton />
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </div>
+                </TabsContent>
+
+                {/* === ABA 2: PERFIL === */}
                 <TabsContent value="profile" className="space-y-6 focus-visible:outline-none">
                     <AppearanceForm 
                         initialColor={settings?.accentColor} 
                         userName={user?.name} 
                         userEmail={user?.email} 
                         userAvatar={user?.avatarUrl} 
-                        userBio={user?.bio}
-                        userCover={user?.coverUrl}
+                        userBio={user?.bio} 
+                        userCover={user?.coverUrl} 
                     />
                 </TabsContent>
 
-                {/* 2. INTELIGÊNCIA ARTIFICIAL */}
+                {/* === ABA 3: INTELIGÊNCIA ARTIFICIAL === */}
                 <TabsContent value="intelligence" className="space-y-6 focus-visible:outline-none">
                     <div className="grid gap-6 md:grid-cols-12">
                         <div className="md:col-span-4">
@@ -100,90 +221,25 @@ export default async function SettingsPage() {
                         </div>
                     </div>
                 </TabsContent>
-                
-                {/* 3. INTEGRAÇÕES & APIS (NOVO CONTEÚDO) */}
+
+                {/* === ABA 4: INTEGRAÇÕES === */}
                 <TabsContent value="integrations" className="space-y-6 focus-visible:outline-none">
                     <div className="grid gap-6 md:grid-cols-12">
                         <div className="md:col-span-4">
                             <h3 className="text-lg font-medium text-foreground">Chaves de Serviço</h3>
-                            <p className="text-sm text-muted-foreground">Conecte serviços externos para enriquecer o conteúdo (filmes, jogos, finanças).</p>
+                            <p className="text-sm text-muted-foreground">Conecte serviços externos.</p>
                         </div>
                         <div className="md:col-span-8">
                             <Card className="border-border shadow-sm bg-card">
                                 <CardContent className="p-6">
-                                    <APIIntegrationsForm settings={settings} /> {/* ✅ NOVO FORMULÁRIO */}
+                                    <APIIntegrationsForm settings={settings} />
                                 </CardContent>
                             </Card>
                         </div>
                     </div>
                 </TabsContent>
 
-
-                {/* 4. DADOS E SISTEMA */}
-                <TabsContent value="system" className="space-y-8 focus-visible:outline-none">
-                    <div className="grid gap-6 md:grid-cols-12">
-                        <div className="md:col-span-4">
-                            <h3 className="text-lg font-medium text-foreground">Armazenamento</h3>
-                            <p className="text-sm text-muted-foreground">Gerencie o local físico e o uso do disco.</p>
-                        </div>
-                        <div className="md:col-span-8 space-y-6">
-                            <Card className="border-border shadow-sm bg-card">
-                                <CardContent className="p-6">
-                                    <StorageLocationForm currentPath={dbFolder} /> 
-                                    
-                                    <div className="my-6 h-px bg-border" />
-                                    
-                                    <StorageAnalytics stats={stats} />
-                                </CardContent>
-                            </Card>
-                        </div>
-                    </div>
-
-                    {/* Backup e Restore */}
-                    <div className="grid gap-6 md:grid-cols-12 pt-6 border-t border-border">
-                        <div className="md:col-span-4">
-                            <h3 className="text-lg font-medium text-foreground">Backup & Reset</h3>
-                            <p className="text-sm text-muted-foreground">Exporte seus dados ou reinicie o sistema.</p>
-                        </div>
-                        <div className="md:col-span-8 space-y-4">
-                            <div className="grid md:grid-cols-2 gap-4">
-                                <Card className="border-border shadow-sm bg-card">
-                                    <CardHeader>
-                                        <CardTitle className="text-base flex items-center gap-2"><Download className="h-4 w-4" /> Exportar</CardTitle>
-                                        <CardDescription>Baixe um arquivo JSON com tudo.</CardDescription>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <Link href="/api/backup" target="_blank">
-                                            <Button variant="outline" className="w-full">Download Backup</Button>
-                                        </Link>
-                                    </CardContent>
-                                </Card>
-
-                                <Card className="border-border shadow-sm bg-card">
-                                    <CardHeader>
-                                        <CardTitle className="text-base flex items-center gap-2"><Upload className="h-4 w-4" /> Importar</CardTitle>
-                                        <CardDescription>Restaure dados de um arquivo.</CardDescription>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <RestoreBackupForm />
-                                    </CardContent>
-                                </Card>
-                            </div>
-
-                            <Card className="border border-destructive/30 bg-destructive/5">
-                                <CardContent className="p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                                    <div>
-                                        <h4 className="text-sm font-bold text-destructive">Zona de Perigo</h4>
-                                        <p className="text-xs text-muted-foreground">Isso apaga todas as tarefas, eventos e finanças.</p>
-                                    </div>
-                                    <FactoryResetButton />
-                                </CardContent>
-                            </Card>
-                        </div>
-                    </div>
-                </TabsContent>
-
-                {/* 5. SEGURANÇA */}
+                {/* === ABA 5: SEGURANÇA === */}
                 <TabsContent value="security" className="space-y-6 focus-visible:outline-none">
                     <div className="grid gap-6 md:grid-cols-12">
                         <div className="md:col-span-4">

@@ -1,14 +1,17 @@
 import { prisma } from "@/lib/prisma";
 import { NutritionDashboard } from "@/components/health/nutrition/nutrition-dashboard";
-import { CalendarDays, AlertCircle, Utensils, ChevronLeft } from "lucide-react";
+import { CalendarDays, AlertCircle, Utensils, ChevronLeft, CalendarRange } from "lucide-react";
 import { Metadata } from "next";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
+// ⚠️ CORREÇÃO CRÍTICA: Força renderização dinâmica para evitar erro de build
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
-  title: "Nutrição | Health",
-  description: "Diário alimentar, controle de macros e histórico calórico.",
+  title: "Nutrição & Planejamento | Health",
+  description: "Diário alimentar, controle de macros e planejador semanal.",
 };
 
 interface PageProps {
@@ -17,6 +20,7 @@ interface PageProps {
 
 // --- Interfaces Estritas (Zero Any) ---
 
+// Interface para o Histórico (Já realizada)
 interface SerializedMeal {
   id: string;
   date: string;
@@ -24,9 +28,6 @@ interface SerializedMeal {
   calories: number; 
   type: string;
   items: string;    
-  protein?: number | null;
-  carbs?: number | null;
-  fat?: number | null;
 }
 
 interface SerializedWeekData {
@@ -35,9 +36,21 @@ interface SerializedWeekData {
   type: string;
 }
 
+// Interface para o Planejamento (Futuro)
+interface SerializedMealPlan {
+  id: string;
+  dayOfWeek: number;
+  mealType: string;
+  title: string;
+  items: string;
+  calories: number | null;
+}
+
 export default async function NutritionPage(props: PageProps) {
   let serializedDayMeals: SerializedMeal[] = [];
   let serializedWeekMeals: SerializedWeekData[] = [];
+  let serializedMealPlan: SerializedMealPlan[] = []; // <--- NOVO
+  
   let selectedDate = new Date();
   let hasError = false;
 
@@ -61,22 +74,31 @@ export default async function NutritionPage(props: PageProps) {
     startOfWeek.setDate(selectedDate.getDate() - 6);
     startOfWeek.setHours(0, 0, 0, 0);
 
-    // Busca Paralela Otimizada
-    const [dayMeals, weekMeals] = await Promise.all([
+    // Busca Paralela Otimizada (Agora inclui o MealPlan)
+    const [dayMeals, weekMeals, mealPlan] = await Promise.all([
+      // 1. Refeições do dia selecionado (Histórico)
       prisma.meal.findMany({
         where: { date: { gte: startOfDay, lte: endOfDay } },
         orderBy: { date: "asc" },
       }),
+      // 2. Dados da semana para o gráfico
       prisma.meal.findMany({
         where: { date: { gte: startOfWeek, lte: endOfDay } },
         select: { date: true, calories: true, type: true }, 
+      }),
+      // 3. Planejamento Semanal (Futuro)
+      prisma.mealPlan.findMany({
+        where: { userId: "user" }, // Ajustar para ID real se tiver auth
+        orderBy: { dayOfWeek: "asc" }
       })
     ]);
 
-    // Serialização Segura (Fallback para nulos)
+    // Serialização Segura (Histórico)
     serializedDayMeals = dayMeals.map(m => ({
-      ...m,
+      id: m.id,
       date: m.date.toISOString(),
+      title: m.title,
+      type: m.type,
       calories: m.calories ?? 0,
       items: m.items ?? "",
     }));
@@ -85,6 +107,16 @@ export default async function NutritionPage(props: PageProps) {
       date: m.date.toISOString(),
       type: m.type,
       calories: m.calories ?? 0,
+    }));
+
+    // Serialização Segura (Planejamento)
+    serializedMealPlan = mealPlan.map(p => ({
+        id: p.id,
+        dayOfWeek: p.dayOfWeek,
+        mealType: p.mealType,
+        title: p.title,
+        items: p.items,
+        calories: p.calories
     }));
 
   } catch (error) {
@@ -111,9 +143,11 @@ export default async function NutritionPage(props: PageProps) {
                 <Link href="/health" className="flex-1">
                     <Button variant="ghost" className="w-full">Voltar</Button>
                 </Link>
-                <Button variant="outline" className="flex-1 border-destructive/20 hover:bg-destructive/10 text-destructive">
-                    Recarregar
-                </Button>
+                <Link href="/health/nutrition" className="flex-1">
+                    <Button variant="outline" className="w-full border-destructive/20 hover:bg-destructive/10 text-destructive">
+                        Recarregar
+                    </Button>
+                </Link>
             </div>
           </CardContent>
         </Card>
@@ -149,30 +183,31 @@ export default async function NutritionPage(props: PageProps) {
                     <div className="p-2.5 bg-primary rounded-xl shadow-lg shadow-primary/20 text-primary-foreground">
                         <Utensils className="h-6 w-6" />
                     </div>
-                    Histórico Nutricional
+                    Nutrição Integrada
                     </h1>
                     <p className="text-muted-foreground text-lg max-w-2xl">
-                    Gerencie sua ingestão calórica, macros e analise tendências da semana.
+                        Gerencie seu histórico e planeje sua semana com inteligência.
                     </p>
                 </div>
 
                 <div className="flex items-center gap-2 px-4 py-2 bg-background/50 backdrop-blur-sm border border-border/50 rounded-full shadow-sm animate-in fade-in slide-in-from-right-4 duration-700">
-                    <CalendarDays className="h-4 w-4 text-primary" />
+                    <CalendarRange className="h-4 w-4 text-primary" />
                     <span className="text-sm font-medium text-muted-foreground">
-                    Modo: <span className="text-foreground font-semibold">Diário Alimentar</span>
+                        Foco: <span className="text-foreground font-semibold">Consistência</span>
                     </span>
                 </div>
             </div>
         </div>
       </header>
 
-      <main className="px-6 md:px-8 py-8 space-y-10 max-w-[1600px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <main className="px-4 md:px-8 py-8 space-y-10 max-w-[1600px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
         
         {/* Dashboard Component */}
         <NutritionDashboard 
           initialDate={selectedDate.toISOString()} 
           meals={serializedDayMeals} 
           weekData={serializedWeekMeals}
+          mealPlan={serializedMealPlan} // <--- Passando o plano
         />
 
       </main>

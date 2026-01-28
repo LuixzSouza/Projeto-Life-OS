@@ -1,12 +1,23 @@
 // app/login/LoginPageClient.tsx
 "use client";
 
-import { useState, useEffect } from "react";
-import { authenticate } from "@/app/auth-actions";
+import { useState, useEffect, KeyboardEvent } from "react";
+import { authenticate } from "@/app/auth-actions"; 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Eye, EyeOff, ArrowRight, ShieldCheck, Zap, Command, BrainCircuit, Users } from "lucide-react";
+import { 
+    Loader2, 
+    Eye, 
+    EyeOff, 
+    ArrowRight, 
+    ShieldCheck, 
+    Command, 
+    BrainCircuit, 
+    AlertCircle,
+    CheckCircle2,
+    ArrowUp
+} from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -34,10 +45,14 @@ const FEATURES = [
     },
 ];
 
-export default function LoginPageClient() { // Renomeado para LoginPageClient
+export default function LoginPageClient() {
     const [isLoading, setIsLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [currentFeature, setCurrentFeature] = useState(0);
+    
+    // Novos estados para UX aprimorada
+    const [capsLockOn, setCapsLockOn] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     // Rotação automática dos slides
     useEffect(() => {
@@ -47,12 +62,38 @@ export default function LoginPageClient() { // Renomeado para LoginPageClient
         return () => clearInterval(timer);
     }, []);
 
+    // Detectar Caps Lock
+    const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+        if (e.getModifierState("CapsLock")) {
+            setCapsLockOn(true);
+        } else {
+            setCapsLockOn(false);
+        }
+    };
+
+    // Limpar erro ao digitar
+    const handleInputChange = () => {
+        if (error) setError(null);
+    };
+
     const handleSubmit = async (formData: FormData) => {
         setIsLoading(true);
-        const result = await authenticate(formData);
+        setError(null);
         
-        if (result?.error) {
-            toast.error(result.error);
+        try {
+            const result = await authenticate(null, formData);
+            
+            if (result?.error) {
+                setError(result.error);
+                toast.error(result.error);
+                setIsLoading(false);
+                // Vibrar celular se estiver em mobile (feedback tátil)
+                if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                    navigator.vibrate(200); 
+                }
+            }
+        } catch (err) {
+            setError("Ocorreu um erro inesperado. Tente novamente.");
             setIsLoading(false);
         }
     };
@@ -91,12 +132,16 @@ export default function LoginPageClient() { // Renomeado para LoginPageClient
                                     type="email" 
                                     placeholder="seu.email.admin@lifeos.local" 
                                     required 
-                                    className="bg-zinc-900/50 border-white/10 text-white placeholder:text-zinc-600 focus:border-indigo-500 focus:ring-indigo-500/20 h-12"
+                                    autoFocus // Foco automático ao carregar
+                                    autoComplete="email"
+                                    disabled={isLoading}
+                                    onChange={handleInputChange}
+                                    className="bg-zinc-900/50 border-white/10 text-white placeholder:text-zinc-600 focus:border-indigo-500 focus:ring-indigo-500/20 h-12 transition-all"
                                 />
                             </div>
 
                             {/* Input Senha */}
-                            <div className="space-y-2">
+                            <div className="space-y-2 relative">
                                 <div className="flex items-center justify-between">
                                     <Label htmlFor="password" className="text-xs font-bold uppercase text-zinc-500 tracking-wider">Chave de Acesso</Label>
                                 </div>
@@ -106,22 +151,63 @@ export default function LoginPageClient() { // Renomeado para LoginPageClient
                                         name="password" 
                                         type={showPassword ? "text" : "password"} 
                                         required 
-                                        className="bg-zinc-900/50 border-white/10 text-white placeholder:text-zinc-600 focus:border-indigo-500 focus:ring-indigo-500/20 h-12 pr-10"
+                                        autoComplete="current-password"
+                                        disabled={isLoading}
+                                        onKeyDown={handleKeyDown}
+                                        onKeyUp={handleKeyDown} // Garante detecção ao soltar a tecla
+                                        onChange={handleInputChange}
+                                        className={cn(
+                                            "bg-zinc-900/50 border-white/10 text-white placeholder:text-zinc-600 focus:border-indigo-500 focus:ring-indigo-500/20 h-12 pr-10 transition-all",
+                                            capsLockOn && "border-amber-500/50 focus:border-amber-500 focus:ring-amber-500/20"
+                                        )}
                                     />
                                     <button 
                                         type="button"
+                                        disabled={isLoading}
                                         onClick={() => setShowPassword(!showPassword)}
-                                        className="absolute right-3 top-3 text-zinc-500 hover:text-white transition-colors"
+                                        className="absolute right-3 top-3 text-zinc-500 hover:text-white transition-colors disabled:opacity-50"
                                     >
                                         {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                                     </button>
                                 </div>
+
+                                {/* Aviso de Caps Lock */}
+                                <AnimatePresence>
+                                    {capsLockOn && (
+                                        <motion.div 
+                                            initial={{ opacity: 0, y: -5 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -5 }}
+                                            className="absolute -bottom-6 left-0 flex items-center gap-1.5 text-amber-500 text-xs font-medium"
+                                        >
+                                            <ArrowUp className="h-3 w-3" /> Caps Lock ativado
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                             </div>
                         </div>
 
+                        {/* Mensagem de Erro Inline (Além do Toast) */}
+                        <AnimatePresence>
+                            {error && (
+                                <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: "auto" }}
+                                    exit={{ opacity: 0, height: 0 }}
+                                    className="rounded-lg bg-red-500/10 border border-red-500/20 p-3 flex items-start gap-3"
+                                >
+                                    <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+                                    <div className="text-sm text-red-200">
+                                        <span className="font-bold text-red-400 block mb-0.5">Falha no Login</span>
+                                        {error}
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
                         <Button 
                             type="submit" 
-                            className="w-full h-12 bg-indigo-600 hover:bg-indigo-500 text-white font-bold shadow-[0_0_20px_rgba(79,70,229,0.3)] transition-all hover:scale-[1.02]" 
+                            className="w-full h-12 bg-indigo-600 hover:bg-indigo-500 text-white font-bold shadow-[0_0_20px_rgba(79,70,229,0.3)] transition-all hover:scale-[1.02] disabled:opacity-70 disabled:hover:scale-100 disabled:cursor-not-allowed" 
                             disabled={isLoading}
                         >
                             {isLoading ? (
@@ -132,21 +218,8 @@ export default function LoginPageClient() { // Renomeado para LoginPageClient
                         </Button>
                     </form>
                     
-                    {/* AVISO E CONTA DE TESTE */}
+                    {/* Link de Retorno */}
                     <div className="space-y-4 pt-4 border-t border-white/10 mt-6">
-                        <div className="p-4 rounded-xl bg-zinc-800/50 border border-zinc-700/50 text-xs space-y-2">
-                            <h4 className="font-bold text-white flex items-center gap-2">
-                                <Users className="h-4 w-4 text-indigo-400" /> Conta de Demonstração (Teste)
-                            </h4>
-                            <p className="text-zinc-400">
-                                Se você acabou de instalar, use estas credenciais para testar o sistema imediatamente:
-                            </p>
-                            <code className="block p-2 rounded bg-black/40 text-emerald-300 font-mono">
-                                Email: <strong>demo@lifeos.local</strong> <br/>
-                                Senha: <strong>teste</strong>
-                            </code>
-                        </div>
-
                         <div className="text-center">
                             <Link href="/" className="text-xs text-zinc-500 hover:text-white transition-colors flex items-center justify-center gap-2 group">
                                 <ArrowRight className="h-3 w-3 rotate-180 group-hover:-translate-x-1 transition-transform" />

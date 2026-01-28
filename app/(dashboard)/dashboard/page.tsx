@@ -8,13 +8,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Progress } from "@/components/ui/progress"; // Certifique-se de ter este componente do shadcn
+import { Progress } from "@/components/ui/progress";
 
-// Componentes Filhos (Vou pedir eles em seguida)
-import { FinanceChart } from "@/components/dashboard/finance-chart";
-import { StudyChart } from "@/components/dashboard/study-chart";
+// ⬇️ CORREÇÃO: Importamos do nosso novo arquivo 'client-charts'
+// Não usamos mais 'next/dynamic' aqui diretamente
+import { FinanceChart, StudyChart } from "@/components/dashboard/client-charts";
+
 import { QuickActions } from "@/components/dashboard/quick-actions";
 import { WelcomeTour } from "@/components/dashboard/welcome-tour";
 
@@ -22,7 +21,6 @@ export default async function DashboardPage() {
   const today = new Date();
   
   // --- CARREGAMENTO DE DADOS OTIMIZADO ---
-  // Usamos 'aggregate' para somar no banco de dados, não no servidor Node.js
   const [
     user,
     accounts,
@@ -38,13 +36,13 @@ export default async function DashboardPage() {
     settings
   ] = await Promise.all([
     prisma.user.findFirst(),
-    prisma.account.findMany({ select: { balance: true } }), // Só traz o saldo
+    prisma.account.findMany({ select: { balance: true } }),
     prisma.transaction.aggregate({ where: { type: 'INCOME' }, _sum: { amount: true } }),
     prisma.transaction.aggregate({ where: { type: 'EXPENSE' }, _sum: { amount: true } }),
     prisma.transaction.findMany({ take: 5, orderBy: { date: 'desc' }, include: { account: true } }),
     prisma.task.count({ where: { isDone: false } }),
     prisma.task.count({ where: { isDone: true } }),
-    prisma.studySession.findMany({ include: { subject: true } }), // Mantido para o gráfico
+    prisma.studySession.findMany({ include: { subject: true } }),
     prisma.event.findFirst({ where: { startTime: { gte: new Date() } }, orderBy: { startTime: 'asc' } }),
     prisma.mediaItem.findMany({ where: { category: 'PLAYING' }, take: 3 }), 
     prisma.project.findMany({ where: { status: 'IN_PROGRESS' }, take: 3 }),
@@ -78,7 +76,6 @@ export default async function DashboardPage() {
   const totalStudyMinutes = studyStats.reduce((acc, s) => acc + s.durationMinutes, 0);
 
   // 4. Score de Produtividade (0 a 100)
-  // Lógica arbitrária: 1 tarefa = 10 pts, 1h estudo = 20 pts. Max 100.
   const rawScore = (completedTasksCount * 10) + Math.floor(totalStudyMinutes / 3);
   const productivityScore = Math.min(rawScore, 100);
 
@@ -202,7 +199,6 @@ export default async function DashboardPage() {
                     <CardDescription>Comparativo de entradas e saídas.</CardDescription>
                 </CardHeader>
                 <CardContent className="pl-0">
-                    {/* AQUI ENTRA O COMPONENTE DE GRÁFICO */}
                     <FinanceChart data={financeData} />
                 </CardContent>
             </Card>
@@ -229,7 +225,6 @@ export default async function DashboardPage() {
                                             <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                                                 <Briefcase className="h-4 w-4" />
                                             </div>
-                                            {/* Badge mockada, se tiver status no banco use-o */}
                                             <Badge variant="secondary" className="text-[10px]">Em andamento</Badge>
                                         </div>
                                         <span className="font-semibold text-sm truncate">{proj.title}</span>
@@ -291,7 +286,6 @@ export default async function DashboardPage() {
                     <CardTitle className="text-sm">Foco por Matéria</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    {/* AQUI ENTRA O GRÁFICO DE ESTUDOS */}
                     <StudyChart data={studyData} />
                 </CardContent>
             </Card>

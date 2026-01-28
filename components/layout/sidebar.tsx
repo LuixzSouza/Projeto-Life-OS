@@ -8,7 +8,8 @@ import {
   LayoutDashboard, Wallet, BookOpen, Dumbbell, Briefcase, Calendar,
   Globe, Settings, BrainCircuit, LogOut, Lock, Zap, Battery, BatteryLow,
   PanelLeftClose, PanelLeftOpen, ChevronRight, Bookmark, Film, Users,
-  Shirt, Loader2, Menu, X, Home
+  Shirt, Loader2, Menu, X, Home,
+  BriefcaseBusiness
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -16,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetClose, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import Image from "next/image";
 
 // --- TIPOS ---
 interface SidebarItem {
@@ -37,6 +39,7 @@ const sidebarItems: SidebarItem[] = [
   { label: "Sites & CMS", icon: Globe, href: "/cms" },
   { label: "Links & Apps", icon: Bookmark, href: "/links" },
   { label: "Acessos", icon: Lock, href: "/access" },
+  { label: "Negócios", icon: BriefcaseBusiness, href: "/business" },
   { label: "Conexões", icon: Users, href: "/social" },
   { label: "Closet", icon: Shirt, href: "/wardrobe" },
   { label: "Configurações", icon: Settings, href: "/settings" },
@@ -204,7 +207,7 @@ export function Sidebar({ user }: SidebarProps) {
     }
   };
 
-  const handleLogout = async (e: React.MouseEvent) => {
+const handleLogout = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (isLoggingOut) return;
 
@@ -215,6 +218,13 @@ export function Sidebar({ user }: SidebarProps) {
     try {
       await signOut();
     } catch (error) {
+      // Verifica se o erro é apenas um redirecionamento do Next.js
+      if ((error as Error).message === "NEXT_REDIRECT") {
+          // Se for redirect, não é erro, deixa passar (o navegador vai mudar de página)
+          return; 
+      }
+      
+      console.error("Logout Error:", error);
       toast.error("Erro ao sair.");
       setIsLoggingOut(false);
     }
@@ -239,17 +249,13 @@ export function Sidebar({ user }: SidebarProps) {
         <div className={cn("flex h-16 items-center border-b border-border/50", isCollapsed ? "justify-center px-0" : "justify-between px-6")}>
           {!isCollapsed && (
             <div className="flex items-center gap-3 font-bold text-xl tracking-tight text-foreground select-none overflow-hidden whitespace-nowrap">
-              <div className="h-8 w-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center shadow-md shrink-0">
-                <span className="font-mono text-base font-bold">L</span>
-              </div>
+              <Image width={40} height={40} src={"/logo.webp"} alt="Logo"/>
               <span className="font-alt tracking-tight text-lg">Life OS</span>
             </div>
           )}
 
           {isCollapsed && (
-            <div className="h-8 w-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center shadow-md">
-              <span className="font-mono text-base font-bold">L</span>
-            </div>
+            <Image width={40} height={40} src={"/logo.webp"} alt="Logo"/>
           )}
 
           <Button
@@ -294,9 +300,7 @@ export function Sidebar({ user }: SidebarProps) {
             <SheetTitle className="sr-only">Menu de Navegação</SheetTitle> {/* sr-only esconde visualmente mas mantém para leitores de tela */}
             
             <div className="flex items-center gap-3 font-bold text-xl tracking-tight text-foreground">
-              <div className="h-8 w-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center shadow-md">
-                <span className="font-mono text-base font-bold">L</span>
-              </div>
+              <Image width={40} height={40} src={"/logo.webp"} alt="Logo"/>
               <span className="font-alt tracking-tight text-lg">Life OS</span>
             </div>
             

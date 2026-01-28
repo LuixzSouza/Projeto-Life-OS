@@ -1,25 +1,43 @@
 import fs from 'fs';
 import path from 'path';
 
-const CONFIG_PATH = path.join(process.cwd(), 'life-os.config.json');
+// Nome do arquivo de configuração salvo na raiz do projeto
+const CONFIG_FILE_NAME = 'life-os-config.json';
+const CONFIG_PATH = path.join(process.cwd(), CONFIG_FILE_NAME);
 
-// Define o caminho padrão caso não tenha config
-const DEFAULT_DB_PATH = path.join(process.cwd(), 'prisma', 'life_os.db');
-
-export function getDatabasePath() {
-  if (fs.existsSync(CONFIG_PATH)) {
-    try {
-      const raw = fs.readFileSync(CONFIG_PATH, 'utf-8');
-      const config = JSON.parse(raw);
-      if (config.dbPath) return config.dbPath;
-    } catch (e) {
-      console.error("Erro ao ler config do banco:", e);
-    }
+export function getDatabasePath(): string | null {
+  // 1. Se o arquivo não existe, retornamos null
+  // Isso avisa ao sistema que ele PRECISA ir para o /setup
+  if (!fs.existsSync(CONFIG_PATH)) {
+    return null;
   }
-  return DEFAULT_DB_PATH;
+
+  try {
+    const raw = fs.readFileSync(CONFIG_PATH, 'utf-8');
+    const config = JSON.parse(raw);
+    
+    // Retorna o caminho se existir, ou null se estiver vazio
+    return config.databasePath || null;
+  } catch (e) {
+    console.error("⚠️ Erro ao ler config do banco:", e);
+    return null;
+  }
 }
 
 export function setDatabasePath(newPath: string) {
-  const config = { dbPath: newPath };
+  const config = { databasePath: newPath };
+  
+  // Garante que o diretório do arquivo de config existe (process.cwd() sempre existe, mas por segurança)
+  const dir = path.dirname(CONFIG_PATH);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+  console.log(`✅ Configuração salva em: ${CONFIG_PATH}`);
+}
+
+// Helper para usar nas páginas e layouts
+export function isSystemInstalled(): boolean {
+  return !!getDatabasePath();
 }

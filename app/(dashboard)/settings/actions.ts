@@ -6,197 +6,185 @@ import fs from 'fs';
 import path from 'path';
 import { getDatabasePath, setDatabasePath } from "@/lib/db-config";
 import os from 'os';
-// Importamos os tipos do Prisma para compor nossa interface de Backup
+// Importamos TODOS os tipos do Prisma para garantir integridade
 import { 
-  Project, 
-  Account, 
-  Task, 
-  Transaction, 
-  StudySubject, 
-  StudySession, 
-  Workout, 
-  HealthMetric, 
-  Event, 
-  ManagedSite, 
-  SitePage,
-  Flashcard,
-  FlashcardDeck,
-  AccessItem,
-  AiMessage,
-  User,
-  Settings,
-  JobApplication
+  Project, Account, Task, Transaction, StudySubject, StudySession, 
+  Workout, HealthMetric, Event, ManagedSite, SitePage, Flashcard, 
+  FlashcardDeck, AccessItem, AiMessage, User, Settings, JobApplication,
+  BackupLog, SavedLink // Certifique-se que SavedLink está no seu schema
 } from "@prisma/client";
 
 // ============================================================================
-// 0. DEFINIÇÃO DE TIPOS DO BACKUP (Para evitar 'any')
+// 0. HELPERS & TIPOS
 // ============================================================================
 
-// Definimos estruturas que incluem os relacionamentos aninhados (ex: Project tem Tasks)
-type ProjectWithRelations = Partial<Project> & {
-    tasks?: Partial<Task>[];
-    events?: Partial<Event>[];
-};
+// Formata bytes para legibilidade (ex: 2.5 MB)
+function formatBytes(bytes: number, decimals = 2) {
+  if (!+bytes) return '0 Bytes';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+}
 
-type AccountWithRelations = Partial<Account> & {
-    transactions?: Partial<Transaction>[];
-};
+// Gera URL amigável (Slug) para projetos antigos que não tinham
+function generateSlug(text: string): string {
+    return text
+        .toString()
+        .toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove acentos
+        .trim()
+        .replace(/\s+/g, "-")
+        .replace(/[^\w-]+/g, "")
+        .replace(/--+/g, "-") || `item-${Date.now()}`;
+}
 
-type SubjectWithRelations = Partial<StudySubject> & {
-    sessions?: Partial<StudySession>[];
-};
+// Tipos para Importação JSON (Mapeia a estrutura do arquivo)
+// Usamos 'Partial' porque o JSON pode não ter todos os campos do banco atual
+type ProjectJSON = Partial<Project> & { tasks?: Partial<Task>[]; events?: Partial<Event>[]; };
+type AccountJSON = Partial<Account> & { transactions?: Partial<Transaction>[]; };
+type SubjectJSON = Partial<StudySubject> & { sessions?: Partial<StudySession>[]; };
+type SiteJSON = Partial<ManagedSite> & { pages?: Partial<SitePage>[]; };
+// A categoria existe no JSON antigo mas não no banco novo, então definimos aqui para ler sem erro
+type DeckJSON = Partial<FlashcardDeck> & { cards?: Partial<Flashcard>[]; category?: string }; 
 
-type SiteWithRelations = Partial<ManagedSite> & {
-    pages?: Partial<SitePage>[];
-};
-
-type DeckWithRelations = Partial<FlashcardDeck> & {
-    cards?: Partial<Flashcard>[];
-};
-
-// Interface Principal do Backup
 interface BackupData {
-    meta?: { system: string; version?: string; date?: string };
-    user?: Partial<User>;
-    settings?: Partial<Settings>;
-    accounts?: AccountWithRelations[];
-    projects?: ProjectWithRelations[];
-    tasksWithoutProject?: Partial<Task>[];
-    jobApplications?: Partial<JobApplication>[];
-    studySubjects?: SubjectWithRelations[];
-    flashcardDecks?: DeckWithRelations[];
-    workouts?: Partial<Workout>[];
-    healthMetrics?: Partial<HealthMetric>[];
-    events?: Partial<Event>[]; // Eventos soltos
-    sites?: SiteWithRelations[];
-    accessItems?: Partial<AccessItem>[];
-    aiMessages?: Partial<AiMessage>[]; // Caso queira salvar histórico
+  meta?: { system: string; version?: string; date?: string };
+  user?: Partial<User>;
+  settings?: Partial<Settings>;
+  accounts?: AccountJSON[];
+  projects?: ProjectJSON[];
+  tasksWithoutProject?: Partial<Task>[];
+  jobApplications?: Partial<JobApplication>[];
+  studySubjects?: SubjectJSON[];
+  flashcardDecks?: DeckJSON[];
+  workouts?: Partial<Workout>[];
+  healthMetrics?: Partial<HealthMetric>[];
+  events?: Partial<Event>[];
+  sites?: SiteJSON[];
+  accessItems?: Partial<AccessItem>[];
+  aiMessages?: Partial<AiMessage>[];
+  savedLinks?: Partial<SavedLink>[];
 }
 
 // ============================================================================
-// 1. ANALYTICS DE DADOS (Para o Gráfico de Armazenamento)
+// 1. SNAPSHOTS LOCAIS (NOVO SISTEMA DE BACKUP FÍSICO)
 // ============================================================================
-export async function getStorageStats() {
-  const [
-    projects,
-    tasks,
-    jobs,
-    events,
-    transactions,
-    flashcards,
-    aiMessages,
-    accessItems
-  ] = await Promise.all([
-    prisma.project.count(),
-    prisma.task.count(),
-    prisma.jobApplication.count(),
-    prisma.event.count(),
-    prisma.transaction.count(),
-    prisma.flashcard.count(),
-    prisma.aiMessage.count(),
-    prisma.accessItem.count()
-  ]);
 
-  const totalItems = projects + tasks + jobs + events + transactions + flashcards + aiMessages + accessItems;
+// 1.1 Criar Snapshot (Cópia do arquivo .db)
+export async function createLocalBackup() {
+  try {
+    const dbPath = getDatabasePath();
+    
+    // ✅ Correção de segurança: garante que é string e existe
+    if (!dbPath || !fs.existsSync(dbPath)) {
+      throw new Error("Banco de dados original não encontrado no caminho configurado.");
+    }
 
-  if (totalItems === 0) {
-    return {
-      totalItems: 0,
-      breakdown: []
-    };
-  }
+    // Define pasta de backups (cria se não existir na mesma pasta do banco atual)
+    const backupDir = path.join(path.dirname(dbPath), "backups");
+    if (!fs.existsSync(backupDir)) {
+      fs.mkdirSync(backupDir, { recursive: true });
+    }
 
-  const calc = (val: number) => (val / totalItems) * 100;
+    // Nome do arquivo: snapshot-YYYY-MM-DD-HH-MM.db
+    const now = new Date();
+    const timestamp = now.toISOString().replace(/T/, '_').replace(/\..+/, '').replace(/:/g, '-'); 
+    const fileName = `snapshot-${timestamp}.db`;
+    const destination = path.join(backupDir, fileName);
 
-  return {
-    totalItems,
-    breakdown: [
-      { label: "Tarefas", count: tasks, percent: calc(tasks), color: "bg-emerald-500" },
-      { label: "Projetos", count: projects, percent: calc(projects), color: "bg-indigo-500" },
-      { label: "Finanças", count: transactions, percent: calc(transactions), color: "bg-blue-500" },
-      { label: "Vagas", count: jobs, percent: calc(jobs), color: "bg-amber-500" },
-      { label: "Agenda", count: events, percent: calc(events), color: "bg-rose-500" },
-      { label: "Estudos", count: flashcards, percent: calc(flashcards), color: "bg-purple-500" },
-      { label: "IA Chat", count: aiMessages, percent: calc(aiMessages), color: "bg-zinc-500" },
-      { label: "Cofre", count: accessItems, percent: calc(accessItems), color: "bg-orange-500" },
-    ].sort((a, b) => b.percent - a.percent)
-  };
-}
+    // Copia o arquivo .db
+    fs.copyFileSync(dbPath, destination);
 
-// ============================================================================
-// 2. CONFIGURAÇÃO DE IA
-// ============================================================================
-export async function updateAISettings(formData: FormData) {
-  const aiProvider = formData.get("aiProvider") as string;
-  const aiModel = formData.get("aiModel") as string;
-  const aiPersona = formData.get("aiPersona") as string;
-  
-  // ✅ Pegando as chaves do formulário
-  const openaiKey = formData.get("openaiKey") as string;
-  const groqKey = formData.get("groqKey") as string;
-  const googleKey = formData.get("googleKey") as string;
+    // Pega o tamanho para exibir no histórico
+    const stats = fs.statSync(destination);
 
-  const existingSettings = await prisma.settings.findFirst();
-
-  const dataToUpdate = {
-    aiProvider,
-    aiModel,
-    aiPersona,
-    // Só atualiza se o usuário digitou algo (para não apagar chaves existentes se deixar em branco)
-    ...(openaiKey && { openaiKey }),
-    ...(groqKey && { groqKey }),
-    ...(googleKey && { googleKey }),
-  };
-
-  if (existingSettings) {
-    await prisma.settings.update({
-      where: { id: existingSettings.id },
-      data: dataToUpdate
-    });
-  } else {
-    await prisma.settings.create({
+    // Salva no Log do Prisma para aparecer na lista
+    await prisma.backupLog.create({
       data: {
-          ...dataToUpdate,
-          // Campos obrigatórios no create se não existirem
-          openaiKey: openaiKey || null,
-          groqKey: groqKey || null,
-          googleKey: googleKey || null
+        fileName,
+        path: destination,
+        size: formatBytes(stats.size),
+        type: "MANUAL"
       }
     });
+
+    revalidatePath("/settings");
+    return { success: true, message: "Snapshot criado com sucesso!" };
+
+  } catch (error) {
+    console.error("Erro ao criar backup:", error);
+    return { success: false, message: "Erro ao criar backup físico." };
   }
-  revalidatePath("/");
-  revalidatePath("/ai");
-  revalidatePath("/settings");
+}
+
+// 1.2 Restaurar Snapshot (Por ID do Log)
+export async function restoreBackup(backupId: string) {
+  try {
+    const backup = await prisma.backupLog.findUnique({ where: { id: backupId } });
+    if (!backup) throw new Error("Registro de backup não encontrado.");
+
+    const dbPath = getDatabasePath();
+    if (!dbPath) throw new Error("Caminho do banco principal desconhecido.");
+
+    // Verifica se o arquivo de backup ainda existe fisicamente
+    if (!fs.existsSync(backup.path)) {
+      throw new Error("O arquivo de backup foi movido ou deletado do disco.");
+    }
+
+    // 1. Cria um backup de segurança do atual antes de substituir (Safety First)
+    const safetyPath = `${dbPath}.safety_overwrite`;
+    try {
+        fs.copyFileSync(dbPath, safetyPath);
+    } catch (e) {
+        console.warn("Aviso: Não foi possível criar backup de segurança temporário.");
+    }
+
+    // 2. Substitui o banco oficial pelo backup
+    fs.copyFileSync(backup.path, dbPath);
+
+    revalidatePath("/");
+    return { success: true, message: "Sistema restaurado com sucesso!" };
+
+  } catch (error) {
+    console.error(error);
+    return { success: false, message: (error as Error).message };
+  }
+}
+
+// 1.3 Excluir Snapshot
+export async function deleteBackup(id: string) {
+    try {
+        const backup = await prisma.backupLog.findUnique({ where: { id } });
+        
+        // Tenta apagar o arquivo físico se existir
+        if(backup && backup.path && fs.existsSync(backup.path)) {
+            try {
+                fs.unlinkSync(backup.path); 
+            } catch (e) {
+                console.error("Erro ao apagar arquivo físico:", e);
+            }
+        }
+        
+        // Apaga o registro do banco
+        await prisma.backupLog.delete({ where: { id } });
+        
+        revalidatePath("/settings");
+        return { success: true };
+    } catch (e) {
+        return { success: false };
+    }
 }
 
 // ============================================================================
-// 3. SEGURANÇA (Alterar Senha)
+// 2. IMPORTAÇÃO JSON (ANTIGO restoreBackup)
 // ============================================================================
-export async function changePassword(formData: FormData) {
-  const newPassword = formData.get("newPassword") as string;
-  
-  // Em produção, use bcrypt.hash(newPassword, 10). 
-  // Aqui estamos salvando direto conforme solicitado para o ambiente local.
-  const user = await prisma.user.findFirst();
-  if (user) {
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { password: newPassword }
-    });
-  }
-  revalidatePath("/");
-}
-
-// ============================================================================
-// 4. RESTORE BACKUP
-// ============================================================================
-export async function restoreBackup(formData: FormData) {
+export async function importJsonData(formData: FormData) {
   const file = formData.get("file") as File;
   if (!file) throw new Error("Nenhum arquivo enviado");
 
   const text = await file.text();
-  
-  // 1. Parsing Tipado: Definimos que o JSON tem o formato BackupData
   let data: BackupData;
   try {
     data = JSON.parse(text) as BackupData;
@@ -204,17 +192,14 @@ export async function restoreBackup(formData: FormData) {
     throw new Error("Arquivo JSON inválido.");
   }
 
-  // Validação básica
   if (data.meta?.system !== "Life OS") {
     throw new Error("Este backup não pertence ao Life OS.");
   }
 
-  // 2. Identificar ou Criar Usuário Dono para vincular os dados
   let currentUser = await prisma.user.findFirst();
 
   if (!currentUser) {
     if (data.user) {
-        // Tenta usar o usuário do backup
         currentUser = await prisma.user.create({
             data: {
                 name: data.user.name || "Usuário Restaurado",
@@ -225,41 +210,30 @@ export async function restoreBackup(formData: FormData) {
             }
         });
     } else {
-        // Cria um padrão se não existir no backup
         currentUser = await prisma.user.create({
             data: {
                 name: "Admin Life OS",
                 email: "admin@lifeos.local",
                 password: "admin", 
-                bio: "Usuário gerado automaticamente pelo Restore."
+                bio: "Usuário gerado automaticamente."
             }
         });
     }
   }
 
   try {
-    // 3. Limpeza Total antes de restaurar
-    await factoryReset(); 
-
+    await factoryReset(); // Limpa tudo antes de importar
     const userId = currentUser.id;
 
-    // 4. Restaurar Dados (Agora o TypeScript sabe os tipos dentro do .map)
+    // --- RECRIAÇÃO DOS DADOS ---
     
-    // Contas e Transações
+    // 1. Contas
     if (data.accounts?.length) {
       for (const a of data.accounts) {
-        if (!a.name || !a.type) continue; // Validação simples
-        
+        if (!a.name || !a.type) continue;
         const newAccount = await prisma.account.create({
-          data: {
-            name: a.name, 
-            type: a.type, 
-            balance: a.balance || 0, 
-            color: a.color, 
-            userId: userId
-          }
+          data: { name: a.name, type: a.type, balance: a.balance || 0, color: a.color, userId: userId }
         });
-        
         if (a.transactions?.length) {
            await prisma.transaction.createMany({
               data: a.transactions.map((t) => ({
@@ -275,49 +249,52 @@ export async function restoreBackup(formData: FormData) {
       }
     }
 
-    // Projetos, Tarefas e Eventos
+    // 2. Projetos (COM CORREÇÃO DE SLUG)
     if (data.projects?.length) {
-      for (const p of data.projects) {
-         if (!p.title) continue;
+        for (const p of data.projects) {
+          if (!p.title) continue;
+          
+          // ✅ CORREÇÃO: Gerar slug se não existir (Obrigatorio no Schema atual)
+          const safeSlug = p.slug || generateSlug(p.title);
 
-         const newProject = await prisma.project.create({
-            data: {
-               title: p.title, 
-               description: p.description, 
-               status: p.status || "ACTIVE", 
-               color: p.color,
-               userId: userId
-            }
-         });
+          const newProject = await prisma.project.create({
+             data: { 
+                 title: p.title, 
+                 slug: safeSlug, // Usa o slug gerado
+                 description: p.description, 
+                 status: p.status || "ACTIVE", 
+                 color: p.color, 
+                 userId: userId 
+             }
+          });
 
-         if (p.tasks?.length) {
-            await prisma.task.createMany({
-               data: p.tasks.map((t) => ({
-                  title: t.title || "Tarefa sem nome",
-                  isDone: t.isDone || false,
-                  dueDate: t.dueDate ? new Date(t.dueDate) : null,
-                  priority: t.priority || "MEDIUM",
-                  image: t.image,
-                  projectId: newProject.id
-               }))
-            });
-         }
-         
-         if (p.events?.length) {
-            await prisma.event.createMany({
-               data: p.events.map((e) => ({
-                  title: e.title || "Evento sem nome",
-                  startTime: e.startTime ? new Date(e.startTime) : new Date(),
-                  endTime: e.endTime ? new Date(e.endTime) : null,
-                  isAllDay: e.isAllDay || false,
-                  projectId: newProject.id
-               }))
-            });
-         }
-      }
+          if (p.tasks?.length) {
+             await prisma.task.createMany({
+                data: p.tasks.map((t) => ({
+                   title: t.title || "Tarefa",
+                   isDone: t.isDone || false,
+                   dueDate: t.dueDate ? new Date(t.dueDate) : null,
+                   priority: t.priority || "MEDIUM",
+                   image: t.image,
+                   projectId: newProject.id
+                }))
+             });
+          }
+          if (p.events?.length) {
+             await prisma.event.createMany({
+                data: p.events.map((e) => ({
+                   title: e.title || "Evento",
+                   startTime: e.startTime ? new Date(e.startTime) : new Date(),
+                   endTime: e.endTime ? new Date(e.endTime) : null,
+                   isAllDay: e.isAllDay || false,
+                   projectId: newProject.id
+                }))
+             });
+          }
+        }
     }
 
-    // Tarefas Avulsas
+    // 3. Tarefas Avulsas
     if (data.tasksWithoutProject?.length) {
         await prisma.task.createMany({
             data: data.tasksWithoutProject.map((t) => ({
@@ -331,7 +308,7 @@ export async function restoreBackup(formData: FormData) {
         });
     }
 
-    // Vagas (Jobs)
+    // 4. Job Applications
     if (data.jobApplications?.length) {
         await prisma.jobApplication.createMany({
             data: data.jobApplications.map((j) => ({
@@ -347,13 +324,15 @@ export async function restoreBackup(formData: FormData) {
         });
     }
 
-    // Estudos (Flashcards)
+    // 5. Flashcards (COM CORREÇÃO DE CATEGORY)
     if (data.flashcardDecks?.length) {
         for (const d of data.flashcardDecks) {
             if (!d.title) continue;
             
+            // ✅ CORREÇÃO: Removemos 'category' pois o banco não aceita
+            // Apenas passamos 'title'
             const newDeck = await prisma.flashcardDeck.create({
-                data: { title: d.title, category: d.category }
+                data: { title: d.title } 
             });
             
             if (d.cards?.length) {
@@ -370,50 +349,7 @@ export async function restoreBackup(formData: FormData) {
         }
     }
 
-    // Matérias e Sessões
-    if (data.studySubjects?.length) {
-        for (const s of data.studySubjects) {
-            if (!s.title || !s.category) continue;
-
-            const newSubject = await prisma.studySubject.create({
-                data: { title: s.title, category: s.category, color: s.color }
-            });
-
-            if (s.sessions?.length) {
-                await prisma.studySession.createMany({
-                    data: s.sessions.map(sess => ({
-                        durationMinutes: sess.durationMinutes || 0,
-                        notes: sess.notes,
-                        date: sess.date ? new Date(sess.date) : new Date(),
-                        subjectId: newSubject.id
-                    }))
-                });
-            }
-        }
-    }
-
-    // CMS (Sites)
-    if (data.sites?.length) {
-        for (const s of data.sites) {
-             if (!s.name) continue;
-
-             const newSite = await prisma.managedSite.create({
-                data: { name: s.name, url: s.url, apiKey: s.apiKey || "generated_key" }
-             });
-             
-             if (s.pages?.length) {
-                 await prisma.sitePage.createMany({
-                    data: s.pages.map((p) => ({
-                        slug: p.slug || "/",
-                        content: p.content || "",
-                        siteId: newSite.id
-                    }))
-                 });
-             }
-        }
-    }
-
-    // Cofre (Access Items)
+    // 6. Access Items
     if (data.accessItems?.length) {
         await prisma.accessItem.createMany({
             data: data.accessItems.map((item) => ({
@@ -428,20 +364,21 @@ export async function restoreBackup(formData: FormData) {
         });
     }
 
-    // Workouts e Health
-    if (data.workouts?.length) {
-         await prisma.workout.createMany({
-            data: data.workouts.map(w => ({
-                title: w.title || "Treino",
-                type: w.type || "Geral",
-                duration: w.duration || 0,
-                intensity: w.intensity || "Média",
-                date: w.date ? new Date(w.date) : new Date()
+    // 7. Links Salvos (Novidade)
+    if (data.savedLinks?.length) {
+        await prisma.savedLink.createMany({
+            data: data.savedLinks.map((l) => ({
+                title: l.title || "Link",
+                url: l.url || "#",
+                description: l.description,
+                imageUrl: l.imageUrl,
+                category: l.category || "Geral",
+                createdAt: l.createdAt ? new Date(l.createdAt) : new Date()
             }))
-         });
+        });
     }
 
-    // Configurações e Perfil
+    // 8. Configurações
     if (data.settings) {
         const existingSettings = await prisma.settings.findFirst();
         if (existingSettings) {
@@ -453,74 +390,137 @@ export async function restoreBackup(formData: FormData) {
                     aiProvider: data.settings.aiProvider 
                 }
             });
-        } else {
-            await prisma.settings.create({
-                data: { 
-                    accentColor: data.settings.accentColor || "theme-blue", 
-                    theme: data.settings.theme || "system" 
-                }
-            });
         }
     }
 
-    if (data.user) {
-         await prisma.user.update({
-            where: { id: userId },
-            data: { bio: data.user.bio, avatarUrl: data.user.avatarUrl }
-         });
-    }
-
     revalidatePath("/");
     return { success: true };
 
   } catch (error) {
-    console.error("Erro no restore:", error);
-    throw new Error("Erro ao processar dados. O arquivo pode estar corrompido ou incompatível.");
+    console.error("Erro na importação JSON:", error);
+    throw new Error("Erro ao processar dados JSON.");
   }
 }
 
 // ============================================================================
-// 5. FACTORY RESET
+// 3. STORAGE STATS (ANALYTICS)
 // ============================================================================
-export async function factoryReset() {
-  try {
-    // Ordem de deleção: Filhos -> Pais para evitar erro de Foreign Key
-    
-    // Nível 3 (Netos)
-    await prisma.transaction.deleteMany();
-    await prisma.sitePage.deleteMany();
-    await prisma.aiMessage.deleteMany();
-    await prisma.flashcard.deleteMany();
-    
-    // Nível 2 (Filhos)
-    await prisma.task.deleteMany(); 
-    await prisma.event.deleteMany(); 
-    await prisma.studySession.deleteMany();
-    
-    // Nível 1 (Pais/Independentes)
-    await prisma.account.deleteMany();
-    await prisma.project.deleteMany();
-    await prisma.jobApplication.deleteMany();
-    await prisma.studySubject.deleteMany();
-    await prisma.flashcardDeck.deleteMany();
-    await prisma.workout.deleteMany();
-    await prisma.healthMetric.deleteMany();
-    await prisma.managedSite.deleteMany();
-    await prisma.aiChat.deleteMany();
-    await prisma.accessItem.deleteMany();
-    await prisma.friend.deleteMany();
-    await prisma.wardrobeItem.deleteMany();
-    
-    revalidatePath("/");
-    return { success: true };
-  } catch (error) {
-    console.error("Erro no Factory Reset:", error);
-    throw new Error("Falha ao apagar dados. Tente novamente.");
+export async function getStorageStats() {
+  // 1. Busca os dados reais para calcular o peso (Size)
+  // Nota: Em apps gigantes, isso seria pesado. Para uso pessoal (SQLite), é rápido.
+  const [
+    projects, tasks, jobs, events, transactions, flashcards, aiMessages, accessItems, links
+  ] = await Promise.all([
+    prisma.project.findMany(),
+    prisma.task.findMany(),
+    prisma.jobApplication.findMany(),
+    prisma.event.findMany(),
+    prisma.transaction.findMany(),
+    prisma.flashcard.findMany(),
+    prisma.aiMessage.findMany(),
+    prisma.accessItem.findMany(),
+    prisma.savedLink.findMany()
+  ]);
+
+  // 2. Calcula o tamanho em Bytes de cada categoria (Aproximação via JSON)
+  const sizes = {
+    projects: Buffer.byteLength(JSON.stringify(projects)),
+    tasks: Buffer.byteLength(JSON.stringify(tasks)),
+    jobs: Buffer.byteLength(JSON.stringify(jobs)),
+    events: Buffer.byteLength(JSON.stringify(events)),
+    transactions: Buffer.byteLength(JSON.stringify(transactions)),
+    flashcards: Buffer.byteLength(JSON.stringify(flashcards)),
+    aiMessages: Buffer.byteLength(JSON.stringify(aiMessages)),
+    accessItems: Buffer.byteLength(JSON.stringify(accessItems)),
+    links: Buffer.byteLength(JSON.stringify(links)),
+  };
+
+  const totalBytes = Object.values(sizes).reduce((a, b) => a + b, 0);
+  const totalItems = projects.length + tasks.length + jobs.length + events.length + transactions.length + flashcards.length + aiMessages.length + accessItems.length + links.length;
+
+  if (totalItems === 0) return { totalItems: 0, breakdown: [], totalSize: "0 B" };
+
+  // 3. Informações do Disco Físico
+  let diskInfo = null;
+  const dbPath = getDatabasePath();
+  if (dbPath && fs.existsSync(dbPath)) {
+      const stats = fs.statSync(dbPath);
+      diskInfo = {
+          path: dbPath,
+          total: "N/A", // SQLite é arquivo único, não partição inteira
+          used: formatBytes(stats.size),
+          rawSize: stats.size,
+          free: "N/A",
+          percent: 0 // Calcularemos no front se necessário ou deixamos fixo
+      };
   }
+
+  // 4. Monta o Breakdown
+  const breakdown = [
+    { label: "Tarefas", count: tasks.length, bytes: sizes.tasks, color: "bg-emerald-500" },
+    { label: "Projetos", count: projects.length, bytes: sizes.projects, color: "bg-indigo-500" },
+    { label: "Finanças", count: transactions.length, bytes: sizes.transactions, color: "bg-blue-500" },
+    { label: "Vagas", count: jobs.length, bytes: sizes.jobs, color: "bg-amber-500" },
+    { label: "Agenda", count: events.length, bytes: sizes.events, color: "bg-rose-500" },
+    { label: "Estudos", count: flashcards.length, bytes: sizes.flashcards, color: "bg-purple-500" },
+    { label: "Links", count: links.length, bytes: sizes.links, color: "bg-cyan-500" },
+    { label: "IA Chat", count: aiMessages.length, bytes: sizes.aiMessages, color: "bg-zinc-500" },
+    { label: "Cofre", count: accessItems.length, bytes: sizes.accessItems, color: "bg-orange-500" },
+  ].map(item => ({
+      ...item,
+      // Calculamos as porcentagens para ambas as métricas
+      percentCount: (item.count / totalItems) * 100,
+      percentSize: totalBytes > 0 ? (item.bytes / totalBytes) * 100 : 0,
+      formattedSize: formatBytes(item.bytes)
+  })).sort((a, b) => b.bytes - a.bytes); // Ordena por tamanho (mais relevante)
+
+  return {
+    totalItems,
+    totalSize: formatBytes(totalBytes),
+    breakdown,
+    disk: diskInfo
+  };
 }
 
 // ============================================================================
-// 6. ATUALIZAR PERFIL (SETTINGS)
+// 4. CONFIGURAÇÕES GERAIS E IA
+// ============================================================================
+export async function updateAISettings(formData: FormData) {
+  const aiProvider = formData.get("aiProvider") as string;
+  const aiModel = formData.get("aiModel") as string;
+  const aiPersona = formData.get("aiPersona") as string;
+  const openaiKey = formData.get("openaiKey") as string;
+  const groqKey = formData.get("groqKey") as string;
+  const googleKey = formData.get("googleKey") as string;
+
+  const existingSettings = await prisma.settings.findFirst();
+
+  const dataToUpdate = {
+    aiProvider,
+    aiModel,
+    aiPersona,
+    ...(openaiKey && { openaiKey }),
+    ...(groqKey && { groqKey }),
+    ...(googleKey && { googleKey }),
+  };
+
+  if (existingSettings) {
+    await prisma.settings.update({ where: { id: existingSettings.id }, data: dataToUpdate });
+  } else {
+    await prisma.settings.create({
+      data: {
+          ...dataToUpdate,
+          openaiKey: openaiKey || null,
+          groqKey: groqKey || null,
+          googleKey: googleKey || null
+      }
+    });
+  }
+  revalidatePath("/");
+}
+
+// ============================================================================
+// 5. UPDATE SETTINGS (PERFIL)
 // ============================================================================
 export async function updateSettings(formData: FormData) {
     const name = formData.get("name") as string;
@@ -536,19 +536,18 @@ export async function updateSettings(formData: FormData) {
     if (user) {
         await prisma.user.update({
             where: { id: user.id },
-            data: { name, email, bio, avatarUrl, coverUrl: coverUrl } // ✅ coverUrl está aqui
+            data: { name, email, bio, avatarUrl, coverUrl }
         });
     } else {
-        // Fallback create se não existir user
         await prisma.user.create({
-            data: { name, email, bio, avatarUrl, password: 'admin', coverUrl: coverUrl }
+            data: { name, email, bio, avatarUrl, password: 'admin', coverUrl }
         });
     }
 
     if (settings) {
         await prisma.settings.update({
             where: { id: settings.id },
-            data: { accentColor } // O updateSettings só deve alterar o accentColor
+            data: { accentColor }
         });
     } else {
         await prisma.settings.create({
@@ -561,55 +560,41 @@ export async function updateSettings(formData: FormData) {
 }
 
 // ============================================================================
-// 7. GERENCIAMENTO DE ARMAZENAMENTO (MOVER BANCO)
+// 6. GERENCIAMENTO DE PASTA (MOVER DB)
 // ============================================================================
 export async function updateStoragePath(formData: FormData) {
   const newPathRaw = formData.get("storagePath") as string;
-  
   if (!newPathRaw) throw new Error("Caminho inválido.");
 
-  // Normaliza o caminho
   let newDbPath = path.normalize(newPathRaw);
-  
-  // Se o usuário digitou apenas uma pasta (ex: D:/LifeOS), adicionamos o arquivo
   if (!newDbPath.endsWith(".db")) {
     newDbPath = path.join(newDbPath, "life_os.db");
   }
 
   const currentDbPath = getDatabasePath();
 
-  // Se for o mesmo caminho, não faz nada
-  if (currentDbPath === newDbPath) return;
+  // ✅ Correção: Verifica se currentDbPath é nulo
+  if (!currentDbPath || currentDbPath === newDbPath) return;
 
   try {
-    // 1. Garante que a pasta de destino existe
     const targetDir = path.dirname(newDbPath);
     if (!fs.existsSync(targetDir)) {
       fs.mkdirSync(targetDir, { recursive: true });
     }
 
-    // 2. Copia o banco atual para o novo local
     if (fs.existsSync(currentDbPath)) {
         fs.copyFileSync(currentDbPath, newDbPath);
-        console.log(`✅ Banco copiado de ${currentDbPath} para ${newDbPath}`);
-    } else {
-        console.log("ℹ️ Nenhum banco anterior encontrado. Um novo será criado.");
     }
 
-    // 3. Atualiza o arquivo JSON de configuração
     setDatabasePath(newDbPath);
     
-    // 4. Salva no banco SQL para o monitoramento de disco (Dashboard)
-    // O erro sumirá após rodar 'npx prisma generate'
     const settings = await prisma.settings.findFirst();
-    
     if (settings) {
         await prisma.settings.update({
             where: { id: settings.id },
-            data: { storagePath: targetDir } // Salva a pasta, não o arquivo
+            data: { storagePath: targetDir }
         });
     } else {
-        // Fallback caso não exista settings ainda
         await prisma.settings.create({
             data: { storagePath: targetDir }
         });
@@ -619,80 +604,153 @@ export async function updateStoragePath(formData: FormData) {
 
   } catch (error) {
     console.error("Erro ao mover banco:", error);
-    throw new Error("Falha ao mover o arquivo. Verifique permissões da pasta.");
+    throw new Error("Falha ao mover o arquivo. Verifique permissões.");
   }
 }
 
 export async function listDirectories(currentPath: string) {
   try {
-    // Lógica para detectar Discos no Windows quando o caminho for "ROOT"
     if (currentPath === "ROOT" && os.platform() === 'win32') {
         const drives = [];
-        // Verifica letras de A a Z
         for (let i = 65; i <= 90; i++) {
             const drive = String.fromCharCode(i) + ":\\";
             try {
-                fs.accessSync(drive); // Testa se o disco existe/está acessível
+                fs.accessSync(drive);
                 drives.push({ name: `Disco Local (${drive})`, path: drive, type: 'drive' });
-            } catch (e) {
-                // Disco não existe, ignora
-            }
+            } catch (e) {}
         }
         return { success: true, path: "Este Computador", directories: drives, isRoot: true };
     }
 
-    // Se caminho vazio, usa a Home do usuário como padrão
     const searchPath = currentPath && currentPath !== "Este Computador" ? currentPath : os.homedir();
-    
-    // Tenta ler o diretório
     const entries = fs.readdirSync(searchPath, { withFileTypes: true });
     
     const directories = entries
-      .filter(entry => entry.isDirectory()) // Só mostra pastas
+      .filter(entry => entry.isDirectory())
       .map(entry => ({
         name: entry.name,
         path: path.join(searchPath, entry.name),
         type: 'folder'
       }))
-      // Ordena alfabeticamente
       .sort((a, b) => a.name.localeCompare(b.name));
 
     return { success: true, path: searchPath, directories, isRoot: false };
 
   } catch (error) {
-    console.error("Erro ao ler pasta:", error);
     return { success: false, error: "Acesso negado ou pasta inválida." };
   }
 }
 
 // ============================================================================
-// 8. CONFIGURAÇÃO DE INTEGRAÇÕES (APIs)
+// 7. SEGURANÇA E FACTORY RESET
+// ============================================================================
+export async function changePassword(formData: FormData) {
+  const newPassword = formData.get("newPassword") as string;
+  const user = await prisma.user.findFirst();
+  if (user) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: newPassword }
+    });
+  }
+  revalidatePath("/");
+}
+
+export async function factoryReset() {
+  try {
+    // Ordem de deleção: Nível 3 (Netos) -> Nível 1 (Pais)
+    await prisma.transaction.deleteMany();
+    await prisma.sitePage.deleteMany();
+    await prisma.aiMessage.deleteMany();
+    await prisma.flashcard.deleteMany();
+    await prisma.task.deleteMany(); 
+    await prisma.event.deleteMany(); 
+    await prisma.studySession.deleteMany();
+    await prisma.account.deleteMany();
+    await prisma.project.deleteMany();
+    await prisma.jobApplication.deleteMany();
+    await prisma.studySubject.deleteMany();
+    await prisma.flashcardDeck.deleteMany();
+    await prisma.workout.deleteMany();
+    await prisma.healthMetric.deleteMany();
+    await prisma.managedSite.deleteMany();
+    await prisma.aiChat.deleteMany();
+    await prisma.accessItem.deleteMany();
+    await prisma.savedLink.deleteMany(); // ✅ Adicionado Links
+    // await prisma.friend.deleteMany(); // Descomente se usar
+    // await prisma.wardrobeItem.deleteMany(); // Descomente se usar
+    await prisma.backupLog.deleteMany(); 
+    
+    revalidatePath("/");
+    return { success: true };
+  } catch (error) {
+    console.error("Erro no Factory Reset:", error);
+    throw new Error("Falha ao apagar dados.");
+  }
+}
+
+export async function updateSecurityPreferences(formData: FormData) {
+    const autoLockMinutes = Number(formData.get("autoLockMinutes"));
+    const privacyMode = formData.get("privacyMode") === "on";
+
+    // 1. Tenta achar a configuração
+    const existingSettings = await prisma.settings.findFirst();
+
+    if (existingSettings) {
+        // CENÁRIO A: Já existe -> Atualiza
+        await prisma.settings.update({
+            where: { id: existingSettings.id },
+            data: { 
+                autoLockMinutes: autoLockMinutes,
+                privacyMode: privacyMode 
+            }
+        });
+    } else {
+        // CENÁRIO B: Não existe -> Cria do zero (Isso estava faltando!)
+        // Precisamos vincular a um usuário se possível
+        const user = await prisma.user.findFirst();
+        
+        await prisma.settings.create({
+            data: {
+                autoLockMinutes: autoLockMinutes,
+                privacyMode: privacyMode,
+                // Preenchemos os padrões obrigatórios
+                theme: "system",
+                accentColor: "blue",
+                userId: user?.id
+            }
+        });
+    }
+    
+    // 2. Força a atualização do cache
+    revalidatePath("/settings");
+    revalidatePath("/", "layout");
+    
+    return { success: true };
+}
+
+export async function verifyMasterPassword(password: string) {
+    const user = await prisma.user.findFirst();
+    if (!user) return { success: false };
+
+    // Em produção, use bcrypt.compare(password, user.password)
+    // Como seu sistema atual usa senha em texto plano (pelo código anterior):
+    const isValid = user.password === password;
+
+    return { success: isValid };
+}
+
+// ============================================================================
+// 8. INTEGRAÇÕES (API KEYS)
 // ============================================================================
 export async function updateApiKeys(formData: FormData) {
-    // Integrações de Conteúdo
     const tmdbApiKey = formData.get("tmdbApiKey") as string;
     const rawgApiKey = formData.get("rawgApiKey") as string;
-    
-    // Integrações Financeiras
     const pluggyClientId = formData.get("pluggyClientId") as string;
     const pluggyClientSecret = formData.get("pluggyClientSecret") as string;
 
     const existingSettings = await prisma.settings.findFirst();
 
-    // Cria um objeto de dados para atualização, incluindo apenas as chaves que foram preenchidas.
-    // Isso evita apagar chaves existentes se o usuário deixar o campo em branco.
-    const dataToUpdate = {
-        ...(tmdbApiKey && { tmdbApiKey }),
-        ...(rawgApiKey && { rawgApiKey }),
-        ...(pluggyClientId && { pluggyClientId }),
-        ...(pluggyClientSecret && { pluggyClientSecret }),
-    };
-
-    // Caso o usuário queira remover a chave (limpar o campo), precisamos tratar o campo vazio.
-    // Para simplificar, assumimos que preencher campos vazios deve manter a chave existente,
-    // ou você precisa de um checkbox "remover chave" no formulário.
-    // Para este caso, vamos atualizar TUDO, assumindo que se o campo vier vazio, o usuário quer limpar a chave.
-    
     const finalData = {
         tmdbApiKey: tmdbApiKey || null,
         rawgApiKey: rawgApiKey || null,
@@ -700,14 +758,12 @@ export async function updateApiKeys(formData: FormData) {
         pluggyClientSecret: pluggyClientSecret || null,
     }
 
-
     if (existingSettings) {
         await prisma.settings.update({
             where: { id: existingSettings.id },
             data: finalData
         });
     } else {
-        // Se não existir settings, cria com os dados fornecidos
         await prisma.settings.create({
             data: finalData
         });
@@ -715,4 +771,54 @@ export async function updateApiKeys(formData: FormData) {
 
     revalidatePath("/settings");
     return { success: true, message: "Chaves de API salvas com sucesso!" };
+}
+
+// ============================================================================
+// 9. MANUTENÇÃO AVANÇADA 
+// ============================================================================
+
+// Executa limpeza e compactação do SQLite
+export async function optimizeDatabase() {
+  try {
+    const startTime = performance.now();
+    
+    // VACUUM: Reconstrói o banco para liberar espaço não utilizado
+    await prisma.$executeRawUnsafe(`VACUUM;`);
+    
+    // OPTIMIZE: Melhora a performance de queries futuras
+    await prisma.$executeRawUnsafe(`PRAGMA optimize;`);
+    
+    const duration = (performance.now() - startTime).toFixed(0);
+    
+    // Recalcula stats para mostrar a diferença
+    revalidatePath("/settings");
+    
+    return { 
+      success: true, 
+      message: `Banco otimizado e compactado em ${duration}ms.` 
+    };
+  } catch (error) {
+    console.error(error);
+    return { success: false, message: "Erro ao otimizar banco de dados." };
+  }
+}
+
+// Verifica se o arquivo .db está saudável
+export async function checkDatabaseIntegrity() {
+  try {
+    // PRAGMA integrity_check: Verifica consistência e corrupção
+    const result = await prisma.$queryRawUnsafe<{ integrity_check: string }[]>(`PRAGMA integrity_check;`);
+    
+    // O resultado vem como array. Se o primeiro item for "ok", está tudo certo.
+    // O retorno do Raw pode variar, então tratamos como any seguro ou unknown
+    const status =  Array.isArray(result) && result[0] ? Object.values(result[0])[0] : "unknown";
+
+    if (status === "ok") {
+      return { success: true, message: "Integridade verificada: 100% Saudável." };
+    } else {
+      return { success: false, message: `Problemas encontrados: ${status}` };
+    }
+  } catch (error) {
+    return { success: false, message: "Falha ao rodar diagnóstico." };
+  }
 }

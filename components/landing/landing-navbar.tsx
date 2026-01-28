@@ -14,6 +14,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 interface NavbarProps {
   authState: {
@@ -104,9 +105,7 @@ export default function LandingNavbar({ authState }: NavbarProps) {
             className="relative z-50 flex items-center gap-3 group"
             aria-label="Life OS Home"
           >
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-zinc-800 to-black border border-white/10 flex items-center justify-center shadow-2xl transition-all group-hover:border-white/20">
-              <Command className="h-5 w-5 text-white" />
-            </div>
+            <Image src={"/logo.webp"} width={40} height={40} alt="Life Os Home"/>
 
             <div className="flex flex-col">
               <span className="text-base font-bold tracking-tight text-white leading-none">

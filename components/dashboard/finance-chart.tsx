@@ -150,11 +150,13 @@ export function FinanceChart({ data, title = "Fluxo de Caixa", className }: Fina
          </div>
       </div>
 
-      <div className="h-[250px] w-full select-none">
+      {/* CORREÇÃO CRÍTICA: Container com altura e largura explícitas 
+          para evitar erro de renderização do Recharts.
+      */}
+      <div style={{ width: '100%', height: 250, minHeight: 250 }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 10, right: 0, left: -24, bottom: 0 }}>
             
-            {/* Definições de Gradiente Premium */}
             <defs>
               <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#10b981" stopOpacity={1} />
@@ -199,6 +201,8 @@ export function FinanceChart({ data, title = "Fluxo de Caixa", className }: Fina
               cursor={<CustomCursor />} 
               animationDuration={200}
               isAnimationActive={true}
+              // Importante para tooltips não ficarem cortados nas bordas
+              allowEscapeViewBox={{ x: true, y: true }}
             />
             
             <ReferenceLine y={0} stroke="hsl(var(--border))" strokeOpacity={0.5} />
@@ -214,10 +218,6 @@ export function FinanceChart({ data, title = "Fluxo de Caixa", className }: Fina
                 <Cell 
                   key={`cell-${index}`} 
                   fill={entry.type === 'INCOME' ? 'url(#incomeGradient)' : 'url(#expenseGradient)'}
-                  // ✅ CORREÇÃO AQUI: 
-                  // 1. stroke-transparent para remover bordas indesejadas
-                  // 2. outline-none e focus:outline-none para remover a borda branca ao clicar
-                  // 3. style={{ outline: 'none' }} como garantia extra
                   className="transition-all duration-300 hover:opacity-80 cursor-pointer outline-none focus:outline-none"
                   style={{ outline: 'none' }}
                   strokeWidth={0}

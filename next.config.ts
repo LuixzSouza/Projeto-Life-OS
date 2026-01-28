@@ -1,12 +1,18 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // ❌ REMOVA ESTA LINHA: output: 'export', 
+  // Configurações de imagem
+  images: { 
+    unoptimized: true,
+    remotePatterns: [
+      { protocol: "https", hostname: "**" }
+    ]
+  },
   
-  // Mantenha o resto:
-  images: { unoptimized: true },
-  eslint: { ignoreDuringBuilds: true },
-  typescript: { ignoreBuildErrors: true },
+  // Ignorar erros de TypeScript no build (ainda suportado no config)
+  typescript: {
+    ignoreBuildErrors: true,
+  },
 };
 
 export default nextConfig;

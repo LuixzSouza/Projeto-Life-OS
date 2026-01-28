@@ -248,6 +248,47 @@ export async function deleteMeal(id: string): Promise<ActionResponse> {
   }
 }
 
+export async function getWeeklyPlan() {
+  // Busca o plano do usuário (mock de userId por enquanto)
+  return await prisma.mealPlan.findMany({
+    where: { userId: "user" }, // Substituir pelo ID real da sessão
+    orderBy: { dayOfWeek: "asc" }
+  });
+}
+
+export async function saveMealPlanSlot(formData: FormData) {
+  const dayOfWeek = parseInt(formData.get("dayOfWeek") as string);
+  const mealType = formData.get("mealType") as string;
+  const title = formData.get("title") as string;
+  const items = formData.get("items") as string;
+  const calories = parseInt(formData.get("calories") as string) || 0;
+
+  // Verifica se já existe um slot nesse dia/horário e atualiza ou cria
+  const existing = await prisma.mealPlan.findFirst({
+    where: { userId: "user", dayOfWeek, mealType }
+  });
+
+  if (existing) {
+    await prisma.mealPlan.update({
+      where: { id: existing.id },
+      data: { title, items, calories }
+    });
+  } else {
+    await prisma.mealPlan.create({
+      data: { userId: "user", dayOfWeek, mealType, title, items, calories }
+    });
+  }
+
+  revalidatePath("/health/nutrition");
+}
+
+export async function clearDayPlan(dayOfWeek: number) {
+  await prisma.mealPlan.deleteMany({
+    where: { userId: "user", dayOfWeek }
+  });
+  revalidatePath("/health/nutrition");
+}
+
 // =========================================================
 // 4. MEDIDAS CORPORAIS COMPLETAS (SNAPSHOT)
 // =========================================================

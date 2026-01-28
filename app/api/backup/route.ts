@@ -3,8 +3,7 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    // 1. Busca TUDO do banco de dados
-    // Usamos Promise.all para buscar tabelas independentes em paralelo
+    // 1. Busca TUDO do banco de dados em paralelo
     const [
       user,
       settings,
@@ -19,29 +18,41 @@ export async function GET() {
       events,
       sites,
       accessItems,
+      savedLinks, // ✅ NOVO: Incluindo a Biblioteca de Links
       aiMessages
     ] = await Promise.all([
       prisma.user.findFirst(),
       prisma.settings.findFirst(),
-      prisma.account.findMany({ include: { transactions: true } }), // Inclui transações dentro das contas
-      prisma.project.findMany({ include: { tasks: true, events: true } }), // Inclui tarefas e eventos do projeto
-      prisma.task.findMany({ where: { projectId: null } }), // Tarefas soltas (Inbox)
+      // Finanças
+      prisma.account.findMany({ include: { transactions: true } }),
+      // Projetos e Tarefas
+      prisma.project.findMany({ include: { tasks: true, events: true } }),
+      prisma.task.findMany({ where: { projectId: null } }), // Inbox
+      // Carreira
       prisma.jobApplication.findMany(),
-      prisma.studySubject.findMany({ include: { sessions: true } }), // Inclui sessões de estudo
-      prisma.flashcardDeck.findMany({ include: { cards: true } }), // Inclui flashcards
+      // Estudos
+      prisma.studySubject.findMany({ include: { sessions: true } }),
+      prisma.flashcardDeck.findMany({ include: { cards: true } }),
+      // Saúde
       prisma.workout.findMany(),
       prisma.healthMetric.findMany(),
-      prisma.event.findMany({ where: { projectId: null } }), // Eventos soltos (sem projeto)
-      prisma.managedSite.findMany({ include: { pages: true } }), // CMS
+      // Agenda (Eventos soltos)
+      prisma.event.findMany({ where: { projectId: null } }),
+      // CMS
+      prisma.managedSite.findMany({ include: { pages: true } }),
+      // Cofre
       prisma.accessItem.findMany(),
-      prisma.aiMessage.findMany({ take: 100, orderBy: { createdAt: 'desc' } }) // Últimas 100 msgs de IA (opcional)
+      // Links
+      prisma.savedLink.findMany(), 
+      // IA (Aumentado limite para preservar contexto)
+      prisma.aiMessage.findMany({ take: 500, orderBy: { createdAt: 'desc' } }) 
     ]);
 
-    // 2. Monta o objeto de Backup
+    // 2. Monta o objeto de Backup com estrutura compatível com a importação
     const backupData = {
       meta: {
         system: "Life OS",
-        version: "1.0",
+        version: "2.0", // Atualizado para refletir novas features
         date: new Date().toISOString(),
       },
       user,
@@ -54,19 +65,21 @@ export async function GET() {
       flashcardDecks,
       workouts,
       healthMetrics,
-      events, // Eventos que não estão dentro de projetos
-      sites, // ManagedSite
+      events,
+      sites,
       accessItems,
-      aiMessages: aiMessages.reverse() // Reordena cronologicamente
+      savedLinks, // ✅ Exportando os links
+      aiMessages: aiMessages.reverse() // Reordena para cronológico (Antigo -> Novo)
     };
 
-    // 3. Prepara a resposta como arquivo JSON para download
-    const json = JSON.stringify(backupData, null, 2); // Identação bonita
+    // 3. Gera o JSON
+    const json = JSON.stringify(backupData, null, 2);
 
     return new NextResponse(json, {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
+        // Nome do arquivo com data: life-os-backup-2023-10-25.json
         'Content-Disposition': `attachment; filename="life-os-backup-${new Date().toISOString().split('T')[0]}.json"`,
       },
     });

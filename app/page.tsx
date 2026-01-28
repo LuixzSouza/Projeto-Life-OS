@@ -1,6 +1,6 @@
 // app/page.tsx
-import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/auth";
+import { isSystemInstalled } from "@/lib/db-config"; // <--- Importamos a checagem de arquivo
 import LandingNavbar from "@/components/landing/landing-navbar";
 import HeroSection from "@/components/landing/hero-section";
 import ModulesGrid from "@/components/landing/modules-grid";
@@ -11,22 +11,17 @@ import TimelineSection from "@/components/landing/timeline-section";
 import MobileSection from "@/components/landing/mobile-section";
 import FAQSection from "@/components/landing/faq-section";
 
-// Força verificação a cada acesso para garantir status de login correto
+// Força verificação a cada acesso para garantir status atualizado
 export const dynamic = 'force-dynamic';
 
 export default async function LandingPage() {
-    let isConfigured = false;
-    const session = await getSession();
-    const isLoggedIn = !!session;
+    // 1. Verifica se o sistema está instalado (se existe o config.json)
+    const isConfigured = isSystemInstalled();
 
-    try {
-        // Verifica se existe pelo menos um usuário/configuração para determinar se é 'setup' ou 'login'.
-        const userCount = await prisma.user.count(); 
-        isConfigured = userCount > 0;
-    } catch (error) {
-        // Se falhar (ex: banco vazio), assume que a configuração é necessária.
-        isConfigured = false;
-    }
+    // 2. Só tentamos buscar sessão se o sistema estiver configurado.
+    // Se não estiver configurado, não tentamos tocar no banco para evitar crashes.
+    const session = isConfigured ? await getSession() : null;
+    const isLoggedIn = !!session;
 
     const authState = {
         isLoggedIn,
@@ -44,6 +39,7 @@ export default async function LandingPage() {
             </div>
 
             {/* Componentes */}
+            {/* Passamos o authState para a Navbar e Hero saberem se mostram "Login" ou "Setup" */}
             <LandingNavbar authState={authState} />
 
             <main>

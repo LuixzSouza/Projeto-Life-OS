@@ -64,36 +64,39 @@ export function StudyChart({ data }: { data: StudyData[] }) {
   }
 
   return (
-    <ResponsiveContainer width="100%" height={220}>
-      <PieChart>
-        <Pie
-          data={data}
-          cx="50%"
-          cy="50%"
-          innerRadius={60}
-          outerRadius={80}
-          paddingAngle={5}
-          dataKey="value"
-          stroke="hsl(var(--card))"
-          strokeWidth={2}
-        >
-          {data.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-          ))}
-        </Pie>
-        
-        <Tooltip content={<CustomTooltip />} cursor={false} />
-        
-        <Legend 
-          verticalAlign="bottom" 
-          height={36} 
-          iconType="circle"
-          iconSize={8}
-          formatter={(value) => (
-            <span className="text-xs text-muted-foreground ml-1 font-medium">{value}</span>
-          )}
-        />
-      </PieChart>
-    </ResponsiveContainer>
+    /* CORREÇÃO DO ERRO DE WIDTH/HEIGHT */
+    <div style={{ width: '100%', height: 220, minHeight: 220 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart>
+          <Pie
+            data={data}
+            cx="50%"
+            cy="50%"
+            innerRadius={60}
+            outerRadius={80}
+            paddingAngle={5}
+            dataKey="value"
+            stroke="hsl(var(--card))"
+            strokeWidth={2}
+          >
+            {data.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+            ))}
+          </Pie>
+          
+          <Tooltip content={<CustomTooltip />} cursor={false} />
+          
+          <Legend 
+            verticalAlign="bottom" 
+            height={36} 
+            iconType="circle"
+            iconSize={8}
+            formatter={(value) => (
+              <span className="text-xs text-muted-foreground ml-1 font-medium">{value}</span>
+            )}
+          />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
   );
 }

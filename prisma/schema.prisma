@@ -12,20 +12,24 @@ datasource db {
 // =========================================================
 
 model User {
-  id              String   @id @default(uuid())
-  name            String
-  email           String   @unique
-  password        String
+  id            String    @id @default(uuid())
+  name          String
+  email         String    @unique
+  password      String
+  
+  // --- CAMPO NOVO ADICIONADO ---
+  role          String    @default("USER") 
+  // -----------------------------
 
-  avatarUrl       String?
-  coverUrl        String?
-  bio             String?
-  salary          Decimal? @default(0)
+  avatarUrl     String?
+  coverUrl      String?
+  bio           String?
+  salary        Decimal? @default(0)
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  // Relacionamentos Gerais
+  // Relacionamentos Gerais (MANTIDOS INTACTOS)
   accounts        Account[]
   projects        Project[]
   jobApplications JobApplication[]
@@ -35,6 +39,7 @@ model User {
   stats           UserStats?
   settings        Settings?
   bodyMeasurements BodyMeasurement[]
+  clients          Client[]
 }
 
 model UserStats {
@@ -315,6 +320,7 @@ model WishlistItem {
 model Project {
   id          String   @id @default(uuid())
   title       String
+  slug        String   @unique
   description String?
   status      String   @default("ACTIVE")
   createdAt   DateTime @default(now())
@@ -325,20 +331,29 @@ model Project {
 
   tasks       Task[]
   events      Event[]
+
+  clientId     String?
+  client       Client?   @relation(fields: [clientId], references: [id])
 }
 
+
 model Task {
-  id        String   @id @default(uuid())
-  title     String
-  isDone    Boolean  @default(false)
-  dueDate   DateTime?
-
-  priority  String   @default("MEDIUM")
-  image     String?  
-  projectId String?
-  project   Project? @relation(fields: [projectId], references: [id])
-
-  createdAt DateTime @default(now())
+  id            String   @id @default(cuid())
+  title         String
+  description   String?
+  isDone        Boolean  @default(false)
+  priority      String   @default("LOW") // HIGH, MEDIUM, LOW
+  status        String   @default("TODO") // TODO, IN_PROGRESS, REVIEW, DONE
+  dueDate       DateTime?
+  image         String?
+  projectId     String?
+  project       Project? @relation(fields: [projectId], references: [id])
+  isPinned      Boolean  @default(false)
+  isStarred     Boolean  @default(false)
+  progress      Int      @default(0)
+  estimatedTime Int?     // em minutos
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 // =========================================================
@@ -435,6 +450,22 @@ model Meal {
   date     DateTime @default(now())
 }
 
+// Modelo para o Planejador Semanal
+model MealPlan {
+  id          String   @id @default(cuid())
+  userId      String
+  dayOfWeek   Int      // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
+  mealType    String   // "BREAKFAST", "LUNCH", "SNACK", "DINNER"
+  title       String   // Ex: "Café da Manhã Forte"
+  items       String   // Ex: "Ovos, Aveia, Banana"
+  calories    Int?     // Estimativa
+  isCompleted Boolean  @default(false) // Para checkar se seguiu o plano
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, dayOfWeek])
+}
+
 // =========================================================
 // MÓDULO 8: AGENDA & ROTINA
 // =========================================================
@@ -505,6 +536,9 @@ model Settings {
 
   updatedAt       DateTime @updatedAt
   onboardingCompleted Boolean @default(false)
+
+  autoLockMinutes Int      @default(15)
+  privacyMode     Boolean  @default(false)
 }
 
 // =========================================================
@@ -630,4 +664,85 @@ model WardrobeItem {
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+// =========================================================
+// MÓDULO 11: NEGÓCIOS & CLIENTES (NOVO)
+// =========================================================
+
+model Client {
+  id        String   @id @default(uuid())
+  name      String   // Nome do contato ou da empresa
+  company   String?  // Nome Fantasia (opcional)
+  phone     String?  // Para o botão de WhatsApp
+  email     String?  
+  document  String?  // CPF ou CNPJ
+  address   String?
+  notes     String?
+  
+  status    String   @default("ACTIVE") // ACTIVE, INACTIVE, LEAD
+  
+  // Relacionamentos
+  userId    String?  // Opcional para não quebrar seeders antigos, mas ideal vincular
+  user      User?    @relation(fields: [userId], references: [id])
+  
+  projects  Project[] // Projetos vinculados a este cliente
+  billings  Billing[] // Contratos/Cobranças gerais
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// O "Contrato" ou "Acordo". Ex: "Criação de Site" ou "Manutenção Mensal"
+model Billing {
+  id          String   @id @default(uuid())
+  title       String   // Ex: "Desenvolvimento E-commerce"
+  description String?
+  
+  totalValue  Decimal  // Valor total do acordo
+  
+  // Configuração de Pagamento
+  type        String   @default("ONE_OFF") // ONE_OFF (Parcelado ou à vista) ou RECURRING (Mensalidade)
+  installments Int     @default(1)         // Número de parcelas (se for ONE_OFF)
+  
+  billingDay  Int?     // Dia de vencimento preferencial (ex: dia 10)
+  startDate   DateTime @default(now()) // Quando começa a valer
+  
+  status      String   @default("ACTIVE") // ACTIVE, COMPLETED, CANCELED
+  
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  
+  invoices    Invoice[] // As faturas geradas (parcelas)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// A "Fatura" ou "Parcela" específica. Ex: "Parcela 1/3"
+model Invoice {
+  id          String   @id @default(uuid())
+  title       String   // Ex: "Parcela 1/3" ou "Mensalidade Janeiro"
+  value       Decimal  // Valor desta fatura específica
+  dueDate     DateTime // Data de Vencimento
+  
+  status      String   @default("PENDING") // PENDING, PAID, OVERDUE, CANCELED
+  paidAt      DateTime? // Data do pagamento (para fluxo de caixa)
+  
+  billingId   String
+  billing     Billing  @relation(fields: [billingId], references: [id], onDelete: Cascade)
+  
+  linkUrl     String?   // Link do boleto ou comprovante se houver
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model BackupLog {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  fileName  String
+  path      String
+  size      String   // Ex: "2.5 MB"
+  type      String   // "MANUAL" | "AUTO"
 }

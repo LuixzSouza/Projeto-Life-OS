@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { completeOnboarding } from "@/app/actions";
+import { completeOnboarding } from "@/app/actions/setup";
 import { Wallet, CheckSquare, BrainCircuit, Sparkles, X, ChevronRight, ChevronLeft, Rocket } from "lucide-react";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
 import { cn } from "@/lib/utils";

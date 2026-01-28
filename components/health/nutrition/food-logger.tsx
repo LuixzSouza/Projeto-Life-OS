@@ -5,26 +5,29 @@ import { Meal } from "@prisma/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
     Utensils, Trash2, Plus, Leaf, Pizza, Coffee, Flame, Check, 
-    Pencil, ChefHat, ArrowRight, Search, Activity, Droplets, Wheat, X, 
-    AlertCircle, Sparkles
+    Pencil, ChefHat, ArrowRight, Search, Activity, X, 
+    Sparkles, CalendarClock, ShoppingBasket
 } from "lucide-react";
 import { logMeal, updateMeal, deleteMeal } from "@/app/(dashboard)/health/actions";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FoodSelector } from "./food-selector";
-import { FoodItem } from "@/lib/food-db";
+import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
-// --- TIPOS E UTILITÁRIOS ---
+// Importe seu componente FoodSelector aqui
+import { FoodSelector } from "./food-selector";
+import { FoodItem } from "@/lib/food-db";
+
+// --- TIPOS ---
 type MealType = "HEALTHY" | "NEUTRAL" | "TRASH";
 
-// --- COMPONENTE PRINCIPAL ---
+// --- COMPONENTE PRINCIPAL (DASHBOARD CARD) ---
 export function FoodLogger({ meals }: { meals: Meal[] }) {
     const todayMeals = meals.filter(m => new Date(m.date).toDateString() === new Date().toDateString());
     
@@ -36,49 +39,37 @@ export function FoodLogger({ meals }: { meals: Meal[] }) {
     const isOverLimit = totalCals > dailyGoal;
 
     return (
-        <Card className="border-border/60 shadow-sm bg-card h-full flex flex-col overflow-hidden relative group">
+        <Card className="border-border/60 shadow-sm bg-card h-full flex flex-col overflow-hidden relative">
             
-            {/* Header com Resumo */}
-            <div className="p-6 pb-2 bg-gradient-to-b from-muted/30 to-background border-b border-border/40 relative z-10">
-                <div className="flex justify-between items-start mb-6">
+            {/* Header com Progresso */}
+            <div className="p-5 pb-4 bg-muted/20 border-b border-border/50">
+                <div className="flex justify-between items-start mb-4">
                     <div>
-                        <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                        <h3 className="text-base font-bold flex items-center gap-2">
                             <div className="p-1.5 bg-primary/10 text-primary rounded-lg">
-                                <Utensils className="h-4 w-4" /> 
+                                <Flame className="h-4 w-4" /> 
                             </div>
                             Diário Alimentar
                         </h3>
-                        <p className="text-xs text-muted-foreground mt-1 pl-1">
-                            Hoje, {new Date().toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })}
+                        <p className="text-xs text-muted-foreground mt-1 ml-1">
+                            {todayMeals.length} refeições hoje
                         </p>
                     </div>
                     <MealFormDialog />
                 </div>
 
-                {/* Painel de Metas */}
-                <div className="space-y-3">
-                    <div className="flex justify-between items-end">
-                        <div>
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Consumido</span>
-                            <div className="flex items-baseline gap-1.5 mt-0.5">
-                                <span className={cn("text-3xl font-black tracking-tight", isOverLimit ? "text-destructive" : "text-foreground")}>
-                                    {totalCals}
-                                </span>
-                                <span className="text-sm font-medium text-muted-foreground">kcal</span>
-                            </div>
-                        </div>
-                        <div className="text-right">
-                            <span className="text-xs text-muted-foreground font-medium">Meta: {dailyGoal}</span>
-                            <p className={cn("text-xs font-bold", isOverLimit ? "text-destructive" : "text-primary")}>
-                                {isOverLimit ? `+${Math.abs(remaining)} excesso` : `${remaining} restantes`}
-                            </p>
-                        </div>
+                {/* Barra de Calorias */}
+                <div className="space-y-2">
+                    <div className="flex justify-between text-xs font-medium">
+                        <span className={cn(isOverLimit ? "text-destructive" : "text-foreground")}>
+                            {totalCals} <span className="text-muted-foreground">kcal consumidas</span>
+                        </span>
+                        <span className="text-muted-foreground">Meta: {dailyGoal}</span>
                     </div>
-                    
-                    <div className="h-2.5 w-full bg-secondary rounded-full overflow-hidden shadow-inner">
+                    <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
                         <div 
                             className={cn(
-                                "h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(0,0,0,0.1)]",
+                                "h-full rounded-full transition-all duration-1000 ease-out",
                                 isOverLimit ? "bg-destructive" : "bg-primary"
                             )} 
                             style={{ width: `${progressPercentage}%` }}
@@ -88,108 +79,94 @@ export function FoodLogger({ meals }: { meals: Meal[] }) {
             </div>
 
             {/* Lista Scrollável */}
-            <CardContent className="p-0 flex-1 relative bg-muted/10">
-                <div className="absolute inset-0 overflow-y-auto custom-scrollbar p-3">
-                    {todayMeals.length === 0 ? (
-                        <EmptyState />
-                    ) : (
-                        <div className="space-y-3">
-                            {todayMeals.map(meal => (
+            <CardContent className="p-0 flex-1 relative bg-background">
+                <ScrollArea className="h-[300px] w-full">
+                    <div className="p-4 space-y-3">
+                        {todayMeals.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-32 text-muted-foreground opacity-60 gap-2">
+                                <Utensils className="h-8 w-8" />
+                                <span className="text-xs">Nenhum registro hoje.</span>
+                            </div>
+                        ) : (
+                            todayMeals.map(meal => (
                                 <MealCard key={meal.id} meal={meal} />
-                            ))}
-                        </div>
-                    )}
-                </div>
+                            ))
+                        )}
+                    </div>
+                </ScrollArea>
             </CardContent>
         </Card>
     );
 }
 
-// --- SUBCOMPONENTES ---
-
-function EmptyState() {
-    return (
-        <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3 min-h-[200px] opacity-60">
-             <div className="p-4 bg-muted rounded-full">
-                <Leaf className="h-8 w-8 text-muted-foreground" />
-             </div>
-             <div className="text-center">
-                <p className="text-sm font-semibold text-foreground">Diário vazio</p>
-                <p className="text-xs">Registre sua primeira refeição do dia.</p>
-             </div>
-        </div>
-    )
-}
-
+// --- CARD DE REFEIÇÃO INDIVIDUAL ---
 function MealCard({ meal }: { meal: Meal }) {
-    
     const handleDelete = async () => {
-        // Em um app real, use um Toast com Undo ou um Alert Dialog. 
-        // `confirm` bloqueia a thread, mas é aceitável para MVP.
-        if(confirm("Remover esta refeição?")) {
+        if(confirm("Deseja excluir este registro?")) {
             await deleteMeal(meal.id);
-            toast.success("Refeição removida.");
+            toast.success("Excluído com sucesso.");
         }
     }
 
     const typeConfig = {
-        HEALTHY: { bg: "bg-primary/10", text: "text-primary", icon: Leaf },
-        NEUTRAL: { bg: "bg-orange-500/10", text: "text-orange-600 dark:text-orange-400", icon: Coffee },
-        TRASH: { bg: "bg-destructive/10", text: "text-destructive", icon: Pizza },
-    }[meal.type as MealType] || { bg: "bg-muted", text: "text-muted-foreground", icon: Utensils };
+        HEALTHY: { color: "text-emerald-500", bg: "bg-emerald-500/10", icon: Leaf },
+        NEUTRAL: { color: "text-blue-500", bg: "bg-blue-500/10", icon: Coffee },
+        TRASH: { color: "text-rose-500", bg: "bg-rose-500/10", icon: Pizza },
+    }[meal.type as MealType] || { color: "text-muted-foreground", bg: "bg-muted", icon: Utensils };
 
     const Icon = typeConfig.icon;
 
     return (
-        <div className="group flex items-center justify-between p-3.5 bg-card rounded-xl border border-border/60 shadow-sm hover:shadow-md hover:border-primary/20 transition-all duration-300">
-            <div className="flex items-center gap-4 overflow-hidden flex-1">
-                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors", typeConfig.bg, typeConfig.text)}>
-                    <Icon className="h-5 w-5" />
+        <div className="group flex items-center justify-between p-3 rounded-xl border border-border/40 hover:border-primary/20 hover:bg-muted/30 transition-all bg-card/50">
+            <div className="flex items-center gap-3 overflow-hidden">
+                <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center shrink-0", typeConfig.bg, typeConfig.color)}>
+                    <Icon className="h-4 w-4" />
                 </div>
-                
-                <div className="min-w-0 flex-1 space-y-0.5">
-                    <p className="text-sm font-bold text-foreground truncate leading-none">{meal.title}</p>
-                    <p className="text-xs text-muted-foreground truncate font-medium">{meal.items || "Sem descrição"}</p>
+                <div className="min-w-0">
+                    <p className="text-sm font-bold truncate">{meal.title}</p>
+                    <p className="text-[11px] text-muted-foreground truncate max-w-[150px]">{meal.items || "Sem descrição"}</p>
                 </div>
             </div>
             
-            <div className="flex items-center gap-3 shrink-0">
-                <Badge variant="secondary" className="font-mono font-bold bg-muted/50 text-foreground border-border/50">
+            <div className="flex items-center gap-2">
+                <Badge variant="outline" className="h-6 font-mono text-[10px]">
                     {meal.calories} kcal
                 </Badge>
                 
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity transform translate-x-2 group-hover:translate-x-0 duration-200">
+                <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
                     <MealFormDialog meal={meal}>
-                        <button className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors">
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary">
                             <Pencil className="h-3.5 w-3.5" />
-                        </button>
+                        </Button>
                     </MealFormDialog>
-                    <button onClick={handleDelete} className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors">
+                    <Button variant="ghost" size="icon" onClick={handleDelete} className="h-7 w-7 text-muted-foreground hover:text-destructive">
                         <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    </Button>
                 </div>
             </div>
         </div>
     )
 }
 
-// --- MODAL DE REFEIÇÃO ---
+// --- MODAL DE CRIAÇÃO/EDIÇÃO (OTIMIZADO) ---
 function MealFormDialog({ meal, children }: { meal?: Meal, children?: React.ReactNode }) {
     const [open, setOpen] = useState(false);
     const [selectedItems, setSelectedItems] = useState<FoodItem[]>([]);
     
-    // Estados Controlados
-    const [description, setDescription] = useState(meal?.items || "");
-    const [calories, setCalories] = useState<number>(meal?.calories || 0);
+    // Estados do Formulário
     const [title, setTitle] = useState(meal?.title || "Almoço");
     const [type, setType] = useState(meal?.type || "HEALTHY");
+    const [manualDesc, setManualDesc] = useState(meal?.items || "");
+    const [manualCals, setManualCals] = useState<number>(meal?.calories || 0);
 
-    // Lógica Derivada
-    const calculatedCalories = useMemo(() => 
+    // Lógica Computada
+    const isUsingSelector = selectedItems.length > 0;
+    
+    const computedCalories = useMemo(() => 
         selectedItems.reduce((acc, item) => acc + item.calories, 0), 
     [selectedItems]);
 
-    const generatedDescription = useMemo(() => {
+    const computedDesc = useMemo(() => {
         if (selectedItems.length === 0) return "";
         const counts: Record<string, number> = {};
         selectedItems.forEach(item => counts[item.name] = (counts[item.name] || 0) + 1);
@@ -198,40 +175,35 @@ function MealFormDialog({ meal, children }: { meal?: Meal, children?: React.Reac
             .join(", ");
     }, [selectedItems]);
 
-    const isUsingSelector = selectedItems.length > 0;
-    const finalDescription = isUsingSelector ? generatedDescription : description;
-    const finalCalories = isUsingSelector ? calculatedCalories : calories;
+    // Valores Finais (Selector > Manual)
+    const finalCalories = isUsingSelector ? computedCalories : manualCals;
+    const finalDescription = isUsingSelector ? computedDesc : manualDesc;
 
-    // Detecção automática de tipo baseada em caloria média (Regra de Negócio Exemplo)
+    // Sugestão Automática de Tipo
     const detectedType = useMemo(() => {
         if (!isUsingSelector) return type;
-        const avgCal = calculatedCalories / selectedItems.length;
-        return avgCal > 350 ? "TRASH" : "HEALTHY";
-    }, [isUsingSelector, type, calculatedCalories, selectedItems.length]);
+        const avgCal = computedCalories / (selectedItems.length || 1);
+        if (avgCal > 400) return "TRASH";
+        if (avgCal > 200) return "NEUTRAL";
+        return "HEALTHY";
+    }, [isUsingSelector, type, computedCalories, selectedItems.length]);
 
-    const handleOpenChange = (newOpen: boolean) => {
-        setOpen(newOpen);
-        if (!newOpen && !meal) {
-            // Reset delay para animação
+    const handleOpenChange = (val: boolean) => {
+        setOpen(val);
+        if(!val && !meal) {
             setTimeout(() => {
                 setSelectedItems([]);
-                setDescription("");
-                setCalories(0);
+                setManualDesc("");
+                setManualCals(0);
                 setTitle("Almoço");
                 setType("HEALTHY");
-            }, 300);
+            }, 200);
         }
-    };
-
-    const handleClear = () => {
-        setSelectedItems([]);
-        setDescription("");
-        setCalories(0);
     }
 
     const handleSubmit = async () => {
-        if (!finalDescription && !isUsingSelector && finalCalories === 0) {
-            toast.error("Preencha os dados da refeição.");
+        if (finalCalories === 0 && !finalDescription) {
+            toast.error("Adicione alimentos ou insira as calorias manualmente.");
             return;
         }
 
@@ -245,12 +217,11 @@ function MealFormDialog({ meal, children }: { meal?: Meal, children?: React.Reac
             if (meal) {
                 formData.append("id", meal.id);
                 await updateMeal(formData);
-                toast.success("Refeição atualizada!");
+                toast.success("Atualizado!");
             } else {
                 await logMeal(formData);
-                toast.success("Refeição registrada!");
+                toast.success("Registrado!");
             }
-            handleClear();
             handleOpenChange(false);
         } catch (e) {
             toast.error("Erro ao salvar.");
@@ -261,78 +232,73 @@ function MealFormDialog({ meal, children }: { meal?: Meal, children?: React.Reac
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogTrigger asChild>
                 {children ? children : (
-                    <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-md gap-2 font-semibold">
+                    <Button size="sm" className="bg-primary text-primary-foreground shadow-md gap-1.5 h-8">
                         <Plus className="h-4 w-4" /> Registrar
                     </Button>
                 )}
             </DialogTrigger>
             
-            <DialogContent className="sm:max-w-[95vw] md:max-w-[1100px] h-[92vh] p-0 gap-0 bg-background border-border shadow-2xl flex flex-col md:flex-row overflow-hidden rounded-xl">
+            {/* Modal Wide e Responsivo */}
+            <DialogContent className="sm:max-w-[90vw] md:max-w-[1000px] h-[85vh] p-0 overflow-hidden flex flex-col md:flex-row gap-0 bg-background">
                 
-                {/* --- LADO ESQUERDO: SELETOR (MERCADO) --- */}
-                <div className="w-full md:w-[60%] flex flex-col border-b md:border-b-0 md:border-r border-border bg-muted/10 h-[45%] md:h-full relative">
-                    <div className="p-4 border-b border-border flex justify-between items-center bg-background/80 backdrop-blur-md z-10 sticky top-0">
-                        <h2 className="font-bold flex items-center gap-2 text-lg text-foreground">
-                            <div className="p-1.5 bg-primary/10 rounded-md text-primary">
-                                <Search className="h-4 w-4" /> 
-                            </div>
-                            Selecionar Alimentos
-                        </h2>
+                {/* --- COLUNA ESQUERDA: MERCADO (Seletor) --- */}
+                <div className="hidden md:flex flex-col w-[60%] border-r border-border bg-muted/5 relative">
+                    <div className="p-4 border-b border-border bg-background/50 backdrop-blur-sm sticky top-0 z-10 flex justify-between items-center">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                            <ShoppingBasket className="h-5 w-5" />
+                            <span className="font-semibold text-sm">Mercado de Alimentos</span>
+                        </div>
+                        {selectedItems.length > 0 && (
+                            <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer" onClick={() => setSelectedItems([])}>
+                                Limpar {selectedItems.length} itens
+                            </Badge>
+                        )}
                     </div>
-                    
+                    {/* Área de Scroll isolada para não quebrar o layout */}
                     <div className="flex-1 overflow-hidden relative">
-                         <div className="absolute inset-0 p-2 overflow-y-auto custom-scrollbar">
+                        <div className="absolute inset-0 overflow-y-auto custom-scrollbar p-2">
                             <FoodSelector onSelectionChange={setSelectedItems} />
-                         </div>
+                        </div>
                     </div>
                 </div>
 
-                {/* --- LADO DIREITO: FICHA TÉCNICA --- */}
-                <div className="w-full md:w-[40%] flex flex-col h-[55%] md:h-full bg-card shadow-[inset_10px_0_20px_-10px_rgba(0,0,0,0.02)]">
+                {/* --- COLUNA DIREITA: FICHA TÉCNICA (Formulário) --- */}
+                <div className="flex-1 flex flex-col w-full h-full bg-card">
                     
                     {/* Header da Ficha */}
-                    <div className="p-6 pb-4 border-b border-border flex justify-between items-start bg-background/50">
-                        <div>
-                            <DialogTitle className="text-xl flex items-center gap-2 font-bold text-foreground">
-                                <div className="p-1.5 bg-primary/10 rounded-md text-primary">
-                                    <ChefHat className="h-5 w-5" />
-                                </div>
-                                {meal ? "Editar Prato" : "Novo Prato"}
-                            </DialogTitle>
-                            <DialogDescription className="text-xs mt-1 text-muted-foreground">
-                                Revise os macros e detalhes.
-                            </DialogDescription>
-                        </div>
-                        {(finalDescription || finalCalories > 0) && (
-                            <Button variant="ghost" size="sm" onClick={handleClear} className="h-8 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive">
-                                <X className="h-3 w-3 mr-1" /> Limpar
-                            </Button>
-                        )}
+                    <div className="p-5 border-b border-border bg-background">
+                        <DialogTitle className="flex items-center gap-2 text-lg font-bold">
+                            <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                                <ChefHat className="h-5 w-5" />
+                            </div>
+                            {meal ? "Editar Refeição" : "Nova Refeição"}
+                        </DialogTitle>
                     </div>
 
-                    <ScrollArea className="flex-1 px-6 bg-background">
-                        <div className="space-y-6 py-6">
+                    {/* Conteúdo Scrollável da Ficha */}
+                    <ScrollArea className="flex-1">
+                        <div className="p-6 space-y-6">
                             
-                            {/* Inputs Principais */}
+                            {/* Bloco 1: Detalhes Básicos */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Momento</Label>
+                                    <Label className="text-xs uppercase font-bold text-muted-foreground">Refeição</Label>
                                     <Select value={title} onValueChange={setTitle}>
-                                        <SelectTrigger className="h-10 bg-muted/20 border-border focus:ring-primary/20"><SelectValue /></SelectTrigger>
+                                        <SelectTrigger><SelectValue /></SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="Café da Manhã">☕ Café da Manhã</SelectItem>
-                                            <SelectItem value="Almoço">🥗 Almoço</SelectItem>
-                                            <SelectItem value="Lanche">🥪 Lanche</SelectItem>
-                                            <SelectItem value="Jantar">🍲 Jantar</SelectItem>
-                                            <SelectItem value="Ceia">🌙 Ceia</SelectItem>
-                                            <SelectItem value="Pós-Treino">💪 Pós-Treino</SelectItem>
+                                            <SelectItem value="Café da Manhã">Café da Manhã</SelectItem>
+                                            <SelectItem value="Almoço">Almoço</SelectItem>
+                                            <SelectItem value="Lanche">Lanche</SelectItem>
+                                            <SelectItem value="Jantar">Jantar</SelectItem>
+                                            <SelectItem value="Ceia">Ceia</SelectItem>
+                                            <SelectItem value="Pós-Treino">Pós-Treino</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Classificação</Label>
+                                    <Label className="text-xs uppercase font-bold text-muted-foreground">Qualidade</Label>
                                     <Select value={isUsingSelector && !meal ? detectedType : type} onValueChange={setType}>
-                                        <SelectTrigger className="h-10 bg-muted/20 border-border focus:ring-primary/20"><SelectValue /></SelectTrigger>
+                                        <SelectTrigger><SelectValue /></SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="HEALTHY">✅ Saudável</SelectItem>
                                             <SelectItem value="NEUTRAL">⚖️ Neutro</SelectItem>
@@ -342,76 +308,81 @@ function MealFormDialog({ meal, children }: { meal?: Meal, children?: React.Reac
                                 </div>
                             </div>
 
-                            {/* Card de Resumo (Calorias) */}
-                            <div className="bg-gradient-to-br from-muted/30 to-background p-5 rounded-xl border border-border relative overflow-hidden group hover:border-primary/30 transition-all">
-                                <div className="flex justify-between items-start mb-6 relative z-10">
-                                    <div className="space-y-1">
-                                        <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Energia Total</Label>
-                                        <div className="flex items-center gap-2">
-                                            <Input 
-                                                type="number" 
-                                                value={finalCalories}
-                                                onChange={(e) => setCalories(Number(e.target.value))}
-                                                readOnly={isUsingSelector}
-                                                className="h-12 text-4xl font-black text-foreground border-none p-0 bg-transparent w-40 focus-visible:ring-0 placeholder:text-muted/50 tracking-tighter"
-                                                placeholder="0"
-                                            />
-                                            <span className="text-sm font-bold text-muted-foreground mt-2">kcal</span>
-                                        </div>
-                                    </div>
-                                    <div className="p-3 bg-primary/10 rounded-full text-primary">
-                                        <Flame className="h-6 w-6" />
-                                    </div>
-                                </div>
+                            <Separator />
 
-                                {/* Macros Visuais (Simulado para UI) */}
-                                <div className="flex gap-2 mb-6 relative z-10">
-                                    <MacroBadge label="Carb" icon={Wheat} color="text-blue-500" bg="bg-blue-500/10" />
-                                    <MacroBadge label="Prot" icon={Activity} color="text-emerald-500" bg="bg-emerald-500/10" />
-                                    <MacroBadge label="Gord" icon={Droplets} color="text-amber-500" bg="bg-amber-500/10" />
+                            {/* Bloco 2: Resumo Financeiro/Calórico */}
+                            <div className="bg-muted/20 rounded-xl p-4 border border-border/50 space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                        <Activity className="h-4 w-4" />
+                                        <span className="text-sm font-medium">Total Calórico</span>
+                                    </div>
+                                    {isUsingSelector && <Badge variant="outline" className="text-[10px] bg-background">Auto</Badge>}
                                 </div>
-
-                                <div className="space-y-2 pt-4 border-t border-border/50 relative z-10">
-                                    <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Conteúdo</Label>
+                                
+                                <div className="flex items-end gap-2">
                                     <Input 
-                                        value={finalDescription}
-                                        onChange={(e) => setDescription(e.target.value)}
+                                        type="number"
+                                        value={finalCalories}
+                                        onChange={(e) => setManualCals(Number(e.target.value))}
                                         readOnly={isUsingSelector}
-                                        placeholder="Ex: Arroz, feijão e frango..."
-                                        className="bg-background/80 border-border font-medium h-10 text-sm focus-visible:ring-primary/20"
+                                        className="text-3xl font-black h-14 w-full bg-background border-border focus-visible:ring-primary/20"
                                     />
-                                    {isUsingSelector && (
-                                        <p className="text-[10px] text-primary flex items-center gap-1 mt-1 font-medium animate-in fade-in">
-                                            <Sparkles className="h-3 w-3" /> Calculado automaticamente via seleção.
-                                        </p>
-                                    )}
+                                    <span className="text-sm font-bold text-muted-foreground mb-3">kcal</span>
                                 </div>
                             </div>
+
+                            {/* Bloco 3: Itens (Mobile Only Button) */}
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <Label className="text-xs uppercase font-bold text-muted-foreground">Composição do Prato</Label>
+                                    {/* Botão visível apenas em Mobile para abrir foods */}
+                                    <Dialog>
+                                        <DialogTrigger asChild>
+                                            <Button variant="outline" size="sm" className="md:hidden h-7 text-xs">
+                                                <Plus className="h-3 w-3 mr-1" /> Add Itens
+                                            </Button>
+                                        </DialogTrigger>
+                                        <DialogContent className="h-[80vh] flex flex-col p-0">
+                                            <div className="p-4 border-b">
+                                                <DialogTitle>Selecionar Alimentos</DialogTitle>
+                                            </div>
+                                            <div className="flex-1 overflow-hidden relative">
+                                                <div className="absolute inset-0 overflow-y-auto p-2">
+                                                    <FoodSelector onSelectionChange={setSelectedItems} />
+                                                </div>
+                                            </div>
+                                        </DialogContent>
+                                    </Dialog>
+                                </div>
+
+                                <textarea 
+                                    value={finalDescription}
+                                    onChange={(e) => setManualDesc(e.target.value)}
+                                    readOnly={isUsingSelector}
+                                    placeholder="Descreva sua refeição ou selecione itens..."
+                                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 min-h-[100px] resize-none"
+                                />
+                                {isUsingSelector && (
+                                    <p className="text-[10px] text-primary flex items-center gap-1">
+                                        <Sparkles className="h-3 w-3" /> Gerado automaticamente da seleção.
+                                    </p>
+                                )}
+                            </div>
+
                         </div>
                     </ScrollArea>
 
                     {/* Footer Fixo */}
-                    <div className="p-6 border-t border-border bg-background z-20">
-                        <Button 
-                            onClick={handleSubmit} 
-                            disabled={(!finalDescription && !isUsingSelector && finalCalories === 0)}
-                            className="w-full h-12 text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 transition-all active:scale-[0.99]"
-                        >
-                            {meal ? "Salvar Alterações" : "Confirmar Registro"} <ArrowRight className="ml-2 h-5 w-5" />
+                    <div className="p-5 border-t border-border bg-background mt-auto">
+                        <Button className="w-full h-12 text-base font-semibold shadow-lg shadow-primary/20" onClick={handleSubmit}>
+                            {meal ? "Salvar Alterações" : "Confirmar Registro"}
+                            <ArrowRight className="ml-2 h-4 w-4" />
                         </Button>
                     </div>
 
                 </div>
             </DialogContent>
         </Dialog>
-    )
-}
-
-function MacroBadge({ label, icon: Icon, color, bg }: { label: string, icon: React.ElementType, color: string, bg: string }) {
-    return (
-        <div className={cn("flex-1 p-2 rounded-lg text-center border border-transparent hover:border-border transition-all cursor-default", bg)}>
-            <Icon className={cn("h-3.5 w-3.5 mx-auto mb-1", color)} />
-            <span className={cn("text-[10px] font-bold opacity-80", color)}>{label}</span>
-        </div>
     )
 }

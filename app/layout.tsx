@@ -1,44 +1,73 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import type { Metadata } from "next";
 import "./globals.css";
-import { prisma } from "@/lib/prisma"; 
+import { prisma } from "@/lib/prisma";
 import ClientProviders from "@/components/providers/client-providers";
+import { SecurityProvider } from "@/components/providers/security-provider";
+import { isSystemInstalled } from "@/lib/db-config"; 
+import { ConsoleWelcome } from "@/components/console-welcome";
 
 const geistSans = Geist({
-    variable: "--font-geist-sans",
-    subsets: ["latin"],
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
 });
 
 const geistMono = Geist_Mono({
-    variable: "--font-geist-mono",
-    subsets: ["latin"],
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-    title: "Life OS",
-    description: "Gerencie Finanças, Projetos e IA.",
+  title: "Life OS",
+  description: "Gerencie Finanças, Projetos e IA.",
 };
 
 export default async function RootLayout({
-    children,
+  children,
 }: Readonly<{
-    children: React.ReactNode;
+  children: React.ReactNode;
 }>) {
-    // 1. Busca configuração no banco (se não existir, usa theme-blue)
-    const settings = await prisma.settings.findFirst();
-    const themeClass = settings?.accentColor || "theme-blue";
+  let themeClass = "theme-blue";
+  
+  // Configuração padrão tipada
+  let securitySettings = {
+    autoLockMinutes: 15, 
+    privacyMode: false,
+  };
 
-    return (
-        <html 
-            lang="pt-BR" 
-            suppressHydrationWarning 
-            className={`${geistSans.variable} ${geistMono.variable}`} 
-        >
-            <body className={`antialiased bg-background text-foreground`}>
-                <ClientProviders themeClass={themeClass}>
-                    {children}
-                </ClientProviders>
-            </body>
-        </html>
-    );
+  if (isSystemInstalled()) {
+    try {
+      const settings = await prisma.settings.findFirst();
+      
+      if (settings) {
+        if (settings.accentColor) {
+          themeClass = settings.accentColor;
+        }
+
+        securitySettings = {
+          autoLockMinutes: settings.autoLockMinutes ?? 15,
+          privacyMode: settings.privacyMode ?? false,
+        };
+      }
+    } catch (error) {
+      console.warn("⚠️ [LAYOUT] Erro ao carregar configurações.", error);
+    }
+  }
+
+  return (
+    <html 
+      lang="pt-BR" 
+      suppressHydrationWarning  
+      className={`${geistSans.variable} ${geistMono.variable}`} 
+    >
+      <body className={`antialiased bg-background text-foreground`}>
+        <ClientProviders themeClass={themeClass}>
+          <SecurityProvider initialSettings={securitySettings}>
+            <ConsoleWelcome />
+            {children}
+          </SecurityProvider>
+        </ClientProviders>
+      </body>
+    </html>
+  );
 }

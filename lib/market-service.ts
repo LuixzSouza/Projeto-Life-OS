@@ -16,7 +16,6 @@ export interface MarketItem {
   logoUrl?: string; 
 }
 
-// Interface tipada da Brapi (expandida)
 interface BrapiResult {
   symbol: string;
   longName?: string;
@@ -53,22 +52,38 @@ const cleanName = (name: string, ticker: string): string => {
 // --- 1. BANCO CENTRAL ---
 async function getIndicadoresMacro(): Promise<MarketItem[]> {
   try {
+    // Adicionei timeout para não travar o build se a API demorar
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 segundos timeout
+
     const [selicRes, ipcaRes] = await Promise.all([
-      fetch("https://api.bcb.gov.br/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json", { next: { revalidate: 3600 * 24 } }),
-      fetch("https://api.bcb.gov.br/dados/serie/bcdata.sgs.13522/dados/ultimos/1?formato=json", { next: { revalidate: 3600 * 24 } })
+      fetch("https://api.bcb.gov.br/dados/serie/bcdata.sgs.432/dados/ultimos/1?formato=json", { next: { revalidate: 3600 * 24 }, signal: controller.signal }).catch(() => null),
+      fetch("https://api.bcb.gov.br/dados/serie/bcdata.sgs.13522/dados/ultimos/1?formato=json", { next: { revalidate: 3600 * 24 }, signal: controller.signal }).catch(() => null)
     ]);
+    
+    clearTimeout(timeoutId);
 
-    if (!selicRes.ok || !ipcaRes.ok) throw new Error("BCB API Error");
+    let selicVal = 11.25; // Fallback hardcoded
+    let ipcaVal = 4.50; // Fallback hardcoded
 
-    const selicData = await selicRes.json();
-    const ipcaData = await ipcaRes.json();
-    const cdiVal = parseFloat(selicData[0].valor) - 0.10; 
+    if (selicRes?.ok) {
+        const data = await selicRes.json();
+        selicVal = parseFloat(data[0].valor);
+    }
+    
+    if (ipcaRes?.ok) {
+        const data = await ipcaRes.json();
+        ipcaVal = parseFloat(data[0].valor);
+    }
+
+    const cdiVal = selicVal - 0.10;
 
     return [
       { ticker: "CDI", name: "Renda Fixa (a.a.)", value: cdiVal, variation: 0, type: "INDEX", displayValue: `${cdiVal.toFixed(2)}%` },
-      { ticker: "IPCA", name: "Inflação 12m", value: parseFloat(ipcaData[0].valor), variation: 0, type: "INDEX", displayValue: `${parseFloat(ipcaData[0].valor).toFixed(2)}%` },
+      { ticker: "IPCA", name: "Inflação 12m", value: ipcaVal, variation: 0, type: "INDEX", displayValue: `${ipcaVal.toFixed(2)}%` },
     ];
   } catch (e) {
+    // Retorna dados estáticos em caso de erro total (ex: sem internet no build)
     return [{ ticker: "CDI", name: "Renda Fixa", value: 11.15, variation: 0, type: "INDEX", displayValue: "11,15%" }];
   }
 }
@@ -77,11 +92,13 @@ async function getIndicadoresMacro(): Promise<MarketItem[]> {
 async function getMoedas(): Promise<MarketItem[]> {
   try {
     const res = await fetch("https://economia.awesomeapi.com.br/last/USD-BRL,EUR-BRL,BTC-BRL", { next: { revalidate: 60 } });
-    if (!res.ok) throw new Error("AwesomeAPI Error");
+    if (!res.ok) return []; // Retorna vazio silenciosamente em caso de erro
     const data = await res.json();
 
     const mapItem = (key: string, ticker: string, type: MarketType): MarketItem => {
         const item = data[key];
+        if (!item) return { ticker, name: ticker, value: 0, variation: 0, type, displayValue: "R$ 0,00" }; // Fallback para item faltante
+        
         const val = parseFloat(item.bid);
         return {
             ticker,
@@ -95,7 +112,11 @@ async function getMoedas(): Promise<MarketItem[]> {
         };
     };
 
-    return [mapItem('USDBRL', 'USD', 'CURRENCY'), mapItem('EURBRL', 'EUR', 'CURRENCY'), mapItem('BTCBRL', 'BTC', 'CRYPTO')];
+    return [
+        mapItem('USDBRL', 'USD', 'CURRENCY'), 
+        mapItem('EURBRL', 'EUR', 'CURRENCY'), 
+        mapItem('BTCBRL', 'BTC', 'CRYPTO')
+    ].filter(i => i.value > 0);
   } catch (e) {
     return [];
   }
@@ -105,9 +126,18 @@ async function getMoedas(): Promise<MarketItem[]> {
 async function getAcoes(customTickers?: string[]): Promise<MarketItem[]> {
   try {
     const tickersToFetch = customTickers?.length ? customTickers : DEFAULT_STOCKS;
+    
+    // Proteção contra chamadas vazias
+    if (tickersToFetch.length === 0) return [];
+
     const res = await fetch(`https://brapi.dev/api/quote/${tickersToFetch.join(",")}?range=1d&interval=1d&token=${BRAPI_TOKEN}`, { next: { revalidate: 300 } });
 
-    if (!res.ok) { console.warn("Brapi Error"); return []; }
+    // Tratamento de erro específico para não poluir o log do build
+    if (!res.ok) { 
+        // Se for erro de autenticação ou limite, apenas retorna array vazio
+        if (res.status === 401 || res.status === 429) return [];
+        return []; 
+    }
 
     const data = await res.json();
     if (!data.results) return [];
@@ -116,7 +146,6 @@ async function getAcoes(customTickers?: string[]): Promise<MarketItem[]> {
         const isFII = item.symbol.endsWith("11") && !["IVVB11", "BOVA11", "XINA11", "SMAL11"].includes(item.symbol);
         const isETF = ["IVVB11", "BOVA11", "SMAL11"].includes(item.symbol);
         
-        // CORREÇÃO AQUI: Usei 'const' em vez de 'let' e lógica ternária direta
         const type: MarketType = isFII ? "FII" : isETF ? "ETF" : "STOCK";
 
         return {
@@ -134,14 +163,21 @@ async function getAcoes(customTickers?: string[]): Promise<MarketItem[]> {
         };
     });
   } catch (e) {
-    console.error("Erro Brapi:", e);
+    // Silencia o erro no console durante o build, a menos que estejamos em DEV
+    if (process.env.NODE_ENV === 'development') console.warn("Brapi fetch warning");
     return [];
   }
 }
 
 // --- MAIN FUNCTION ---
 export async function getMarketOverview(customTickers?: string[]): Promise<MarketItem[]> {
-  const [macro, moedas, bolsa] = await Promise.allSettled([getIndicadoresMacro(), getMoedas(), getAcoes(customTickers)]);
+  // Promise.allSettled garante que se uma API falhar, as outras continuam e a página renderiza
+  const [macro, moedas, bolsa] = await Promise.allSettled([
+      getIndicadoresMacro(), 
+      getMoedas(), 
+      getAcoes(customTickers)
+  ]);
+
   return [
     ...(macro.status === 'fulfilled' ? macro.value : []),
     ...(moedas.status === 'fulfilled' ? moedas.value : []),
