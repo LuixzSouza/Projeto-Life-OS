@@ -12,85 +12,104 @@ interface ProfileSelectorProps {
 
 export function ProfileSelector({ currentProfile, onSelect }: ProfileSelectorProps) {
     return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
             <ProfileCard
-                id="SAFE"
                 active={currentProfile === "SAFE"}
                 onClick={() => onSelect("SAFE")}
                 icon={ShieldCheck}
-                colorClass="text-emerald-600 bg-emerald-500/10 border-emerald-500/50"
+                theme="emerald"
                 title="Conservador"
                 subtitle="Segurança Máxima"
                 desc="Prioriza preservar o capital. Ideal para Reserva de Emergência e curto prazo."
             />
             <ProfileCard
-                id="MODERATE"
                 active={currentProfile === "MODERATE"}
                 onClick={() => onSelect("MODERATE")}
                 icon={Banknote}
-                colorClass="text-blue-600 bg-blue-500/10 border-blue-500/50"
+                theme="blue"
                 title="Moderado"
                 subtitle="Equilíbrio Inteligente"
-                desc="Aceita pequenas oscilações em troca de rendimentos acima da inflação."
+                desc="Aceita pequenas oscilações em troca de rendimentos consistentes acima da inflação."
             />
             <ProfileCard
-                id="BOLD"
                 active={currentProfile === "BOLD"}
                 onClick={() => onSelect("BOLD")}
                 icon={Rocket}
-                colorClass="text-orange-600 bg-orange-500/10 border-orange-500/50"
+                theme="orange"
                 title="Arrojado"
                 subtitle="Foco em Crescimento"
-                desc="Visa multiplicação de patrimônio no longo prazo, aceitando riscos."
+                desc="Visa multiplicação de patrimônio no longo prazo, tolerando riscos maiores."
             />
         </div>
     );
 }
 
 interface ProfileCardProps {
-    id: string;
     active: boolean;
     onClick: () => void;
     icon: LucideIcon;
-    colorClass: string;
+    theme: "emerald" | "blue" | "orange";
     title: string;
     subtitle: string;
     desc: string;
 }
 
-function ProfileCard({ active, onClick, icon: Icon, colorClass, title, subtitle, desc }: ProfileCardProps) {
+function ProfileCard({ active, onClick, icon: Icon, theme, title, subtitle, desc }: ProfileCardProps) {
+    // Sistema seguro de mapeamento de cores do Tailwind
+    const themes = {
+        emerald: {
+            activeBorder: "border-emerald-500/50 shadow-emerald-500/10",
+            iconBg: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+            check: "text-emerald-500"
+        },
+        blue: {
+            activeBorder: "border-blue-500/50 shadow-blue-500/10",
+            iconBg: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+            check: "text-blue-500"
+        },
+        orange: {
+            activeBorder: "border-orange-500/50 shadow-orange-500/10",
+            iconBg: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
+            check: "text-orange-500"
+        }
+    };
+
+    const t = themes[theme];
+
     return (
         <button
+            type="button"
             onClick={onClick}
             className={cn(
-                "relative group flex flex-col items-start text-left p-5 rounded-xl border-2 transition-all duration-300 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+                "relative group flex flex-col items-start text-left p-6 rounded-2xl border-2 transition-all duration-300 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 active:scale-[0.98]",
                 active 
-                    ? `bg-background shadow-md ${colorClass.split(" ")[2]}` // Borda colorida se ativo
-                    : "bg-card border-transparent hover:border-border/80 hover:bg-muted/30"
+                    ? `bg-background shadow-lg ${t.activeBorder}` 
+                    : "bg-card border-transparent shadow-sm hover:border-border hover:shadow-md"
             )}
         >
-            {/* Indicador de Seleção (Radio Style) */}
-            <div className="absolute top-4 right-4 text-muted-foreground/30 transition-colors">
+            {/* Indicador de Seleção */}
+            <div className="absolute top-5 right-5 text-muted-foreground/30 transition-colors">
                 {active 
-                    ? <CheckCircle2 className={cn("w-5 h-5", colorClass.split(" ")[0])} /> 
-                    : <Circle className="w-5 h-5 group-hover:text-muted-foreground" />
+                    ? <CheckCircle2 className={cn("w-6 h-6", t.check)} /> 
+                    : <Circle className="w-6 h-6 group-hover:text-muted-foreground/60 transition-colors" />
                 }
             </div>
 
-            <div className={cn("p-3 rounded-xl mb-4 transition-colors", active ? colorClass : "bg-muted text-muted-foreground")}>
+            {/* Ícone */}
+            <div className={cn("p-3.5 rounded-xl mb-5 transition-colors", active ? t.iconBg : "bg-muted text-muted-foreground")}>
                 <Icon className="h-6 w-6" />
             </div>
 
-            <div className="space-y-1 mb-3">
-                <h3 className={cn("font-bold text-lg", active ? "text-foreground" : "text-muted-foreground group-hover:text-foreground")}>
+            <div className="space-y-1.5 mb-3">
+                <h3 className={cn("font-extrabold text-xl", active ? "text-foreground" : "text-muted-foreground group-hover:text-foreground transition-colors")}>
                     {title}
                 </h3>
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/70">
                     {subtitle}
                 </p>
             </div>
 
-            <p className="text-sm text-muted-foreground leading-relaxed">
+            <p className="text-sm font-medium text-muted-foreground leading-relaxed">
                 {desc}
             </p>
         </button>

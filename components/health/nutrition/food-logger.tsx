@@ -5,12 +5,17 @@ import { Meal } from "@prisma/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { 
+    Dialog, DialogContent, DialogHeader, DialogTitle, 
+    DialogTrigger, DialogDescription 
+} from "@/components/ui/dialog";
+import { 
+    Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
+} from "@/components/ui/select";
 import { 
     Utensils, Trash2, Plus, Leaf, Pizza, Coffee, Flame, Check, 
-    Pencil, ChefHat, ArrowRight, Search, Activity, X, 
-    Sparkles, CalendarClock, ShoppingBasket
+    Pencil, ChefHat, ArrowRight, Activity, Sparkles, 
+    ShoppingBasket, Target, AlertCircle, Info
 } from "lucide-react";
 import { logMeal, updateMeal, deleteMeal } from "@/app/(dashboard)/health/actions";
 import { toast } from "sonner";
@@ -20,77 +25,94 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
-// Importe seu componente FoodSelector aqui
 import { FoodSelector } from "./food-selector";
 import { FoodItem } from "@/lib/food-db";
 
-// --- TIPOS ---
+// --- TIPAGEM ---
 type MealType = "HEALTHY" | "NEUTRAL" | "TRASH";
 
-// --- COMPONENTE PRINCIPAL (DASHBOARD CARD) ---
+interface TypeConfig {
+    color: string;
+    bg: string;
+    icon: React.ElementType;
+    label: string;
+}
+
+const mealConfigs: Record<MealType, TypeConfig> = {
+    HEALTHY: { color: "text-emerald-500", bg: "bg-emerald-500/10", icon: Leaf, label: "Saudável" },
+    NEUTRAL: { color: "text-blue-500", bg: "bg-blue-500/10", icon: Coffee, label: "Neutro" },
+    TRASH: { color: "text-rose-500", bg: "bg-rose-500/10", icon: Pizza, label: "Off-Plan" },
+};
+
+// --- DASHBOARD PRINCIPAL ---
 export function FoodLogger({ meals }: { meals: Meal[] }) {
-    const todayMeals = meals.filter(m => new Date(m.date).toDateString() === new Date().toDateString());
+    const today = new Date().toDateString();
+    const todayMeals = meals.filter(m => new Date(m.date).toDateString() === today);
     
-    // Cálculos
     const totalCals = todayMeals.reduce((acc, m) => acc + (m.calories || 0), 0);
     const dailyGoal = 2500; 
-    const progressPercentage = Math.min((totalCals / dailyGoal) * 100, 100);
-    const remaining = Math.max(dailyGoal - totalCals, 0);
-    const isOverLimit = totalCals > dailyGoal;
+    const progress = Math.min((totalCals / dailyGoal) * 100, 100);
 
     return (
-        <Card className="border-border/60 shadow-sm bg-card h-full flex flex-col overflow-hidden relative">
-            
-            {/* Header com Progresso */}
-            <div className="p-5 pb-4 bg-muted/20 border-b border-border/50">
-                <div className="flex justify-between items-start mb-4">
-                    <div>
-                        <h3 className="text-base font-bold flex items-center gap-2">
-                            <div className="p-1.5 bg-primary/10 text-primary rounded-lg">
-                                <Flame className="h-4 w-4" /> 
-                            </div>
-                            Diário Alimentar
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-1 ml-1">
-                            {todayMeals.length} refeições hoje
-                        </p>
+        <Card className="border-border/40 shadow-2xl bg-card rounded-[2rem] h-full flex flex-col overflow-hidden">
+            {/* PROGRESS HEADER */}
+            <div className="p-6 bg-muted/20 border-b border-border/40">
+                <div className="flex justify-between items-center mb-6">
+                    <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
+                            <Utensils className="h-5 w-5" />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-black uppercase tracking-widest">Diário Nutricional</h3>
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">
+                                {todayMeals.length} registros ativos
+                            </p>
+                        </div>
                     </div>
                     <MealFormDialog />
                 </div>
 
-                {/* Barra de Calorias */}
-                <div className="space-y-2">
-                    <div className="flex justify-between text-xs font-medium">
-                        <span className={cn(isOverLimit ? "text-destructive" : "text-foreground")}>
-                            {totalCals} <span className="text-muted-foreground">kcal consumidas</span>
-                        </span>
-                        <span className="text-muted-foreground">Meta: {dailyGoal}</span>
+                {/* CALORIE TRACKER */}
+                <div className="space-y-3">
+                    <div className="flex justify-between items-end px-1">
+                        <div className="space-y-1">
+                            <span className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest block">Consumo Atual</span>
+                            <div className="flex items-baseline gap-1.5">
+                                <span className={cn("text-3xl font-black tracking-tighter tabular-nums", totalCals > dailyGoal ? "text-rose-500" : "text-foreground")}>
+                                    {totalCals}
+                                </span>
+                                <span className="text-xs font-bold text-muted-foreground uppercase">kcal</span>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <span className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest block">Meta Alvo</span>
+                            <span className="text-sm font-mono font-bold text-foreground/80">{dailyGoal} kcal</span>
+                        </div>
                     </div>
-                    <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+                    
+                    <div className="h-2 w-full bg-muted/40 rounded-full overflow-hidden p-0.5 border border-border/20 shadow-inner">
                         <div 
                             className={cn(
-                                "h-full rounded-full transition-all duration-1000 ease-out",
-                                isOverLimit ? "bg-destructive" : "bg-primary"
+                                "h-full rounded-full transition-all duration-1000 ease-in-out shadow-[0_0_10px_rgba(0,0,0,0.1)]",
+                                totalCals > dailyGoal ? "bg-rose-500" : "bg-primary"
                             )} 
-                            style={{ width: `${progressPercentage}%` }}
+                            style={{ width: `${progress}%` }}
                         />
                     </div>
                 </div>
             </div>
 
-            {/* Lista Scrollável */}
-            <CardContent className="p-0 flex-1 relative bg-background">
-                <ScrollArea className="h-[300px] w-full">
+            {/* LISTA DE REFEIÇÕES */}
+            <CardContent className="p-0 flex-1 bg-background/30">
+                <ScrollArea className="h-[350px] w-full">
                     <div className="p-4 space-y-3">
                         {todayMeals.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-32 text-muted-foreground opacity-60 gap-2">
-                                <Utensils className="h-8 w-8" />
-                                <span className="text-xs">Nenhum registro hoje.</span>
+                            <div className="flex flex-col items-center justify-center py-20 opacity-30 gap-3">
+                                <ShoppingBasket className="h-10 w-10" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">Aguardando logs de hoje...</span>
                             </div>
                         ) : (
-                            todayMeals.map(meal => (
-                                <MealCard key={meal.id} meal={meal} />
-                            ))
+                            todayMeals.map(meal => <MealRow key={meal.id} meal={meal} />)
                         )}
                     </div>
                 </ScrollArea>
@@ -99,290 +121,231 @@ export function FoodLogger({ meals }: { meals: Meal[] }) {
     );
 }
 
-// --- CARD DE REFEIÇÃO INDIVIDUAL ---
-function MealCard({ meal }: { meal: Meal }) {
+// --- LINHA DE REFEIÇÃO ---
+function MealRow({ meal }: { meal: Meal }) {
+    const config = mealConfigs[meal.type as MealType] || mealConfigs.NEUTRAL;
+    const Icon = config.icon;
+
     const handleDelete = async () => {
-        if(confirm("Deseja excluir este registro?")) {
+        if(confirm("Confirmar exclusão deste log nutricional?")) {
             await deleteMeal(meal.id);
-            toast.success("Excluído com sucesso.");
+            toast.success("Registro removido.");
         }
-    }
-
-    const typeConfig = {
-        HEALTHY: { color: "text-emerald-500", bg: "bg-emerald-500/10", icon: Leaf },
-        NEUTRAL: { color: "text-blue-500", bg: "bg-blue-500/10", icon: Coffee },
-        TRASH: { color: "text-rose-500", bg: "bg-rose-500/10", icon: Pizza },
-    }[meal.type as MealType] || { color: "text-muted-foreground", bg: "bg-muted", icon: Utensils };
-
-    const Icon = typeConfig.icon;
+    };
 
     return (
-        <div className="group flex items-center justify-between p-3 rounded-xl border border-border/40 hover:border-primary/20 hover:bg-muted/30 transition-all bg-card/50">
-            <div className="flex items-center gap-3 overflow-hidden">
-                <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center shrink-0", typeConfig.bg, typeConfig.color)}>
-                    <Icon className="h-4 w-4" />
+        <div className="group flex items-center justify-between p-3.5 rounded-[1.25rem] border border-border/40 bg-card hover:border-primary/30 transition-all shadow-sm">
+            <div className="flex items-center gap-4 min-w-0">
+                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border shadow-inner", config.bg, config.color, "border-current/10")}>
+                    <Icon className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">
-                    <p className="text-sm font-bold truncate">{meal.title}</p>
-                    <p className="text-[11px] text-muted-foreground truncate max-w-[150px]">{meal.items || "Sem descrição"}</p>
+                    <p className="text-xs font-black uppercase tracking-widest truncate">{meal.title}</p>
+                    <p className="text-[10px] font-medium text-muted-foreground truncate opacity-70 mt-0.5 italic">
+                        {meal.items || "Sem especificações"}
+                    </p>
                 </div>
             </div>
             
-            <div className="flex items-center gap-2">
-                <Badge variant="outline" className="h-6 font-mono text-[10px]">
-                    {meal.calories} kcal
+            <div className="flex items-center gap-3">
+                <Badge variant="secondary" className="font-mono text-[10px] font-black h-7 px-3 bg-muted/50 border border-border/60">
+                    {meal.calories} KCAL
                 </Badge>
                 
-                <div className="flex opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <MealFormDialog meal={meal}>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary">
-                            <Pencil className="h-3.5 w-3.5" />
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-primary/10 hover:text-primary transition-colors">
+                            <Pencil className="h-4 w-4" />
                         </Button>
                     </MealFormDialog>
-                    <Button variant="ghost" size="icon" onClick={handleDelete} className="h-7 w-7 text-muted-foreground hover:text-destructive">
-                        <Trash2 className="h-3.5 w-3.5" />
+                    <Button variant="ghost" size="icon" onClick={handleDelete} className="h-8 w-8 rounded-lg hover:bg-rose-500/10 hover:text-rose-500 transition-colors">
+                        <Trash2 className="h-4 w-4" />
                     </Button>
                 </div>
             </div>
         </div>
-    )
+    );
 }
 
-// --- MODAL DE CRIAÇÃO/EDIÇÃO (OTIMIZADO) ---
+// --- FORMULÁRIO / MODAL ---
 function MealFormDialog({ meal, children }: { meal?: Meal, children?: React.ReactNode }) {
     const [open, setOpen] = useState(false);
     const [selectedItems, setSelectedItems] = useState<FoodItem[]>([]);
     
-    // Estados do Formulário
     const [title, setTitle] = useState(meal?.title || "Almoço");
-    const [type, setType] = useState(meal?.type || "HEALTHY");
+    const [type, setType] = useState<MealType>((meal?.type as MealType) || "HEALTHY");
     const [manualDesc, setManualDesc] = useState(meal?.items || "");
     const [manualCals, setManualCals] = useState<number>(meal?.calories || 0);
 
-    // Lógica Computada
     const isUsingSelector = selectedItems.length > 0;
     
-    const computedCalories = useMemo(() => 
-        selectedItems.reduce((acc, item) => acc + item.calories, 0), 
-    [selectedItems]);
+    const computedCals = useMemo(() => selectedItems.reduce((acc, item) => acc + item.calories, 0), [selectedItems]);
 
     const computedDesc = useMemo(() => {
         if (selectedItems.length === 0) return "";
         const counts: Record<string, number> = {};
         selectedItems.forEach(item => counts[item.name] = (counts[item.name] || 0) + 1);
-        return Object.entries(counts)
-            .map(([name, count]) => count > 1 ? `${count}x ${name}` : name)
-            .join(", ");
+        return Object.entries(counts).map(([name, count]) => count > 1 ? `${count}x ${name}` : name).join(", ");
     }, [selectedItems]);
 
-    // Valores Finais (Selector > Manual)
-    const finalCalories = isUsingSelector ? computedCalories : manualCals;
-    const finalDescription = isUsingSelector ? computedDesc : manualDesc;
-
-    // Sugestão Automática de Tipo
-    const detectedType = useMemo(() => {
+    const detectedType = useMemo((): MealType => {
         if (!isUsingSelector) return type;
-        const avgCal = computedCalories / (selectedItems.length || 1);
-        if (avgCal > 400) return "TRASH";
-        if (avgCal > 200) return "NEUTRAL";
+        const avg = computedCals / selectedItems.length;
+        if (avg > 450) return "TRASH";
+        if (avg > 250) return "NEUTRAL";
         return "HEALTHY";
-    }, [isUsingSelector, type, computedCalories, selectedItems.length]);
-
-    const handleOpenChange = (val: boolean) => {
-        setOpen(val);
-        if(!val && !meal) {
-            setTimeout(() => {
-                setSelectedItems([]);
-                setManualDesc("");
-                setManualCals(0);
-                setTitle("Almoço");
-                setType("HEALTHY");
-            }, 200);
-        }
-    }
+    }, [isUsingSelector, type, computedCals, selectedItems.length]);
 
     const handleSubmit = async () => {
-        if (finalCalories === 0 && !finalDescription) {
-            toast.error("Adicione alimentos ou insira as calorias manualmente.");
-            return;
-        }
+        const cals = isUsingSelector ? computedCals : manualCals;
+        const items = isUsingSelector ? computedDesc : manualDesc;
+
+        if (cals === 0) return toast.error("Defina o valor calórico.");
 
         const formData = new FormData();
         formData.append("title", title);
         formData.append("type", (isUsingSelector && !meal) ? detectedType : type);
-        formData.append("items", finalDescription);
-        formData.append("calories", finalCalories.toString());
+        formData.append("items", items);
+        formData.append("calories", cals.toString());
 
         try {
             if (meal) {
                 formData.append("id", meal.id);
                 await updateMeal(formData);
-                toast.success("Atualizado!");
             } else {
                 await logMeal(formData);
-                toast.success("Registrado!");
             }
-            handleOpenChange(false);
-        } catch (e) {
-            toast.error("Erro ao salvar.");
+            toast.success("Sincronizado com sucesso!");
+            setOpen(false);
+        } catch {
+            toast.error("Falha na operação.");
         }
-    }
+    };
 
     return (
-        <Dialog open={open} onOpenChange={handleOpenChange}>
+        <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                {children ? children : (
-                    <Button size="sm" className="bg-primary text-primary-foreground shadow-md gap-1.5 h-8">
-                        <Plus className="h-4 w-4" /> Registrar
+                {children || (
+                    <Button size="sm" className="bg-foreground text-background hover:bg-foreground/90 font-black uppercase tracking-widest text-[10px] h-9 rounded-xl shadow-lg transition-all active:scale-95">
+                        <Plus className="h-3.5 w-3.5 mr-1.5" /> Registrar
                     </Button>
                 )}
             </DialogTrigger>
             
-            {/* Modal Wide e Responsivo */}
-            <DialogContent className="sm:max-w-[90vw] md:max-w-[1000px] h-[85vh] p-0 overflow-hidden flex flex-col md:flex-row gap-0 bg-background">
+            <DialogContent className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 sm:max-w-[95vw] md:max-w-[1000px] h-[85vh] p-0 overflow-hidden flex flex-col md:flex-row gap-0 bg-background rounded-[2.5rem] shadow-2xl border-border/40 z-[100]">
                 
-                {/* --- COLUNA ESQUERDA: MERCADO (Seletor) --- */}
-                <div className="hidden md:flex flex-col w-[60%] border-r border-border bg-muted/5 relative">
-                    <div className="p-4 border-b border-border bg-background/50 backdrop-blur-sm sticky top-0 z-10 flex justify-between items-center">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                            <ShoppingBasket className="h-5 w-5" />
-                            <span className="font-semibold text-sm">Mercado de Alimentos</span>
+                {/* MARKET SIDEBAR (ESQUERDA) */}
+                <div className="hidden md:flex flex-col w-[60%] border-r border-border/40 bg-muted/5">
+                    <div className="p-6 border-b border-border/40 bg-background/50 backdrop-blur-md sticky top-0 z-10 flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-primary/10 rounded-xl text-primary">
+                                <ShoppingBasket className="h-5 w-5" />
+                            </div>
+                            <span className="text-xs font-black uppercase tracking-widest">Base de Alimentos</span>
                         </div>
-                        {selectedItems.length > 0 && (
-                            <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer" onClick={() => setSelectedItems([])}>
-                                Limpar {selectedItems.length} itens
-                            </Badge>
+                        {isUsingSelector && (
+                            <Button variant="ghost" size="sm" className="text-[10px] font-black uppercase tracking-widest text-primary" onClick={() => setSelectedItems([])}>
+                                Resetar ({selectedItems.length})
+                            </Button>
                         )}
                     </div>
-                    {/* Área de Scroll isolada para não quebrar o layout */}
-                    <div className="flex-1 overflow-hidden relative">
-                        <div className="absolute inset-0 overflow-y-auto custom-scrollbar p-2">
-                            <FoodSelector onSelectionChange={setSelectedItems} />
-                        </div>
+                    <div className="flex-1 overflow-y-auto custom-scrollbar p-4">
+                        <FoodSelector onSelectionChange={setSelectedItems} />
                     </div>
                 </div>
 
-                {/* --- COLUNA DIREITA: FICHA TÉCNICA (Formulário) --- */}
-                <div className="flex-1 flex flex-col w-full h-full bg-card">
-                    
-                    {/* Header da Ficha */}
-                    <div className="p-5 border-b border-border bg-background">
-                        <DialogTitle className="flex items-center gap-2 text-lg font-bold">
-                            <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                {/* FICHA TÉCNICA (DIREITA) */}
+                <div className="flex-1 flex flex-col bg-card relative">
+                    <div className="p-6 border-b border-border/40 bg-background">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2.5 bg-primary/10 rounded-xl text-primary border border-primary/20">
                                 <ChefHat className="h-5 w-5" />
                             </div>
-                            {meal ? "Editar Refeição" : "Nova Refeição"}
-                        </DialogTitle>
+                            <div>
+                                <DialogTitle className="text-lg font-black uppercase tracking-tighter">Ficha Nutricional</DialogTitle>
+                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Status: {meal ? 'Edição' : 'Novo Registro'}</p>
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Conteúdo Scrollável da Ficha */}
                     <ScrollArea className="flex-1">
-                        <div className="p-6 space-y-6">
-                            
-                            {/* Bloco 1: Detalhes Básicos */}
+                        <div className="p-8 space-y-8">
+                            {/* REFEIÇÃO E TIPO */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label className="text-xs uppercase font-bold text-muted-foreground">Refeição</Label>
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Momento</Label>
                                     <Select value={title} onValueChange={setTitle}>
-                                        <SelectTrigger><SelectValue /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Café da Manhã">Café da Manhã</SelectItem>
-                                            <SelectItem value="Almoço">Almoço</SelectItem>
-                                            <SelectItem value="Lanche">Lanche</SelectItem>
-                                            <SelectItem value="Jantar">Jantar</SelectItem>
-                                            <SelectItem value="Ceia">Ceia</SelectItem>
-                                            <SelectItem value="Pós-Treino">Pós-Treino</SelectItem>
+                                        <SelectTrigger className="h-12 rounded-xl bg-muted/30 border-border/40 font-bold"><SelectValue /></SelectTrigger>
+                                        <SelectContent className="rounded-xl">
+                                            {["Café da Manhã", "Almoço", "Lanche", "Jantar", "Ceia", "Pós-Treino"].map(t => <SelectItem key={t} value={t} className="font-bold">{t}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-xs uppercase font-bold text-muted-foreground">Qualidade</Label>
-                                    <Select value={isUsingSelector && !meal ? detectedType : type} onValueChange={setType}>
-                                        <SelectTrigger><SelectValue /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="HEALTHY">✅ Saudável</SelectItem>
-                                            <SelectItem value="NEUTRAL">⚖️ Neutro</SelectItem>
-                                            <SelectItem value="TRASH">🍔 Off-Plan</SelectItem>
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Classificação</Label>
+                                    <Select value={isUsingSelector && !meal ? detectedType : type} onValueChange={(v) => setType(v as MealType)}>
+                                        <SelectTrigger className="h-12 rounded-xl bg-muted/30 border-border/40 font-bold"><SelectValue /></SelectTrigger>
+                                        <SelectContent className="rounded-xl">
+                                            <SelectItem value="HEALTHY" className="text-emerald-500 font-bold">✅ Saudável</SelectItem>
+                                            <SelectItem value="NEUTRAL" className="text-blue-500 font-bold">⚖️ Neutro</SelectItem>
+                                            <SelectItem value="TRASH" className="text-rose-500 font-bold">🍔 Off-Plan</SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
                             </div>
 
-                            <Separator />
-
-                            {/* Bloco 2: Resumo Financeiro/Calórico */}
-                            <div className="bg-muted/20 rounded-xl p-4 border border-border/50 space-y-4">
+                            {/* DISPLAY DE CALORIAS */}
+                            <div className="bg-muted/40 rounded-[1.5rem] p-6 border border-border/40 shadow-inner space-y-4">
                                 <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2 text-muted-foreground">
-                                        <Activity className="h-4 w-4" />
-                                        <span className="text-sm font-medium">Total Calórico</span>
-                                    </div>
-                                    {isUsingSelector && <Badge variant="outline" className="text-[10px] bg-background">Auto</Badge>}
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 flex items-center gap-2">
+                                        <Activity className="h-3 w-3" /> Carga Calórica
+                                    </span>
+                                    {isUsingSelector && <Badge variant="outline" className="text-[9px] font-black uppercase bg-background">Calculado</Badge>}
                                 </div>
-                                
-                                <div className="flex items-end gap-2">
+                                <div className="flex items-end gap-3">
                                     <Input 
-                                        type="number"
-                                        value={finalCalories}
+                                        type="number" value={isUsingSelector ? computedCals : manualCals}
                                         onChange={(e) => setManualCals(Number(e.target.value))}
                                         readOnly={isUsingSelector}
-                                        className="text-3xl font-black h-14 w-full bg-background border-border focus-visible:ring-primary/20"
+                                        className="text-4xl font-black h-16 bg-transparent border-none shadow-none focus-visible:ring-0 p-0 tabular-nums"
                                     />
-                                    <span className="text-sm font-bold text-muted-foreground mb-3">kcal</span>
+                                    <span className="text-sm font-black text-muted-foreground mb-3 uppercase tracking-widest">kcal</span>
                                 </div>
                             </div>
 
-                            {/* Bloco 3: Itens (Mobile Only Button) */}
+                            {/* COMPOSIÇÃO */}
                             <div className="space-y-3">
-                                <div className="flex justify-between items-center">
-                                    <Label className="text-xs uppercase font-bold text-muted-foreground">Composição do Prato</Label>
-                                    {/* Botão visível apenas em Mobile para abrir foods */}
+                                <div className="flex justify-between items-center px-1">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Composição do Prato</Label>
                                     <Dialog>
-                                        <DialogTrigger asChild>
-                                            <Button variant="outline" size="sm" className="md:hidden h-7 text-xs">
-                                                <Plus className="h-3 w-3 mr-1" /> Add Itens
-                                            </Button>
-                                        </DialogTrigger>
-                                        <DialogContent className="h-[80vh] flex flex-col p-0">
-                                            <div className="p-4 border-b">
-                                                <DialogTitle>Selecionar Alimentos</DialogTitle>
-                                            </div>
-                                            <div className="flex-1 overflow-hidden relative">
-                                                <div className="absolute inset-0 overflow-y-auto p-2">
-                                                    <FoodSelector onSelectionChange={setSelectedItems} />
-                                                </div>
-                                            </div>
-                                        </DialogContent>
+                                        <DialogTrigger asChild><Button variant="outline" size="sm" className="md:hidden rounded-lg text-[9px] font-black uppercase tracking-widest h-7">Abrir Mercado</Button></DialogTrigger>
+                                        <DialogContent className="h-[80vh] flex flex-col p-0 rounded-[2rem]"><div className="p-4 border-b font-black text-center">Base de Alimentos</div><div className="flex-1 overflow-y-auto p-4"><FoodSelector onSelectionChange={setSelectedItems} /></div></DialogContent>
                                     </Dialog>
                                 </div>
-
                                 <textarea 
-                                    value={finalDescription}
+                                    value={isUsingSelector ? computedDesc : manualDesc}
                                     onChange={(e) => setManualDesc(e.target.value)}
                                     readOnly={isUsingSelector}
-                                    placeholder="Descreva sua refeição ou selecione itens..."
-                                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 min-h-[100px] resize-none"
+                                    placeholder="Descreva sua refeição ou use o mercado..."
+                                    className="w-full rounded-2xl border border-border/40 bg-muted/20 p-4 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-within:ring-primary/20 min-h-[120px] resize-none leading-relaxed transition-all"
                                 />
                                 {isUsingSelector && (
-                                    <p className="text-[10px] text-primary flex items-center gap-1">
-                                        <Sparkles className="h-3 w-3" /> Gerado automaticamente da seleção.
+                                    <p className="text-[10px] font-bold text-primary flex items-center gap-1.5 ml-1">
+                                        <Sparkles className="h-3 w-3" /> Metadados gerados via Mercado.
                                     </p>
                                 )}
                             </div>
-
                         </div>
                     </ScrollArea>
 
-                    {/* Footer Fixo */}
-                    <div className="p-5 border-t border-border bg-background mt-auto">
-                        <Button className="w-full h-12 text-base font-semibold shadow-lg shadow-primary/20" onClick={handleSubmit}>
-                            {meal ? "Salvar Alterações" : "Confirmar Registro"}
-                            <ArrowRight className="ml-2 h-4 w-4" />
+                    <div className="p-6 border-t border-border/40 bg-background backdrop-blur-xl">
+                        <Button className="w-full h-14 rounded-2xl bg-foreground text-background hover:bg-foreground/90 font-black uppercase tracking-widest text-[11px] shadow-xl group" onClick={handleSubmit}>
+                            {meal ? "Confirmar Atualização" : "Sincronizar Refeição"}
+                            <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                         </Button>
                     </div>
-
                 </div>
             </DialogContent>
         </Dialog>
-    )
+    );
 }

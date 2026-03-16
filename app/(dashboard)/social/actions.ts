@@ -40,6 +40,7 @@ export async function createFriend(formData: FormData) {
       data: {
         userId: userId,
         name: name,
+        tags: getValue(formData, "tags"),
         
         // Campos Opcionais
         nickname: getValue(formData, "nickname"),
@@ -99,6 +100,7 @@ export async function updateFriend(formData: FormData) {
         userId: userId 
       },
       data: {
+        tags: getValue(formData, "tags"),
         name: name,
         nickname: getValue(formData, "nickname"),
         proximity: (formData.get("proximity") as string) || "CASUAL",

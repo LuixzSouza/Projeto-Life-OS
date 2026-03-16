@@ -19,9 +19,8 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { format } from "date-fns";
+import { format, addHours } from "date-fns";
 import { cn } from "@/lib/utils";
 
 export interface EventFormData {
@@ -29,19 +28,20 @@ export interface EventFormData {
   title: string;
   description?: string | null;
   startTime: Date;
+  endTime?: Date | null; 
   location?: string | null;
   color?: string | null;
   projectId?: string | null;
 }
 
 const PRESET_COLORS = [
-  "#6366f1", // Indigo
-  "#ef4444", // Red
-  "#f59e0b", // Amber
-  "#10b981", // Emerald
-  "#3b82f6", // Blue
-  "#ec4899", // Pink
-  "#8b5cf6", // Violet
+  "#3B82F6", // Blue (Google Default)
+  "#10B981", // Emerald
+  "#F59E0B", // Amber
+  "#EF4444", // Red
+  "#8B5CF6", // Violet
+  "#EC4899", // Pink
+  "#64748B", // Slate
 ];
 
 export function EventForm({
@@ -56,17 +56,23 @@ export function EventForm({
   const searchParams = useSearchParams();
 
   const [selectedColor, setSelectedColor] = useState(
-    initialData?.color || "#6366f1"
+    initialData?.color || "#3B82F6"
   );
 
   const urlDate = searchParams.get("date");
   const defaultDate = initialData
     ? format(new Date(initialData.startTime), "yyyy-MM-dd")
-    : urlDate || new Date().toISOString().split("T")[0];
+    : urlDate || format(new Date(), "yyyy-MM-dd");
 
-  const defaultTime = initialData
+  const defaultStartTime = initialData
     ? format(new Date(initialData.startTime), "HH:mm")
     : "09:00";
+
+  const defaultEndTime = initialData?.endTime
+    ? format(new Date(initialData.endTime), "HH:mm")
+    : initialData 
+        ? format(addHours(new Date(initialData.startTime), 1), "HH:mm")
+        : "10:00";
 
   const handleSubmit = async (formData: FormData) => {
     setIsPending(true);
@@ -75,205 +81,175 @@ export function EventForm({
     try {
       if (initialData) {
         await updateEvent(formData);
-        toast.success("Evento atualizado com sucesso!");
+        toast.success("Alocação de tempo atualizada.");
       } else {
         await createEvent(formData);
-        toast.success("Novo compromisso agendado!");
+        toast.success("Novo bloco de tempo reservado.");
       }
 
       router.refresh();
       if (onClose) onClose();
     } catch (error) {
-      console.error(error);
-      toast.error("Ocorreu um erro ao salvar.");
+      const msg = error instanceof Error ? error.message : "Falha na sincronização.";
+      toast.error(msg);
     } finally {
       setIsPending(false);
     }
   };
 
   return (
-    <form action={handleSubmit} className="space-y-6 pt-2">
+    // 🟢 CORREÇÃO AQUI: Trocado 'h-full' por 'max-h-[75vh] w-full'. Isso garante que ele nunca ultrapasse a tela do celular/monitor!
+    <form action={handleSubmit} className="flex flex-col w-full max-h-[75vh] sm:max-h-[80vh] overflow-hidden">
+      
       {initialData && <input type="hidden" name="id" value={initialData.id} />}
 
-      {/* Seção Principal: Título */}
-      <div className="space-y-2">
-        <Label
-          htmlFor="title"
-          className="text-xs font-bold text-primary uppercase tracking-wide flex items-center gap-1.5"
-        >
-          <Type className="h-3.5 w-3.5" /> Título do Evento
-        </Label>
-        <Input
-          id="title"
-          name="title"
-          defaultValue={initialData?.title}
-          placeholder="Ex: Reunião de Planejamento Trimestral"
-          className="h-12 text-lg font-medium placeholder:text-muted-foreground/50 border-primary/20 bg-primary/5 focus-visible:ring-primary focus-visible:border-primary transition-all rounded-xl"
-          required
-          autoFocus={!initialData}
-        />
-      </div>
-
-      {/* Grid: Data e Hora */}
-      <div className="grid grid-cols-2 gap-6">
-        <div className="space-y-2">
-          <Label
-            htmlFor="date"
-            className="text-xs font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5"
-          >
-            <CalendarCheck className="h-3.5 w-3.5" /> Data
-          </Label>
-          <div className="relative group">
-            <CalendarIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors z-10 pointer-events-none" />
+      {/* ÁREA ROLÁVEL (Inputs) - Agora vai rolar perfeitamente */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
+        
+          {/* Título */}
+          <div className="space-y-2">
+            <Label htmlFor="title" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+              <Type className="h-3 w-3" /> Identificação do Evento
+            </Label>
             <Input
-              id="date"
-              name="date"
-              type="date"
+              id="title"
+              name="title"
+              defaultValue={initialData?.title}
+              placeholder="Ex: Sync de Projetos"
+              className="h-12 text-base font-bold placeholder:text-muted-foreground/30 bg-muted/20 border-border/40 focus-visible:ring-primary/30 focus-visible:border-primary transition-all rounded-xl"
               required
-              defaultValue={defaultDate}
-              className="pl-10 h-11 bg-background border-input hover:border-primary/50 focus-visible:ring-primary transition-all rounded-lg"
+              autoFocus={!initialData}
             />
           </div>
-        </div>
-        <div className="space-y-2">
-          <Label
-            htmlFor="time"
-            className="text-xs font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5"
-          >
-            <Clock className="h-3.5 w-3.5" /> Horário
-          </Label>
-          <div className="relative group">
-            <Clock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors z-10 pointer-events-none" />
-            <Input
-              id="time"
-              name="time"
-              type="time"
-              required
-              defaultValue={defaultTime}
-              className="pl-10 h-11 bg-background border-input hover:border-primary/50 focus-visible:ring-primary transition-all rounded-lg"
-            />
-          </div>
-        </div>
-      </div>
 
-      {/* Localização */}
-      <div className="space-y-2">
-        <Label
-          htmlFor="location"
-          className="text-xs font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5"
-        >
-          <MapPin className="h-3.5 w-3.5" /> Localização
-        </Label>
-        <div className="relative group">
-          <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors z-10 pointer-events-none" />
-          <Input
-            id="location"
-            name="location"
-            defaultValue={initialData?.location || ""}
-            placeholder="Ex: Sala de Reunião 1 / Link do Meet"
-            className="pl-10 h-11 bg-background border-input hover:border-primary/50 focus-visible:ring-primary transition-all rounded-lg"
-          />
-        </div>
-      </div>
-
-      {/* Detalhes (Textarea) */}
-      <div className="space-y-2">
-        <Label
-          htmlFor="description"
-          className="text-xs font-bold text-muted-foreground uppercase tracking-wide"
-        >
-          Detalhes Adicionais
-        </Label>
-        <Textarea
-          id="description"
-          name="description"
-          defaultValue={initialData?.description || ""}
-          placeholder="Adicione pautas, links importantes ou notas prévias..."
-          rows={3}
-          className="bg-background border-input focus-visible:ring-primary resize-none p-3 rounded-xl min-h-[100px] leading-relaxed"
-        />
-      </div>
-
-      {/* Seção Visual: Cor e Notificação */}
-      <div className="pt-4 flex flex-col gap-6 border-t border-border/50">
-        {/* Seletor de Cor */}
-        <div className="space-y-3">
-          <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-            <Palette className="h-3.5 w-3.5" /> Identificação Visual
-          </Label>
-          <div className="flex flex-wrap gap-3 items-center">
-            {PRESET_COLORS.map((color) => (
-              <button
-                key={color}
-                type="button"
-                onClick={() => setSelectedColor(color)}
-                className={cn(
-                  "w-8 h-8 rounded-full transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary shadow-sm flex items-center justify-center border-2 border-transparent",
-                  selectedColor === color
-                    ? "ring-2 ring-offset-2 ring-primary scale-110 border-background"
-                    : "hover:border-primary/30"
-                )}
-                style={{ backgroundColor: color }}
-                aria-label={`Select color ${color}`}
-              >
-                {selectedColor === color && (
-                  <CheckCircle className="h-4 w-4 text-white drop-shadow-md animate-in zoom-in duration-200" />
-                )}
-              </button>
-            ))}
-
-            {/* Custom Color Picker (Hidden logic, visual trigger) */}
-            <div className="relative w-8 h-8 rounded-full overflow-hidden border-2 border-border border-dashed hover:border-primary hover:scale-110 transition-all cursor-pointer shadow-sm bg-gradient-to-br from-background to-muted group">
-              <input
-                type="color"
-                value={selectedColor}
-                onChange={(e) => setSelectedColor(e.target.value)}
-                className="absolute -top-1/2 -left-1/2 w-[200%] h-[200%] p-0 cursor-pointer border-0 opacity-0"
-                title="Cor personalizada"
-              />
-              <div
-                className="w-full h-full flex items-center justify-center"
-                style={{
-                  backgroundColor: !PRESET_COLORS.includes(selectedColor)
-                    ? selectedColor
-                    : "transparent",
-                }}
-              >
-                {!PRESET_COLORS.includes(selectedColor) ? (
-                  <CheckCircle className="h-4 w-4 text-white drop-shadow-md" />
-                ) : (
-                  <Palette className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                )}
+          {/* Data e Horários (Timeblocking Grid) */}
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 bg-muted/10 p-4 rounded-[1.5rem] border border-border/40 shadow-inner">
+            <div className="sm:col-span-12">
+              <Label htmlFor="date" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2 mb-2">
+                <CalendarCheck className="h-3 w-3" /> Data Base
+              </Label>
+              <div className="relative group">
+                <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors pointer-events-none" />
+                <Input
+                  id="date"
+                  name="date"
+                  type="date"
+                  required
+                  defaultValue={defaultDate}
+                  className="pl-10 h-11 bg-background border-border/40 focus-visible:ring-primary/30 transition-all rounded-xl font-mono font-bold text-sm"
+                />
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Notificação Checkbox */}
-        <div className="flex items-center space-x-3 bg-primary/5 p-4 rounded-xl border border-primary/10 transition-colors hover:border-primary/20">
-          <Checkbox
-            id="notification"
-            name="notification"
-            defaultChecked
-            className="h-5 w-5 border-2 border-primary/50 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all"
-          />
-          <Label
-            htmlFor="notification"
-            className="text-sm flex items-center gap-2 cursor-pointer font-medium text-foreground select-none"
-          >
-            <Bell className="h-4 w-4 text-primary" />
-            Receber lembrete 30 minutos antes
-          </Label>
-        </div>
+            <div className="sm:col-span-6 space-y-2">
+              <Label htmlFor="time" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <Clock className="h-3 w-3" /> Início
+              </Label>
+              <Input
+                id="time"
+                name="time"
+                type="time"
+                required
+                defaultValue={defaultStartTime}
+                className="h-11 bg-background border-border/40 focus-visible:ring-primary/30 transition-all rounded-xl font-mono font-bold text-sm text-center"
+              />
+            </div>
+            
+            <div className="sm:col-span-6 space-y-2">
+              <Label htmlFor="endTime" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <Clock className="h-3 w-3" /> Fim
+              </Label>
+              <Input
+                id="endTime"
+                name="endTime"
+                type="time"
+                required
+                defaultValue={defaultEndTime}
+                className="h-11 bg-background border-border/40 focus-visible:ring-primary/30 transition-all rounded-xl font-mono font-bold text-sm text-center"
+              />
+            </div>
+          </div>
+
+          {/* Localização */}
+          <div className="space-y-2">
+            <Label htmlFor="location" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+              <MapPin className="h-3 w-3" /> Local ou Link
+            </Label>
+            <div className="relative group">
+              <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors pointer-events-none" />
+              <Input
+                id="location"
+                name="location"
+                defaultValue={initialData?.location || ""}
+                placeholder="Ex: Sala de Reunião 1 / Link do Meet"
+                className="pl-10 h-11 bg-muted/20 border-border/40 focus-visible:ring-primary/30 transition-all rounded-xl font-medium text-sm"
+              />
+            </div>
+          </div>
+
+          {/* Descrição */}
+          <div className="space-y-2">
+            <Label htmlFor="description" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+              Detalhes Adicionais
+            </Label>
+            <Textarea
+              id="description"
+              name="description"
+              defaultValue={initialData?.description || ""}
+              placeholder="Adicione pautas, links importantes ou notas..."
+              rows={3}
+              className="bg-muted/20 border-border/40 focus-visible:ring-primary/30 resize-none p-4 rounded-xl min-h-[100px] text-sm font-medium leading-relaxed transition-all"
+            />
+          </div>
+
+          {/* Cor e Notificações */}
+          <div className="space-y-6 pb-2">
+            <div className="space-y-3">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <Palette className="h-3 w-3" /> Classificação de Cor
+              </Label>
+              <div className="flex flex-wrap gap-2">
+                {PRESET_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setSelectedColor(color)}
+                    className={cn(
+                      "w-8 h-8 rounded-lg transition-all focus:outline-none shadow-sm flex items-center justify-center border-2 border-transparent",
+                      selectedColor === color
+                        ? "scale-110 border-background ring-2 ring-primary"
+                        : "hover:scale-105 hover:border-primary/20"
+                    )}
+                    style={{ backgroundColor: color }}
+                  >
+                    {selectedColor === color && <CheckCircle className="h-4 w-4 text-white drop-shadow-md" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-3 bg-muted/30 p-4 rounded-xl border border-border/40">
+              <Checkbox
+                id="notification"
+                name="notification"
+                defaultChecked
+                className="h-5 w-5 border-2 border-primary/50 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all rounded-md"
+              />
+              <Label htmlFor="notification" className="text-xs font-bold uppercase tracking-wider text-foreground cursor-pointer select-none flex items-center gap-2">
+                <Bell className="h-3.5 w-3.5 text-primary" /> Alerta (-30 min)
+              </Label>
+            </div>
+          </div>
       </div>
 
-      <DialogFooter className="mt-8 pt-4 border-t border-border/50 gap-2 sm:gap-0">
+      {/* 🟢 ÁREA FIXA (Footer) - Usando shrink-0 para impedir que o flexbox amasse os botões */}
+      <div className="p-6 bg-background border-t border-border/40 flex items-center gap-3 shrink-0">
         {onClose && (
           <Button
             type="button"
             variant="ghost"
             onClick={onClose}
-            className="mr-auto text-muted-foreground hover:text-foreground hover:bg-muted"
+            className="flex-1 h-12 rounded-xl text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-foreground hover:bg-muted/50 border border-border/40 transition-all hidden sm:flex"
           >
             Cancelar
           </Button>
@@ -281,20 +257,17 @@ export function EventForm({
         <Button
           type="submit"
           disabled={isPending}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 min-w-[160px] shadow-lg shadow-primary/20 h-11 text-sm font-semibold rounded-lg transition-all active:scale-[0.98]"
+          className="flex-[2] h-12 w-full rounded-xl bg-foreground text-background hover:bg-primary hover:text-white font-black uppercase tracking-widest text-[10px] shadow-lg transition-all group active:scale-95"
         >
           {isPending ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin mr-2" /> Salvando...
-            </>
+            <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
-            <>
-              <CalendarIcon className="h-4 w-4 mr-2" />
-              {initialData ? "Atualizar Evento" : "Confirmar Agendamento"}
-            </>
+            <span className="flex items-center gap-2">
+              {initialData ? "Atualizar Linha do Tempo" : "Gravar Linha do Tempo"}
+            </span>
           )}
         </Button>
-      </DialogFooter>
+      </div>
     </form>
   );
 }

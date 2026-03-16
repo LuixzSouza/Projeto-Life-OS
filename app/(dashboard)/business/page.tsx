@@ -1,17 +1,17 @@
 import { prisma } from "@/lib/prisma"
 import { Metadata } from "next"
-import { BusinessView } from "@/components/business/business-view" // Ajuste o caminho se necessário
+import { BusinessView } from "@/components/business/business-view" 
+import { cn } from "@/lib/utils"
 
-// Componentes UI
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Wallet, Users, AlertCircle, TrendingUp, Briefcase } from "lucide-react"
+import { Wallet, Users, AlertCircle, TrendingUp, Briefcase, Landmark } from "lucide-react"
 
 export const metadata: Metadata = {
   title: "Gestão de Negócios | Life OS",
 }
 
 export default async function BusinessPage() {
-  // 1. Buscamos os dados brutos do banco (Contém Decimals)
+  // 1. Buscamos os dados brutos do banco
   const rawClients = await prisma.client.findMany({
     include: {
       billings: {
@@ -26,149 +26,148 @@ export default async function BusinessPage() {
     orderBy: { createdAt: 'desc' }
   })
 
-  // 2. CORREÇÃO CRÍTICA: Serialização
-  // Convertemos os objetos Decimal do Prisma para number (JavaScript padrão)
-  // para que o Next.js consiga enviar para o componente Client-Side.
+  // 2. Serialização Segura para Client Components
   const clients = rawClients.map(client => ({
     ...client,
     billings: client.billings.map(billing => ({
       ...billing,
-      // Converte Decimal para number
       totalValue: Number(billing.totalValue), 
       invoices: billing.invoices.map(invoice => ({
         ...invoice,
-        // Converte Decimal para number
         value: Number(invoice.value),
-        // Garante que datas sejam objetos Date (Prisma já faz, mas garante segurança)
         dueDate: new Date(invoice.dueDate), 
+        paidAt: invoice.paidAt ? new Date(invoice.paidAt) : null // Adicionado para segurança caso vá usar no front
       }))
     }))
   }))
 
-  // 3. Lógica de KPIs (Usamos os dados já convertidos para facilitar)
   const today = new Date()
-  today.setHours(0,0,0,0) // Zera hora para comparar apenas datas
+  today.setHours(0,0,0,0)
   
-  // Total a Receber (Geral)
-  const totalReceivables = clients.reduce((acc, client) => {
-    const clientDebt = client.billings.reduce((bAcc, billing) => {
-      const pendingInvoices = billing.invoices
-        .filter(inv => inv.status === 'PENDING' || inv.status === 'OVERDUE')
-        .reduce((iAcc, inv) => iAcc + inv.value, 0) // Já é number
-      return bAcc + pendingInvoices
+  // 3. Cálculos (KPIs)
+  
+  // NOVO: Total Ganho (Soma de tudo que está PAGO)
+  const totalEarned = clients.reduce((acc, client) => {
+    return acc + client.billings.reduce((bAcc, billing) => {
+      return bAcc + billing.invoices
+        .filter(inv => inv.status === 'PAID')
+        .reduce((iAcc, inv) => iAcc + inv.value, 0)
     }, 0)
-    return acc + clientDebt
   }, 0)
 
-  // Total em Atraso (Urgente)
+  // Total Pendente (Soma de tudo que ainda vai vencer ou não foi pago, ignorando cancelados)
+  const totalReceivables = clients.reduce((acc, client) => {
+    return acc + client.billings.reduce((bAcc, billing) => {
+      return bAcc + billing.invoices
+        .filter(inv => inv.status === 'PENDING')
+        .reduce((iAcc, inv) => iAcc + inv.value, 0)
+    }, 0)
+  }, 0)
+
+  // Total Atrasado (Soma de PENDING vencidos hoje ou antes, ou marcados como OVERDUE)
   const totalOverdue = clients.reduce((acc, client) => {
-    const clientOverdue = client.billings.reduce((bAcc, billing) => {
-      const lateInvoices = billing.invoices
+    return acc + client.billings.reduce((bAcc, billing) => {
+      return bAcc + billing.invoices
         .filter(inv => (inv.status === 'PENDING' && new Date(inv.dueDate) < today) || inv.status === 'OVERDUE')
         .reduce((iAcc, inv) => iAcc + inv.value, 0)
-      return bAcc + lateInvoices
     }, 0)
-    return acc + clientOverdue
   }, 0)
 
-  // Total de Contratos Ativos
+  // Total de Contratos em andamento
   const activeContracts = clients.reduce((acc, client) => {
     return acc + client.billings.filter(b => b.status === 'ACTIVE').length
   }, 0)
 
-  // Formatador de Moeda
+  // Utilitário de formatação
   const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
 
   return (
-    <div className="space-y-6 max-w-[1600px] mx-auto p-4 md:p-8 animate-in fade-in duration-500">
+    <div className="min-h-screen bg-background/50 animate-in fade-in duration-500">
       
-      {/* --- HEADER --- */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 pb-2 border-b border-border/50">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <Briefcase className="h-8 w-8 text-primary" /> Negócios & Clientes
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Gerencie contratos, emita cobranças e acompanhe o fluxo de caixa dos seus projetos.
-          </p>
+      {/* HEADER MINIMALISTA */}
+      <header className="sticky top-0 z-20 bg-background/80 backdrop-blur-md border-b border-border/40 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-8 rounded flex items-center justify-center bg-primary/10 text-primary">
+            <Briefcase className="h-5 w-5" />
+          </div>
+          <div className="flex flex-col">
+            <span className="font-semibold text-sm leading-none">Negócios & Clientes</span>
+            <span className="text-[10px] text-muted-foreground">Gestão Financeira</span>
+          </div>
         </div>
-      </div>
+      </header>
 
-      {/* --- KPI CARDS (MÉTRICAS) --- */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <main className="p-6 md:p-8 mx-auto space-y-8">
         
-        {/* Card 1: Total a Receber */}
-        <Card className="shadow-sm border-l-4 border-l-emerald-500">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total a Receber
-            </CardTitle>
-            <Wallet className="h-4 w-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-              {formatCurrency(totalReceivables)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Soma de todas faturas abertas
-            </p>
-          </CardContent>
-        </Card>
+        {/* KPI CARDS (CLEAN UI) */}
+        {/* Ajustado para 5 colunas no desktop para acomodar a nova métrica */}
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+          
+          {/* 1. O que já entrou no bolso */}
+          <Card className="shadow-sm border-border/50 bg-card">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Total Recebido</CardTitle>
+              <Landmark className="h-4 w-4 text-muted-foreground/70" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-xl lg:text-2xl font-bold text-foreground">
+                {formatCurrency(totalEarned)}
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Card 2: Em Atraso */}
-        <Card className={`shadow-sm ${totalOverdue > 0 ? "border-l-4 border-l-red-500 bg-red-50/50 dark:bg-red-900/10" : ""}`}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Em Atraso / Vencido
-            </CardTitle>
-            <AlertCircle className={`h-4 w-4 ${totalOverdue > 0 ? "text-red-500" : "text-muted-foreground"}`} />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${totalOverdue > 0 ? "text-red-600 dark:text-red-400" : ""}`}>
-              {formatCurrency(totalOverdue)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Requer atenção imediata
-            </p>
-          </CardContent>
-        </Card>
+          {/* 2. O que tem pra receber (Saudável) */}
+          <Card className="shadow-sm border-transparent bg-emerald-50/50 dark:bg-emerald-950/10">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-xs font-medium text-emerald-600 dark:text-emerald-400">A Receber</CardTitle>
+              <Wallet className="h-4 w-4 text-emerald-500 opacity-70" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-xl lg:text-2xl font-bold text-emerald-700 dark:text-emerald-300">
+                {formatCurrency(totalReceivables)}
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Card 3: Contratos Ativos */}
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Contratos Ativos
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{activeContracts}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Projetos em andamento
-            </p>
-          </CardContent>
-        </Card>
+          {/* 3. O que deu ruim (Atenção) */}
+          <Card className={cn("shadow-sm border-transparent transition-colors", totalOverdue > 0 ? "bg-red-50 dark:bg-red-950/20" : "bg-muted/30")}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className={cn("text-xs font-medium", totalOverdue > 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground")}>Em Atraso</CardTitle>
+              <AlertCircle className={cn("h-4 w-4 opacity-70", totalOverdue > 0 ? "text-red-500" : "text-muted-foreground")} />
+            </CardHeader>
+            <CardContent>
+              <div className={cn("text-xl lg:text-2xl font-bold", totalOverdue > 0 ? "text-red-700 dark:text-red-300" : "text-muted-foreground")}>
+                {formatCurrency(totalOverdue)}
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Card 4: Base de Clientes */}
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Base de Clientes
-            </CardTitle>
-            <Users className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{clients.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Clientes cadastrados
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+          {/* 4. Operacional */}
+          <Card className="shadow-sm border-border/50 bg-card">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Contratos Ativos</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground/70" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-xl lg:text-2xl font-bold">{activeContracts}</div>
+            </CardContent>
+          </Card>
 
-      {/* --- ÁREA PRINCIPAL (INTERATIVA) --- */}
-      {/* Agora passamos 'clients' que já foi convertido, o erro de tipo vai sumir */}
-      <BusinessView initialClients={clients} />
+          {/* 5. Clientes */}
+          <Card className="shadow-sm border-border/50 bg-card hidden md:block">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Base de Clientes</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground/70" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-xl lg:text-2xl font-bold">{clients.length}</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ÁREA PRINCIPAL INTERATIVA */}
+        <BusinessView initialClients={clients} />
+      </main>
     </div>
   )
 }

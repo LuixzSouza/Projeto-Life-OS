@@ -1,6 +1,5 @@
 import * as React from "react"
 import { LucideIcon } from "lucide-react"
-
 import { cn } from "@/lib/utils"
 
 interface EmptyStateProps {
@@ -11,64 +10,20 @@ interface EmptyStateProps {
   className?: string
 }
 
-export function EmptyState({
-  icon: Icon,
-  title,
-  description,
-  action,
-  className,
-}: EmptyStateProps) {
+export function EmptyState({ icon: Icon, title, description, action, className }: EmptyStateProps) {
   return (
-    <div
-      data-slot="empty-state"
-      className={cn(
-        "relative flex flex-col items-center justify-center gap-2 p-8 text-center",
-
-        /* Container */
-        "rounded-2xl border border-dashed border-border",
-        "bg-gradient-to-b from-background to-muted/30",
-        "shadow-sm",
-
-        /* Focus / Hover refinement */
-        "transition-colors",
-
-        className
-      )}
-    >
-      {/* Icon container */}
-      <div
-        data-slot="empty-state-icon"
-        className={cn(
-          "mb-3 flex size-12 items-center justify-center rounded-full",
-          "bg-primary/10 ring-1 ring-primary/20",
-          "text-primary"
-        )}
-      >
-        <Icon className="size-6" />
+    <div className={cn("relative flex flex-col items-center justify-center gap-3 p-10 text-center rounded-[2rem] bg-gradient-to-b from-card/40 to-muted/20 border border-dashed border-border/60 shadow-sm transition-all hover:bg-muted/30", className)}>
+      <div className="mb-4 flex size-16 items-center justify-center rounded-2xl bg-background shadow-sm border border-border/50 text-muted-foreground/60">
+        <Icon className="size-8" />
       </div>
-
-      {/* Title */}
-      <h3
-        data-slot="empty-state-title"
-        className="text-sm font-semibold leading-none text-foreground"
-      >
+      <h3 className="text-xl font-extrabold tracking-tight text-foreground">
         {title}
       </h3>
-
-      {/* Description */}
-      <p
-        data-slot="empty-state-description"
-        className="max-w-xs text-sm text-muted-foreground"
-      >
+      <p className="max-w-xs text-sm font-medium text-muted-foreground/80 leading-relaxed">
         {description}
       </p>
-
-      {/* Action */}
       {action && (
-        <div
-          data-slot="empty-state-action"
-          className="mt-4 flex items-center justify-center"
-        >
+        <div className="mt-6 flex items-center justify-center w-full">
           {action}
         </div>
       )}

@@ -53,7 +53,7 @@ const DialogPortal = DialogPrimitive.Portal
 const DialogClose = DialogPrimitive.Close
 
 /* -------------------------------------------------------------------------------------------------
- * Overlay
+ * Overlay (Fundo Desfocado Premium)
  * -----------------------------------------------------------------------------------------------*/
 
 const DialogOverlay = React.forwardRef<
@@ -64,8 +64,8 @@ const DialogOverlay = React.forwardRef<
     ref={ref}
     data-slot="dialog-overlay"
     className={cn(
-      "fixed inset-0 z-50",
-      "bg-black/70 backdrop-blur-md",
+      "fixed inset-0 z-[100]", // Z-index alto para cobrir qualquer elemento
+      "bg-background/80 backdrop-blur-md", // Desfoque de vidro (Glassmorphism)
       "data-[state=open]:animate-in data-[state=closed]:animate-out",
       "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className
@@ -76,7 +76,7 @@ const DialogOverlay = React.forwardRef<
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
 /* -------------------------------------------------------------------------------------------------
- * Content
+ * Content (A "Janela" do HUD)
  * -----------------------------------------------------------------------------------------------*/
 
 interface DialogContentProps
@@ -90,9 +90,6 @@ const DialogContent = React.forwardRef<
 >(({ className, children, showCloseButton = true, ...props }, ref) => {
   const { clickPosition } = useDialogClick()
 
-  /**
-   * Variáveis CSS para animação baseada no clique
-   */
   const style: React.CSSProperties & Record<string, string> = {
     "--start-x": `${clickPosition.x}px`,
     "--start-y": `${clickPosition.y}px`,
@@ -106,22 +103,20 @@ const DialogContent = React.forwardRef<
         style={style}
         data-slot="dialog-content"
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg",
-          "-translate-x-1/2 -translate-y-1/2 gap-4",
-          "rounded-xl border border-border bg-card p-6 shadow-2xl",
-          "outline-none",
-          "max-h-[90vh] overflow-y-auto",
+          "fixed left-1/2 top-1/2 z-[100] grid w-[95%] max-w-lg",
+          "-translate-x-1/2 -translate-y-1/2 flex flex-col", // Centralização perfeita
+          "rounded-[2.5rem] border border-border/50 bg-background shadow-2xl", // Bordas extremas e sombra pesada
+          "outline-none overflow-hidden",
+          "max-h-[90vh]", // Limite de altura inteligente
 
           /* Radix animations */
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
           "data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0",
           "data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95",
+          "duration-300",
 
-          /* Custom click-origin animation */
+          /* Custom click-origin animation (mantido seu context) */
           "animate-in-from-click data-[state=closed]:animate-out-to-click",
-
-          /* Premium polish */
-          "ring-1 ring-primary/10 dark:ring-primary/20",
 
           className
         )}
@@ -129,17 +124,18 @@ const DialogContent = React.forwardRef<
       >
         {children}
 
+        {/* Botão de Fechar Tático */}
         {showCloseButton && (
           <DialogPrimitive.Close
             className={cn(
-              "absolute right-4 top-4 rounded-full p-1.5",
-              "opacity-70 transition-all",
-              "hover:bg-primary/10 hover:opacity-100",
-              "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
-              "ring-offset-background"
+              "absolute right-6 top-6 h-8 w-8 rounded-xl flex items-center justify-center",
+              "bg-muted/50 text-muted-foreground transition-all duration-200",
+              "hover:bg-rose-500/10 hover:text-rose-500 hover:rotate-90", // Rotação ao passar o mouse
+              "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ring-offset-background",
+              "disabled:pointer-events-none"
             )}
           >
-            <X className="size-4 text-muted-foreground" />
+            <X className="h-4 w-4 stroke-[3]" />
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>
         )}
@@ -150,7 +146,7 @@ const DialogContent = React.forwardRef<
 DialogContent.displayName = DialogPrimitive.Content.displayName
 
 /* -------------------------------------------------------------------------------------------------
- * Layout Helpers
+ * Layout Helpers (Header e Footer estruturados)
  * -----------------------------------------------------------------------------------------------*/
 
 const DialogHeader = ({
@@ -160,7 +156,7 @@ const DialogHeader = ({
   <div
     data-slot="dialog-header"
     className={cn(
-      "flex flex-col gap-1.5 text-center sm:text-left",
+      "flex flex-col gap-1 text-center sm:text-left px-8 py-6 border-b border-border/40 bg-muted/10 shrink-0",
       className
     )}
     {...props}
@@ -175,7 +171,7 @@ const DialogFooter = ({
   <div
     data-slot="dialog-footer"
     className={cn(
-      "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
+      "flex flex-col-reverse gap-3 sm:flex-row sm:justify-end px-8 py-5 border-t border-border/40 bg-background shrink-0 mt-auto",
       className
     )}
     {...props}
@@ -184,7 +180,7 @@ const DialogFooter = ({
 DialogFooter.displayName = "DialogFooter"
 
 /* -------------------------------------------------------------------------------------------------
- * Typography
+ * Typography (Tipografia Tática)
  * -----------------------------------------------------------------------------------------------*/
 
 const DialogTitle = React.forwardRef<
@@ -195,8 +191,7 @@ const DialogTitle = React.forwardRef<
     ref={ref}
     data-slot="dialog-title"
     className={cn(
-      "text-lg font-semibold tracking-tight",
-      "text-foreground",
+      "text-xl font-black uppercase tracking-tighter text-foreground leading-none",
       className
     )}
     {...props}
@@ -212,7 +207,7 @@ const DialogDescription = React.forwardRef<
     ref={ref}
     data-slot="dialog-description"
     className={cn(
-      "text-sm text-muted-foreground",
+      "text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1.5",
       className
     )}
     {...props}

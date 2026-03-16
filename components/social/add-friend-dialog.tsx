@@ -1,369 +1,264 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { 
-    UserPlus, Heart, Briefcase, Star, Users, Camera, 
-    UploadCloud, X, Phone, Mail, Instagram, Linkedin, 
-    Calendar, Wallet, MapPin, Gift, StickyNote 
-} from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loader2, User, Briefcase, Heart, X, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { createFriend, updateFriend } from "@/app/(dashboard)/social/actions";
-import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
-// --- Tipos ---
-export type FriendData = {
-    id?: string;
-    name?: string;
-    nickname?: string | null;
-    phone?: string | null;
-    instagram?: string | null;
-    linkedin?: string | null;
-    jobTitle?: string | null;
-    company?: string | null;
-    birthday?: string | null;
-    proximity?: string;
-    notes?: string | null;
-    pixKey?: string | null;
-    address?: string | null;
-    imageUrl?: string | null;
-    giftIdeas?: string | null;
-};
-
-interface FriendFormDialogProps {
-    mode?: "create" | "edit";
-    initialData?: FriendData;
-    trigger?: React.ReactNode; 
-    open?: boolean;
-    onOpenChange?: (open: boolean) => void;
+export interface FriendData {
+  id?: string;
+  name: string;
+  nickname?: string | null;
+  proximity: string;
+  email?: string | null;
+  phone?: string | null;
+  imageUrl?: string | null;
+  birthday?: string | null;
+  instagram?: string | null;
+  linkedin?: string | null;
+  twitter?: string | null;
+  jobTitle?: string | null;
+  company?: string | null;
+  pixKey?: string | null;
+  address?: string | null;
+  notes?: string | null;
+  giftIdeas?: string | null;
+  tags?: string | null; // 🟢 Novo campo adicionado
 }
 
-// --- Componente Principal ---
-export function FriendFormDialog({ 
-    mode = "create", 
-    initialData, 
-    trigger, 
-    open: controlledOpen, 
-    onOpenChange 
-}: FriendFormDialogProps) {
-    const [internalOpen, setInternalOpen] = useState(false);
-    const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
-    const setIsOpen = onOpenChange || setInternalOpen;
-
-    // Chave para forçar o reset do formulário quando os dados mudam
-    const formKey = isOpen ? (initialData?.id || 'new') : 'closed';
-
-    return (
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
-            {/* ✅ CORREÇÃO: Lógica de Exibição do Gatilho (Trigger)
-                1. Se um 'trigger' customizado for passado, renderiza ele.
-                2. Se for modo 'create' e sem trigger, renderiza o botão padrão "Nova Conexão".
-                3. Se for modo 'edit' e sem trigger, NÃO RENDERIZA NADA (modal controlado apenas por 'open').
-            */}
-            {(trigger || mode === "create") && (
-                <DialogTrigger asChild>
-                    {trigger || (
-                        <Button className="gap-2 shadow-lg shadow-primary/20 font-semibold transition-all active:scale-95 bg-primary hover:bg-primary/90 text-primary-foreground" size="lg">
-                            <UserPlus className="h-5 w-5" /> Nova Conexão
-                        </Button>
-                    )}
-                </DialogTrigger>
-            )}
-            
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 gap-0 border-border/50 bg-background rounded-3xl shadow-2xl">
-                {/* Renderiza o Inner apenas quando aberto para garantir 
-                   que o estado interno (inputs) seja montado do zero com os dados corretos.
-                */}
-                {isOpen && (
-                    <FriendFormInner 
-                        key={formKey} 
-                        mode={mode} 
-                        initialData={initialData} 
-                        onSuccess={() => setIsOpen(false)}
-                        onCancel={() => setIsOpen(false)}
-                    />
-                )}
-            </DialogContent>
-        </Dialog>
-    );
+interface FriendFormProps {
+  mode: "create" | "edit";
+  initialData?: FriendData;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-// --- Lógica Interna do Formulário ---
-function FriendFormInner({ mode, initialData, onSuccess, onCancel }: { mode: string, initialData?: FriendData, onSuccess: () => void, onCancel: () => void }) {
-    const [isLoading, setIsLoading] = useState(false);
+export function FriendFormDialog({ mode, initialData, open: controlledOpen, onOpenChange }: FriendFormProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = onOpenChange || setInternalOpen;
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [tagInput, setTagInput] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+
+  // Carrega as tags se estiver editando
+  useEffect(() => {
+    if (initialData?.tags && mode === 'edit') {
+      setTags(initialData.tags.split(",").map(t => t.trim()).filter(Boolean));
+    } else {
+      setTags([]);
+    }
+  }, [initialData, mode, open]);
+
+  const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement> | React.MouseEvent) => {
+    if ('key' in e && e.key !== 'Enter') return;
+    e.preventDefault();
     
-    // States
-    const [name, setName] = useState(initialData?.name || "");
-    const [phone, setPhone] = useState(initialData?.phone || "");
-    const [proximity, setProximity] = useState(initialData?.proximity || "CASUAL");
-    const [previewImage, setPreviewImage] = useState(initialData?.imageUrl || ""); 
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    if (tagInput.trim() && !tags.includes(tagInput.trim())) {
+      setTags([...tags, tagInput.trim()]);
+      setTagInput("");
+    }
+  };
 
-    // Handlers
-    const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        let value = e.target.value.replace(/\D/g, "");
-        if (value.length > 11) value = value.slice(0, 11);
-        if (value.length > 2) value = `(${value.slice(0, 2)}) ${value.slice(2)}`;
-        if (value.length > 9) value = `${value.slice(0, 10)}-${value.slice(10)}`;
-        setPhone(value);
-    };
+  const removeTag = (tagToRemove: string) => {
+    setTags(tags.filter(t => t !== tagToRemove));
+  };
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        if (file.size > 2 * 1024 * 1024) {
-            toast.error("Imagem muito grande. Máximo 2MB.");
-            return;
-        }
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const img = new Image();
-            img.src = event.target?.result as string;
-            img.onload = () => {
-                const canvas = document.createElement("canvas");
-                const ctx = canvas.getContext("2d");
-                const maxSize = 300;
-                let width = img.width;
-                let height = img.height;
-                if (width > height) { if (width > maxSize) { height *= maxSize / width; width = maxSize; } } 
-                else { if (height > maxSize) { width *= maxSize / height; height = maxSize; } }
-                canvas.width = width; canvas.height = height;
-                ctx?.drawImage(img, 0, 0, width, height);
-                setPreviewImage(canvas.toDataURL("image/jpeg", 0.8));
-                toast.success("Foto carregada!");
-            };
-        };
-        reader.readAsDataURL(file);
-    };
+  const handleSubmit = async (formData: FormData) => {
+    setIsSubmitting(true);
+    
+    // Injeta as tags no formulário antes de enviar
+    formData.append("tags", tags.join(", "));
+    
+    if (mode === "edit" && initialData?.id) {
+      formData.append("id", initialData.id);
+    }
 
-    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        if (!name.trim()) { toast.error("O nome é obrigatório."); return; }
+    try {
+      const action = mode === "create" ? createFriend : updateFriend;
+      const result = await action(formData);
+      
+      if (result.success) {
+        toast.success(result.message);
+        setOpen(false);
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      toast.error("Ocorreu um erro inesperado.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-        setIsLoading(true);
-        const formData = new FormData(e.currentTarget);
-        formData.set('proximity', proximity);
-        formData.set('phone', phone);
-        if (previewImage.startsWith("data:")) formData.set('imageUrl', previewImage);
-        else if (!previewImage) formData.delete('imageUrl');
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      {mode === "create" && (
+        <Button onClick={() => setOpen(true)} className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20">
+          <Plus className="h-4 w-4" /> Novo Contato
+        </Button>
+      )}
+      
+      <DialogContent className="max-w-2xl p-0 overflow-hidden bg-background border-border/60">
+        <DialogHeader className="p-6 pb-4 border-b border-border/40 bg-muted/10">
+          <DialogTitle className="text-xl">
+            {mode === "create" ? "Adicionar Nova Conexão" : "Editar Perfil"}
+          </DialogTitle>
+          <DialogDescription>
+            Salve as informações importantes para nunca perder o contexto dessa amizade ou parceiro de negócios.
+          </DialogDescription>
+        </DialogHeader>
 
-        let result;
-        if (mode === "edit" && initialData?.id) {
-            formData.append("id", initialData.id);
-            result = await updateFriend(formData);
-        } else {
-            result = await createFriend(formData);
-        }
-
-        if (result.success) {
-            toast.success(result.message);
-            onSuccess();
-        } else {
-            toast.error(result.message || "Erro ao salvar.");
-        }
-        setIsLoading(false);
-    };
-
-    const initials = name ? name.substring(0, 2).toUpperCase() : "??";
-
-    return (
-        <form onSubmit={handleSubmit} className="flex flex-col h-full">
-            
-            {/* --- HEADER VISUAL --- */}
-            <div className="relative bg-gradient-to-b from-primary/10 to-background p-8 pt-10 text-center shrink-0 border-b border-border/40">
-                
-                {/* Dialog Header Oculto para Acessibilidade */}
-                <DialogHeader className="sr-only">
-                    <DialogTitle>{mode === "create" ? "Nova Conexão" : "Editar Perfil"}</DialogTitle>
-                    <DialogDescription>Formulário de cadastro de contatos</DialogDescription>
-                </DialogHeader>
-
-                <div className="relative z-10 flex flex-col items-center gap-5">
-                    
-                    {/* Avatar Upload */}
-                    <div className="relative group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                        <Avatar className="h-32 w-32 border-4 border-background shadow-2xl ring-2 ring-primary/20 transition-transform group-hover:scale-105">
-                            <AvatarImage src={previewImage || undefined} className="object-cover" />
-                            <AvatarFallback className="bg-primary text-primary-foreground text-4xl font-bold">
-                                {initials}
-                            </AvatarFallback>
-                        </Avatar>
-                        
-                        {/* Remove Button */}
-                        {previewImage && (
-                            <button 
-                                type="button" 
-                                onClick={(e) => { e.stopPropagation(); setPreviewImage(""); }} 
-                                className="absolute -top-1 -right-1 p-1.5 bg-destructive rounded-full text-destructive-foreground hover:bg-destructive/90 shadow-md transition-all z-20 ring-2 ring-background"
-                            >
-                                <X className="h-3.5 w-3.5" />
-                            </button>
-                        )}
-                        
-                        {/* Overlay */}
-                        <div className="absolute inset-0 bg-black/60 rounded-full flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-[1px]">
-                            <Camera className="h-8 w-8 text-white mb-1" />
-                            <span className="text-[9px] font-bold text-white uppercase tracking-wider">Alterar</span>
-                        </div>
-                        <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
-                    </div>
-
-                    <div className="space-y-1">
-                        <h2 className="text-2xl font-bold tracking-tight text-foreground">
-                            {mode === "create" ? "Nova Conexão" : "Editar Perfil"}
-                        </h2>
-                        <p className="text-muted-foreground text-sm">
-                            Preencha os detalhes para organizar sua rede.
-                        </p>
-                    </div>
-                </div>
+        <form action={handleSubmit}>
+          <Tabs defaultValue="perfil" className="w-full">
+            <div className="px-6 pt-4">
+              <TabsList className="grid w-full grid-cols-3 bg-muted/50">
+                <TabsTrigger value="perfil" className="gap-2"><User className="h-4 w-4"/> Perfil</TabsTrigger>
+                <TabsTrigger value="contato" className="gap-2"><Briefcase className="h-4 w-4"/> Profissional</TabsTrigger>
+                <TabsTrigger value="contexto" className="gap-2"><Heart className="h-4 w-4"/> Contexto</TabsTrigger>
+              </TabsList>
             </div>
 
-            {/* --- CONTEÚDO SCROLLÁVEL --- */}
-            <div className="p-6 md:p-8 space-y-8 bg-background flex-1">
-                
-                {/* Image URL Fallback */}
-                <div className="flex items-center gap-3 p-3 bg-secondary/30 rounded-xl border border-border/50">
-                    <div className="p-2 bg-background rounded-lg text-muted-foreground border border-border/50">
-                        <UploadCloud className="h-5 w-5" />
-                    </div>
-                    <div className="flex-1">
-                        <Label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Ou cole o link da foto</Label>
-                        <Input 
-                            name="imageUrl" 
-                            placeholder="https://..." 
-                            value={!previewImage.startsWith("data:") ? previewImage : ""} 
-                            onChange={(e) => setPreviewImage(e.target.value)} 
-                            className="h-7 text-xs border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/50" 
-                        />
-                    </div>
+            {/* --- ABA 1: PERFIL ESSENCIAL --- */}
+            <TabsContent value="perfil" className="p-6 space-y-4 focus-visible:outline-none focus-visible:ring-0">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2 col-span-2 md:col-span-1">
+                  <Label htmlFor="name">Nome Completo *</Label>
+                  <Input id="name" name="name" defaultValue={initialData?.name} required placeholder="Ex: João Silva" />
                 </div>
-
-                {/* Seção 1: Identidade */}
-                <div className="space-y-5">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div className="space-y-2">
-                            <Label>Nome Completo <span className="text-destructive">*</span></Label>
-                            <Input name="name" placeholder="Ex: Gabriel" required value={name} onChange={(e) => setName(e.target.value)} className="h-11 bg-background" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Vulgo / Apelido</Label>
-                            <Input name="nickname" defaultValue={initialData?.nickname || ""} placeholder="Como você o chama?" className="h-11 bg-background" />
-                        </div>
-                    </div>
-
-                    <div className="space-y-3">
-                        <Label>Nível de Proximidade</Label>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            {[
-                                { id: "FAMILY", label: "Família", icon: Heart, activeClass: "border-primary bg-primary/5 text-primary ring-1 ring-primary/20" },
-                                { id: "CLOSE", label: "Próximo", icon: Star, activeClass: "border-primary bg-primary/5 text-primary ring-1 ring-primary/20" },
-                                { id: "WORK", label: "Trabalho", icon: Briefcase, activeClass: "border-primary bg-primary/5 text-primary ring-1 ring-primary/20" },
-                                { id: "CASUAL", label: "Casual", icon: Users, activeClass: "border-primary bg-primary/5 text-primary ring-1 ring-primary/20" }
-                            ].map((item) => (
-                                <div 
-                                    key={item.id} 
-                                    onClick={() => setProximity(item.id)} 
-                                    className={cn(
-                                        "cursor-pointer rounded-xl border p-3 flex flex-col items-center justify-center gap-2 transition-all duration-200 hover:bg-accent",
-                                        proximity === item.id ? item.activeClass : "border-border bg-card text-muted-foreground"
-                                    )}
-                                >
-                                    <item.icon className="h-5 w-5" />
-                                    <span className="text-xs font-semibold">{item.label}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                <div className="space-y-2 col-span-2 md:col-span-1">
+                  <Label htmlFor="nickname">Apelido (Como você o chama)</Label>
+                  <Input id="nickname" name="nickname" defaultValue={initialData?.nickname || ""} placeholder="Ex: Jão" />
                 </div>
+              </div>
 
-                {/* Seção 2: Contatos */}
-                <div className="bg-secondary/20 p-5 rounded-2xl border border-border/50 space-y-4">
-                    <div className="flex items-center gap-2 border-b border-border/40 pb-2">
-                        <div className="p-1.5 bg-background text-primary rounded-md border border-border/50">
-                            <Phone className="h-3.5 w-3.5" />
-                        </div>
-                        <h4 className="text-sm font-semibold text-foreground">Canais de Contato</h4>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Input name="phone" value={phone} onChange={handlePhoneChange} placeholder="WhatsApp" maxLength={15} className="bg-background" />
-                        
-                        <div className="relative group">
-                            <Input name="instagram" defaultValue={initialData?.instagram || ""} placeholder="Instagram" className="pl-9 bg-background" />
-                            <Instagram className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                        </div>
-                        
-                        <div className="relative group">
-                            <Input name="linkedin" defaultValue={initialData?.linkedin || ""} placeholder="LinkedIn" className="pl-9 bg-background" />
-                            <Linkedin className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                        </div>
-                        
-                        <div className="relative group">
-                            <Input name="birthday" type="date" defaultValue={initialData?.birthday ? new Date(initialData.birthday).toISOString().split('T')[0] : ""} className="pl-9 bg-background" />
-                            <Calendar className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                        </div>
-                    </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2 col-span-2 md:col-span-1">
+                  <Label htmlFor="proximity">Círculo de Proximidade</Label>
+                  <Select name="proximity" defaultValue={initialData?.proximity || "CASUAL"}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o nível" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="FAMILY">Família</SelectItem>
+                      <SelectItem value="CLOSE">Amigo Próximo</SelectItem>
+                      <SelectItem value="WORK">Trabalho / Negócios</SelectItem>
+                      <SelectItem value="CASUAL">Conhecido / Casual</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-
-                {/* Seção 3: Profissional & Pessoal */}
-                <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                            <Label>Profissional</Label>
-                            <div className="space-y-2">
-                                <div className="relative">
-                                    <Briefcase className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                                    <Input name="jobTitle" defaultValue={initialData?.jobTitle || ""} placeholder="Cargo" className="pl-9" />
-                                </div>
-                                <div className="relative">
-                                    <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                                    <Input name="company" defaultValue={initialData?.company || ""} placeholder="Empresa" className="pl-9" />
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div className="space-y-2">
-                            <Label>Financeiro & Endereço</Label>
-                            <div className="space-y-2">
-                                <div className="relative">
-                                    <Wallet className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                                    <Input name="pixKey" defaultValue={initialData?.pixKey || ""} placeholder="Chave Pix" className="pl-9 font-mono" />
-                                </div>
-                                <Input name="address" defaultValue={initialData?.address || ""} placeholder="Endereço Completo" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                            <Label className="flex items-center gap-2"><Gift className="h-3.5 w-3.5 text-primary" /> Ideias de Presente</Label>
-                            <Textarea name="giftIdeas" defaultValue={initialData?.giftIdeas || ""} placeholder="Ex: Vinhos, Livros de Sci-Fi..." className="min-h-[80px] resize-none bg-secondary/10 border-border/60 focus:border-primary/50" />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="flex items-center gap-2"><StickyNote className="h-3.5 w-3.5 text-primary" /> Notas Gerais</Label>
-                            <Textarea name="notes" defaultValue={initialData?.notes || ""} placeholder="Ex: Alérgico a camarão..." className="min-h-[80px] resize-none bg-secondary/10 border-border/60 focus:border-primary/50" />
-                        </div>
-                    </div>
+                <div className="space-y-2 col-span-2 md:col-span-1">
+                  <Label htmlFor="imageUrl">Foto (URL da imagem)</Label>
+                  <Input id="imageUrl" name="imageUrl" defaultValue={initialData?.imageUrl || ""} placeholder="https://..." />
                 </div>
-            </div>
+              </div>
+            </TabsContent>
 
-            {/* --- FOOTER --- */}
-            <DialogFooter className="p-6 border-t border-border/40 bg-muted/10 mt-auto">
-                <div className="flex gap-3 w-full sm:w-auto">
-                    <Button type="button" variant="ghost" onClick={onCancel} className="h-11 px-6 flex-1 sm:flex-none">
-                        Cancelar
-                    </Button>
-                    <Button type="submit" disabled={isLoading} className="h-11 px-8 rounded-xl font-semibold flex-1 sm:flex-none shadow-lg shadow-primary/20 bg-primary text-primary-foreground hover:bg-primary/90">
-                        {isLoading ? "Salvando..." : "Salvar Conexão"}
-                    </Button>
+            {/* --- ABA 2: CONTATO E PROFISSIONAL --- */}
+            <TabsContent value="contato" className="p-6 space-y-4 focus-visible:outline-none focus-visible:ring-0">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="phone">WhatsApp / Telefone</Label>
+                  <Input id="phone" name="phone" defaultValue={initialData?.phone || ""} placeholder="(00) 00000-0000" />
                 </div>
-            </DialogFooter>
+                <div className="space-y-2">
+                  <Label htmlFor="instagram">Instagram</Label>
+                  <Input id="instagram" name="instagram" defaultValue={initialData?.instagram || ""} placeholder="@usuario" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="jobTitle">Cargo / Ocupação</Label>
+                  <Input id="jobTitle" name="jobTitle" defaultValue={initialData?.jobTitle || ""} placeholder="Ex: Desenvolvedor Front-end" />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="company">Empresa / Instituição</Label>
+                  <Input id="company" name="company" defaultValue={initialData?.company || ""} placeholder="Ex: Google, UNIVÁS..." />
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="linkedin">LinkedIn URL</Label>
+                <Input id="linkedin" name="linkedin" defaultValue={initialData?.linkedin || ""} placeholder="https://linkedin.com/in/..." />
+              </div>
+            </TabsContent>
+
+            {/* --- ABA 3: CONTEXTO, TAGS E NOTAS --- */}
+            <TabsContent value="contexto" className="p-6 space-y-4 focus-visible:outline-none focus-visible:ring-0">
+              
+              {/* O NOVO SISTEMA DE TAGS */}
+              <div className="space-y-2 bg-primary/5 p-4 rounded-xl border border-primary/10">
+                <Label>Tags & Contexto (Onde se conheceram, Interesses)</Label>
+                <div className="flex gap-2">
+                  <Input 
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={handleAddTag}
+                    placeholder="Ex: Cliente, League of Legends, Faculdade..."
+                    className="bg-background"
+                  />
+                  <Button type="button" variant="secondary" onClick={handleAddTag}>Adicionar</Button>
+                </div>
+                {tags.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {tags.map(tag => (
+                      <Badge key={tag} className="gap-1 pr-1.5 py-1 bg-primary text-primary-foreground hover:bg-primary/90">
+                        {tag}
+                        <button type="button" onClick={() => removeTag(tag)} className="rounded-full hover:bg-background/20 p-0.5 transition-colors">
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+                <p className="text-[10px] text-muted-foreground mt-1">Pressione Enter para adicionar a Tag.</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="birthday">Data de Aniversário</Label>
+                  {/* Se o banco for data, o input type date formata o value nativo */}
+                  <Input id="birthday" name="birthday" type="date" defaultValue={initialData?.birthday ? initialData.birthday.split('T')[0] : ""} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pixKey">Chave Pix (Para rachar contas)</Label>
+                  <Input id="pixKey" name="pixKey" defaultValue={initialData?.pixKey || ""} placeholder="CPF, Email, Telefone..." />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="notes">Anotações e Histórico</Label>
+                <Textarea 
+                  id="notes" 
+                  name="notes" 
+                  defaultValue={initialData?.notes || ""} 
+                  placeholder="Escreva detalhes úteis: como vocês se conheceram, gostos pessoais, alergias a comidas..."
+                  className="resize-none h-20"
+                />
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <DialogFooter className="p-6 pt-4 border-t border-border/40 bg-muted/10">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isSubmitting} className="min-w-[120px]">
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar Perfil"}
+            </Button>
+          </DialogFooter>
         </form>
-    );
+      </DialogContent>
+    </Dialog>
+  );
 }

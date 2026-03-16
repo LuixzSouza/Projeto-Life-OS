@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react"; // Removi useEffect pois não é mais necessário
+import { useState } from "react";
 import { AccessItem } from "@prisma/client";
 import {
   Briefcase,
@@ -10,6 +10,9 @@ import {
   KeyRound,
   ChevronLeft,
   ChevronRight,
+  ShieldCheck,
+  Zap,
+  Filter
 } from "lucide-react";
 import { AccessList } from "@/components/access/access-list";
 import { AccessDialog } from "@/components/access/access-dialog";
@@ -18,6 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const ITEMS_PER_PAGE = 12;
 
@@ -26,122 +30,106 @@ export function AccessView({ initialItems }: { initialItems: AccessItem[] }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState("PERSONAL");
 
-  // 1. Lógica de Filtragem
+  // 1. Filtragem Inteligente
   const filteredItems = initialItems.filter((item) => {
     const searchLower = search.toLowerCase();
-    const matchesSearch =
+    return (
       (item.title?.toLowerCase() ?? "").includes(searchLower) ||
       (item.username?.toLowerCase() ?? "").includes(searchLower) ||
       (item.client?.toLowerCase() ?? "").includes(searchLower) ||
-      (item.category?.toLowerCase() ?? "").includes(searchLower);
-
-    return matchesSearch;
+      (item.category?.toLowerCase() ?? "").includes(searchLower)
+    );
   });
 
-  // 2. Separação por Abas
   const personalItems = filteredItems.filter((item) => !item.client);
   const clientItems = filteredItems.filter((item) => item.client);
-
-  // 3. Define qual lista está ativa
   const currentList = activeTab === "PERSONAL" ? personalItems : clientItems;
 
-  // 4. Lógica de Paginação
-  const totalPages = Math.ceil(currentList.length / ITEMS_PER_PAGE);
-  
-  // Segurança: Se a página atual for maior que o total (ex: filtrou e sobrou pouco), volta pra 1
-  // Isso resolve o problema sem usar useEffect
-  const safeCurrentPage = currentPage > totalPages && totalPages > 0 ? 1 : currentPage;
-  
+  // 2. Paginação Tática
+  const totalPages = Math.ceil(currentList.length / ITEMS_PER_PAGE) || 1;
+  const safeCurrentPage = currentPage > totalPages ? 1 : currentPage;
   const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
   const paginatedItems = currentList.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-  // Handlers
-  const goToNext = () => setCurrentPage((p) => Math.min(p + 1, totalPages));
-  const goToPrev = () => setCurrentPage((p) => Math.max(p - 1, 1));
-
-  // --- FUNÇÕES DE CONTROLE (AQUI ESTÁ A CORREÇÃO) ---
-  
-  // Ao buscar, atualizamos o texto E resetamos a página na mesma ação
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearch(e.target.value);
     setCurrentPage(1); 
   };
 
-  // Ao trocar aba, atualizamos a aba E resetamos a página na mesma ação
   const handleTabChange = (val: string) => {
     setActiveTab(val);
     setCurrentPage(1);
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      {/* --- BARRA DE CONTROLE --- */}
-      <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-card/50 p-4 rounded-xl border border-border/50 shadow-sm backdrop-blur-sm">
-        <div className="relative w-full md:max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+    <div className="space-y-8 animate-in fade-in duration-700">
+      
+      {/* --- BARRA DE CONTROLE HUD --- */}
+      <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-card border border-border/40 p-5 rounded-[2rem] shadow-xl shadow-black/5 backdrop-blur-md">
+        <div className="relative w-full md:max-w-md group">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
           <Input
-            placeholder="Buscar por nome, usuário ou cliente..."
-            className="pl-10 bg-background/50 border-muted-foreground/20 focus:border-primary transition-all"
+            placeholder="PESQUISAR NO COFRE..."
+            className="pl-11 h-12 bg-muted/20 border-border/40 focus-visible:ring-primary/20 rounded-2xl font-bold text-xs tracking-widest uppercase placeholder:text-muted-foreground/40 transition-all"
             value={search}
-            onChange={handleSearchChange} // Usando o novo handler
+            onChange={handleSearchChange}
           />
         </div>
 
-        <div className="flex w-full md:w-auto justify-end">
+        <div className="flex w-full md:w-auto items-center gap-3 justify-end">
+          <Badge variant="outline" className="hidden lg:flex h-10 px-4 rounded-xl border-border/60 font-black uppercase tracking-widest text-[9px] gap-2 bg-muted/10">
+            <ShieldCheck className="h-3 w-3 text-emerald-500" /> Criptografia Ativa
+          </Badge>
           <AccessDialog />
         </div>
       </div>
 
-      {/* --- ABAS E CONTEÚDO --- */}
-      <Tabs
-        value={activeTab}
-        onValueChange={handleTabChange} // Usando o novo handler
-        className="space-y-8"
-      >
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-          <TabsList className="bg-muted/50 p-1 rounded-xl h-auto border border-border/50 w-full sm:w-auto">
+      {/* --- ABAS TÁTICAS --- */}
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-8">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
+          <TabsList className="bg-muted/30 p-1.5 rounded-[1.5rem] h-auto border border-border/40 w-full sm:w-auto shadow-inner">
             <TabsTrigger
               value="PERSONAL"
-              className="gap-2 px-6 py-2 flex-1 sm:flex-none rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm transition-all"
+              className="gap-3 px-8 py-3 flex-1 sm:flex-none rounded-xl data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-lg font-black uppercase tracking-widest text-[10px] transition-all"
             >
-              <User className="h-4 w-4" />
+              <User className="h-4 w-4 opacity-70" />
               Pessoal
-              <Badge
-                variant="secondary"
-                className="ml-1.5 h-5 px-1.5 text-[10px] bg-zinc-200 dark:bg-zinc-700"
-              >
+              <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-lg ml-2 font-mono text-xs">
                 {personalItems.length}
-              </Badge>
+              </span>
             </TabsTrigger>
 
             <TabsTrigger
               value="CLIENTS"
-              className="gap-2 px-6 py-2 flex-1 sm:flex-none rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:shadow-sm transition-all"
+              className="gap-3 px-8 py-3 flex-1 sm:flex-none rounded-xl data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-lg font-black uppercase tracking-widest text-[10px] transition-all"
             >
-              <Briefcase className="h-4 w-4" />
+              <Briefcase className="h-4 w-4 opacity-70" />
               Clientes
-              <Badge
-                variant="secondary"
-                className="ml-1.5 h-5 px-1.5 text-[10px] bg-zinc-200 dark:bg-zinc-700"
-              >
+              <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-lg ml-2 font-mono text-xs">
                 {clientItems.length}
-              </Badge>
+              </span>
             </TabsTrigger>
           </TabsList>
+
+          {search && (
+            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-primary animate-pulse">
+                <Filter className="h-3 w-3" /> Filtrando: {search}
+            </div>
+          )}
         </div>
 
-        {/* ÁREA DE LISTA COM PAGINAÇÃO */}
-        <div className="min-h-[400px]">
-          <TabsContent value="PERSONAL" className="space-y-6 focus-visible:outline-none mt-0">
+        {/* --- GRID DE RESULTADOS --- */}
+        <div className="min-h-[500px]">
+          <TabsContent value="PERSONAL" className="space-y-8 focus-visible:outline-none mt-0">
             {personalItems.length > 0 ? (
               <>
                 <AccessList items={paginatedItems} />
                 <PaginationFooter
-                  currentPage={safeCurrentPage} // Usando safeCurrentPage
+                  currentPage={safeCurrentPage}
                   totalPages={totalPages}
                   totalItems={personalItems.length}
-                  onNext={goToNext}
-                  onPrev={goToPrev}
+                  onNext={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+                  onPrev={() => setCurrentPage(p => Math.max(p - 1, 1))}
                 />
               </>
             ) : (
@@ -149,16 +137,16 @@ export function AccessView({ initialItems }: { initialItems: AccessItem[] }) {
             )}
           </TabsContent>
 
-          <TabsContent value="CLIENTS" className="space-y-6 focus-visible:outline-none mt-0">
+          <TabsContent value="CLIENTS" className="space-y-8 focus-visible:outline-none mt-0">
             {clientItems.length > 0 ? (
               <>
-                <AccessList items={paginatedItems} showClientBadge />
+                <AccessList items={paginatedItems} />
                 <PaginationFooter
-                  currentPage={safeCurrentPage} // Usando safeCurrentPage
+                  currentPage={safeCurrentPage}
                   totalPages={totalPages}
                   totalItems={clientItems.length}
-                  onNext={goToNext}
-                  onPrev={goToPrev}
+                  onNext={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+                  onPrev={() => setCurrentPage(p => Math.max(p - 1, 1))}
                 />
               </>
             ) : (
@@ -171,7 +159,7 @@ export function AccessView({ initialItems }: { initialItems: AccessItem[] }) {
   );
 }
 
-// --- RODAPÉ (Mantido igual) ---
+// --- RODAPÉ DE PAGINAÇÃO HUD ---
 function PaginationFooter({
   currentPage,
   totalPages,
@@ -188,31 +176,32 @@ function PaginationFooter({
   if (totalPages <= 1) return null;
 
   return (
-    <div className="flex items-center justify-between border-t border-border/40 pt-4 animate-in fade-in slide-in-from-bottom-2">
-      <p className="text-xs text-muted-foreground">
-        Mostrando <span className="font-medium text-foreground">{Math.min(ITEMS_PER_PAGE * currentPage, totalItems)}</span> de{" "}
-        <span className="font-medium text-foreground">{totalItems}</span> resultados
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border/40 pt-8 animate-in slide-in-from-bottom-4 duration-500">
+      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+        SCAN_RESULTS: <span className="text-foreground">{Math.min(ITEMS_PER_PAGE * currentPage, totalItems)}</span> / <span className="text-foreground">{totalItems}</span>
       </p>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3 bg-muted/20 p-1.5 rounded-2xl border border-border/40">
         <Button
-          variant="outline"
-          size="sm"
+          variant="ghost"
+          size="icon"
           onClick={onPrev}
           disabled={currentPage === 1}
-          className="h-8 w-8 p-0"
+          className="h-9 w-9 rounded-xl hover:bg-background hover:shadow-sm disabled:opacity-30 transition-all"
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <span className="text-xs font-medium min-w-[60px] text-center">
-          Pág {currentPage} de {totalPages}
-        </span>
+        
+        <div className="px-4 text-[10px] font-black uppercase tracking-widest border-x border-border/40 h-5 flex items-center">
+          PÁGINA {currentPage} <span className="mx-2 opacity-30">|</span> {totalPages}
+        </div>
+
         <Button
-          variant="outline"
-          size="sm"
+          variant="ghost"
+          size="icon"
           onClick={onNext}
           disabled={currentPage === totalPages}
-          className="h-8 w-8 p-0"
+          className="h-9 w-9 rounded-xl hover:bg-background hover:shadow-sm disabled:opacity-30 transition-all"
         >
           <ChevronRight className="h-4 w-4" />
         </Button>
@@ -221,41 +210,43 @@ function PaginationFooter({
   );
 }
 
-// --- EMPTY STATE (Mantido igual) ---
+// --- EMPTY STATE HUD ---
 function EmptyState({ isSearch, type }: { isSearch: boolean; type: "PERSONAL" | "CLIENTS" }) {
-  if (isSearch) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 text-center animate-in zoom-in-95 duration-300">
-        <div className="p-4 rounded-full bg-muted mb-4 opacity-50">
-          <Search className="h-8 w-8 text-muted-foreground" />
-        </div>
-        <h3 className="text-lg font-semibold">Nenhum resultado encontrado</h3>
-        <p className="text-muted-foreground text-sm max-w-xs mt-1">
-          Tente buscar por outro termo ou verifique a ortografia.
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <Card className="flex flex-col items-center justify-center py-20 border-dashed border-2 bg-muted/5 shadow-none">
-      <div className="p-4 rounded-full bg-primary/10 text-primary mb-4 ring-8 ring-primary/5">
-        {type === "PERSONAL" ? (
-          <KeyRound className="h-8 w-8" />
-        ) : (
-          <ShieldAlert className="h-8 w-8" />
-        )}
+    <Card className="flex flex-col items-center justify-center py-24 border-dashed border-2 border-border/60 bg-muted/5 rounded-[3rem] shadow-inner animate-in zoom-in-95 duration-500">
+      <div className="relative mb-8">
+        <div className={cn(
+            "p-6 rounded-[2rem] bg-background border border-border shadow-2xl transition-all duration-700",
+            isSearch ? "rotate-12" : "rotate-0"
+        )}>
+            {isSearch ? (
+              <Search className="h-10 w-10 text-muted-foreground animate-pulse" />
+            ) : type === "PERSONAL" ? (
+              <KeyRound className="h-10 w-10 text-primary" />
+            ) : (
+              <ShieldAlert className="h-10 w-10 text-primary" />
+            )}
+        </div>
+        <div className="absolute -top-2 -right-2 h-6 w-6 bg-primary rounded-full animate-ping opacity-20" />
       </div>
-      <h3 className="text-xl font-semibold text-foreground">
-        {type === "PERSONAL"
-          ? "Cofre Pessoal Vazio"
-          : "Sem Acessos de Clientes"}
+
+      <h3 className="text-2xl font-black uppercase tracking-tighter text-foreground mb-3">
+        {isSearch ? "DADOS NÃO ENCONTRADOS" : type === "PERSONAL" ? "COFRE_PESSOAL_VAZIO" : "DADOS_CLIENTE_OFFLINE"}
       </h3>
-      <p className="text-sm text-muted-foreground max-w-sm mt-2 text-center px-4">
-        {type === "PERSONAL"
-          ? "Adicione logins de bancos, redes sociais e serviços pessoais com segurança máxima."
-          : "Centralize as senhas de servidores, painéis e contas dos seus clientes aqui."}
+      
+      <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-[0.2em] max-w-xs text-center leading-relaxed px-6 opacity-60">
+        {isSearch 
+          ? "NENHUM REGISTRO CORRESPONDE AOS PARÂMETROS DE BUSCA DEFINIDOS."
+          : type === "PERSONAL" 
+            ? "INICIE O PROTOCOLO DE ARMAZENAMENTO PARA LOGINS, BANCOS E REDES SOCIAIS."
+            : "AGUARDANDO INPUT DE CREDENCIAIS DE SERVIDORES E PAINÉIS EXTERNOS."}
       </p>
+
+      {isSearch && (
+          <Button variant="link" onClick={() => window.location.reload()} className="mt-6 text-[10px] font-black uppercase tracking-widest text-primary">
+              <Zap className="h-3 w-3 mr-2" /> Reiniciar Varredura
+          </Button>
+      )}
     </Card>
   );
 }

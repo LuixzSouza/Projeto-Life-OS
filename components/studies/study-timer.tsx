@@ -1,66 +1,25 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
-  Play,
-  Pause,
-  CheckCircle2,
-  BrainCircuit,
-  Lightbulb,
-  RotateCcw,
-  Target,
-  FolderTree,
-  Settings,
-  Timer,
-  Coffee,
-  Volume2,
-  VolumeX,
-  Bell,
-  History,
-  Award,
-  ChevronRight,
-  ChevronLeft,
-  Sparkles,
-  Clock,
-  Zap,
+  Play, Pause, CheckCircle2, BrainCircuit, Lightbulb, RotateCcw,
+  Target, FolderTree, Settings, Timer, Coffee, Volume2, VolumeX,
+  Bell, History, Award, ChevronRight, Clock, X,
+  PenTool, EyeOff, Eye, AlertTriangle, Sparkles,
+  Zap
 } from "lucide-react";
 import { StudySubject } from "@prisma/client";
 import { logSession } from "@/app/(dashboard)/studies/actions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  SelectGroup,
-} from "@/components/ui/select";
-import {
-  Slider,
-} from "@/components/ui/slider";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 
 /* ================================
    TIPOS / CONSTANTES
@@ -83,162 +42,78 @@ const POMODORO_PRESETS = {
   QUICK: { focus: 15 * 60, shortBreak: 3 * 60, longBreak: 10 * 60, cycles: 5 },
 } as const;
 
+type PomodoroPreset = keyof typeof POMODORO_PRESETS;
+
 const STUDY_TIPS = [
-  "Técnica Pomodoro: 25min foco, 5min pausa. Após 4 ciclos, faça uma pausa longa de 15-30min.",
+  "Técnica Pomodoro: 25min foco, 5min pausa. Após 4 ciclos, faça uma pausa longa.",
   "Estudo ativo > estudo passivo. Faça perguntas, resuma, explique em voz alta.",
   "Intercale matérias diferentes para evitar fadiga mental.",
   "Revise o conteúdo 24h depois para fixar na memória de longo prazo.",
   "Use a técnica Feynman: explique como se estivesse ensinando uma criança.",
-  "Anote dúvidas que surgirem e volte nelas depois para não quebrar o fluxo.",
-  "Ambiente organizado = mente organizada. Prepare seu espaço antes de começar.",
-  "Hidrate-se! A desidratação reduz a concentração em até 30%.",
-  "Respire fundo por 4 segundos, segure por 7, expire por 8. Repita 3x para acalmar.",
-  "Reserve os últimos 5 minutos para revisar o que aprendeu na sessão.",
+  "Beba água! A desidratação reduz a concentração em até 30%.",
 ];
 
-type PomodoroPreset = keyof typeof POMODORO_PRESETS;
-
-interface StudyTimerProps {
-  subjects: StudySubject[];
+/* ================================
+   COMPONENTE 1: MODO FOCO (MODAL IMERSIVO)
+================================ */
+interface FocusModeModalProps {
+  isOpen: boolean;
+  subject: StudySubject | null;
+  settings: { focus: number; shortBreak: number; longBreak: number; cycles: number };
+  preferences: { sound: boolean; notif: boolean; autoBreak: boolean; autoFocus: boolean };
+  onFinish: (totalFocusSeconds: number, liveNotes: string) => void;
+  onAbort: () => void;
 }
 
-/* ================================
-   COMPONENTE
-================================ */
-export function StudyTimer({ subjects }: StudyTimerProps) {
-  /* ---------- ESTADOS PRINCIPAIS ---------- */
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string>("");
-  const [isRunning, setIsRunning] = useState(false);
-  const [seconds, setSeconds] = useState(0);
+function FocusModeModal({ isOpen, subject, settings, preferences, onFinish, onAbort }: FocusModeModalProps) {
+  const [isRunning, setIsRunning] = useState(true);
   const [isBreak, setIsBreak] = useState(false);
+  const [seconds, setSeconds] = useState(settings.focus);
   const [completedCycles, setCompletedCycles] = useState(0);
-  const [totalCompletedSessions, setTotalCompletedSessions] = useState(0);
+  const [totalFocusElapsed, setTotalFocusElapsed] = useState(0); 
+  const [liveNotes, setLiveNotes] = useState("");
   
-  /* ---------- CONFIGURAÇÕES POMODORO ---------- */
-  const [pomodoroPreset, setPomodoroPreset] = useState<PomodoroPreset>("CLASSIC");
-  const [customFocusTime, setCustomFocusTime] = useState(25); // minutos
-  const [customBreakTime, setCustomBreakTime] = useState(5); // minutos
-  const [customLongBreakTime, setCustomLongBreakTime] = useState(15); // minutos
-  const [cyclesBeforeLongBreak, setCyclesBeforeLongBreak] = useState(4);
-  const [useCustomSettings, setUseCustomSettings] = useState(false);
+  const [isTimerHidden, setIsTimerHidden] = useState(false);
   
-  /* ---------- CONFIGURAÇÕES GERAIS ---------- */
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [autoStartBreaks, setAutoStartBreaks] = useState(true);
-  const [autoStartFocus, setAutoStartFocus] = useState(false);
-  
-  /* ---------- ESTADOS DA SESSÃO ---------- */
-  const [notes, setNotes] = useState("");
-  const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
-  const [focusLevel, setFocusLevel] = useState("3");
-  const [sessionType, setSessionType] = useState<SessionType>("LEITURA");
-  const [sessionTags, setSessionTags] = useState("");
-  const [activeTip, setActiveTip] = useState(() => 
-    STUDY_TIPS[Math.floor(Math.random() * STUDY_TIPS.length)]
-  );
-  const [showSettings, setShowSettings] = useState(false);
-  const [timerHistory, setTimerHistory] = useState<Array<{
-    date: Date;
-    duration: number;
-    subject: string;
-    type: SessionType;
-  }>>([]);
+  // 🟢 A grande mudança: A confirmação de saída é um Estado da View, não um modal sobreposto!
+  const [viewMode, setViewMode] = useState<"FOCUS" | "CONFIRM_EXIT">("FOCUS");
 
-  /* ---------- CÁLCULOS ---------- */
-  const currentSettings = useMemo(() => {
-    if (useCustomSettings) {
-      return {
-        focus: customFocusTime * 60,
-        shortBreak: customBreakTime * 60,
-        longBreak: customLongBreakTime * 60,
-        cycles: cyclesBeforeLongBreak,
-      };
-    }
-    return POMODORO_PRESETS[pomodoroPreset];
-  }, [useCustomSettings, pomodoroPreset, customFocusTime, customBreakTime, customLongBreakTime, cyclesBeforeLongBreak]);
+  const isLongBreak = completedCycles > 0 && completedCycles % settings.cycles === 0;
+  const currentTargetTime = isBreak ? (isLongBreak ? settings.longBreak : settings.shortBreak) : settings.focus;
+  const progressPercentage = ((currentTargetTime - seconds) / currentTargetTime) * 100;
 
-  const isLongBreak = useMemo(() => 
-    completedCycles > 0 && completedCycles % currentSettings.cycles === 0,
-    [completedCycles, currentSettings.cycles]
-  );
-
-  const currentTargetTime = useMemo(() => 
-    isBreak 
-      ? (isLongBreak ? currentSettings.longBreak : currentSettings.shortBreak)
-      : currentSettings.focus,
-    [isBreak, isLongBreak, currentSettings]
-  );
-
-  const progressPercentage = useMemo(() => 
-    ((currentTargetTime - seconds) / currentTargetTime) * 100,
-    [seconds, currentTargetTime]
-  );
-
-  const nextBreakType = useMemo(() => 
-    (completedCycles + 1) % currentSettings.cycles === 0 ? "longa" : "curta",
-    [completedCycles, currentSettings.cycles]
-  );
-
-  /* ---------- EFEITOS ---------- */
   useEffect(() => {
-    if (!isRunning) return;
+    if (!isRunning || viewMode === "CONFIRM_EXIT") return; // Pausa no background se estiver na tela de saída
 
     const interval = setInterval(() => {
-      setSeconds(prev => {
+      setSeconds((prev) => {
         if (prev <= 1) {
-          // Tempo acabou
-          if (soundEnabled) {
-            const audio = new Audio('/sounds/notification.mp3');
-            audio.play().catch(() => {
-              // Fallback para som do navegador
-              const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-              const audioContext = new AudioContextClass();
-              const oscillator = audioContext.createOscillator();
-              oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-              oscillator.connect(audioContext.destination);
-              oscillator.start();
-              oscillator.stop(audioContext.currentTime + 0.5);
-            });
-          }
-
-          if (notificationsEnabled && document.hidden) {
-            new Notification(isBreak ? "Pausa encerrada! ⏰" : "Tempo de foco completo! 🎯", {
-              body: isBreak 
-                ? "Hora de voltar ao foco!"
-                : `Bom trabalho! Hora de uma pausa ${nextBreakType}.`,
-              icon: "/favicon.ico",
-            });
+          if (preferences.sound) {
+            try {
+                const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+                if (AudioCtx) {
+                    const audioContext = new AudioCtx();
+                    const oscillator = audioContext.createOscillator();
+                    oscillator.frequency.setValueAtTime(isBreak ? 600 : 800, audioContext.currentTime);
+                    oscillator.connect(audioContext.destination);
+                    oscillator.start();
+                    oscillator.stop(audioContext.currentTime + 0.5);
+                }
+            } catch (e) { /* Abafa erro de autoplay bloqueado pelo navegador */ }
           }
 
           if (isBreak) {
             setIsBreak(false);
-            setSeconds(currentSettings.focus);
-            if (autoStartFocus) {
-              // Auto-start do próximo foco
-              setTimeout(() => setIsRunning(true), 1000);
-            } else {
-              setIsRunning(false);
-            }
+            setSeconds(settings.focus);
+            setIsRunning(preferences.autoFocus);
           } else {
-            setIsBreak(true);
             const newCycles = completedCycles + 1;
+            setTotalFocusElapsed(curr => curr + settings.focus);
             setCompletedCycles(newCycles);
-            setTotalCompletedSessions(prev => prev + 1);
-            
-            const breakTime = newCycles % currentSettings.cycles === 0 
-              ? currentSettings.longBreak 
-              : currentSettings.shortBreak;
-            
-            setSeconds(breakTime);
-            
-            if (autoStartBreaks) {
-              setTimeout(() => setIsRunning(true), 1000);
-            } else {
-              setIsRunning(false);
-            }
+            setIsBreak(true);
+            setSeconds(newCycles % settings.cycles === 0 ? settings.longBreak : settings.shortBreak);
+            setIsRunning(preferences.autoBreak);
           }
-          
           return 0;
         }
         return prev - 1;
@@ -246,631 +121,407 @@ export function StudyTimer({ subjects }: StudyTimerProps) {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isRunning, isBreak, completedCycles, currentSettings, soundEnabled, notificationsEnabled, autoStartBreaks, autoStartFocus, nextBreakType]);
+  }, [isRunning, isBreak, completedCycles, settings, preferences, viewMode]);
 
-  /* ---------- FUNÇÕES DE FORMATAÇÃO ---------- */
-  const formatTime = (totalSeconds: number) => {
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-    
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    }
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  const formatTime = (secs: number) => {
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
-  const formatTimeForDisplay = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  /* ---------- HANDLERS ---------- */
-  const handleStart = () => {
-    if (!selectedSubjectId) {
-      toast.error("Selecione um tópico para começar!", {
-        description: "Escolha o assunto que você vai estudar",
-      });
-      return;
-    }
-
-    if (seconds === 0) {
-      setSeconds(isBreak ? currentTargetTime : currentSettings.focus);
-    }
-
-    setIsRunning(true);
-    
-    toast.success(isBreak ? "Pausa iniciada! ☕" : "Sessão de foco iniciada! 🚀", {
-      description: isBreak 
-        ? "Descanse um pouco, você merece!"
-        : "Foco total nos próximos minutos",
-    });
-  };
-
-  const handlePause = () => {
-    setIsRunning(false);
-    toast.info("Timer pausado", {
-      description: "Pressione play para continuar",
-    });
-  };
-
-  const handleReset = () => {
-    if (confirm("Tem certeza que quer resetar o timer?")) {
-      setSeconds(0);
-      setIsRunning(false);
-      setIsBreak(false);
-      toast.info("Timer resetado");
-    }
-  };
-
-  const handleSkip = () => {
+  const handleManualSkip = () => {
     if (isBreak) {
       setIsBreak(false);
-      setSeconds(currentSettings.focus);
-      setIsRunning(autoStartFocus);
-      toast.info("Pausa pulada", {
-        description: "Voltando ao tempo de foco",
-      });
+      setSeconds(settings.focus);
+      setIsRunning(true);
     } else {
+      setTotalFocusElapsed(curr => curr + (settings.focus - seconds));
+      const newCycles = completedCycles + 1;
+      setCompletedCycles(newCycles);
       setIsBreak(true);
-      setCompletedCycles(prev => prev + 1);
-      setTotalCompletedSessions(prev => prev + 1);
-      setSeconds(currentSettings.shortBreak);
-      setIsRunning(autoStartBreaks);
-      toast.success("Sessão completada!", {
-        description: "Iniciando pausa",
-      });
+      setSeconds(newCycles % settings.cycles === 0 ? settings.longBreak : settings.shortBreak);
+      setIsRunning(true);
     }
   };
 
-  const handleSaveSession = async () => {
-    if (!selectedSubjectId) {
-      toast.error("Selecione uma matéria");
-      return;
-    }
-
-    const durationMinutes = Math.ceil(seconds / 60);
-    const loadingToast = toast.loading("Salvando sua sessão...");
-
-    try {
-      const result = await logSession(
-        selectedSubjectId,
-        durationMinutes,
-        notes,
-        focusLevel,
-        sessionType,
-        sessionTags
-      );
-
-      toast.dismiss(loadingToast);
-
-      if (result.success) {
-        toast.success("Sessão salva com sucesso! 🎉", {
-          description: `+${durationMinutes} XP adicionados`,
-        });
-        
-        // Adicionar ao histórico
-        const subject = subjects.find(s => s.id === selectedSubjectId);
-        setTimerHistory(prev => [{
-          date: new Date(),
-          duration: durationMinutes,
-          subject: subject?.title || "Desconhecido",
-          type: sessionType,
-        }, ...prev.slice(0, 4)]);
-        
-        // Reset
-        setSeconds(0);
-        setIsRunning(false);
-        setIsBreak(false);
-        setNotes("");
-        setSessionTags("");
-        setFocusLevel("3");
-        setSessionType("LEITURA");
-        setIsSaveDialogOpen(false);
-        
-        // Nova dica
-        setActiveTip(STUDY_TIPS[Math.floor(Math.random() * STUDY_TIPS.length)]);
-      } else {
-        toast.error("Erro ao salvar", {
-          description: result.message,
-        });
-      }
-    } catch (error) {
-      toast.dismiss(loadingToast);
-      toast.error("Erro de conexão", {
-        description: "Verifique sua internet e tente novamente",
-      });
-    }
+  const handleFinish = () => {
+    const finalElapsed = isBreak ? totalFocusElapsed : totalFocusElapsed + (settings.focus - seconds);
+    setIsRunning(false);
+    onFinish(finalElapsed, liveNotes);
   };
 
-  const handlePresetChange = (preset: PomodoroPreset) => {
-    setPomodoroPreset(preset);
-    if (!isRunning && !isBreak && seconds === 0) {
-      setSeconds(POMODORO_PRESETS[preset].focus);
-    }
-    toast.info(`Preset alterado: ${preset.replace('_', ' ')}`);
+  const handleAttemptExit = () => {
+    setIsRunning(false);
+    setViewMode("CONFIRM_EXIT");
   };
 
-  /* ---------- RENDER ---------- */
+  const handleResumeFromExit = () => {
+    setViewMode("FOCUS");
+    setIsRunning(true);
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleAttemptExit(); }}>
+      {/* Container principal flexível com restrição estrita de altura */}
+      <DialogContent 
+          className="max-w-[95vw] w-full max-h-[95vh] h-full md:h-[85vh] p-0 overflow-hidden border-border/50 shadow-2xl [&>button]:hidden flex flex-col bg-background"
+          onInteractOutside={(e) => e.preventDefault()} 
+          onEscapeKeyDown={(e) => { e.preventDefault(); handleAttemptExit(); }}
+      >
+          <DialogHeader className="sr-only">
+              <DialogTitle>Modo Foco</DialogTitle>
+              <DialogDescription>Concentre-se nos estudos.</DialogDescription>
+          </DialogHeader>
+
+          {/* 🟢 SUBSTITUIÇÃO DE VIEW (Garante que o layout não quebre) */}
+          {viewMode === "CONFIRM_EXIT" ? (
+              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in-95 duration-300">
+                  <div className="h-24 w-24 bg-destructive/10 text-destructive flex items-center justify-center rounded-full mb-6 ring-8 ring-destructive/5">
+                      <AlertTriangle className="h-12 w-12" />
+                  </div>
+                  <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-4">Tem certeza?</h2>
+                  <p className="text-muted-foreground mb-10 max-w-md text-lg">
+                      Se você sair agora, todo o progresso do seu ciclo atual <strong>será perdido</strong> e não irá para o seu histórico.
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-4 w-full max-w-md">
+                      <Button variant="outline" size="lg" className="flex-1 h-14 text-base" onClick={handleResumeFromExit}>
+                          Voltar ao Foco
+                      </Button>
+                      <Button variant="destructive" size="lg" className="flex-1 h-14 text-base" onClick={onAbort}>
+                          Sair sem salvar
+                      </Button>
+                  </div>
+              </div>
+          ) : (
+              <div className="flex flex-col md:flex-row h-full w-full overflow-hidden animate-in fade-in duration-300">
+                  {/* ESQUERDA: TIMER GIGANTE */}
+                  <div className="w-full md:w-1/2 bg-gradient-to-br from-primary/10 via-background to-background flex flex-col items-center justify-center p-6 md:p-8 relative border-b md:border-b-0 md:border-r border-border/40 shrink-0">
+                  
+                    <div className="absolute top-4 left-6 right-4 flex justify-between items-start">
+                        <div>
+                            <Badge variant={isBreak ? "outline" : "primary"} className={cn("px-3 py-1.5 text-[10px] md:text-xs font-bold uppercase tracking-wider", isBreak && "text-emerald-500 border-emerald-500/30")}>
+                            {isBreak ? <Coffee className="w-3 h-3 mr-2" /> : <BrainCircuit className="w-3 h-3 mr-2" />}
+                            {isBreak ? (isLongBreak ? "Pausa Longa" : "Pausa Curta") : "Sessão de Foco"}
+                            </Badge>
+                            <h3 className="mt-3 text-lg md:text-xl font-bold line-clamp-1">{subject?.title}</h3>
+                            <p className="text-xs md:text-sm text-muted-foreground">Ciclo: {completedCycles % settings.cycles || settings.cycles} de {settings.cycles}</p>
+                        </div>
+                        <Button variant="ghost" size="icon" onClick={handleAttemptExit} className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors shrink-0">
+                            <X className="h-5 w-5" />
+                        </Button>
+                    </div>
+
+                    {/* Container fixo para o relógio (evita que a tela pule) */}
+                    <div className="relative w-56 h-56 md:w-72 md:h-72 my-8 flex items-center justify-center shrink-0">
+                        {!isTimerHidden && (
+                            <svg className="absolute inset-0 w-full h-full transform -rotate-90 transition-opacity">
+                                <circle cx="50%" cy="50%" r="45%" stroke="currentColor" strokeWidth="6" fill="transparent" className="text-muted/20" />
+                                <circle cx="50%" cy="50%" r="45%" stroke="currentColor" strokeWidth="8" fill="transparent"
+                                    strokeDasharray="283%" // Aproximação de 2 * PI * 45
+                                    strokeDashoffset={`${283 * (1 - progressPercentage / 100)}%`}
+                                    className={cn("transition-all duration-1000 ease-linear", isBreak ? "text-emerald-500" : "text-primary")}
+                                    strokeLinecap="round"
+                                />
+                            </svg>
+                        )}
+                        
+                        {/* 🟢 O MODO ZEN APRIMORADO */}
+                        {isTimerHidden ? (
+                            <div className="flex flex-col items-center justify-center animate-in zoom-in duration-500">
+                                <div className="p-6 rounded-full bg-primary/5 mb-4 animate-pulse">
+                                    <BrainCircuit className="h-16 w-16 text-primary/70" />
+                                </div>
+                                <span className="text-sm font-bold tracking-widest uppercase text-primary/70">Foco Profundo</span>
+                                <span className="text-[10px] text-muted-foreground mt-2">O tempo está rodando...</span>
+                            </div>
+                        ) : (
+                            <div className="text-6xl md:text-7xl font-black font-mono tracking-tighter tabular-nums text-foreground animate-in fade-in">
+                                {formatTime(seconds)}
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="flex flex-col items-center gap-4">
+                        <div className="flex gap-3">
+                            <Button size="lg" onClick={() => setIsRunning(!isRunning)} className={cn("h-12 md:h-14 px-6 md:px-8 rounded-full shadow-lg transition-all", !isRunning ? "bg-primary" : "bg-destructive hover:bg-destructive/90")}>
+                                {isRunning ? <Pause className="h-5 w-5 mr-2" /> : <Play className="h-5 w-5 mr-2" />}
+                                {isRunning ? "Pausar" : "Continuar"}
+                            </Button>
+                            <Button size="lg" variant="outline" onClick={handleManualSkip} className="h-12 w-12 md:h-14 md:w-14 p-0 rounded-full" title="Pular fase atual">
+                                <ChevronRight className="h-5 w-5" />
+                            </Button>
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={() => setIsTimerHidden(!isTimerHidden)} className="text-muted-foreground text-xs mt-2 hover:bg-transparent hover:text-foreground">
+                            {isTimerHidden ? <Eye className="h-4 w-4 mr-2" /> : <EyeOff className="h-4 w-4 mr-2" />}
+                            {isTimerHidden ? "Mostrar Tempo" : "Modo Zen (Ocultar)"}
+                        </Button>
+                    </div>
+                  </div>
+
+                  {/* DIREITA: CADERNO DE ANOTAÇÕES */}
+                  {/* min-h-0 é o segredo do flexbox para a Textarea não estourar a tela! */}
+                  <div className="w-full md:w-1/2 flex flex-col h-full min-h-0 bg-card">
+                      <div className="p-4 md:p-6 border-b border-border/40 flex items-center gap-3 shrink-0 bg-muted/10">
+                          <div className="p-2 bg-primary/10 rounded-lg text-primary hidden md:block"><PenTool className="h-5 w-5" /></div>
+                          <div>
+                              <h3 className="font-bold text-sm md:text-base">Caderno ao Vivo</h3>
+                              <p className="text-[10px] md:text-xs text-muted-foreground">Anote insights sem perder o foco.</p>
+                          </div>
+                      </div>
+                      
+                      {/* Área flexível que empurra o rodapé para baixo */}
+                      <div className="flex-1 p-4 md:p-6 min-h-0">
+                          <Textarea 
+                              value={liveNotes}
+                              onChange={(e) => setLiveNotes(e.target.value)}
+                              placeholder="Faça seus resumos aqui. O que você está aprendendo agora?"
+                              className="w-full h-full resize-none border-0 shadow-none focus-visible:ring-0 bg-transparent text-sm md:text-base leading-relaxed p-0 placeholder:text-muted-foreground/40"
+                          />
+                      </div>
+
+                      <div className="p-4 md:p-6 border-t border-border/40 bg-muted/10 flex justify-between items-center shrink-0">
+                          <p className="text-[10px] md:text-xs text-muted-foreground flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5"/> 
+                              <span className="hidden md:inline">Tempo focado:</span> 
+                              <strong className="text-foreground">{Math.floor((totalFocusElapsed + (isBreak ? 0 : settings.focus - seconds)) / 60)}min</strong>
+                          </p>
+                          <Button onClick={handleFinish} size="sm" className="bg-gradient-to-r from-primary to-primary shadow-lg shadow-primary/20 gap-2 h-10 md:h-11 px-4 md:px-6">
+                              <CheckCircle2 className="h-4 w-4" /> Finalizar Sessão
+                          </Button>
+                      </div>
+                  </div>
+              </div>
+          )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ================================
+   COMPONENTE 2: PAINEL PRINCIPAL
+================================ */
+export function StudyTimer({ subjects }: { subjects: StudySubject[] }) {
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string>("");
+  const [showSettings, setShowSettings] = useState(false);
+  const [pomodoroPreset, setPomodoroPreset] = useState<PomodoroPreset>("CLASSIC");
+  
+  const [preferences, setPreferences] = useState({ sound: true, notif: true, autoBreak: true, autoFocus: false });
+  
+  const [isFocusModeOpen, setIsFocusModeOpen] = useState(false);
+  const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
+  
+  const [sessionNotes, setSessionNotes] = useState("");
+  const [sessionDurationMinutes, setSessionDurationMinutes] = useState(0);
+  const [focusLevel, setFocusLevel] = useState("4");
+  const [sessionType, setSessionType] = useState<SessionType>("LEITURA");
+  const [sessionTags, setSessionTags] = useState("");
+  const [activeTip, setActiveTip] = useState(STUDY_TIPS[0]);
+
+  useEffect(() => {
+      const interval = setInterval(() => {
+          setActiveTip(STUDY_TIPS[Math.floor(Math.random() * STUDY_TIPS.length)]);
+      }, 15000); 
+      return () => clearInterval(interval);
+  }, []);
+
   const groupedSubjects = subjects.reduce((acc, subject) => {
     if (!subject.parentId) {
-      if (!acc[subject.id]) {
-        acc[subject.id] = { parent: subject, children: [] };
-      } else {
-        acc[subject.id].parent = subject;
-      }
+      if (!acc[subject.id]) acc[subject.id] = { parent: subject, children: [] };
+      else acc[subject.id].parent = subject;
     } else {
-      if (!acc[subject.parentId]) {
-        acc[subject.parentId] = { parent: null, children: [] };
-      }
+      if (!acc[subject.parentId]) acc[subject.parentId] = { parent: null, children: [] };
       acc[subject.parentId].children.push(subject);
     }
     return acc;
   }, {} as Record<string, { parent: StudySubject | null; children: StudySubject[] }>);
 
-  const selectedSubject = subjects.find(s => s.id === selectedSubjectId);
+  const selectedSubject = subjects.find(s => s.id === selectedSubjectId) || null;
+
+  const handleFocusFinish = (totalSeconds: number, liveNotes: string) => {
+    setIsFocusModeOpen(false);
+    setSessionDurationMinutes(Math.max(1, Math.floor(totalSeconds / 60))); 
+    setSessionNotes(liveNotes);
+    setIsSaveDialogOpen(true); 
+  };
+
+  const handleSaveSession = async () => {
+    const loadingToast = toast.loading("Salvando e calculando XP...");
+    try {
+      const result = await logSession(selectedSubjectId, sessionDurationMinutes, sessionNotes, focusLevel, sessionType, sessionTags);
+      toast.dismiss(loadingToast);
+
+      if (result.success) {
+        toast.success("Evolução registrada! 🎉", { description: `+${sessionDurationMinutes * 10} XP ganhos!` });
+        setIsSaveDialogOpen(false);
+        setSessionNotes("");
+        setSessionTags("");
+        setFocusLevel("4");
+      } else {
+        toast.error("Erro ao salvar", { description: result.message });
+      }
+    } catch (error) {
+      toast.dismiss(loadingToast);
+      toast.error("Erro de conexão");
+    }
+  };
 
   return (
     <div className="space-y-6">
-      {/* HEADER COM STATS */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-primary flex items-center justify-center shadow-lg">
-            <Timer className="h-5 w-5 text-white" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold">Timer de Estudos</h2>
-            <p className="text-sm text-muted-foreground">
-              {totalCompletedSessions} sessões completadas • {completedCycles} pomodoros hoje
-            </p>
-          </div>
-        </div>
-        
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowSettings(!showSettings)}
-            className="gap-2"
-          >
-            <Settings className="h-4 w-4" />
-            Configurações
-          </Button>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handleReset()}
-            className="gap-2"
-            disabled={seconds === 0}
-          >
-            <RotateCcw className="h-4 w-4" />
-            Resetar
-          </Button>
-        </div>
-      </div>
-
-      {/* CONFIGURAÇÕES (ACORDION STYLE) */}
-      {showSettings && (
-        <Card className="border-border/50 bg-gradient-to-br from-background to-muted/20">
-          <CardContent className="p-6 space-y-6">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold flex items-center gap-2">
-                <Settings className="h-4 w-4" />
-                Configurações do Timer
-              </h3>
-              <Button variant="ghost" size="sm" onClick={() => setShowSettings(false)}>
-                Fechar
-              </Button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* PRESETS */}
-              <div className="space-y-4">
-                <Label className="text-sm font-medium">Presets Pomodoro</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {Object.entries(POMODORO_PRESETS).map(([key, preset]) => (
-                    <Button
-                      key={key}
-                      variant={pomodoroPreset === key && !useCustomSettings ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => {
-                        setPomodoroPreset(key as PomodoroPreset);
-                        setUseCustomSettings(false);
-                      }}
-                      className="justify-start h-auto py-3"
-                    >
-                      <div className="text-left">
-                        <div className="font-medium">{key.replace('_', ' ')}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {preset.focus / 60}min • {preset.shortBreak / 60}min
-                        </div>
-                      </div>
-                    </Button>
-                  ))}
-                </div>
-              </div>
-
-              {/* CONFIGURAÇÕES PERSONALIZADAS */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">Personalizado</Label>
-                  <Switch
-                    checked={useCustomSettings}
-                    onCheckedChange={setUseCustomSettings}
-                  />
-                </div>
-                
-                {useCustomSettings && (
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label className="text-xs">Foco: {customFocusTime}min</Label>
-                      <Slider
-                        min={5}
-                        max={120}
-                        step={5}
-                        value={[customFocusTime]}
-                        onValueChange={([value]) => setCustomFocusTime(value)}
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label className="text-xs">Pausa: {customBreakTime}min</Label>
-                      <Slider
-                        min={1}
-                        max={30}
-                        step={1}
-                        value={[customBreakTime]}
-                        onValueChange={([value]) => setCustomBreakTime(value)}
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label className="text-xs">Ciclos até pausa longa: {cyclesBeforeLongBreak}</Label>
-                      <Slider
-                        min={1}
-                        max={8}
-                        step={1}
-                        value={[cyclesBeforeLongBreak]}
-                        onValueChange={([value]) => setCyclesBeforeLongBreak(value)}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* OPÇÕES ADICIONAIS */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  checked={soundEnabled}
-                  onCheckedChange={setSoundEnabled}
-                  id="sound-switch"
-                />
-                <Label htmlFor="sound-switch" className="flex items-center gap-2">
-                  {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-                  Som
-                </Label>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Switch
-                  checked={notificationsEnabled}
-                  onCheckedChange={setNotificationsEnabled}
-                  id="notifications-switch"
-                />
-                <Label htmlFor="notifications-switch" className="flex items-center gap-2">
-                  <Bell className="h-4 w-4" />
-                  Notificações
-                </Label>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Switch
-                  checked={autoStartBreaks}
-                  onCheckedChange={setAutoStartBreaks}
-                  id="auto-break-switch"
-                />
-                <Label htmlFor="auto-break-switch" className="flex items-center gap-2">
-                  <Coffee className="h-4 w-4" />
-                  Auto-pausa
-                </Label>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Switch
-                  checked={autoStartFocus}
-                  onCheckedChange={setAutoStartFocus}
-                  id="auto-focus-switch"
-                />
-                <Label htmlFor="auto-focus-switch" className="flex items-center gap-2">
-                  <Zap className="h-4 w-4" />
-                  Auto-foco
-                </Label>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      
+      {/* 🟢 Renderização segura do Modal */}
+      {isFocusModeOpen && (
+        <FocusModeModal 
+            isOpen={isFocusModeOpen}
+            subject={selectedSubject}
+            settings={POMODORO_PRESETS[pomodoroPreset]}
+            preferences={preferences}
+            onFinish={handleFocusFinish}
+            onAbort={() => setIsFocusModeOpen(false)}
+        />
       )}
 
-      {/* TIMER PRINCIPAL */}
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* COLUNA ESQUERDA - TIMER VISUAL */}
-        <Card className="lg:col-span-2 border-none shadow-xl bg-gradient-to-br from-primary/5 via-background to-background">
-          <CardContent className="p-8">
-            {/* DISPLAY DO TIMER */}
-            <div className="text-center space-y-6">
-              {/* BADGE DE STATUS */}
-              <div className="flex justify-center">
-                <Badge
-                  variant={isBreak ? "outline" : "primary"}
-                  className={cn(
-                    "px-4 py-2 text-sm font-semibold animate-pulse",
-                    isBreak 
-                      ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/20"
-                      : "bg-primary/10 text-primary border-primary/20"
-                  )}
-                >
-                  {isBreak ? (
-                    <>
-                      <Coffee className="h-4 w-4 mr-2" />
-                      {isLongBreak ? "PAUSA LONGA" : "PAUSA CURTA"}
-                    </>
-                  ) : (
-                    <>
-                      <BrainCircuit className="h-4 w-4 mr-2" />
-                      MODO FOCUS
-                    </>
-                  )}
-                </Badge>
-              </div>
-
-              {/* TIMER CIRCULAR (SIMULADO) */}
-              <div className="relative mx-auto w-64 h-64">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="relative">
-                    <div className="text-6xl font-bold font-mono tracking-tighter">
-                      {formatTimeForDisplay(seconds)}
+      <Card className="border-border/50 bg-card shadow-sm relative overflow-hidden">
+        <div className="absolute right-0 top-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none" />
+        
+        <CardContent className="p-6 md:p-8">
+            <div className="flex flex-col md:flex-row gap-8">
+                <div className="flex-1 space-y-6">
+                    <div>
+                        <h2 className="text-2xl font-bold tracking-tight mb-1">Sala de Preparação</h2>
+                        <p className="text-sm text-muted-foreground">Escolha a matéria, ajuste o ambiente e entre no modo foco profundo.</p>
                     </div>
-                    <div className="text-sm text-muted-foreground mt-2">
-                      {isBreak ? "Relaxe um pouco" : "Foco total"}
+
+                    <div className="space-y-3">
+                        <Label className="text-xs uppercase font-bold text-muted-foreground tracking-wider">O que vamos estudar?</Label>
+                        <Select value={selectedSubjectId} onValueChange={setSelectedSubjectId}>
+                            <SelectTrigger className="h-14 text-base bg-muted/30 border-border/60">
+                                <SelectValue placeholder="Selecione um tópico ou matéria" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {Object.entries(groupedSubjects).map(([parentId, group]) => (
+                                    <SelectGroup key={parentId}>
+                                    {group.parent && (
+                                        <SelectItem value={group.parent.id} className="font-bold py-3"><FolderTree className="h-4 w-4 inline mr-2" />{group.parent.title}</SelectItem>
+                                    )}
+                                    {group.children.map(child => (
+                                        <SelectItem key={child.id} value={child.id} className="pl-8 py-2"><ChevronRight className="h-3 w-3 inline mr-2 opacity-50" />{child.title}</SelectItem>
+                                    ))}
+                                    </SelectGroup>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
-                  </div>
-                </div>
-                
-                {/* PROGRESS RING SIMULADO */}
-                <svg className="absolute inset-0 w-full h-full transform -rotate-90">
-                  <circle
-                    cx="128"
-                    cy="128"
-                    r="120"
-                    stroke="currentColor"
-                    strokeWidth="8"
-                    fill="transparent"
-                    className="text-muted/20"
-                  />
-                  <circle
-                    cx="128"
-                    cy="128"
-                    r="120"
-                    stroke="currentColor"
-                    strokeWidth="8"
-                    fill="transparent"
-                    strokeDasharray={2 * Math.PI * 120}
-                    strokeDashoffset={2 * Math.PI * 120 * (1 - progressPercentage / 100)}
-                    className={cn(
-                      "transition-all duration-1000 ease-out",
-                      isBreak ? "text-emerald-500" : "text-primary"
-                    )}
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </div>
 
-              {/* INFORMAÇÕES DO CICLO */}
-              <div className="grid grid-cols-3 gap-4 max-w-md mx-auto">
-                <div className="text-center p-3 rounded-lg bg-secondary/50">
-                  <div className="text-2xl font-bold">{completedCycles}</div>
-                  <div className="text-xs text-muted-foreground">Ciclos</div>
+                    <Button 
+                        size="lg" 
+                        onClick={() => selectedSubjectId ? setIsFocusModeOpen(true) : toast.error("Selecione uma matéria primeiro!")}
+                        className="w-full h-14 text-lg font-bold shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 transition-all active:scale-[0.98]"
+                    >
+                        <Play className="h-5 w-5 mr-2" /> Iniciar Modo Foco
+                    </Button>
                 </div>
-                <div className="text-center p-3 rounded-lg bg-secondary/50">
-                  <div className="text-2xl font-bold">
-                    {completedCycles % currentSettings.cycles || currentSettings.cycles}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Ciclo atual</div>
-                </div>
-                <div className="text-center p-3 rounded-lg bg-secondary/50">
-                  <div className="text-2xl font-bold">
-                    {isLongBreak ? currentSettings.longBreak / 60 : currentSettings.shortBreak / 60}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Pausa (min)</div>
-                </div>
-              </div>
 
-              {/* CONTROLES PRINCIPAIS */}
-              <div className="flex gap-3 justify-center pt-6">
-                <Button
-                  variant="outline"
-                  size="lg"
-                  onClick={handleSkip}
-                  disabled={!isRunning && seconds === 0}
-                  className="gap-2"
-                >
-                  <ChevronRight className="h-5 w-5" />
-                  Pular
-                </Button>
-                
-                {isRunning ? (
-                  <Button
-                    size="lg"
-                    onClick={handlePause}
-                    className="gap-2 px-8 bg-destructive hover:bg-destructive/90"
-                  >
-                    <Pause className="h-5 w-5" />
-                    Pausar
-                  </Button>
-                ) : (
-                  <Button
-                    size="lg"
-                    onClick={handleStart}
-                    disabled={!selectedSubjectId}
-                    className={cn(
-                      "gap-2 px-8",
-                      !selectedSubjectId && "opacity-50 cursor-not-allowed"
-                    )}
-                  >
-                    <Play className="h-5 w-5" />
-                    {seconds === 0 ? "Começar" : "Continuar"}
-                  </Button>
-                )}
-                
-                <Button
-                  variant="outline"
-                  size="lg"
-                  onClick={() => setIsSaveDialogOpen(true)}
-                  disabled={seconds === 0 || isRunning}
-                  className="gap-2"
-                >
-                  <CheckCircle2 className="h-5 w-5" />
-                  Salvar
-                </Button>
-              </div>
+                <div className="w-full md:w-1/3 space-y-6 md:pl-8 md:border-l border-border/40">
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                            <Label className="text-xs uppercase font-bold text-muted-foreground tracking-wider">Técnica</Label>
+                            <Button variant="outline" size="sm" onClick={() => setShowSettings(!showSettings)}>
+                                <Settings className="h-3.5 w-3.5 mr-2" /> Preferências
+                            </Button>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2">
+                            {Object.entries(POMODORO_PRESETS).map(([key, preset]) => (
+                                <Button
+                                    key={key}
+                                    variant={pomodoroPreset === key ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => setPomodoroPreset(key as PomodoroPreset)}
+                                    className={cn("h-auto py-2 px-3 justify-start flex-col items-start gap-1", pomodoroPreset === key && "shadow-sm bg-primary")}
+                                >
+                                    <span className="font-semibold text-xs leading-none">{key.replace('_', ' ')}</span>
+                                    <span className={cn("text-[10px] leading-none opacity-70", pomodoroPreset === key ? "text-primary-foreground" : "text-muted-foreground")}>{preset.focus / 60}m foco</span>
+                                </Button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="bg-amber-500/10 border border-amber-500/20 p-4 rounded-xl relative overflow-hidden">
+                        <div className="flex gap-2 items-center text-amber-600 dark:text-amber-400 font-bold text-xs mb-2">
+                            <Lightbulb className="h-3.5 w-3.5 animate-pulse" /> Dica de Produtividade
+                        </div>
+                        <p className="text-xs text-amber-700/80 dark:text-amber-500/80 leading-relaxed italic animate-in fade-in duration-700 key={activeTip}">
+                            &quot;{activeTip}&quot;
+                        </p>
+                    </div>
+                </div>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* COLUNA DIREITA - CONTROLES E INFORMAÇÕES */}
-        <div className="space-y-6">
-          {/* SELEÇÃO DE MATÉRIA */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Target className="h-4 w-4" />
-                O que estudar?
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Select value={selectedSubjectId} onValueChange={setSelectedSubjectId}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecione um tópico" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(groupedSubjects).map(([parentId, group]) => (
-                    <SelectGroup key={parentId}>
-                      {group.parent && (
-                        <SelectItem value={group.parent.id} className="font-semibold">
-                          <div className="flex items-center gap-2">
-                            <FolderTree className="h-4 w-4" />
-                            {group.parent.title}
-                          </div>
-                        </SelectItem>
-                      )}
-                      {group.children.map(child => (
-                        <SelectItem key={child.id} value={child.id} className="pl-8">
-                          <ChevronRight className="h-3 w-3 inline mr-2 opacity-50" />
-                          {child.title}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              {selectedSubject && (
-                <div className="mt-4 p-3 rounded-lg bg-secondary/50">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">{selectedSubject.title}</span>
-                    <Badge variant="outline" className="text-xs">
-                      {selectedSubject.difficulty}/5 dificuldade
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Meta: {selectedSubject.goalMinutes} minutos
-                  </p>
+            {showSettings && (
+                <div className="mt-8 pt-6 border-t border-border/40 animate-in slide-in-from-top-4">
+                    <h3 className="text-sm font-bold mb-4 flex items-center gap-2"><Settings className="w-4 h-4"/> Configurações do Ambiente</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                        <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/20">
+                            <Label htmlFor="sound-switch" className="flex items-center gap-2 cursor-pointer text-[10px] md:text-xs font-semibold">
+                            {preferences.sound ? <Volume2 className="h-4 w-4 text-primary" /> : <VolumeX className="h-4 w-4 text-muted-foreground" />}
+                            Som
+                            </Label>
+                            <Switch id="sound-switch" checked={preferences.sound} onCheckedChange={(v) => setPreferences(p => ({...p, sound: v}))} />
+                        </div>
+                        
+                        <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/20">
+                            <Label htmlFor="notif-switch" className="flex items-center gap-2 cursor-pointer text-[10px] md:text-xs font-semibold">
+                            <Bell className={cn("h-4 w-4", preferences.notif ? "text-primary" : "text-muted-foreground")} />
+                            Avisos
+                            </Label>
+                            <Switch id="notif-switch" checked={preferences.notif} onCheckedChange={(v) => setPreferences(p => ({...p, notif: v}))} />
+                        </div>
+                        
+                        <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/20">
+                            <Label htmlFor="break-switch" className="flex items-center gap-2 cursor-pointer text-[10px] md:text-xs font-semibold">
+                            <Coffee className={cn("h-4 w-4", preferences.autoBreak ? "text-primary" : "text-muted-foreground")} />
+                            Auto-Pausa
+                            </Label>
+                            <Switch id="break-switch" checked={preferences.autoBreak} onCheckedChange={(v) => setPreferences(p => ({...p, autoBreak: v}))} />
+                        </div>
+                        
+                        <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/20">
+                            <Label htmlFor="focus-switch" className="flex items-center gap-2 cursor-pointer text-[10px] md:text-xs font-semibold">
+                            <Zap className={cn("h-4 w-4", preferences.autoFocus ? "text-primary" : "text-muted-foreground")} />
+                            Auto-Foco
+                            </Label>
+                            <Switch id="focus-switch" checked={preferences.autoFocus} onCheckedChange={(v) => setPreferences(p => ({...p, autoFocus: v}))} />
+                        </div>
+                    </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* DICA DO DIA */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Lightbulb className="h-4 w-4 text-amber-500" />
-                Dica de Estudo
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 ml-auto"
-                  onClick={() => setActiveTip(STUDY_TIPS[Math.floor(Math.random() * STUDY_TIPS.length)])}
-                >
-                  <Sparkles className="h-3 w-3" />
-                </Button>
-              </CardTitle>
-            </CardHeader>
-              <CardContent>
-                <span 
-                  className="text-sm text-muted-foreground italic"
-                  suppressHydrationWarning={true}
-                >
-                  &quot;{activeTip}&quot;
-                </span>
-              </CardContent>
-          </Card>
-
-          {/* HISTÓRICO RÁPIDO */}
-          {timerHistory.length > 0 && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <History className="h-4 w-4" />
-                  Histórico Hoje
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {timerHistory.map((session, index) => (
-                  <div key={index} className="flex items-center justify-between text-sm p-2 rounded hover:bg-secondary/50">
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-3 w-3 text-muted-foreground" />
-                      <span className="truncate">{session.subject}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="text-xs">
-                        {session.duration}min
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
+            )}
+        </CardContent>
+      </Card>
 
       {/* DIALOG DE SALVAR SESSÃO */}
       <Dialog open={isSaveDialogOpen} onOpenChange={setIsSaveDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Award className="h-5 w-5 text-primary" />
-              Salvar Sessão de Estudo
-            </DialogTitle>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-xl p-0 overflow-hidden border-border/60 shadow-2xl">
+          <div className="p-6 bg-gradient-to-r from-primary/10 to-background border-b border-border/40">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-2xl font-bold">
+                <Award className="h-6 w-6 text-primary" /> Relatório da Sessão
+              </DialogTitle>
+              <DialogDescription>
+                Você focou por <strong className="text-foreground">{sessionDurationMinutes} minutos</strong> em {selectedSubject?.title}. Como foi?
+              </DialogDescription>
+            </DialogHeader>
+          </div>
 
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-xs font-medium">Nível de Foco (1-5)</Label>
-                <div className="flex gap-1">
+          <div className="p-6 space-y-6 bg-background">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Nível de Foco (1-5)</Label>
+                <div className="flex gap-1 bg-muted/30 p-1 rounded-lg">
                   {[1, 2, 3, 4, 5].map(level => (
                     <Button
-                      key={level}
-                      type="button"
-                      variant={focusLevel === level.toString() ? "default" : "outline"}
-                      size="sm"
-                      className="flex-1"
+                      key={level} type="button"
+                      variant={focusLevel === level.toString() ? "default" : "ghost"}
+                      className="flex-1 rounded-md transition-all"
                       onClick={() => setFocusLevel(level.toString())}
                     >
                       {level}
@@ -879,68 +530,33 @@ export function StudyTimer({ subjects }: StudyTimerProps) {
                 </div>
               </div>
               
-              <div className="space-y-2">
-                <Label className="text-xs font-medium">Tipo de Sessão</Label>
+              <div className="space-y-3">
+                <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Tipo de Atividade</Label>
                 <Select value={sessionType} onValueChange={(v) => setSessionType(v as SessionType)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger className="bg-muted/30"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {SESSION_TYPE_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        <span className="flex items-center gap-2">
-                          <span>{option.icon}</span>
-                          {option.label}
-                        </span>
-                      </SelectItem>
+                      <SelectItem key={option.value} value={option.value}><span className="flex items-center gap-2">{option.icon} {option.label}</span></SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-xs font-medium">Tags (separadas por vírgula)</Label>
-              <Input
-                placeholder="Ex: hooks, api, deploy, algoritmo"
-                value={sessionTags}
-                onChange={(e) => setSessionTags(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-xs font-medium">O que você aprendeu? (Opcional)</Label>
+            <div className="space-y-3">
+              <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Resumo / Anotações</Label>
               <Textarea
-                placeholder="Anote os principais pontos aprendidos, insights ou dúvidas..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="min-h-[120px] resize-none"
+                placeholder="Anotações feitas durante o foco aparecerão aqui..."
+                value={sessionNotes}
+                onChange={(e) => setSessionNotes(e.target.value)}
+                className="min-h-[120px] resize-none bg-muted/30 focus:bg-background"
               />
             </div>
 
-            <div className="bg-secondary/50 p-3 rounded-lg">
-              <div className="text-sm font-medium">Resumo da Sessão</div>
-              <div className="text-xs text-muted-foreground mt-1">
-                • Duração: {Math.ceil(seconds / 60)} minutos<br/>
-                • Matéria: {selectedSubject?.title || "Não selecionada"}<br/>
-                • XP ganho: {Math.ceil(seconds / 60)} pontos
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                onClick={() => setIsSaveDialogOpen(false)}
-                className="flex-1"
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleSaveSession}
-                className="flex-1 bg-gradient-to-r from-primary to-primary"
-              >
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-                Salvar e Ganhar XP
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" onClick={() => setIsSaveDialogOpen(false)} className="flex-1 h-12">Descartar</Button>
+              <Button onClick={handleSaveSession} className="flex-1 h-12 bg-primary font-bold shadow-lg shadow-primary/20 text-md">
+                <CheckCircle2 className="h-5 w-5 mr-2" /> Salvar Evolução
               </Button>
             </div>
           </div>

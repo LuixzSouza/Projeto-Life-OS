@@ -1,11 +1,13 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogTrigger
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,8 +17,9 @@ import {
   CalendarX2,
   Clock,
   MoreHorizontal,
+  CalendarPlus
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, differenceInMinutes, startOfDay } from "date-fns";
 import { EventForm } from "@/components/agenda/event-form";
 import { EventDeleteButton } from "@/components/agenda/event-delete-button";
 import { Prisma } from "@prisma/client";
@@ -26,9 +29,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { DialogTrigger } from "@radix-ui/react-dialog";
+import { cn } from "@/lib/utils";
 
-// Tipo auxiliar para tipagem segura
+// --- TIPAGENS ---
 type EventWithProject = Prisma.EventGetPayload<{
   include: { project: { select: { title: true; color: true } } };
 }>;
@@ -38,174 +41,211 @@ interface EventListProps {
   sortedKeys: string[];
 }
 
+// Configurações do Grid
+const START_HOUR = 6; // Inicia às 06:00
+const END_HOUR = 23; // Termina às 23:00
+const HOUR_HEIGHT = 80; // Cada hora ocupa 80 pixels de altura na tela
+
 export function EventList({ groupedEvents, sortedKeys }: EventListProps) {
+  
+  // ✅ CORREÇÃO: O Hook useMemo agora está no topo, ANTES do 'if'
+  const hours = useMemo(() => {
+    const h = [];
+    for (let i = START_HOUR; i <= END_HOUR; i++) {
+      h.push(i);
+    }
+    return h;
+  }, []);
+
+  // Se não houver eventos na data atual, mostra o Empty State
   if (sortedKeys.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed border-border/60 rounded-xl bg-muted/5 animate-in fade-in zoom-in-95 duration-500">
-        <div className="h-20 w-20 bg-muted/50 rounded-full flex items-center justify-center mb-6 shadow-sm ring-1 ring-border">
-          <CalendarX2 className="h-10 w-10 text-muted-foreground/50" />
+      <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-center border-2 border-dashed border-border/40 rounded-[2rem] bg-muted/5 animate-in fade-in duration-500">
+        <div className="h-20 w-20 bg-muted/30 rounded-[1.5rem] flex items-center justify-center mb-6 shadow-inner border border-border/40">
+          <CalendarX2 className="h-10 w-10 text-muted-foreground/30" />
         </div>
-        <h3 className="font-semibold text-lg text-foreground">Agenda Livre</h3>
-        <p className="text-sm text-muted-foreground mt-2 max-w-xs leading-relaxed">
-          Nenhum compromisso agendado. Aproveite para focar em projetos ou
-          descansar.
+        <h3 className="font-black text-xl text-foreground uppercase tracking-tighter">Linha do Tempo Vazia</h3>
+        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-2 max-w-xs leading-relaxed opacity-60">
+          Nenhum bloco de tempo alocado. A grade está livre.
         </p>
       </div>
     );
   }
 
+  // Pegamos apenas o primeiro dia (o selecionado) para renderizar a grade
+  const targetDateKey = sortedKeys[0];
+  const dailyEvents = groupedEvents[targetDateKey];
+
+  // Lógica de Posicionamento Matemático
+  const getEventStyles = (event: EventWithProject) => {
+    const eventStart = new Date(event.startTime);
+    const eventEnd = event.endTime ? new Date(event.endTime) : new Date(eventStart.getTime() + 60 * 60 * 1000); // Default 1h
+    
+    const startOfDayRef = startOfDay(eventStart);
+    startOfDayRef.setHours(START_HOUR, 0, 0, 0);
+
+    // Calcula os minutos desde o início do grid (06:00)
+    const minutesFromStart = differenceInMinutes(eventStart, startOfDayRef);
+    const durationMinutes = differenceInMinutes(eventEnd, eventStart);
+
+    // Posicionamento Top (em pixels)
+    const top = (minutesFromStart / 60) * HOUR_HEIGHT;
+    // Altura (em pixels)
+    const height = Math.max((durationMinutes / 60) * HOUR_HEIGHT, 30); // Mínimo de 30px para não sumir
+
+    return {
+      top: `${top}px`,
+      height: `${height}px`,
+      backgroundColor: event.color ? `${event.color}15` : "hsl(var(--primary) / 0.1)",
+      borderColor: event.color ? `${event.color}40` : "hsl(var(--primary) / 0.3)",
+      color: event.color || "hsl(var(--primary))",
+    };
+  };
+
   return (
-    <div className="space-y-10 relative pl-4 md:pl-0">
-      {/* Linha do tempo contínua (Mobile) */}
-      <div className="absolute left-[19px] top-4 bottom-4 w-px bg-gradient-to-b from-primary/20 via-border to-transparent md:hidden" />
-
-      {sortedKeys.map((dateKey) => (
-        <div key={dateKey} className="group/date relative md:pl-0">
-          {/* Cabeçalho da Data (Sticky) */}
-          <div className="sticky top-20 z-10 mb-6 flex items-center gap-4 bg-background/95 backdrop-blur py-2">
-            <div className="hidden md:flex h-3 w-3 rounded-full bg-primary ring-4 ring-primary/10" />
-            <h3 className="text-xl font-bold capitalize text-foreground flex items-center gap-2">
-              {dateKey}
-              <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full border border-border/50">
-                {groupedEvents[dateKey].length} eventos
-              </span>
-            </h3>
-          </div>
-
-          <div className="grid gap-4 pl-8 md:pl-7 border-l md:border-l-2 border-border/50 md:border-primary/10 ml-1 md:ml-[5px] space-y-4 md:space-y-0">
-            {groupedEvents[dateKey].map((event) => {
-              const eventColor = event.color || "hsl(var(--primary))";
-              
-              return (
-                <div
-                  key={event.id}
-                  className="group relative flex flex-col sm:flex-row gap-0 sm:gap-6 p-0 sm:p-5 rounded-2xl bg-card border border-border/60 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 overflow-hidden"
+    <div className="relative w-full h-[800px] overflow-y-auto custom-scrollbar pr-2 animate-in fade-in duration-500">
+        
+        {/* LINHA DO TEMPO (Régua Vertical) */}
+        <div className="relative w-full" style={{ height: `${(END_HOUR - START_HOUR + 1) * HOUR_HEIGHT}px` }}>
+            
+            {/* Linhas Horizontais (Background Grid) */}
+            {hours.map((hour) => (
+                <div 
+                    key={hour} 
+                    className="absolute w-full flex items-start"
+                    style={{ top: `${(hour - START_HOUR) * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }}
                 >
-                  {/* Indicador lateral colorido */}
-                  <div
-                    className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary transition-all group-hover:w-2"
-                    style={{ backgroundColor: eventColor }}
-                  />
-
-                  {/* Coluna de Horário */}
-                  <div className="flex sm:flex-col items-center sm:items-start gap-2 sm:gap-1 p-4 sm:p-0 border-b sm:border-0 border-border/40 bg-muted/10 sm:bg-transparent min-w-[5.5rem]">
-                    <div className="flex items-center gap-1.5 text-foreground font-bold text-lg sm:text-xl font-mono tracking-tight">
-                      <Clock className="h-4 w-4 text-muted-foreground sm:hidden" />
-                      {format(new Date(event.startTime), "HH:mm")}
+                    {/* Hora no eixo esquerdo */}
+                    <div className="w-16 text-right pr-4 shrink-0 -mt-2.5">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40">
+                            {hour.toString().padStart(2, '0')}:00
+                        </span>
                     </div>
-                    {event.endTime && (
-                      <span className="text-xs font-medium text-muted-foreground/80 bg-muted px-1.5 py-0.5 rounded-md">
-                        até {format(new Date(event.endTime), "HH:mm")}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Conteúdo Principal */}
-                  <div className="flex-1 p-4 sm:p-0 flex flex-col justify-center gap-2">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="space-y-1.5">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="font-bold text-base sm:text-lg text-foreground leading-tight group-hover:text-primary transition-colors">
-                            {event.title}
-                          </h4>
-                          {event.project && (
-                            <Badge
-                              variant="outline"
-                              className="text-[10px] h-5 px-2 border-primary/20 bg-primary/5 text-primary font-medium"
-                              style={{
-                                borderColor: event.project.color
-                                  ? `${event.project.color}40`
-                                  : undefined,
-                                color: event.project.color || undefined,
-                                backgroundColor: event.project.color
-                                  ? `${event.project.color}10`
-                                  : undefined,
-                              }}
-                            >
-                              {event.project.title}
-                            </Badge>
-                          )}
-                        </div>
-
-                        {event.description && (
-                          <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
-                            {event.description}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Ações (Desktop: Hover / Mobile: Always visible via Menu) */}
-                      <div className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex items-start">
-                        <Dialog>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 -mr-2 text-muted-foreground hover:text-foreground"
-                              >
-                                <MoreHorizontal className="h-5 w-5" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40">
-                              <DialogTrigger asChild>
-                                <DropdownMenuItem className="gap-2 cursor-pointer">
-                                  <Pencil className="h-4 w-4" /> Editar
-                                </DropdownMenuItem>
-                              </DialogTrigger>
-                              <div className="p-1">
-                                {/* CORREÇÃO 2: Removida a prop 'variant' que não existia */}
-                                <EventDeleteButton
-                                  eventId={event.id}
-                                  eventTitle={event.title}
-                                  className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10 h-8 px-2 text-sm"
-                                />
-                              </div>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-
-                          {/* Modal de Edição */}
-                          <DialogContent className="sm:max-w-[500px]">
-                            <DialogHeader>
-                              <DialogTitle className="flex items-center gap-2">
-                                <Pencil className="h-5 w-5 text-primary" />
-                                Editar Compromisso
-                              </DialogTitle>
-                              <DialogDescription>
-                                Atualize os detalhes do seu evento abaixo.
-                              </DialogDescription>
-                            </DialogHeader>
-                            {/* CORREÇÃO 1: Removido 'endTime' do initialData */}
-                            <EventForm
-                              initialData={{
-                                id: event.id,
-                                title: event.title,
-                                startTime: event.startTime,
-                                description: event.description || null,
-                                location: event.location || null,
-                                color: event.color || null,
-                                projectId: event.projectId || "none",
-                              }}
-                            />
-                          </DialogContent>
-                        </Dialog>
-                      </div>
-                    </div>
-
-                    {/* Rodapé do Card (Localização) */}
-                    {event.location && (
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
-                        <MapPin className="h-3.5 w-3.5 text-primary/70" />
-                        <span className="font-medium">{event.location}</span>
-                      </div>
-                    )}
-                  </div>
+                    {/* Divisória da grade */}
+                    <div className="flex-1 border-t border-border/40 border-dashed" />
                 </div>
-              );
-            })}
-          </div>
+            ))}
+
+            {/* EVENTOS (Blocos Flutuantes) */}
+            <div className="absolute left-16 right-0 top-0 bottom-0">
+                {dailyEvents.map((event) => {
+                    const styles = getEventStyles(event);
+                    // Checa se o evento é muito pequeno para esconder o descritivo
+                    const isCompact = parseFloat(styles.height) < 60; 
+
+                    return (
+                        <div
+                            key={event.id}
+                            className={cn(
+                                "absolute left-4 right-4 rounded-xl border-l-4 p-3 shadow-sm transition-all hover:shadow-md hover:brightness-110 group overflow-hidden"
+                            )}
+                            style={{
+                                top: styles.top,
+                                height: styles.height,
+                                backgroundColor: styles.backgroundColor,
+                                borderLeftColor: styles.color,
+                                borderTopColor: styles.borderColor,
+                                borderRightColor: styles.borderColor,
+                                borderBottomColor: styles.borderColor,
+                                borderTopWidth: '1px',
+                                borderRightWidth: '1px',
+                                borderBottomWidth: '1px',
+                            }}
+                        >
+                            {/* Conteúdo do Bloco */}
+                            <div className="flex justify-between items-start h-full">
+                                
+                                <div className="flex flex-col min-w-0 h-full">
+                                    <div className="flex items-center gap-2">
+                                        <h4 className="font-bold text-sm truncate" style={{ color: styles.color }}>
+                                            {event.title}
+                                        </h4>
+                                        {!isCompact && event.project && (
+                                            <Badge variant="outline" className="text-[8px] h-4 px-1.5 uppercase font-black bg-background/50 hidden sm:flex border-current" style={{ color: styles.color }}>
+                                                {event.project.title}
+                                            </Badge>
+                                        )}
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-[10px] font-bold text-foreground/60 uppercase tracking-widest">
+                                            {format(new Date(event.startTime), "HH:mm")} - {event.endTime ? format(new Date(event.endTime), "HH:mm") : '...'}
+                                        </span>
+                                        {!isCompact && event.location && (
+                                            <span className="text-[10px] font-bold text-foreground/50 truncate flex items-center gap-1">
+                                                <MapPin className="h-3 w-3" /> {event.location}
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    {!isCompact && event.description && (
+                                        <p className="text-xs text-foreground/70 line-clamp-1 mt-2 font-medium">
+                                            {event.description}
+                                        </p>
+                                    )}
+                                </div>
+
+                                {/* Menu de Ações (Aparece no Hover) */}
+                                <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 backdrop-blur-sm rounded-lg border border-border/40 shadow-sm shrink-0">
+                                    <Dialog>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-foreground hover:text-primary">
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="w-40 rounded-xl border-border/40 shadow-xl">
+                                                <DialogTrigger asChild>
+                                                    <DropdownMenuItem className="gap-2 cursor-pointer font-bold text-xs uppercase tracking-widest">
+                                                        <Pencil className="h-3.5 w-3.5" /> Editar
+                                                    </DropdownMenuItem>
+                                                </DialogTrigger>
+                                                <div className="p-1">
+                                                    <EventDeleteButton
+                                                        eventId={event.id}
+                                                        eventTitle={event.title}
+                                                        className="w-full justify-start text-rose-500 hover:text-white hover:bg-rose-500 h-8 px-2"
+                                                    />
+                                                </div>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+
+                                        {/* Modal de Edição (HUD Style) */}
+                                        <DialogContent className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] max-w-[500px] p-0 bg-background border-border/40 shadow-2xl rounded-[2.5rem] z-[100] overflow-hidden">
+                                            <div className="p-6 border-b border-border/40 bg-muted/10">
+                                                <div className="flex items-center gap-3">
+                                                <div className="h-10 w-10 rounded-xl flex items-center justify-center shadow-inner border" style={{ backgroundColor: styles.backgroundColor, borderColor: styles.borderColor, color: styles.color }}>
+                                                    <CalendarPlus className="h-5 w-5" />
+                                                </div>
+                                                <div>
+                                                    <DialogTitle className="text-lg font-black uppercase tracking-tighter">Editar Evento</DialogTitle>
+                                                    <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">Atualizar linha do tempo</DialogDescription>
+                                                </div>
+                                                </div>
+                                            </div>
+                                            <div className="p-6">
+                                                <EventForm
+                                                    initialData={{
+                                                        id: event.id,
+                                                        title: event.title,
+                                                        startTime: event.startTime,
+                                                        endTime: event.endTime,
+                                                        description: event.description || null,
+                                                        location: event.location || null,
+                                                        color: event.color || null,
+                                                        projectId: event.projectId || "none",
+                                                    }}
+                                                />
+                                            </div>
+                                        </DialogContent>
+                                    </Dialog>
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
         </div>
-      ))}
     </div>
   );
 }

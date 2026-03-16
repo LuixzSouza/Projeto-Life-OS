@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { 
     Dumbbell, Footprints, Clock, MapPin, Trash2, Pencil, 
-    Activity, ChevronDown, Search, Zap, LucideIcon, Flame, Timer
+    Activity, ChevronDown, Search, Zap, LucideIcon, Flame, Timer,
+    Calendar, ListFilter, Target, History
 } from "lucide-react";
 import { deleteWorkout } from "@/app/(dashboard)/health/actions";
 import { toast } from "sonner";
@@ -18,9 +19,13 @@ import { RunForm } from "./running/run-form";
 import { cn } from "@/lib/utils";
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { 
+    AlertDialog, AlertDialogAction, AlertDialogCancel, 
+    AlertDialogContent, AlertDialogDescription, AlertDialogFooter, 
+    AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger 
+} from "@/components/ui/alert-dialog";
 
-// --- TIPOS ---
+// --- INTERFACES ESTREITAS ---
 interface ExerciseItem {
     name: string;
     weight: string;
@@ -28,12 +33,10 @@ interface ExerciseItem {
     reps?: string;
 }
 
-interface ActivityStatsProps {
-    stats: {
-        count: number;
-        duration: number;
-        calories: number;
-    };
+interface ActivityStatsData {
+    count: number;
+    duration: number;
+    calories: number;
 }
 
 interface ActivityFiltersProps {
@@ -50,19 +53,12 @@ interface FilterButtonProps {
     label: string;
 }
 
-interface DayGroupProps {
-    dateKey: string;
-    items: Workout[];
-    onDelete: (id: string) => void;
-}
-
 // --- COMPONENTE PRINCIPAL ---
 export function ActivityFeed({ initialWorkouts }: { initialWorkouts: Workout[] }) {
     const [filter, setFilter] = useState<'ALL' | 'GYM' | 'RUN'>('ALL');
     const [searchTerm, setSearchTerm] = useState("");
     const [visibleCount, setVisibleCount] = useState(10);
 
-    // 1. Filtragem Otimizada
     const filteredWorkouts = useMemo(() => {
         return initialWorkouts.filter(w => {
             const matchesType = filter === 'ALL' 
@@ -78,8 +74,7 @@ export function ActivityFeed({ initialWorkouts }: { initialWorkouts: Workout[] }
         });
     }, [initialWorkouts, filter, searchTerm]);
 
-    // 2. Estatísticas em Tempo Real
-    const stats = useMemo(() => {
+    const stats = useMemo<ActivityStatsData>(() => {
         const totalDuration = filteredWorkouts.reduce((acc, curr) => acc + (curr.duration || 0), 0);
         const totalCaloriesEst = Math.round(totalDuration * 8); 
         return { count: filteredWorkouts.length, duration: totalDuration, calories: totalCaloriesEst };
@@ -87,7 +82,6 @@ export function ActivityFeed({ initialWorkouts }: { initialWorkouts: Workout[] }
 
     const visibleWorkouts = filteredWorkouts.slice(0, visibleCount);
 
-    // 3. Agrupamento por Data
     const groupedWorkouts = useMemo(() => {
         const groups: Record<string, Workout[]> = {};
         visibleWorkouts.forEach(workout => {
@@ -101,21 +95,20 @@ export function ActivityFeed({ initialWorkouts }: { initialWorkouts: Workout[] }
     const handleDelete = async (id: string) => {
         const result = await deleteWorkout(id);
         if (result.success) {
-            toast.success("Atividade removida com sucesso.");
+            toast.success("Log de atividade removido.");
         } else {
-            toast.error("Erro ao remover atividade.");
+            toast.error("Falha ao deletar.");
         }
     }
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-700">
+        <div className="space-y-10 animate-in fade-in slide-in-from-bottom-2 duration-700">
             
-            {/* CABEÇALHO DE CONTROLE */}
-            <div className="bg-card rounded-xl border border-border/60 p-1 shadow-sm">
-                <div className="p-4 border-b border-border/40">
+            {/* PAINEL DE CONTROLE DE ATIVIDADE */}
+            <div className="bg-card border border-border/40 rounded-[2.5rem] shadow-2xl overflow-hidden p-2">
+                <div className="p-6 md:p-8 space-y-8">
                     <ActivityStats stats={stats} />
-                </div>
-                <div className="p-4 bg-muted/20">
+                    <SeparatorWithIcon icon={ListFilter} />
                     <ActivityFilters 
                         filter={filter} 
                         setFilter={setFilter} 
@@ -125,35 +118,48 @@ export function ActivityFeed({ initialWorkouts }: { initialWorkouts: Workout[] }
                 </div>
             </div>
 
-            {/* TIMELINE */}
-            <div className="relative min-h-[200px] pl-4 sm:pl-0">
-                {/* Linha Vertical Conectora */}
-                <div className="absolute left-[7px] sm:left-[19px] top-2 bottom-4 w-px bg-border/60 z-0 border-l border-dashed border-primary/20"></div>
+            {/* TIMELINE DE LOGS */}
+            <div className="relative pl-6 md:pl-10">
+                {/* Linha de Conexão Vertical Estilizada */}
+                <div className="absolute left-2.5 md:left-[19px] top-4 bottom-0 w-px bg-gradient-to-b from-primary/50 via-border/40 to-transparent z-0" />
 
                 {Object.keys(groupedWorkouts).length === 0 ? (
                     <EmptyState />
                 ) : (
                     Object.entries(groupedWorkouts).map(([dateKey, items]) => (
-                        <DayGroup 
-                            key={dateKey} 
-                            dateKey={dateKey} 
-                            items={items} 
-                            onDelete={handleDelete} 
-                        />
+                        <div key={dateKey} className="relative z-10 mb-12">
+                            {/* Marcador de Data */}
+                            <div className="flex items-center gap-4 mb-6 -ml-[22px] md:-ml-[31px]">
+                                <div className="h-6 w-6 rounded-full bg-background border-2 border-primary shadow-[0_0_15px_rgba(var(--primary),0.3)] flex items-center justify-center z-20">
+                                    <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+                                </div>
+                                <div className="bg-muted/40 backdrop-blur-md border border-border/40 px-4 py-1.5 rounded-xl">
+                                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground/70">
+                                        {isToday(new Date(dateKey)) ? "Hoje" : isYesterday(new Date(dateKey)) ? "Ontem" : format(new Date(dateKey), "dd 'de' MMMM", { locale: ptBR })}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                {items.map((w) => (
+                                    <ActivityCard key={w.id} workout={w} onDelete={handleDelete} />
+                                ))}
+                            </div>
+                        </div>
                     ))
                 )}
             </div>
 
             {/* CARREGAR MAIS */}
             {visibleCount < filteredWorkouts.length && (
-                <div className="flex justify-center pt-4 pb-12">
+                <div className="flex justify-center pb-10">
                     <Button 
                         variant="outline" 
                         onClick={() => setVisibleCount(prev => prev + 5)}
-                        className="gap-2 bg-background shadow-sm hover:bg-muted/50 border-border/60 text-muted-foreground hover:text-foreground transition-all"
+                        className="rounded-2xl font-black uppercase tracking-widest text-[10px] h-12 px-8 border-border/60 hover:bg-muted shadow-lg transition-all active:scale-95"
                     >
-                        <ChevronDown className="h-4 w-4" />
-                        Carregar mais ({filteredWorkouts.length - visibleCount})
+                        <ChevronDown className="h-4 w-4 mr-2" />
+                        Expandir Histórico ({filteredWorkouts.length - visibleCount})
                     </Button>
                 </div>
             )}
@@ -163,241 +169,206 @@ export function ActivityFeed({ initialWorkouts }: { initialWorkouts: Workout[] }
 
 // --- SUBCOMPONENTES ---
 
-function ActivityStats({ stats }: ActivityStatsProps) {
+function ActivityStats({ stats }: { stats: ActivityStatsData }) {
     return (
-        <div className="grid grid-cols-3 gap-4">
-            <StatItem 
-                label="Atividades" 
-                value={stats.count} 
-                icon={Activity}
-            />
-            <StatItem 
-                label="Tempo Total" 
-                value={
-                    <span className="flex items-baseline gap-1">
-                        {Math.floor(stats.duration / 60)}<span className="text-xs text-muted-foreground font-medium">h</span>
-                        {stats.duration % 60}<span className="text-xs text-muted-foreground font-medium">min</span>
-                    </span>
-                } 
-                icon={Timer}
-            />
-            <StatItem 
-                label="Est. Calorias" 
-                value={<span className="text-primary">{stats.calories} <span className="text-xs text-muted-foreground font-medium">kcal</span></span>} 
-                icon={Flame}
-            />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <StatBox label="Frequência" value={stats.count} unit="Logs" icon={History} color="text-primary" />
+            <StatBox label="Carga de Tempo" value={stats.duration} unit="Min" icon={Timer} color="text-blue-500" isTime />
+            <StatBox label="Energia Estimada" value={stats.calories} unit="Kcal" icon={Flame} color="text-orange-500" />
         </div>
-    )
+    );
 }
 
-function StatItem({ label, value, icon: Icon }: { label: string, value: React.ReactNode, icon: LucideIcon }) {
+function StatBox({ label, value, unit, icon: Icon, color, isTime }: { label: string, value: number, unit: string, icon: LucideIcon, color: string, isTime?: boolean }) {
     return (
-        <div className="flex flex-col items-center justify-center p-2 first:border-r last:border-l border-border/40 sm:border-r-0 sm:last:border-l-0">
-            <div className="flex items-center gap-1.5 mb-1 text-muted-foreground">
-                <Icon className="h-3.5 w-3.5" />
-                <span className="text-[10px] uppercase font-bold tracking-wider">{label}</span>
+        <div className="bg-muted/10 border border-border/30 rounded-3xl p-5 flex items-center gap-5 shadow-inner group hover:bg-muted/20 transition-all">
+            <div className={cn("h-12 w-12 rounded-2xl bg-background border border-border/40 shadow-xl flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform", color)}>
+                <Icon className="h-6 w-6" />
             </div>
-            <div className="text-2xl font-bold text-foreground leading-none tracking-tight">{value}</div>
+            <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 leading-none">{label}</p>
+                <div className="flex items-baseline gap-1 mt-1">
+                    <span className="text-2xl font-black tracking-tighter tabular-nums text-foreground">
+                        {isTime ? `${Math.floor(value / 60)}h ${value % 60}` : value}
+                    </span>
+                    <span className="text-[10px] font-bold text-muted-foreground/40 uppercase">{unit}</span>
+                </div>
+            </div>
         </div>
-    )
+    );
 }
 
 function ActivityFilters({ filter, setFilter, searchTerm, setSearchTerm }: ActivityFiltersProps) {
     return (
-        <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
-            <div className="relative w-full sm:w-72">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <div className="flex flex-col xl:flex-row gap-4 justify-between items-center">
+            <div className="relative w-full xl:w-96 group">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                 <Input 
-                    placeholder="Buscar por título ou notas..." 
+                    placeholder="Filtrar por nome ou notas..." 
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-9 h-9 text-sm bg-background border-border/60 focus:border-primary/50 transition-colors"
+                    className="pl-11 h-12 rounded-2xl bg-background border-border/60 shadow-inner focus-visible:ring-primary/20 font-medium"
                 />
             </div>
-            <div className="flex gap-1 bg-background p-1 rounded-lg border border-border/60 w-full sm:w-auto overflow-x-auto">
-                <FilterButton active={filter === 'ALL'} onClick={() => setFilter('ALL')} icon={Activity} label="Todos" />
-                <FilterButton active={filter === 'GYM'} onClick={() => setFilter('GYM')} icon={Dumbbell} label="Treino" />
-                <FilterButton active={filter === 'RUN'} onClick={() => setFilter('RUN')} icon={Footprints} label="Corrida" />
+            <div className="flex p-1.5 bg-muted/40 rounded-[1.25rem] border border-border/40 w-full xl:w-auto shadow-inner">
+                <FilterTab active={filter === 'ALL'} onClick={() => setFilter('ALL')} icon={Activity} label="Todos" />
+                <FilterTab active={filter === 'GYM'} onClick={() => setFilter('GYM')} icon={Dumbbell} label="Gym" />
+                <FilterTab active={filter === 'RUN'} onClick={() => setFilter('RUN')} icon={Footprints} label="Run" />
             </div>
         </div>
-    )
+    );
 }
 
-function FilterButton({ active, onClick, icon: Icon, label }: FilterButtonProps) {
+function FilterTab({ active, onClick, icon: Icon, label }: FilterButtonProps) {
     return (
         <button
             onClick={onClick}
             className={cn(
-                "flex items-center gap-2 px-4 py-1.5 rounded-md text-xs font-medium transition-all flex-1 sm:flex-none justify-center whitespace-nowrap",
+                "flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex-1 xl:flex-none",
                 active 
-                    ? "bg-primary/10 text-primary ring-1 ring-primary/20 shadow-sm" 
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    ? "bg-background text-primary shadow-lg ring-1 ring-border/20" 
+                    : "text-muted-foreground hover:text-foreground"
             )}
         >
             <Icon className="h-3.5 w-3.5" />
             {label}
         </button>
-    )
-}
-
-function DayGroup({ dateKey, items, onDelete }: DayGroupProps) {
-    const dateObj = new Date(items[0].date);
-    let dateLabel = format(dateObj, "dd 'de' MMMM", { locale: ptBR });
-    if (isToday(dateObj)) dateLabel = "Hoje";
-    if (isYesterday(dateObj)) dateLabel = "Ontem";
-
-    return (
-        <div className="relative z-10 mb-10 group/day">
-            <div className="flex items-center gap-4 mb-5 sm:ml-0 -ml-2">
-                <div className="h-3 w-3 rounded-full bg-background border-2 border-primary ring-4 ring-background z-20 hidden sm:block"></div>
-                <span className="text-xs font-bold uppercase tracking-widest text-primary bg-primary/5 border border-primary/10 px-3 py-1 rounded-full backdrop-blur-sm sticky top-2 z-20 shadow-sm">
-                    {dateLabel}
-                </span>
-            </div>
-
-            <div className="space-y-4 sm:pl-10 pl-2">
-                {items.map((w: Workout) => (
-                    <ActivityCard key={w.id} workout={w} onDelete={onDelete} />
-                ))}
-            </div>
-        </div>
-    )
+    );
 }
 
 function ActivityCard({ workout, onDelete }: { workout: Workout, onDelete: (id: string) => void }) {
     const isRun = workout.type === 'RUN' || workout.type === 'RUNNING';
     
-    // Parse seguro dos exercícios
-    let parsedExercises: ExerciseItem[] = [];
-    try { 
-        if(workout.exercises) parsedExercises = JSON.parse(workout.exercises); 
-    } catch {
-        parsedExercises = [];
-    }
+    const parsedExercises = useMemo<ExerciseItem[]>(() => {
+        try { 
+            return workout.exercises ? JSON.parse(workout.exercises) : []; 
+        } catch { return []; }
+    }, [workout.exercises]);
 
     return (
-        <Card className="group hover:border-primary/40 transition-all border-border/60 bg-card/50 backdrop-blur-sm overflow-hidden hover:shadow-md">
-            <CardContent className="p-5">
-                <div className="flex gap-5">
-                    {/* Ícone Lateral */}
+        <Card className="group border-border/40 bg-card hover:border-primary/30 transition-all rounded-[2rem] shadow-sm hover:shadow-xl overflow-hidden">
+            <CardContent className="p-6">
+                <div className="flex flex-col sm:flex-row gap-6">
+                    {/* Indicador de Tipo */}
                     <div className={cn(
-                        "h-12 w-12 rounded-xl flex items-center justify-center shrink-0 border mt-1 shadow-sm transition-colors",
+                        "h-14 w-14 rounded-2xl flex items-center justify-center shrink-0 border shadow-inner transition-all",
                         isRun 
-                            ? "bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-400 group-hover:bg-blue-500/20" 
-                            : "bg-primary/10 border-primary/20 text-primary group-hover:bg-primary/20"
+                            ? "bg-blue-500/10 border-blue-500/20 text-blue-500" 
+                            : "bg-primary/10 border-primary/20 text-primary"
                     )}>
-                        {isRun ? <Footprints className="h-6 w-6" /> : <Dumbbell className="h-6 w-6" />}
+                        {isRun ? <Footprints className="h-7 w-7" /> : <Dumbbell className="h-7 w-7" />}
                     </div>
 
-                    <div className="flex-1 min-w-0 space-y-3">
-                        {/* Header do Card */}
+                    <div className="flex-1 min-w-0 space-y-4">
                         <div className="flex justify-between items-start">
-                            <div>
-                                <h4 className="font-bold text-foreground text-base leading-tight truncate pr-2">
+                            <div className="min-w-0">
+                                <h4 className="font-black text-foreground text-lg uppercase tracking-tight truncate leading-none">
                                     {workout.title}
                                 </h4>
-                                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1.5 font-medium">
-                                    <span className="flex items-center gap-1.5">
-                                        <Clock className="h-3.5 w-3.5 text-primary/70" />
+                                <div className="flex items-center gap-3 mt-2">
+                                    <Badge variant="outline" className="font-mono text-[9px] font-bold bg-muted/30 border-border/40 px-2">
+                                        <Clock className="h-3 w-3 mr-1 opacity-40" />
                                         {format(new Date(workout.date), "HH:mm")}
-                                    </span>
-                                    <span className="w-1 h-1 rounded-full bg-border" />
-                                    <span>{workout.duration} min</span>
+                                    </Badge>
+                                    <Badge variant="outline" className="font-mono text-[9px] font-bold bg-muted/30 border-border/40 px-2">
+                                        <Timer className="h-3 w-3 mr-1 opacity-40" />
+                                        {workout.duration} MIN
+                                    </Badge>
                                 </div>
                             </div>
-                            
-                            {/* Menu de Ações (Visível no Hover em Desktop) */}
-                            <div className="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                                <Dialog>
-                                    <DialogTrigger asChild>
-                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10">
-                                            <Pencil className="h-3.5 w-3.5" />
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-                                        <DialogHeader>
-                                            <DialogTitle>Editar Atividade</DialogTitle>
-                                        </DialogHeader>
-                                        {isRun ? <RunForm /> : <GymForm />} 
-                                    </DialogContent>
-                                </Dialog>
-                                
+
+                            {/* AÇÕES */}
+                            <div className="flex gap-1.5 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg hover:bg-primary/10 hover:text-primary">
+                                    <Pencil className="h-4 w-4" />
+                                </Button>
                                 <AlertDialog>
                                     <AlertDialogTrigger asChild>
-                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10">
-                                            <Trash2 className="h-3.5 w-3.5" />
+                                        <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg hover:bg-rose-500/10 hover:text-rose-500">
+                                            <Trash2 className="h-4 w-4" />
                                         </Button>
                                     </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                        <AlertDialogHeader>
-                                            <AlertDialogTitle>Excluir Atividade?</AlertDialogTitle>
-                                            <AlertDialogDescription>
-                                                Esta ação não pode ser desfeita. Isso removerá permanentemente o registro do histórico.
-                                            </AlertDialogDescription>
+                                    <AlertDialogContent className="rounded-[2.5rem] border-border/40 p-8 shadow-2xl fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] max-w-md">
+                                        <AlertDialogHeader className="flex flex-col items-center text-center">
+                                            <div className="h-14 w-14 rounded-2xl bg-rose-500/10 flex items-center justify-center text-rose-500 mb-4">
+                                                <Trash2 className="h-7 w-7" />
+                                            </div>
+                                            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tighter">Excluir Log?</AlertDialogTitle>
+                                            <AlertDialogDescription className="text-sm font-medium">Esta atividade será removida permanentemente do histórico biometrizado.</AlertDialogDescription>
                                         </AlertDialogHeader>
-                                        <AlertDialogFooter>
-                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                            <AlertDialogAction onClick={() => onDelete(workout.id)} className="bg-destructive hover:bg-destructive/90">
-                                                Excluir
-                                            </AlertDialogAction>
+                                        <AlertDialogFooter className="sm:justify-center gap-3 mt-6">
+                                            <AlertDialogCancel className="rounded-xl font-black uppercase text-[10px] tracking-widest h-12 px-6">Abortar</AlertDialogCancel>
+                                            <AlertDialogAction onClick={() => onDelete(workout.id)} className="rounded-xl bg-rose-500 text-white hover:bg-rose-600 font-black uppercase text-[10px] tracking-widest h-12 px-6 shadow-lg shadow-rose-500/20">Confirmar Exclusão</AlertDialogAction>
                                         </AlertDialogFooter>
                                     </AlertDialogContent>
                                 </AlertDialog>
                             </div>
                         </div>
 
-                        {/* Badges de Métricas */}
+                        {/* Badges de Performance */}
                         <div className="flex flex-wrap gap-2">
                             {workout.feeling && (
-                                <Badge variant="secondary" className="bg-muted/50 border-border/50 text-muted-foreground hover:bg-muted">
-                                    {workout.feeling === 'GOOD' ? '😃 Bem' : workout.feeling === 'TIRED' ? '😫 Cansado' : '🔥 Max'}
+                                <Badge className={cn(
+                                    "text-[9px] font-black uppercase tracking-widest border-none px-2",
+                                    workout.feeling === 'GOOD' ? "bg-emerald-500/10 text-emerald-600" : "bg-orange-500/10 text-orange-600"
+                                )}>
+                                    Feel: {workout.feeling}
                                 </Badge>
                             )}
-                            {workout.distance && (
-                                <Badge variant="outline" className="border-blue-500/20 text-blue-600 bg-blue-500/5 gap-1.5">
-                                    <MapPin className="h-3 w-3" /> {workout.distance} km
-                                </Badge>
-                            )}
-                            {workout.pace && (
-                                <Badge variant="outline" className="border-primary/20 text-primary bg-primary/5 gap-1.5">
-                                    <Zap className="h-3 w-3" /> {workout.pace}/km
-                                </Badge>
-                            )}
+                            {workout.distance && <MetricBadge icon={Target} value={`${workout.distance} KM`} color="text-blue-500" />}
+                            {workout.pace && <MetricBadge icon={Zap} value={`${workout.pace}/KM`} color="text-amber-500" />}
                         </div>
 
-                        {/* Lista de Exercícios (Preview Compacto) */}
+                        {/* LISTA DE EXERCÍCIOS (Se existir) */}
                         {parsedExercises.length > 0 && (
-                            <div className="pt-2 border-t border-border/40 flex flex-wrap gap-2">
-                                {parsedExercises.slice(0, 4).map((ex, i) => (
-                                    <div key={i} className="inline-flex items-center text-[11px] px-2 py-1 rounded-md bg-muted/30 border border-border/50 text-muted-foreground font-medium">
-                                        <span className="text-foreground mr-1.5">{ex.name}</span>
-                                        {ex.weight && <span className="opacity-70 border-l border-border pl-1.5 ml-0.5">{ex.weight}kg</span>}
+                            <div className="pt-4 border-t border-border/40 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                {parsedExercises.map((ex, i) => (
+                                    <div key={i} className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground bg-muted/20 p-2 rounded-lg border border-border/40">
+                                        <span className="text-foreground uppercase truncate">{ex.name}</span>
+                                        {ex.weight && <span className="ml-auto text-primary font-mono tabular-nums">{ex.weight}kg</span>}
                                     </div>
                                 ))}
-                                {parsedExercises.length > 4 && (
-                                    <span className="text-[10px] font-medium text-muted-foreground px-2 py-1 bg-muted/20 rounded-md">
-                                        +{parsedExercises.length - 4} mais
-                                    </span>
-                                )}
                             </div>
                         )}
                     </div>
                 </div>
             </CardContent>
         </Card>
-    )
+    );
+}
+
+// --- HELPERS UI ---
+
+function MetricBadge({ icon: Icon, value, color }: { icon: LucideIcon, value: string, color: string }) {
+    return (
+        <Badge variant="outline" className={cn("border-current/20 bg-current/5 gap-1.5 font-mono text-[9px] font-black", color)}>
+            <Icon className="h-3 w-3" /> {value}
+        </Badge>
+    );
+}
+
+function SeparatorWithIcon({ icon: Icon }: { icon: LucideIcon }) {
+    return (
+        <div className="relative flex items-center py-4">
+            <div className="flex-grow border-t border-border/40"></div>
+            <div className="mx-4 p-1.5 rounded-lg bg-muted/30 border border-border/60">
+                <Icon className="h-3 w-3 text-muted-foreground/40" />
+            </div>
+            <div className="flex-grow border-t border-border/40"></div>
+        </div>
+    );
 }
 
 function EmptyState() {
     return (
-        <div className="flex flex-col items-center justify-center py-20 text-center border border-dashed border-border rounded-xl bg-card/30">
-            <div className="h-16 w-16 bg-muted/30 rounded-full flex items-center justify-center mb-4">
-                <Search className="h-7 w-7 text-muted-foreground/50" />
+        <div className="flex flex-col items-center justify-center py-32 text-center border-2 border-dashed border-border/40 rounded-[3rem] bg-muted/5 opacity-50">
+            <div className="h-20 w-20 bg-muted/40 rounded-[2rem] flex items-center justify-center mb-6 shadow-inner">
+                <History className="h-10 w-10 text-muted-foreground/30" />
             </div>
-            <h3 className="text-lg font-semibold text-foreground">Nenhuma atividade encontrada</h3>
-            <p className="text-sm text-muted-foreground mt-2 max-w-xs">
-                Tente ajustar seus filtros ou comece registrando um novo treino hoje.
+            <h3 className="text-xl font-black uppercase tracking-tighter">Fila Vazia</h3>
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mt-3 max-w-[280px] leading-relaxed">
+                Nenhuma atividade detectada para este filtro. Inicie um log agora.
             </p>
         </div>
-    )
+    );
 }

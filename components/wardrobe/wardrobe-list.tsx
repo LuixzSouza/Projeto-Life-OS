@@ -9,14 +9,14 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { 
     Search, Heart, MoreVertical, Pencil, Trash2, 
-    Shirt, CheckCircle2, RotateCcw, Droplets, X, Tag, ShoppingBag, AlertTriangle 
+    Shirt, CheckCircle2, RotateCcw, Droplets, X, Tag, ShoppingBag, AlertTriangle, Sparkles, Wand2
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { deleteWardrobeItem, toggleFavoriteItem, wearItem } from "@/app/(dashboard)/wardrobe/actions";
 import { WardrobeFormDialog, WardrobeItemData } from "./wardrobe-form-dialog";
 
-// --- TIPAGEM ESTRITA (Zero Any) ---
+// --- TIPAGEM ESTRITA ---
 interface WardrobeItem {
     id: string;
     name: string;
@@ -44,16 +44,11 @@ const getCostPerWear = (price: number | null, count: number) => {
 
 const StatusBadge = ({ status }: { status: string }) => {
     switch (status) {
-        case "LAUNDRY": 
-            return <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-blue-200 hover:bg-blue-500/20 gap-1"><Droplets className="w-3 h-3" /> Lavando</Badge>;
-        case "LENT": 
-            return <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 border-amber-200 hover:bg-amber-500/20 gap-1"><RotateCcw className="w-3 h-3" /> Emprestado</Badge>;
-        case "REPAIR": 
-            return <Badge variant="destructive" className="bg-destructive/10 text-destructive border-destructive/20 hover:bg-destructive/20 gap-1"><AlertTriangle className="w-3 h-3" /> Conserto</Badge>;
-        case "DONATED": 
-            return <Badge variant="outline" className="text-muted-foreground bg-muted/50 gap-1"><ShoppingBag className="w-3 h-3" /> Doado</Badge>;
-        default: 
-            return null; // "IN_CLOSET" não precisa de badge para manter o visual limpo
+        case "LAUNDRY": return <Badge variant="secondary" className="bg-blue-500/10 text-blue-600 border-blue-200 gap-1"><Droplets className="w-3 h-3" /> Lavando</Badge>;
+        case "LENT": return <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 border-amber-200 gap-1"><RotateCcw className="w-3 h-3" /> Emprestado</Badge>;
+        case "REPAIR": return <Badge variant="destructive" className="bg-destructive/10 text-destructive border-destructive/20 gap-1"><AlertTriangle className="w-3 h-3" /> Conserto</Badge>;
+        case "DONATED": return <Badge variant="outline" className="text-muted-foreground bg-muted/50 gap-1"><ShoppingBag className="w-3 h-3" /> Doado</Badge>;
+        default: return null; 
     }
 };
 
@@ -63,20 +58,27 @@ export function WardrobeList({ initialData }: { initialData: WardrobeItem[] }) {
     const [filterCategory, setFilterCategory] = useState("ALL");
     const [filterStatus, setFilterStatus] = useState<string | null>(null);
     const [editingItem, setEditingItem] = useState<WardrobeItemData | null>(null);
+    
+    // Estado para o "Montador de Looks"
+    const [outfitBuilder, setOutfitBuilder] = useState<WardrobeItem[]>([]);
+    const [isBuildingOutfit, setIsBuildingOutfit] = useState(false);
 
     // --- FILTRAGEM ---
     const filteredItems = initialData.filter(item => {
         const searchLower = search.toLowerCase();
         const matchesSearch = (item.name?.toLowerCase() || "").includes(searchLower) || 
-                              (item.brand?.toLowerCase() || "").includes(searchLower);
+                              (item.brand?.toLowerCase() || "").includes(searchLower) ||
+                              (item.color?.toLowerCase() || "").includes(searchLower); 
         
-        const matchesCategory = filterCategory === "ALL" ? true : item.category === filterCategory;
+        const matchesCategory = filterCategory === "ALL" ? true : 
+                                filterCategory === "FAVORITES" ? item.isFavorite : 
+                                item.category === filterCategory;
         const matchesStatus = filterStatus ? item.status === filterStatus : true;
 
         return matchesSearch && matchesCategory && matchesStatus;
     });
 
-    // --- ACTIONS ---
+    // --- ACTIONS BÁSICAS ---
     const handleWear = async (id: string) => {
         const res = await wearItem(id);
         if (res.success) toast.success("Look registrado! +1 uso");
@@ -84,8 +86,6 @@ export function WardrobeList({ initialData }: { initialData: WardrobeItem[] }) {
     };
 
     const handleFavorite = async (id: string, current: boolean) => {
-        // Optimistic UI update could be implemented here via React Query or similar, 
-        // but for now we rely on Server Action + Toast
         await toggleFavoriteItem(id, current);
         toast.success(current ? "Removido dos favoritos" : "Adicionado aos favoritos ❤️");
     };
@@ -96,7 +96,7 @@ export function WardrobeList({ initialData }: { initialData: WardrobeItem[] }) {
         else toast.error("Erro ao excluir.");
     };
 
-    // Mapper para edição
+    // 🟢 CORREÇÃO: Função de edição adicionada de volta
     const handleEditClick = (item: WardrobeItem) => {
         setEditingItem({
             id: item.id,
@@ -112,13 +112,75 @@ export function WardrobeList({ initialData }: { initialData: WardrobeItem[] }) {
         });
     };
 
+    // --- ACTIONS DO OUTFIT BUILDER ---
+    const toggleOutfitItem = (item: WardrobeItem) => {
+        setOutfitBuilder(prev => {
+            const exists = prev.find(i => i.id === item.id);
+            if (exists) return prev.filter(i => i.id !== item.id);
+            if (prev.length >= 5) {
+                toast.warning("Seu look já tem 5 peças!");
+                return prev;
+            }
+            return [...prev, item];
+        });
+    };
+
+    const handleWearOutfit = async () => {
+        if (outfitBuilder.length === 0) return;
+        
+        toast.loading("Registrando o look completo...");
+        let successCount = 0;
+        
+        for (const item of outfitBuilder) {
+            const res = await wearItem(item.id);
+            if (res.success) successCount++;
+        }
+
+        toast.success(`Look registrado! ${successCount} peças atualizadas. 👗`);
+        setOutfitBuilder([]);
+        setIsBuildingOutfit(false);
+    };
+
     return (
-        <div className="space-y-8">
+        <div className="space-y-6">
             
+            {/* OUTFIT BUILDER WIDGET */}
+            {isBuildingOutfit && (
+                <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 animate-in slide-in-from-top-4 flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-3 w-full md:w-auto">
+                        <div className="p-2 bg-primary/10 rounded-full"><Wand2 className="h-5 w-5 text-primary" /></div>
+                        <div>
+                            <h3 className="text-sm font-bold text-primary">Montando Look do Dia</h3>
+                            <p className="text-xs text-muted-foreground">Selecione as peças abaixo (Máx 5)</p>
+                        </div>
+                    </div>
+                    
+                    <div className="flex-1 flex gap-2 overflow-x-auto px-2 min-h-[50px] items-center bg-background/50 rounded-xl p-2 border border-border/50 w-full">
+                        {outfitBuilder.length === 0 ? (
+                            <span className="text-xs text-muted-foreground italic w-full text-center">Nenhuma peça selecionada ainda...</span>
+                        ) : (
+                            outfitBuilder.map(item => (
+                                <div key={item.id} className="relative h-10 w-10 shrink-0 rounded-lg border border-border overflow-hidden group">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    {item.imageUrl ? <img src={item.imageUrl} alt="" className="h-full w-full object-cover" /> : <Shirt className="h-full w-full p-2 text-muted-foreground bg-muted" />}
+                                    <button onClick={() => toggleOutfitItem(item)} className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <X className="h-4 w-4 text-white" />
+                                    </button>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                    
+                    <div className="flex gap-2 w-full md:w-auto">
+                        <Button variant="ghost" onClick={() => { setIsBuildingOutfit(false); setOutfitBuilder([]); }} className="text-muted-foreground">Cancelar</Button>
+                        <Button disabled={outfitBuilder.length === 0} onClick={handleWearOutfit} className="bg-primary shadow-lg shadow-primary/20">Usar Look</Button>
+                    </div>
+                </div>
+            )}
+
             {/* --- TOOLBAR DE FILTROS --- */}
             <div className="flex flex-col gap-4 bg-card/50 backdrop-blur-sm p-2 rounded-2xl border border-border/60 shadow-sm">
                 <div className="flex flex-col md:flex-row gap-3 p-2">
-                    {/* Busca */}
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input 
@@ -129,24 +191,29 @@ export function WardrobeList({ initialData }: { initialData: WardrobeItem[] }) {
                         />
                     </div>
                     
-                    {/* Filtro de Status (Toggle) */}
                     <div className="flex gap-2">
+                        {/* Botão de Ativar o Outfit Builder */}
+                        <Button 
+                            variant={isBuildingOutfit ? "secondary" : "outline"} 
+                            size="sm"
+                            onClick={() => setIsBuildingOutfit(!isBuildingOutfit)}
+                            className={cn("h-10 transition-all", isBuildingOutfit ? "bg-primary text-primary-foreground border-primary" : "border-dashed")}
+                        >
+                            <Sparkles className="h-4 w-4 mr-2" /> Montar Look
+                        </Button>
+                        
+                        {/* Filtro de Status (Toggle) */}
                         <Button 
                             variant={filterStatus === "LAUNDRY" ? "default" : "outline"} 
                             size="sm"
                             onClick={() => setFilterStatus(filterStatus === "LAUNDRY" ? null : "LAUNDRY")}
                             className={cn(
                                 "h-10 border-dashed transition-all", 
-                                filterStatus === "LAUNDRY" ? "bg-primary text-primary-foreground border-primary" : "text-muted-foreground hover:text-foreground"
+                                filterStatus === "LAUNDRY" ? "bg-blue-600 hover:bg-blue-700 text-white border-blue-600" : "text-muted-foreground hover:text-foreground"
                             )}
                         >
-                            <Droplets className="h-4 w-4 mr-2" /> Lavanderia
+                            <Droplets className="h-4 w-4 md:mr-2" /> <span className="hidden md:inline">Lavanderia</span>
                         </Button>
-                        {filterStatus && (
-                             <Button variant="ghost" size="icon" onClick={() => setFilterStatus(null)} className="h-10 w-10 text-destructive hover:bg-destructive/10">
-                                <X className="h-4 w-4" />
-                             </Button>
-                        )}
                     </div>
                 </div>
 
@@ -154,6 +221,7 @@ export function WardrobeList({ initialData }: { initialData: WardrobeItem[] }) {
                 <div className="flex gap-2 overflow-x-auto pb-2 px-2 scrollbar-hide">
                     {[
                         { key: "ALL", label: "Tudo" },
+                        { key: "FAVORITES", label: "Favoritos ❤️" },
                         { key: "TOP", label: "Parte de Cima" },
                         { key: "BOTTOM", label: "Parte de Baixo" },
                         { key: "SHOES", label: "Calçados" },
@@ -187,63 +255,82 @@ export function WardrobeList({ initialData }: { initialData: WardrobeItem[] }) {
                     <p className="text-sm text-muted-foreground mt-1">Tente ajustar os filtros ou adicione novas roupas ao seu closet.</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
                     {filteredItems.map((item) => {
                         const costPerWear = getCostPerWear(item.price, item.wearCount);
+                        const isSelectedForOutfit = outfitBuilder.some(i => i.id === item.id);
                         
                         return (
-                            <Card key={item.id} className="group relative overflow-hidden border-border/60 shadow-sm hover:shadow-xl hover:border-primary/30 transition-all duration-300 bg-card rounded-2xl flex flex-col">
-                                
+                            <Card 
+                                key={item.id} 
+                                onClick={() => isBuildingOutfit ? toggleOutfitItem(item) : undefined}
+                                className={cn(
+                                    "group relative overflow-hidden border-border/60 shadow-sm transition-all duration-300 bg-card rounded-2xl flex flex-col",
+                                    isBuildingOutfit && "cursor-pointer hover:border-primary/50",
+                                    isSelectedForOutfit ? "ring-2 ring-primary border-primary shadow-lg shadow-primary/20 scale-[0.98]" : "hover:shadow-xl hover:border-primary/30"
+                                )}
+                            >
+                                {/* Overlay Visual de Seleção no Modo Outfit */}
+                                {isSelectedForOutfit && (
+                                    <div className="absolute inset-0 bg-primary/10 z-20 pointer-events-none flex items-center justify-center">
+                                        <div className="bg-primary text-primary-foreground p-2 rounded-full shadow-xl">
+                                            <CheckCircle2 className="h-6 w-6" />
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* --- ZONA DE IMAGEM --- */}
                                 <div className="aspect-[3/4] relative bg-muted/30 flex items-center justify-center overflow-hidden">
                                     {item.imageUrl ? (
                                         // eslint-disable-next-line @next/next/no-img-element
-                                        <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                                        <img src={item.imageUrl} alt={item.name} className={cn("w-full h-full object-cover transition-transform duration-700", !isBuildingOutfit && "group-hover:scale-105")} />
                                     ) : (
                                         <Shirt className="h-12 w-12 text-muted-foreground/20" />
                                     )}
                                     
                                     {/* Overlay Gradiente (Hover) */}
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                    {!isBuildingOutfit && <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />}
 
                                     {/* Botões Flutuantes (Top Right) */}
-                                    <div className="absolute top-2 right-2 flex flex-col gap-2 z-10 translate-x-10 group-hover:translate-x-0 transition-transform duration-300">
-                                        <button 
-                                            onClick={() => handleFavorite(item.id, item.isFavorite)}
-                                            className="p-2 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/40 transition-colors shadow-lg"
-                                        >
-                                            <Heart className={cn("h-4 w-4 transition-colors", item.isFavorite ? "fill-red-500 text-red-500" : "text-white")} />
-                                        </button>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <button className="p-2 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/40 transition-colors shadow-lg text-white">
-                                                    <MoreVertical className="h-4 w-4" />
-                                                </button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem onClick={() => handleEditClick(item)}>
-                                                    <Pencil className="h-3.5 w-3.5 mr-2" /> Editar
-                                                </DropdownMenuItem>
-                                                <AlertDialog>
-                                                    <AlertDialogTrigger asChild>
-                                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                                                            <Trash2 className="h-3.5 w-3.5 mr-2" /> Excluir
-                                                        </DropdownMenuItem>
-                                                    </AlertDialogTrigger>
-                                                    <AlertDialogContent>
-                                                        <AlertDialogHeader>
-                                                            <AlertDialogTitle>Excluir {item.name}?</AlertDialogTitle>
-                                                            <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
-                                                        </AlertDialogHeader>
-                                                        <AlertDialogFooter>
-                                                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                                            <AlertDialogAction onClick={() => handleDelete(item.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Excluir</AlertDialogAction>
-                                                        </AlertDialogFooter>
-                                                    </AlertDialogContent>
-                                                </AlertDialog>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    </div>
+                                    {!isBuildingOutfit && (
+                                        <div className="absolute top-2 right-2 flex flex-col gap-2 z-10 translate-x-10 group-hover:translate-x-0 transition-transform duration-300">
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); handleFavorite(item.id, item.isFavorite); }}
+                                                className="p-2 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/40 transition-colors shadow-lg"
+                                            >
+                                                <Heart className={cn("h-4 w-4 transition-colors", item.isFavorite ? "fill-red-500 text-red-500" : "text-white")} />
+                                            </button>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <button className="p-2 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/40 transition-colors shadow-lg text-white">
+                                                        <MoreVertical className="h-4 w-4" />
+                                                    </button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditClick(item); }}>
+                                                        <Pencil className="h-3.5 w-3.5 mr-2" /> Editar
+                                                    </DropdownMenuItem>
+                                                    <AlertDialog>
+                                                        <AlertDialogTrigger asChild>
+                                                            <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                                                                <Trash2 className="h-3.5 w-3.5 mr-2" /> Excluir
+                                                            </DropdownMenuItem>
+                                                        </AlertDialogTrigger>
+                                                        <AlertDialogContent>
+                                                            <AlertDialogHeader>
+                                                                <AlertDialogTitle>Excluir {item.name}?</AlertDialogTitle>
+                                                                <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
+                                                            </AlertDialogHeader>
+                                                            <AlertDialogFooter>
+                                                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                                                <AlertDialogAction onClick={() => handleDelete(item.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Excluir</AlertDialogAction>
+                                                            </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                    </AlertDialog>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        </div>
+                                    )}
 
                                     {/* Status Badge (Top Left) */}
                                     <div className="absolute top-2 left-2 z-10">
@@ -274,16 +361,18 @@ export function WardrobeList({ initialData }: { initialData: WardrobeItem[] }) {
                                 </CardContent>
 
                                 {/* --- AÇÃO PRINCIPAL --- */}
-                                <CardFooter className="p-3 pt-2">
-                                    <Button 
-                                        variant="default" 
-                                        size="sm" 
-                                        onClick={() => handleWear(item.id)}
-                                        className="w-full h-9 text-xs font-semibold rounded-lg shadow-md shadow-primary/10 active:scale-95 transition-all bg-gradient-to-r from-primary to-primary/90 hover:to-primary"
-                                    >
-                                        <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Usei Hoje
-                                    </Button>
-                                </CardFooter>
+                                {!isBuildingOutfit && (
+                                    <CardFooter className="p-3 pt-2">
+                                        <Button 
+                                            variant="default" 
+                                            size="sm" 
+                                            onClick={(e) => { e.stopPropagation(); handleWear(item.id); }}
+                                            className="w-full h-9 text-xs font-semibold rounded-lg shadow-md shadow-primary/10 active:scale-95 transition-all bg-gradient-to-r from-primary to-primary/90 hover:to-primary"
+                                        >
+                                            <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Usei Hoje
+                                        </Button>
+                                    </CardFooter>
+                                )}
                             </Card>
                         )
                     })}

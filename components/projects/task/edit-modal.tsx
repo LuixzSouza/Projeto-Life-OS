@@ -1,36 +1,33 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Task } from '@prisma/client';
+import { Task, Project } from '@prisma/client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 
 // UI Components
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  CalendarIcon,
-  Flag,
-  Trash2,
-  Image as ImageIcon,
-  X,
-  Save,
-  Loader2,
-  Pin,
-  PinOff,
-  Calendar,
-  Link2,
-  Star,
-  StarOff,
-  Target,
-  Timer,
-  Eye,
-  FileImage,
-} from 'lucide-react';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Separator } from '@/components/ui/separator';
+import { Slider } from '@/components/ui/slider';
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+} from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,442 +39,368 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { Slider } from '@/components/ui/slider';
-import { 
-  Sheet, 
-  SheetContent, 
-  SheetFooter, 
-  SheetHeader, 
-  SheetTitle,
-  SheetDescription 
-} from '@/components/ui/sheet';
-import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 
-// Constants
-import { PRIORITY_STYLES, STATUS_STYLES } from '../task-item';
-import { usePasteFormatter } from '../task-item';
+// Icons
+import {
+  Flag,
+  CalendarDays,
+  LayoutTemplate,
+  Save,
+  Trash2,
+  Star,
+  Pin,
+  ChevronRight,
+  Target,
+  Timer,
+  ArrowRightLeft,
+  Zap,
+  Info,
+  Loader2,
+  ImageIcon,
+  Link2
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 interface EditModalProps {
   isOpen: boolean;
   onClose: () => void;
   task: Task;
+  allProjects?: Project[];
+  progress: number;
+  estimatedTime: number;
+  setProgress: (v: number) => void;
+  setEstimatedTime: (v: number) => void;
+  isPinned: boolean;
+  isStarred: boolean;
+  onTogglePin: () => void;
+  onToggleStar: () => void;
+  onDelete: () => void;
+  isSaving: boolean;
+  onSubmit: (data: FormData) => Promise<void>;
   imageContent: string | null;
   setImageContent: (value: string | null) => void;
   fileInputRef: React.RefObject<HTMLInputElement | null>;
-  isPinned: boolean;
-  isStarred: boolean;
-  progress: number;
-  estimatedTime: number;
-  isSaving: boolean;
-  onTogglePin: () => void;
-  onToggleStar: () => void;
-  onProgressChange: (value: number) => void;
-  setProgress: (value: number) => void;
-  setEstimatedTime: (value: number) => void;
-  onCopyLink: () => void;
-  onDelete: () => void;
-  onSubmit: (formData: FormData) => Promise<void>;
   onImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onPaste: (e: React.ClipboardEvent) => void;
+  onPaste: (e: React.ClipboardEvent<HTMLTextAreaElement>) => void;
+  onProgressChange: (value: number) => void;
+  onCopyLink: () => void;
 }
 
-export function EditModal({
-  isOpen,
-  onClose,
+export function EditModal(props: EditModalProps) {
+  const { isOpen, onClose, task } = props;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent
+        className="max-w-[95vw] w-full xl:max-w-7xl h-[92vh] p-0 gap-0 overflow-hidden bg-background border-border/40 shadow-2xl rounded-[2.5rem] flex flex-col outline-none"
+      >
+        {/* ACESSIBILIDADE */}
+        <DialogHeader className="sr-only">
+          <DialogTitle>{task.title}</DialogTitle>
+          <DialogDescription>Painel de gerenciamento de missão</DialogDescription>
+        </DialogHeader>
+
+        {/* TOOLTIP E CONTEÚDO COM RESET POR ID */}
+        <TooltipProvider delayDuration={0}>
+          <EditModalContent key={task.id} {...props} />
+        </TooltipProvider>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditModalContent({
   task,
+  allProjects = [],
+  progress,
+  estimatedTime,
+  setProgress,
+  setEstimatedTime,
+  isPinned,
+  isStarred,
+  onTogglePin,
+  onToggleStar,
+  onDelete,
+  isSaving,
+  onSubmit,
   imageContent,
   setImageContent,
   fileInputRef,
-  isPinned,
-  isStarred,
-  progress,
-  estimatedTime,
-  isSaving,
-  onTogglePin,
-  onToggleStar,
-  onProgressChange,
-  setProgress,
-  setEstimatedTime,
-  onCopyLink,
-  onDelete,
-  onSubmit,
   onImageUpload,
+  onPaste,
+  onProgressChange,
+  onCopyLink
 }: EditModalProps) {
-  const [activeTab, setActiveTab] = useState('details');
-  const [isAlertOpen, setIsAlertOpen] = useState(false);
-  const [description, setDescription] = useState(task.description || '');
   
-  const { handlePaste: handleDescriptionPaste, isProcessing: isProcessingPaste } = usePasteFormatter((content) => {
-    setDescription(content);
-  });
+  // Estado local sincronizado via 'key' no componente pai
+  const [title, setTitle] = useState(task.title);
+  const [description, setDescription] = useState(task.description ?? '');
+  const [status, setStatus] = useState(task.status ?? 'TODO');
+  const [priority, setPriority] = useState(task.priority ?? 'MEDIUM');
+  const [projectId, setProjectId] = useState(task.projectId ?? 'inbox');
+  const [dueDate, setDueDate] = useState<Date | undefined>(
+    task.dueDate ? new Date(task.dueDate) : undefined
+  );
 
-  const handleDateSelect = useCallback((date: Date | undefined) => {
-    const input = document.querySelector(`[name="dueDate"]`) as HTMLInputElement;
-    if (input && date) {
-      input.value = format(date, 'yyyy-MM-dd');
+  const handleFormSubmit = useCallback(async () => {
+    const data = new FormData();
+    
+    // OBRIGATÓRIO: O servidor precisa do ID para dar o update
+    data.set('id', task.id); 
+    
+    data.set('title', title);
+    data.set('description', description);
+    data.set('status', status);
+    data.set('priority', priority);
+    data.set('projectId', projectId);
+    data.set('progress', progress.toString());
+    data.set('estimatedTime', estimatedTime.toString());
+    
+    if (dueDate) {
+      data.set('dueDate', dueDate.toISOString());
+    } else {
+      data.delete('dueDate'); // Garante que limpa se não houver data
     }
-  }, []);
 
-  const handleFormSubmit = (formData: FormData) => {
-    formData.set('description', description);
-    onSubmit(formData);
-  };
+    await onSubmit(data);
+  }, [task.id, title, description, status, priority, projectId, progress, estimatedTime, dueDate, onSubmit]);
+    
+return (
+    <>
+      {/* 1. TOP BAR (O X padrão da biblioteca aparecerá à direita deste header automaticamente) */}
+      <header className="h-14 border-b border-border/40 bg-muted/5 flex items-center justify-between px-6 shrink-0 pr-16">
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-sm">
+            <Zap size={14} className="fill-current" />
+          </div>
+          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">
+            <span>Control Panel</span>
+            <ChevronRight size={10} />
+            <span className="text-foreground/60">{task.id.slice(-8).toUpperCase()}</span>
+          </div>
+        </div>
 
-  const handlePasteInTextarea = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    e.preventDefault();
-    handleDescriptionPaste(e);
-  };
+        <div className="flex items-center gap-1.5">
+          <QuickAction icon={Pin} active={isPinned} color="text-amber-400" onClick={onTogglePin} tooltip="Fixar" />
+          <QuickAction icon={Star} active={isStarred} color="text-yellow-400" onClick={onToggleStar} tooltip="Priorizar" />
+          <QuickAction icon={Link2} active={false} color="" onClick={onCopyLink} tooltip="Copiar Link" />
+        </div>
+      </header>
 
-  return (
-    <Sheet open={isOpen} onOpenChange={onClose}>
-        <SheetContent 
-        side="right" 
-        className="fixed right-0 top-0 h-full w-full sm:max-w-xl !p-0 flex flex-col border-l shadow-2xl bg-background outline-none !translate-x-0"
-        >
-        {/* CORREÇÃO DO ERRO: Título acessível (escondido ou visível) */}
-        <SheetHeader className="sr-only">
-          <SheetTitle>Editar Tarefa: {task.title}</SheetTitle>
-          <SheetDescription>Modifique os detalhes, progresso e prazos da sua tarefa.</SheetDescription>
-        </SheetHeader>
-
-        <div className="relative shrink-0">
-          <div className="relative w-full bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 h-48 flex items-center justify-center overflow-hidden">
-            {imageContent ? (
-              <>
-                <img src={imageContent} alt="Capa" className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-                <Button
-                  size="icon"
-                  variant="secondary"
-                  className="absolute top-4 right-4 h-8 w-8 bg-background/90 backdrop-blur shadow-lg hover:bg-background hover:text-destructive transition-all"
-                  onClick={() => setImageContent(null)}
-                >
-                  <X className="h-4 w-4" />
+      {/* 2. ÁREA DE TRABALHO */}
+      <div className="flex flex-1 overflow-hidden flex-col lg:flex-row bg-background">
+        
+        {/* COLUNA ESQUERDA: EDITOR */}
+        <main className="flex-1 overflow-y-auto p-8 lg:p-16 space-y-12 custom-scrollbar">
+          <div className="space-y-6">
+            {/* AREA DE IMAGEM */}
+            <div className="relative group/image max-w-2xl">
+              {imageContent ? (
+                <div className="relative rounded-[2rem] overflow-hidden border border-border/40 shadow-2xl">
+                  <img src={imageContent} alt="Cover" className="w-full h-64 object-cover" />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/image:opacity-100 transition-all flex items-center justify-center gap-3">
+                    <Button variant="secondary" size="sm" className="rounded-xl font-bold text-[10px] uppercase" onClick={() => fileInputRef.current?.click()}>Alterar</Button>
+                    <Button variant="destructive" size="icon" className="h-9 w-9 rounded-xl" onClick={() => setImageContent(null)}>
+                      <Trash2 size={16} />
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button variant="ghost" className="w-full h-32 border-2 border-dashed border-border/40 rounded-[2rem] hover:bg-primary/5 flex flex-col gap-2" onClick={() => fileInputRef.current?.click()}>
+                  <ImageIcon className="h-6 w-6 text-muted-foreground/40" />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40">Inserir Mídia de Capa</span>
                 </Button>
-                <div className="absolute bottom-4 left-4 right-4">
-                  <Input
-                    name="title"
-                    defaultValue={task.title}
-                    required
-                    className="text-2xl font-bold bg-transparent border-0 px-0 focus-visible:ring-0 focus-visible:border-b-2 focus-visible:border-primary rounded-none h-auto text-white placeholder:text-white/70 shadow-none"
-                    placeholder="Nome da tarefa..."
-                  />
-                </div>
-              </>
-            ) : (
-              <div className="flex flex-col items-center gap-4 text-muted-foreground p-8">
-                <div
-                  className="p-4 bg-background/50 backdrop-blur rounded-full shadow-lg border border-border cursor-pointer hover:scale-105 transition-transform"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <ImageIcon className="h-8 w-8" />
-                </div>
-                <div className="text-center space-y-2">
-                  <p className="text-sm font-semibold">Adicionar imagem de capa</p>
-                  <p className="text-xs text-muted-foreground">Arraste uma imagem ou clique para upload</p>
-                  <p className="text-xs text-muted-foreground font-mono">Ou cole com Ctrl+V</p>
-                </div>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              <input
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                placeholder="Título da Missão..."
+                className="w-full bg-transparent text-4xl lg:text-6xl font-black tracking-tighter outline-none border-none p-0 focus:ring-0"
+              />
+              <Separator className="bg-border/40" />
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground/30">
+                <Info size={12} /> Briefing Técnico
               </div>
-            )}
+              <Textarea
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                onPaste={onPaste}
+                variant="ghost"
+                placeholder="Detalhes operacionais..."
+                className="min-h-[400px] text-xl leading-relaxed px-0 placeholder:text-muted-foreground/10"
+              />
+            </div>
           </div>
-          
-          <input
-            type="file"
-            ref={fileInputRef}
-            className="hidden"
-            accept="image/*"
-            onChange={onImageUpload}
-          />
+        </main>
 
-          <div className="absolute top-4 left-4 flex items-center gap-2">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="secondary"
-                    className={cn(
-                      'h-8 w-8 bg-background/90 backdrop-blur shadow-lg transition-all',
-                      isPinned ? 'text-amber-600' : 'text-muted-foreground',
-                    )}
-                    onClick={onTogglePin}
-                  >
-                    {isPinned ? <Pin className="h-4 w-4" /> : <PinOff className="h-4 w-4" />}
+        {/* COLUNA DIREITA: SIDEBAR */}
+        <aside className="w-full lg:w-[360px] border-l border-border/40 bg-muted/5 p-8 space-y-10 overflow-y-auto shrink-0">
+          <section className="space-y-8">
+            <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-muted-foreground/30">Parâmetros</h4>
+            
+            <PropertyRow icon={LayoutTemplate} label="Status">
+              <Select value={status} onValueChange={setStatus}>
+                <SelectTrigger className="h-11 border-none bg-background/50 shadow-xl rounded-2xl font-bold text-[10px] uppercase">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl">
+                  <SelectItem value="TODO" className="text-[10px] font-bold uppercase">A Fazer</SelectItem>
+                  <SelectItem value="IN_PROGRESS" className="text-[10px] font-bold uppercase">Em Curso</SelectItem>
+                  <SelectItem value="DONE" className="text-[10px] font-bold uppercase">Concluído</SelectItem>
+                </SelectContent>
+              </Select>
+            </PropertyRow>
+
+            <PropertyRow icon={Flag} label="Urgência">
+              <Select value={priority} onValueChange={setPriority}>
+                <SelectTrigger className="h-11 border-none bg-background/50 shadow-xl rounded-2xl font-bold text-[10px] uppercase">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl">
+                  <SelectItem value="LOW" className="text-[10px] font-bold uppercase">Baixa</SelectItem>
+                  <SelectItem value="MEDIUM" className="text-[10px] font-bold uppercase text-amber-500">Média</SelectItem>
+                  <SelectItem value="HIGH" className="text-[10px] font-bold uppercase text-rose-500">Alta</SelectItem>
+                </SelectContent>
+              </Select>
+            </PropertyRow>
+
+            <PropertyRow icon={CalendarDays} label="Prazo">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" className="w-full h-11 justify-start bg-background/50 shadow-xl rounded-2xl font-bold text-[10px] uppercase px-5">
+                    {dueDate ? format(dueDate, "dd MMM, yyyy", { locale: ptBR }) : "Definir"}
                   </Button>
-                </TooltipTrigger>
-                <TooltipContent><p>{isPinned ? 'Desfixar' : 'Fixar'}</p></TooltipContent>
-              </Tooltip>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 rounded-[2rem] overflow-hidden border-border/40 shadow-2xl" align="end">
+                  <Calendar mode="single" selected={dueDate} onSelect={setDueDate} locale={ptBR} initialFocus />
+                </PopoverContent>
+              </Popover>
+            </PropertyRow>
+          </section>
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="secondary"
-                    className={cn(
-                      'h-8 w-8 bg-background/90 backdrop-blur shadow-lg transition-all',
-                      isStarred ? 'text-yellow-500' : 'text-muted-foreground',
-                    )}
-                    onClick={onToggleStar}
-                  >
-                    {isStarred ? <Star className="h-4 w-4 fill-current" /> : <StarOff className="h-4 w-4" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent><p>Destaque</p></TooltipContent>
-              </Tooltip>
+          <Separator className="bg-border/40" />
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="secondary"
-                    className="h-8 w-8 bg-background/90 backdrop-blur shadow-lg text-muted-foreground"
-                    onClick={onCopyLink}
-                  >
-                    <Link2 className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent><p>Copiar Link</p></TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-hidden">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-            <div className="border-b px-6 shrink-0">
-              <TabsList className="w-full justify-start h-12 bg-transparent">
-                <TabsTrigger value="details" className="flex-1 data-[state=active]:bg-primary/10">
-                  <Eye className="h-4 w-4 mr-2" /> Detalhes
-                </TabsTrigger>
-                <TabsTrigger value="progress" className="flex-1 data-[state=active]:bg-primary/10">
-                  <Target className="h-4 w-4 mr-2" /> Progresso
-                </TabsTrigger>
-              </TabsList>
+          <section className="space-y-8">
+            <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-muted-foreground/30">Métricas</h4>
+            <div className="bg-background border border-border/40 rounded-[2rem] p-6 space-y-6 shadow-xl">
+               <div className="flex justify-between items-end">
+                  <div className="space-y-1">
+                     <span className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-[0.3em]">Saúde</span>
+                     <div className="text-4xl font-black font-mono tracking-tighter text-primary">{progress}%</div>
+                  </div>
+                  <Target size={24} className="text-primary/20" />
+               </div>
+               <Slider value={[progress]} onValueChange={([v]) => { setProgress(v); onProgressChange(v); }} max={100} step={5} />
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6">
-              <form action={handleFormSubmit} id={`form-${task.id}`} className="space-y-6">
-                <input type="hidden" name="id" value={task.id} />
-                
-                <TabsContent value="details" className="space-y-6 m-0 outline-none">
-                  {!imageContent && (
-                    <div className="space-y-2">
-                      <Label htmlFor="title">Título</Label>
-                      <Input
-                        id="title"
-                        name="title"
-                        defaultValue={task.title}
-                        required
-                        className="text-xl font-bold"
-                        placeholder="Nome da tarefa..."
-                      />
-                    </div>
-                  )}
-
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="description">Descrição</Label>
-                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Markdown Ativo</span>
-                    </div>
-                    <div className="relative">
-                      <Textarea
-                        id="description"
-                        name="description"
-                        value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        onPaste={handlePasteInTextarea}
-                        className="min-h-[120px] resize-none"
-                        placeholder="Descreva a tarefa..."
-                      />
-                      {isProcessingPaste && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-background/80 rounded-lg">
-                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-4 p-4 rounded-lg border bg-card">
-                      <h3 className="font-semibold text-sm flex items-center gap-2 text-primary">
-                        <Flag className="h-4 w-4" /> Configurações
-                      </h3>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-xs">Prioridade</Label>
-                          <Select name="priority" defaultValue={task.priority}>
-                            <SelectTrigger className="w-[130px] h-8 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Object.entries(PRIORITY_STYLES).map(([key, value]) => (
-                                <SelectItem key={key} value={key}>
-                                  <div className="flex items-center gap-2">
-                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: value.bgColor }} />
-                                    {value.label}
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <Label className="text-xs">Status</Label>
-                          <Select name="status" defaultValue={task.status || 'TODO'}>
-                            <SelectTrigger className="w-[130px] h-8 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Object.entries(STATUS_STYLES).map(([key, value]) => (
-                                <SelectItem key={key} value={key}>
-                                  <div className="flex items-center gap-2">
-                                    {value.icon} <span>{value.label}</span>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4 p-4 rounded-lg border bg-card">
-                      <h3 className="font-semibold text-sm flex items-center gap-2 text-primary">
-                        <Calendar className="h-4 w-4" /> Datas
-                      </h3>
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <Label className="text-xs">Vencimento</Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button variant="outline" size="sm" className="w-[130px] h-8 text-xs justify-start">
-                                <CalendarIcon className="mr-2 h-3 w-3" />
-                                {task.dueDate ? format(new Date(task.dueDate), 'dd/MM/yy') : 'Definir'}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="end">
-                              <CalendarComponent
-                                mode="single"
-                                selected={task.dueDate ? new Date(task.dueDate) : undefined}
-                                onSelect={handleDateSelect}
-                                locale={ptBR}
-                              />
-                            </PopoverContent>
-                          </Popover>
-                          <input
-                            type="hidden"
-                            name="dueDate"
-                            defaultValue={task.dueDate ? format(new Date(task.dueDate), 'yyyy-MM-dd') : ''}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="progress" className="space-y-6 m-0 outline-none">
-                  <div className="space-y-6">
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-base font-semibold">Progresso Atual</Label>
-                        <span className="text-2xl font-bold text-primary">{progress}%</span>
-                      </div>
-                      <Slider
-                        value={[progress]}
-                        onValueChange={([v]) => { setProgress(v); onProgressChange(v); }}
-                        max={100}
-                        step={5}
-                        className="w-full"
-                      />
-                    </div>
-
-                    <Separator />
-
-                    <div className="space-y-4">
-                      <Label className="text-base font-semibold flex items-center gap-2">
-                        <Timer className="h-4 w-4" /> Tempo estimado (minutos)
-                      </Label>
-                      <div className="grid grid-cols-4 gap-2">
-                        {[15, 30, 60, 120].map((min) => (
-                          <Button
-                            key={min}
-                            type="button"
-                            variant={estimatedTime === min ? 'default' : 'outline'}
-                            className="h-10 text-xs"
-                            onClick={() => {
-                              setEstimatedTime(min);
-                              const fd = new FormData();
-                              fd.set('id', task.id);
-                              fd.set('estimatedTime', min.toString());
-                              onSubmit(fd);
-                            }}
-                          >
-                            {min}m
-                          </Button>
-                        ))}
-                      </div>
-                      <Input
-                        type="number"
-                        value={estimatedTime}
-                        onChange={(e) => setEstimatedTime(parseInt(e.target.value) || 0)}
-                        onBlur={() => {
-                          const fd = new FormData();
-                          fd.set('id', task.id);
-                          fd.set('estimatedTime', estimatedTime.toString());
-                          onSubmit(fd);
-                        }}
-                      />
-                    </div>
-                  </div>
-                </TabsContent>
-              </form>
+            <div className="flex items-center justify-between px-4 py-4 bg-background/40 rounded-2xl border border-dashed border-border/60">
+               <div className="flex items-center gap-3 text-[10px] font-bold uppercase text-muted-foreground/60">
+                  <Timer size={14} /> Esforço
+               </div>
+               <div className="flex items-center gap-2">
+                  <input 
+                    type="number" 
+                    value={estimatedTime} 
+                    onChange={e => setEstimatedTime(Number(e.target.value))}
+                    className="w-12 bg-transparent border-none text-right font-mono text-lg font-black outline-none text-primary"
+                  />
+                  <span className="text-[9px] font-black text-muted-foreground/30 uppercase">Min</span>
+               </div>
             </div>
-          </Tabs>
-        </div>
+          </section>
+        </aside>
+      </div>
 
-        <SheetFooter className="p-4 border-t bg-muted/20 flex flex-row justify-between items-center gap-4 shrink-0">
-          <div className="flex items-center gap-2">
-            <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
-              <AlertDialogTrigger asChild>
-                <Button type="button" variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10">
-                  <Trash2 className="mr-2 h-4 w-4" /> Excluir
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Excluir permanentemente?</AlertDialogTitle>
-                  <AlertDialogDescription>Essa tarefa sumirá de todos os seus relatórios.</AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={onDelete} className="bg-destructive hover:bg-destructive/90">
-                    Excluir
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-          
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={onClose}>Cancelar</Button>
-            <Button
-              type="submit"
-              form={`form-${task.id}`}
-              disabled={isSaving}
-              size="sm"
-              className="px-8 shadow-md"
-            >
-              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-              {isSaving ? 'Salvando...' : 'Salvar'}
+      {/* 3. RODAPÉ / DELETE CENTRALIZADO */}
+      <footer className="h-24 px-8 border-t border-border/40 bg-muted/5 flex items-center justify-between shrink-0">
+        
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="ghost" className="h-12 px-6 rounded-2xl text-muted-foreground/30 hover:text-rose-500 font-black text-[10px] uppercase tracking-widest transition-all group">
+              <Trash2 size={16} className="mr-2 group-hover:rotate-12 transition-transform" /> Eliminar Unidade
             </Button>
-          </div>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+          </AlertDialogTrigger>
+          
+          <AlertDialogContent 
+            className="rounded-[2.5rem] border-border/40 shadow-2xl p-10 max-w-sm flex flex-col items-center fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+          >
+            <AlertDialogHeader className="flex flex-col items-center text-center space-y-4">
+              <div className="h-20 w-20 rounded-[2rem] bg-rose-500/10 flex items-center justify-center text-rose-500 shadow-inner">
+                 <Trash2 size={32} />
+              </div>
+              <div className="space-y-2">
+                <AlertDialogTitle className="text-3xl font-black uppercase tracking-tighter italic">Apagar?</AlertDialogTitle>
+                <AlertDialogDescription className="text-muted-foreground font-medium text-sm leading-relaxed px-4">
+                  Esta ação removerá todos os dados desta missão permanentemente do Life OS.
+                </AlertDialogDescription>
+              </div>
+            </AlertDialogHeader>
+            
+            <AlertDialogFooter className="mt-10 flex flex-col gap-3 w-full sm:flex-col">
+              <AlertDialogAction 
+                onClick={onDelete} 
+                className="h-14 w-full rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-black uppercase text-[11px] tracking-widest shadow-xl shadow-rose-500/20"
+              >
+                Confirmar Exclusão
+              </AlertDialogAction>
+              <AlertDialogCancel className="h-14 w-full rounded-2xl font-black uppercase text-[11px] tracking-widest border-border/60 bg-transparent hover:bg-muted">
+                Cancelar
+              </AlertDialogCancel>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <Button 
+          onClick={handleFormSubmit} 
+          disabled={isSaving}
+          className="h-14 px-12 rounded-2xl bg-foreground text-background hover:bg-foreground/90 font-black uppercase tracking-[0.1em] text-[11px] shadow-2xl transition-all active:scale-95 disabled:opacity-50"
+        >
+          {isSaving ? <Loader2 size={18} className="animate-spin mr-3" /> : <Save size={18} className="mr-3" />}
+          {isSaving ? "Salvando..." : "Confirmar Mudanças"}
+        </Button>
+      </footer>
+
+      <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={onImageUpload} />
+    </>
+  );
+}
+
+// --- HELPERS ---
+
+function PropertyRow({ icon: Icon, label, children }: { icon: LucideIcon; label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2.5 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/30">
+        <Icon size={14} /> {label}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function QuickAction({ icon: Icon, active, color, onClick, tooltip }: { icon: LucideIcon; active: boolean; color: string; onClick: () => void; tooltip: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button 
+          type="button" 
+          variant="ghost" 
+          size="icon" 
+          className={cn(
+            "h-10 w-10 rounded-xl transition-all", 
+            active ? `${color} bg-background shadow-lg border border-border/10` : "text-muted-foreground hover:bg-muted"
+          )}
+          onClick={onClick}
+        >
+          <Icon size={20} className={cn(active && "fill-current")} />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="text-[10px] font-black uppercase tracking-widest bg-zinc-950 border-none text-white px-3 py-1.5 shadow-2xl">
+        {tooltip}
+      </TooltipContent>
+    </Tooltip>
   );
 }

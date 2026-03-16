@@ -11,23 +11,51 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Trash2, Save, Copy, Check, FileJson, Settings, Code, Layout } from "lucide-react";
+import { 
+    AlertDialog, 
+    AlertDialogAction, 
+    AlertDialogCancel, 
+    AlertDialogContent, 
+    AlertDialogDescription, 
+    AlertDialogFooter, 
+    AlertDialogHeader, 
+    AlertDialogTitle, 
+    AlertDialogTrigger 
+} from "@/components/ui/alert-dialog";
+import { 
+    Dialog, 
+    DialogContent, 
+    DialogDescription, 
+    DialogHeader, 
+    DialogTitle, 
+    DialogTrigger 
+} from "@/components/ui/dialog";
+import { 
+    Plus, Trash2, Save, Copy, Check, FileJson, 
+    Settings, Code2, Database, AlertCircle, TerminalSquare, 
+    ShieldAlert, X, ExternalLink
+} from "lucide-react";
 import { toast } from "sonner";
 import { savePageContent, createPage, deletePage, deleteSite } from "@/app/(dashboard)/cms/actions";
 import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
 
 interface SiteWithPages extends ManagedSite {
   pages: SitePage[];
 }
 
-// --- SUB-COMPONENTE: EDITOR JSON ---
+/* ======================================================
+   SUB-COMPONENTE: EDITOR JSON (Terminal UI)
+====================================================== */
 function JsonEditor({ page }: { page: SitePage }) {
     const [json, setJson] = useState(page.content);
     const [isValid, setIsValid] = useState(true);
+    const [isDirty, setIsDirty] = useState(false);
 
     const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const val = e.target.value;
         setJson(val);
+        setIsDirty(true);
         try {
             JSON.parse(val);
             setIsValid(true);
@@ -37,63 +65,110 @@ function JsonEditor({ page }: { page: SitePage }) {
     };
 
     const handleSave = async () => {
-        if (!isValid) return toast.error("JSON Inválido. Corrija antes de salvar.");
-        
+        if (!isValid) return toast.error("JSON Inválido. Corrija a sintaxe antes de salvar.");
         const formData = new FormData();
         formData.append("pageId", page.id);
         formData.append("content", json);
-        
         try {
             await savePageContent(formData);
-            toast.success("Conteúdo salvo com sucesso!");
+            setIsDirty(false);
+            toast.success("Deploy realizado!");
         } catch {
-            toast.error("Erro ao salvar.");
+            toast.error("Erro na sincronização.");
         }
     };
 
-    const handleDelete = async () => {
-        if(confirm(`Tem certeza que deseja apagar a rota /${page.slug}?`)) {
+    const handleConfirmDelete = async () => {
+        try {
             await deletePage(page.id);
-            toast.success("Página removida.");
+            toast.success("Endpoint removido.");
+        } catch {
+            toast.error("Erro ao excluir.");
         }
-    }
+    };
 
     return (
-        <div className="h-full flex flex-col gap-4">
-            <div className="flex items-center justify-between bg-zinc-50 dark:bg-zinc-900 p-3 rounded-lg border">
-                <div className="flex items-center gap-3">
-                    <Badge variant="outline" className="text-sm font-mono px-3 py-1">/{page.slug}</Badge>
+        <div className="h-full flex flex-col bg-card border border-border/40 rounded-[2rem] shadow-sm overflow-hidden animate-in fade-in duration-500">
+            <div className="flex items-center justify-between bg-muted/10 border-b border-border/40 p-4 md:px-6">
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                        <TerminalSquare className="h-4 w-4 text-primary" />
+                        <Badge variant="outline" className="text-xs font-mono font-bold px-3 py-1 bg-background shadow-inner">
+                            /{page.slug}
+                        </Badge>
+                    </div>
+                    
                     {!isValid ? (
-                        <span className="text-xs text-red-500 font-bold flex items-center gap-1">
-                            ⚠️ JSON Inválido
-                        </span>
+                        <Badge variant="destructive" className="text-[10px] font-black uppercase tracking-widest gap-1">
+                            <AlertCircle className="h-3 w-3" /> Syntax Error
+                        </Badge>
+                    ) : isDirty ? (
+                        <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest gap-1 bg-amber-500/10 text-amber-600 border-amber-500/20">
+                            Pendente
+                        </Badge>
                     ) : (
-                        <span className="text-xs text-green-600 flex items-center gap-1">
-                            <Check className="h-3 w-3" /> Válido
-                        </span>
+                        <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest gap-1 bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
+                            <Check className="h-3 w-3" /> Live
+                        </Badge>
                     )}
                 </div>
+
                 <div className="flex gap-2">
-                    <Button variant="destructive" size="sm" onClick={handleDelete}>
-                        <Trash2 className="h-4 w-4" />
-                    </Button>
-                    <Button size="sm" onClick={handleSave} disabled={!isValid} className="gap-2">
-                        <Save className="h-4 w-4" /> Salvar Alterações
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl">
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        </AlertDialogTrigger>
+                        {/* FIX: Centralização forçada do modal */}
+                        <AlertDialogContent className="fixed left-1/2 top-1/2 z-50 w-[95%] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-[2rem] border border-border/40 bg-background p-8 shadow-2xl">
+                            <AlertDialogHeader className="flex flex-col items-center text-center">
+                                <div className="h-12 w-12 rounded-2xl bg-destructive/10 flex items-center justify-center text-destructive mb-2">
+                                    <ShieldAlert className="h-6 w-6" />
+                                </div>
+                                <AlertDialogTitle className="text-xl font-black uppercase tracking-tighter">Remover Endpoint?</AlertDialogTitle>
+                                <AlertDialogDescription className="text-sm font-medium">
+                                    A rota <code className="text-foreground font-bold">/{page.slug}</code> será excluída permanentemente.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter className="sm:justify-center gap-3 mt-4">
+                                <AlertDialogCancel className="rounded-xl font-bold uppercase text-[10px] tracking-widest h-11 px-6">Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleConfirmDelete} className="rounded-xl bg-destructive text-white hover:bg-destructive/90 font-bold uppercase text-[10px] tracking-widest h-11 px-6">
+                                    Deletar Agora
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+
+                    <Button size="sm" onClick={handleSave} disabled={!isValid || !isDirty} className="gap-2 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg">
+                        <Save className="h-4 w-4" /> Deploy
                     </Button>
                 </div>
             </div>
 
-            <Textarea 
-                value={json}
-                onChange={handleChange}
-                className={`font-mono text-sm flex-1 bg-zinc-950 text-green-400 border-zinc-800 resize-none p-6 leading-relaxed ${!isValid ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
-                spellCheck={false}
-            />
+            <div className="flex-1 relative bg-[#0E0E11] p-6">
+                <Textarea 
+                    value={json}
+                    onChange={handleChange}
+                    className={cn(
+                        "w-full h-full font-mono text-[13px] md:text-sm bg-transparent text-emerald-400 border-none resize-none leading-relaxed focus-visible:ring-0 focus-visible:ring-offset-0 p-0 custom-scrollbar",
+                        !isValid && "text-red-400"
+                    )}
+                    spellCheck={false}
+                    placeholder="Cole seu JSON aqui..."
+                />
+            </div>
+            <div className="bg-muted/10 border-t border-border/40 p-3 px-6 flex justify-between items-center text-[10px] font-mono font-bold text-muted-foreground/50 uppercase tracking-widest">
+                <span>Instance: {page.id.split('-')[0]}</span>
+                <span>Sincronizado: {new Date(page.updatedAt).toLocaleTimeString("pt-BR")}</span>
+            </div>
         </div>
     );
 }
 
-// --- SUB-COMPONENTE: ABA API ---
+/* ======================================================
+   SUB-COMPONENTE: API GUIDE
+====================================================== */
 function ApiGuide({ site }: { site: ManagedSite }) {
     const [copied, setCopied] = useState(false);
     const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
@@ -106,37 +181,31 @@ function ApiGuide({ site }: { site: ManagedSite }) {
     }
 
     return (
-        <div className="space-y-6 max-w-2xl">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Integração</CardTitle>
-                    <CardDescription>Como consumir os dados deste site no seu Frontend (React, Vue, etc).</CardDescription>
+        <div className="space-y-6 max-w-3xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <Card className="border-border/40 shadow-xl rounded-[2rem] bg-card overflow-hidden">
+                <CardHeader className="bg-muted/10 border-b border-border/40 p-8">
+                    <CardTitle className="flex items-center gap-2 text-lg font-black uppercase tracking-tighter">
+                        <Code2 className="h-5 w-5 text-primary" /> Integração de Rede
+                    </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                        <Label>API Key (Privada)</Label>
-                        <div className="flex gap-2">
-                            <Input value={site.apiKey} readOnly className="font-mono bg-zinc-50 dark:bg-zinc-900" />
-                            <Button variant="outline" onClick={() => copyToClip(site.apiKey)}>
-                                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                <CardContent className="p-8 space-y-8">
+                    <div className="space-y-3">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">X-API-KEY (Privada)</Label>
+                        <div className="flex gap-2 p-1 bg-muted/20 border border-border/50 rounded-2xl shadow-inner">
+                            <Input value={site.apiKey} readOnly className="font-mono text-sm bg-transparent border-none focus-visible:ring-0" />
+                            <Button variant="secondary" className="rounded-xl shadow-sm" onClick={() => copyToClip(site.apiKey)}>
+                                {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
                             </Button>
                         </div>
                     </div>
                     
-                    <div className="space-y-2">
-                        <Label>Exemplo de Fetch (Javascript)</Label>
-                        <div className="bg-zinc-950 text-zinc-300 p-4 rounded-md font-mono text-xs overflow-x-auto relative group">
-                            <pre>{`const res = await fetch('${baseUrl}/api/cms/${site.apiKey}/home');
-const data = await res.json();
-console.log(data.titulo);`}</pre>
-                            <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-white hover:text-white hover:bg-zinc-800"
-                                onClick={() => copyToClip(`${baseUrl}/api/cms/${site.apiKey}/home`)}
-                            >
-                                <Copy className="h-3 w-3" />
-                            </Button>
+                    <div className="space-y-3">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Fetch Snippet</Label>
+                        <div className="bg-[#0E0E11] border border-border/20 p-5 rounded-2xl relative group shadow-inner">
+                            <pre className="font-mono text-[13px] text-zinc-300 overflow-x-auto">
+{`const res = await fetch('${baseUrl}/api/cms/${site.apiKey}/home');
+const data = await res.json();`}
+                            </pre>
                         </div>
                     </div>
                 </CardContent>
@@ -145,128 +214,166 @@ console.log(data.titulo);`}</pre>
     )
 }
 
-// --- COMPONENTE PRINCIPAL: SITE EDITOR ---
+/* ======================================================
+   COMPONENTE PRINCIPAL: SITE EDITOR
+====================================================== */
 export function SiteEditor({ site }: { site: SiteWithPages }) {
     const router = useRouter();
-    const [activeTab, setActiveTab] = useState(site.pages[0]?.id || "settings");
+    const [activeTab, setActiveTab] = useState(site.pages.length > 0 ? site.pages[0].id : "new-page");
+    const [deleteConfirmName, setDeleteConfirmName] = useState("");
 
-    const handleDeleteSite = async () => {
-        const confirmName = prompt(`Para deletar, digite o nome do site: "${site.name}"`);
-        if (confirmName === site.name) {
-            await deleteSite(site.id);
-            toast.success("Site excluído permanentemente.");
-            router.push("/cms"); // Redireciona para a listagem
-        } else {
-            toast.error("Nome incorreto. Cancelado.");
-        }
+    const handleFinalDeleteSite = async () => {
+        await deleteSite(site.id);
+        toast.success("Container destruído.");
+        router.push("/cms");
     };
 
     return (
-        <div className="flex-1 flex gap-6 overflow-hidden">
-            
-            {/* SIDEBAR DO EDITOR */}
-            <aside className="w-64 flex flex-col gap-2 shrink-0">
-                <Tabs value={activeTab} onValueChange={setActiveTab} orientation="vertical" className="h-full flex flex-col p-6">
-                    
-                    <div className="font-semibold text-xs text-zinc-500 uppercase tracking-wider mb-2 px-2">Páginas</div>
-                    <ScrollArea className="flex-1 pr-3">
-                        <TabsList className="flex flex-col h-auto bg-transparent gap-1 p-0">
-                            {site.pages.map(page => (
-                                <TabsTrigger 
-                                    key={page.id} 
-                                    value={page.id}
-                                    className="w-full justify-start px-3 py-2 h-9 data-[state=active]:bg-zinc-200 dark:data-[state=active]:bg-zinc-800 font-normal"
-                                >
-                                    <FileJson className="mr-2 h-4 w-4 text-zinc-500" />
-                                    <span className="truncate">/{page.slug}</span>
-                                </TabsTrigger>
-                            ))}
-                        </TabsList>
+        <div className="flex-1 flex flex-col md:flex-row h-full overflow-hidden">
+            <aside className="w-full md:w-64 lg:w-72 border-b md:border-b-0 md:border-r border-border/40 bg-muted/5 flex flex-col shrink-0">
+                <Tabs value={activeTab} onValueChange={setActiveTab} orientation="vertical" className="flex flex-col h-full">
+                    <div className="p-5 border-b border-border/40 bg-background/50">
+                        <Button onClick={() => setActiveTab("new-page")} className="w-full gap-2 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-md h-10">
+                            <Plus className="h-4 w-4" /> Novo Endpoint
+                        </Button>
+                    </div>
+
+                    <ScrollArea className="flex-1">
+                        <div className="p-4 space-y-6">
+                            <div className="space-y-2">
+                                <div className="text-[9px] font-black text-muted-foreground/50 uppercase tracking-[0.2em] px-2 flex items-center gap-2">
+                                    <Database className="h-3 w-3" /> Rotas Ativas
+                                </div>
+                                <TabsList className="flex flex-col h-auto bg-transparent gap-1 p-0">
+                                    {site.pages.map(page => (
+                                        <TabsTrigger 
+                                            key={page.id} value={page.id}
+                                            className="w-full justify-start px-3 py-2.5 h-auto text-xs font-semibold rounded-xl text-muted-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary border border-transparent data-[state=active]:border-primary/20 transition-all"
+                                        >
+                                            <FileJson className="mr-2 h-4 w-4 opacity-70" />
+                                            <span className="truncate">/{page.slug}</span>
+                                        </TabsTrigger>
+                                    ))}
+                                </TabsList>
+                            </div>
+
+                            <Separator className="bg-border/40" />
+
+                            <div className="space-y-2">
+                                <div className="text-[9px] font-black text-muted-foreground/50 uppercase tracking-[0.2em] px-2 flex items-center gap-2">
+                                    <Settings className="h-3 w-3" /> Sistema
+                                </div>
+                                <TabsList className="flex flex-col h-auto bg-transparent gap-1 p-0">
+                                    <TabsTrigger value="api" className="w-full justify-start px-3 py-2.5 rounded-xl text-muted-foreground data-[state=active]:bg-foreground data-[state=active]:text-background transition-all">
+                                        <Code2 className="mr-2 h-4 w-4 opacity-70" /> Integração
+                                    </TabsTrigger>
+                                    <TabsTrigger value="settings" className="w-full justify-start px-3 py-2.5 rounded-xl text-muted-foreground hover:text-red-600 data-[state=active]:bg-red-500 data-[state=active]:text-white transition-all">
+                                        <AlertCircle className="mr-2 h-4 w-4 opacity-70" /> Danger Zone
+                                    </TabsTrigger>
+                                </TabsList>
+                            </div>
+                        </div>
                     </ScrollArea>
-
-                    <Separator className="my-3" />
-
-                    <div className="font-semibold text-xs text-zinc-500 uppercase tracking-wider mb-2 px-2">Configuração</div>
-                    <TabsList className="flex flex-col h-auto bg-transparent gap-1 p-0">
-                        <TabsTrigger value="new-page" className="w-full justify-start px-3 py-2 h-9 border border-dashed border-zinc-300 dark:border-zinc-700 text-zinc-500 hover:text-foreground">
-                            <Plus className="mr-2 h-4 w-4" /> Nova Página
-                        </TabsTrigger>
-                        <TabsTrigger value="api" className="w-full justify-start px-3 py-2 h-9 data-[state=active]:bg-zinc-200 dark:data-[state=active]:bg-zinc-800">
-                            <Code className="mr-2 h-4 w-4" /> API & Chaves
-                        </TabsTrigger>
-                        <TabsTrigger value="settings" className="w-full justify-start px-3 py-2 h-9 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 data-[state=active]:bg-red-100">
-                            <Settings className="mr-2 h-4 w-4" /> Zona de Perigo
-                        </TabsTrigger>
-                    </TabsList>
                 </Tabs>
             </aside>
 
-            {/* ÁREA DE CONTEÚDO */}
-            <main className="flex-1 bg-white dark:bg-zinc-950 rounded-xl border shadow-sm p-6 overflow-hidden flex flex-col">
-                <Tabs value={activeTab} className="h-full flex flex-col">
+            <main className="flex-1 bg-background/50 p-4 md:p-6 overflow-hidden flex flex-col relative">
+                <Tabs value={activeTab} className="h-full flex flex-col relative w-full">
                     
-                    {/* Renderização das Páginas */}
                     {site.pages.map(page => (
-                        <TabsContent key={page.id} value={page.id} className="h-full mt-0">
+                        <TabsContent key={page.id} value={page.id} className="h-full mt-0 focus-visible:ring-0">
                             <JsonEditor page={page} />
                         </TabsContent>
                     ))}
 
-                    {/* Criar Nova Página */}
-                    <TabsContent value="new-page" className="h-full mt-0">
-                        <div className="max-w-md mx-auto mt-10">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Adicionar Nova Rota</CardTitle>
-                                    <CardDescription>Cria um novo endpoint JSON para este site.</CardDescription>
+                    <TabsContent value="new-page" className="h-full mt-0 overflow-y-auto">
+                        <div className="max-w-xl mx-auto py-10">
+                            <Card className="border-border/40 shadow-xl rounded-[2rem] bg-card overflow-hidden">
+                                <CardHeader className="bg-primary/5 border-b border-border/40 p-8 text-center">
+                                    <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mx-auto mb-4 border border-primary/20">
+                                        <Plus className="h-6 w-6" />
+                                    </div>
+                                    <CardTitle className="text-2xl font-black uppercase tracking-tighter">Inicializar Rota</CardTitle>
                                 </CardHeader>
-                                <CardContent>
+                                <CardContent className="p-8">
                                     <form action={async (fd) => {
                                         await createPage(fd);
-                                        toast.success("Página criada com sucesso!");
-                                        // Não precisamos mudar a tab manualmente, o revalidate vai atualizar a lista 
-                                        // e podemos deixar o usuário clicar na nova página.
-                                    }} className="space-y-4">
+                                        toast.success("Build completo!");
+                                    }} className="space-y-6">
                                         <input type="hidden" name="siteId" value={site.id} />
-                                        <div className="space-y-2">
-                                            <Label>Slug da URL (ex: &quot;quem-somos&quot;)</Label>
-                                            <div className="flex items-center">
-                                                <span className="bg-zinc-100 dark:bg-zinc-800 px-3 py-2 rounded-l-md border border-r-0 text-sm text-zinc-500">/</span>
-                                                <Input name="slug" placeholder="minha-pagina" className="rounded-l-none" required autoFocus />
+                                        <div className="space-y-3">
+                                            <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Caminho do Endpoint</Label>
+                                            <div className="flex items-center bg-muted/20 border border-border/50 rounded-xl shadow-inner p-1 focus-within:ring-2 focus-within:ring-primary/20 transition-all h-12">
+                                                <span className="pl-4 pr-2 font-mono text-muted-foreground font-bold text-lg">/</span>
+                                                <Input name="slug" placeholder="ex: v1-posts" className="border-none bg-transparent shadow-none font-mono font-bold text-lg focus-visible:ring-0" required />
                                             </div>
                                         </div>
-                                        <Button type="submit" className="w-full">Criar Página</Button>
+                                        <Button type="submit" className="w-full h-12 rounded-xl font-black uppercase tracking-widest text-[11px] shadow-lg shadow-primary/20">
+                                            Provisionar Endpoint
+                                        </Button>
                                     </form>
                                 </CardContent>
                             </Card>
                         </div>
                     </TabsContent>
 
-                    {/* Guia da API */}
-                    <TabsContent value="api" className="h-full mt-0">
-                        <ApiGuide site={site} />
+                    <TabsContent value="api" className="h-full mt-0 overflow-y-auto focus-visible:ring-0">
+                        <div className="py-10 flex justify-center">
+                            <ApiGuide site={site} />
+                        </div>
                     </TabsContent>
 
-                    {/* Configurações (Deletar) */}
-                    <TabsContent value="settings" className="h-full mt-0">
-                        <div className="max-w-2xl space-y-6">
-                            <Card className="border-red-500/30 bg-red-50/10">
-                                <CardHeader>
-                                    <CardTitle className="text-red-600">Deletar Projeto</CardTitle>
-                                    <CardDescription>
-                                        Esta ação é irreversível. Todas as páginas e conteúdos JSON serão apagados permanentemente.
-                                        A API Key deixará de funcionar imediatamente.
+                    <TabsContent value="settings" className="h-full mt-0 overflow-y-auto focus-visible:ring-0">
+                        <div className="max-w-2xl py-10 mx-auto">
+                            <Card className="border-red-500/30 bg-red-500/5 shadow-2xl rounded-[2rem]">
+                                <CardHeader className="p-8 pb-4">
+                                    <div className="h-12 w-12 rounded-2xl bg-red-500/20 flex items-center justify-center text-red-500 mb-4">
+                                        <AlertCircle className="h-6 w-6" />
+                                    </div>
+                                    <CardTitle className="text-red-600 text-xl font-black uppercase tracking-tighter">Destruir Container</CardTitle>
+                                    <CardDescription className="text-red-600/70 font-medium text-xs mt-2 leading-relaxed">
+                                        Isso apagará todos os dados JSON e desativará a API Key <code className="font-bold">{site.apiKey.slice(0,8)}...</code> imediatamente.
                                     </CardDescription>
                                 </CardHeader>
-                                <CardContent>
-                                    <Button variant="destructive" onClick={handleDeleteSite}>
-                                        <Trash2 className="mr-2 h-4 w-4" /> Excluir {site.name}
-                                    </Button>
+                                <CardContent className="p-8 pt-4">
+                                    <Dialog onOpenChange={() => setDeleteConfirmName("")}>
+                                        <DialogTrigger asChild>
+                                            <Button variant="destructive" className="w-full h-12 rounded-xl font-black uppercase tracking-widest text-[11px] shadow-xl shadow-red-500/20 transition-all hover:scale-[1.02]">
+                                                <Trash2 className="mr-2 h-4 w-4" /> Iniciar Destruição
+                                            </Button>
+                                        </DialogTrigger>
+                                        {/* FIX: Centralização forçada do modal de exclusão */}
+                                        <DialogContent className="fixed left-1/2 top-1/2 z-50 w-[95%] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-[2.5rem] border border-border/40 bg-card p-8 shadow-2xl">
+                                            <DialogHeader className="flex flex-col items-center text-center">
+                                                <div className="h-14 w-14 rounded-2xl bg-red-500/10 flex items-center justify-center text-red-500 mb-4">
+                                                    <ShieldAlert className="h-7 w-7" />
+                                                </div>
+                                                <DialogTitle className="text-2xl font-black uppercase tracking-tighter text-foreground">Ação Crítica</DialogTitle>
+                                                <DialogDescription className="text-sm font-medium py-2">
+                                                    Para confirmar a exclusão de <span className="font-black text-foreground underline">{site.name}</span>, digite o nome do projeto:
+                                                </DialogDescription>
+                                            </DialogHeader>
+                                            <div className="space-y-6 mt-2">
+                                                <Input 
+                                                    value={deleteConfirmName} 
+                                                    onChange={(e) => setDeleteConfirmName(e.target.value)} 
+                                                    placeholder={site.name}
+                                                    className="h-14 rounded-2xl bg-muted/40 border-border/60 shadow-inner font-bold text-center text-lg focus-visible:ring-red-500/20"
+                                                />
+                                                <Button 
+                                                    disabled={deleteConfirmName !== site.name} 
+                                                    onClick={handleFinalDeleteSite}
+                                                    className="w-full h-14 rounded-2xl bg-destructive text-white hover:bg-destructive/90 font-black uppercase tracking-widest text-[11px] shadow-lg disabled:opacity-30 transition-all"
+                                                >
+                                                    DELETAR PROJETO PERMANENTEMENTE
+                                                </Button>
+                                            </div>
+                                        </DialogContent>
+                                    </Dialog>
                                 </CardContent>
                             </Card>
                         </div>
                     </TabsContent>
-
                 </Tabs>
             </main>
         </div>

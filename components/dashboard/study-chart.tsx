@@ -1,102 +1,186 @@
 "use client";
 
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, Legend } from "recharts";
-import { BookOpen } from "lucide-react";
+import dynamic from "next/dynamic";
+import {
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  Legend,
+  TooltipProps,
+} from "recharts";
+import { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
+import { BookOpen, Activity } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-const COLORS = [
-  '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4'
-];
+/* -------------------------------------------------------------------------------------------------
+ * 1. INTERFACES
+ * -----------------------------------------------------------------------------------------------*/
 
-interface StudyData {
+export interface StudyData {
   name: string;
   value: number;
-  [key: string]: string | number; 
+  fill?: string;
+  [key: string]: string | number | undefined;
 }
 
-// ✅ DEFINIÇÃO MANUAL DE TIPAGEM
-// O Recharts Pie Chart passa 'fill' diretamente no objeto do payload do tooltip
-interface StudyChartTooltipProps {
-  active?: boolean;
-  payload?: Array<{
-    name: string;
-    value: number;
-    fill: string; // O Recharts adiciona isso automaticamente
-    payload: StudyData;
-  }>;
+interface StudyChartProps {
+  data: StudyData[];
 }
 
-const CustomTooltip = ({ active, payload }: StudyChartTooltipProps) => {
+interface TooltipPayloadItem {
+  name?: NameType;
+  value?: ValueType;
+  color?: string;
+  payload?: StudyData;
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * 2. CUSTOM TOOLTIP
+ * -----------------------------------------------------------------------------------------------*/
+
+type CustomTooltipProps = TooltipProps<ValueType, NameType> & {
+  payload?: TooltipPayloadItem[];
+};
+
+const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
   if (active && payload && payload.length > 0) {
-    const data = payload[0];
-    
+    const item = payload[0];
+
+    const chartData: StudyData = item.payload ?? {
+      name: String(item.name ?? "Unknown"),
+      value: Number(item.value ?? 0),
+    };
+
+    const indicatorColor =
+      chartData.fill || item.color || "#3b82f6";
+
     return (
-      <div className="rounded-lg border border-border bg-popover p-2 shadow-sm">
-        <div className="flex items-center gap-2 mb-1">
-          <div 
-            className="h-2 w-2 rounded-full" 
-            style={{ backgroundColor: data.fill }} 
+      <div className="rounded-xl border border-border/40 bg-background/95 p-3 shadow-2xl backdrop-blur-md min-w-[150px] animate-in fade-in zoom-in duration-200">
+        <div className="flex items-center gap-2 mb-2 border-b border-border/40 pb-1.5">
+          <div
+            className="h-2.5 w-2.5 rounded-full shadow-[0_0_8px_currentColor]"
+            style={{
+              backgroundColor: indicatorColor,
+              color: indicatorColor,
+            }}
           />
-          <span className="text-[10px] uppercase text-muted-foreground font-semibold">
-            {data.name}
+
+          <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+            {chartData.name}
           </span>
         </div>
-        <span className="font-bold text-popover-foreground font-mono text-sm pl-4 block">
-          {data.value} min
-        </span>
+
+        <div className="flex items-baseline gap-1">
+          <span className="font-black text-foreground font-mono text-lg tracking-tighter">
+            {chartData.value}
+          </span>
+
+          <span className="text-[9px] font-black uppercase text-muted-foreground/50">
+            Minutos_Sessão
+          </span>
+        </div>
       </div>
     );
   }
+
   return null;
 };
 
-export function StudyChart({ data }: { data: StudyData[] }) {
-  const isEmpty = data.length === 0 || data.every(d => d.value === 0);
+/* -------------------------------------------------------------------------------------------------
+ * 3. COMPONENTE DO GRÁFICO
+ * -----------------------------------------------------------------------------------------------*/
+
+function StudyChartContent({ data }: StudyChartProps) {
+  const isEmpty = !data || data.length === 0 || data.every((d) => d.value === 0);
 
   if (isEmpty) {
     return (
-      <div className="h-[220px] flex flex-col items-center justify-center text-muted-foreground text-sm bg-muted/20 rounded-lg border border-dashed border-border">
-        <div className="p-3 bg-muted rounded-full mb-2">
-            <BookOpen className="h-5 w-5 opacity-50" />
+      <div className="h-[220px] flex flex-col items-center justify-center bg-muted/5 rounded-[2.5rem] border-2 border-dashed border-border/40">
+        <div className="p-4 bg-background rounded-3xl mb-3 shadow-inner border border-border/10">
+          <BookOpen className="h-6 w-6 text-muted-foreground/30" />
         </div>
-        <p>Sem sessões registradas</p>
+
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">
+          Offline_Data_Null
+        </p>
       </div>
     );
   }
 
+  const colors = [
+    "#3b82f6",
+    "#10b981",
+    "#f59e0b",
+    "#ec4899",
+    "#8b5cf6",
+    "#06b6d4",
+  ];
+
   return (
-    /* CORREÇÃO DO ERRO DE WIDTH/HEIGHT */
-    <div style={{ width: '100%', height: 220, minHeight: 220 }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="50%"
-            innerRadius={60}
-            outerRadius={80}
-            paddingAngle={5}
-            dataKey="value"
-            stroke="hsl(var(--card))"
-            strokeWidth={2}
-          >
-            {data.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-            ))}
-          </Pie>
-          
-          <Tooltip content={<CustomTooltip />} cursor={false} />
-          
-          <Legend 
-            verticalAlign="bottom" 
-            height={36} 
-            iconType="circle"
-            iconSize={8}
-            formatter={(value) => (
-              <span className="text-xs text-muted-foreground ml-1 font-medium">{value}</span>
-            )}
-          />
-        </PieChart>
-      </ResponsiveContainer>
+    <div className="w-full">
+      <div style={{ width: "100%", height: 220 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              innerRadius={70}
+              outerRadius={90}
+              paddingAngle={10}
+              dataKey="value"
+              stroke="transparent"
+              className="outline-none"
+            >
+              {data.map((_, index) => (
+                <Cell
+                  key={`cell-${index}`}
+                  fill={colors[index % colors.length]}
+                  className="hover:opacity-80 transition-opacity cursor-pointer outline-none"
+                />
+              ))}
+            </Pie>
+
+            <Tooltip content={<CustomTooltip />} />
+
+            <Legend
+              verticalAlign="bottom"
+              height={40}
+              iconType="circle"
+              iconSize={6}
+              formatter={(value: string) => (
+                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/70 ml-2">
+                  {value}
+                </span>
+              )}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
+
+/* -------------------------------------------------------------------------------------------------
+ * 4. EXPORT DINÂMICO (SSR SAFE)
+ * -----------------------------------------------------------------------------------------------*/
+
+export const StudyChart = dynamic<StudyChartProps>(
+  () => Promise.resolve(StudyChartContent),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[220px] w-full bg-muted/5 animate-pulse rounded-[2.5rem] border border-border/40 flex items-center justify-center">
+        <div className="flex items-center gap-3">
+          <Activity className="h-4 w-4 text-muted-foreground/20 animate-spin" />
+
+          <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/30">
+            Analysing_Brain_State...
+          </span>
+        </div>
+      </div>
+    ),
+  }
+);

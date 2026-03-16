@@ -21,34 +21,34 @@ export default async function InvestmentsPage() {
         
         {/* --- HEADER DE NAVEGAÇÃO --- */}
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 animate-in fade-in slide-in-from-top-4 duration-700">
-          <div className="flex items-start gap-5">
+          <div className="flex items-center gap-5">
             <Link href="/finance">
               <Button 
                 variant="outline" 
                 size="icon" 
-                className="h-10 w-10 rounded-xl border-border/60 bg-background/50 backdrop-blur-sm hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-all shadow-sm"
+                className="h-12 w-12 rounded-2xl border-border/50 bg-background/50 backdrop-blur-sm hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-all shadow-sm active:scale-95"
               >
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
             
-            <div className="space-y-1">
-              <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-lg text-primary">
+            <div>
+              <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground flex items-center gap-3">
+                <div className="p-2.5 bg-primary/10 rounded-xl text-primary shadow-sm border border-primary/20 hidden sm:block">
                     <LineChart className="h-6 w-6" />
                 </div>
                 Central de Investimentos
               </h1>
-              <p className="text-muted-foreground text-base max-w-lg">
-                Laboratório de estratégia financeira. Analise o mercado e simule o crescimento do seu patrimônio.
+              <p className="text-muted-foreground text-xs sm:text-sm font-bold uppercase tracking-widest mt-1.5">
+                Simule e planeje o crescimento do seu patrimônio
               </p>
             </div>
           </div>
 
-          {/* Badge ou Info Extra (Opcional) */}
-          <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-primary/5 border border-primary/10 rounded-full text-xs font-medium text-primary">
-            <Sparkles className="h-3.5 w-3.5" />
-            <span>Dados de Mercado Atualizados</span>
+          {/* Badge Extra */}
+          <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-primary/5 border border-primary/20 rounded-full text-xs font-black tracking-wider uppercase text-primary shadow-sm">
+            <Sparkles className="h-4 w-4" />
+            <span>Dados de Mercado Ao Vivo</span>
           </div>
         </header>
 

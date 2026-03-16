@@ -4,40 +4,61 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 
 /* -------------------------------------------------------------------------------------------------
- * Textarea — Enterprise / Premium
- * Visual refinado e interatividade aprimorada
- * Cores dinâmicas do tema, feedback visual e estrutura clara
+ * Textarea — Life OS Enterprise Edition
+ * Foco em: Respiro visual (Padding), Tipografia e Variantes de Contexto.
  * ------------------------------------------------------------------------------------------------- */
 
-function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
-  return (
-    <textarea
-      data-slot="textarea"
-      className={cn(
-        // Base styles
-        "border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30",
+type TextareaProps = React.ComponentProps<"textarea"> & {
+  variant?: "default" | "ghost" | "paper"
+};
 
-        // Container styles
-        "flex w-full min-h-16 rounded-md border bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none md:text-sm",
+const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
+  ({ className, variant = "default", ...props }, ref) => {
+    return (
+      <textarea
+        ref={ref}
+        data-slot="textarea"
+        className={cn(
+          // --- Base: Comportamento e Respiro Padrão ---
+          "flex w-full min-h-[140px] outline-none resize-none transition-all duration-300",
+          "text-base md:text-sm leading-relaxed tracking-tight text-foreground/90",
+          "selection:bg-primary/20",
+          
+          // --- Variantes com Calibração de Padding ---
+          
+          // 1. Default: Padding equilibrado para inputs de formulário
+          variant === "default" && [
+            "px-4 py-3.5 rounded-xl border border-input bg-background shadow-sm",
+            "hover:border-primary/30 focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:border-primary"
+          ],
 
-        // States and interactivity
-        "focus-visible:ring-[3px] focus-visible:outline-none",
-        "disabled:cursor-not-allowed disabled:opacity-50",
+          // 2. Ghost: Padding lateral leve para não colar na borda do Modal
+          variant === "ghost" && [
+            "px-2 py-2 bg-transparent border-none shadow-none",
+            "placeholder:text-muted-foreground/30 focus-visible:ring-0"
+          ],
 
-        // Hover and focus effects
-        "hover:ring-2 hover:ring-primary/30 focus-visible:ring-primary/30 focus-visible:ring-2 focus-visible:ring-offset-2",
-        
-        // Responsive sizing
-        "md:text-sm",
+          // 3. Paper: Padding generoso (estilo escrita de notas longas)
+          variant === "paper" && [
+            "px-7 py-7 rounded-[2rem] border-none bg-muted/30 shadow-inner",
+            "focus-visible:bg-muted/50"
+          ],
 
-        // Dynamic styles based on theme and invalid states
-        "dark:bg-input/30 dark:focus-visible:ring-primary/30 dark:focus-visible:ring-offset-dark",
+          // --- Estados Globais ---
+          "disabled:cursor-not-allowed disabled:opacity-50",
+          "aria-invalid:border-destructive aria-invalid:ring-destructive/20",
 
-        className
-      )}
-      {...props}
-    />
-  )
-}
+          // --- Scrollbar Premium (Invisível, aparece no hover) ---
+          "scrollbar-none hover:scrollbar-thin scrollbar-thumb-muted-foreground/10 scrollbar-track-transparent",
+          
+          className
+        )}
+        {...props}
+      />
+    )
+  }
+)
+
+Textarea.displayName = "Textarea"
 
 export { Textarea }

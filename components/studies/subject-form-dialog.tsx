@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { createSubject, updateSubject } from "@/app/(dashboard)/studies/actions";
 
 import {
@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 
 import { Button } from "@/components/ui/button";
@@ -18,13 +19,16 @@ import { Label } from "@/components/ui/label";
 import {
   Target,
   Gauge,
-  Hash,
   Save,
   Loader2,
   FolderTree,
+  Hash as HashIcon,
+  Palette,
+  Check
 } from "lucide-react";
 
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 import {
   Select,
@@ -34,10 +38,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-/* -------------------------------------------------------------------------- */
-/* TYPES                                                                      */
-/* -------------------------------------------------------------------------- */
-
 interface Subject {
   id: string;
   title: string;
@@ -46,13 +46,14 @@ interface Subject {
   goalMinutes: number;
   icon?: string | null;
   parentId?: string | null;
+  color?: string | null;
 }
 
 interface SubjectFormDialogProps {
   open: boolean;
   onClose: () => void;
   currentSubject?: Subject | null;
-  potentialParents?: Subject[]; 
+  potentialParents?: Subject[];
 }
 
 interface ActionResult {
@@ -60,268 +61,281 @@ interface ActionResult {
   message?: string;
 }
 
-/* -------------------------------------------------------------------------- */
-/* CONSTANTS                                                                  */
-/* -------------------------------------------------------------------------- */
-
 const DIFFICULTY_OPTIONS = [
-  { value: "1", label: "1 - Muito Fácil" },
+  { value: "1", label: "1 - Iniciante" },
   { value: "2", label: "2 - Fácil" },
-  { value: "3", label: "3 - Padrão" },
+  { value: "3", label: "3 - Intermediário" },
   { value: "4", label: "4 - Difícil" },
   { value: "5", label: "5 - Expert" },
 ] as const;
 
+// PALETA DE CORES VIBRANTES PARA MATÉRIAS
+const SUBJECT_COLORS = [
+  { hex: "#3b82f6", name: "Azul" },
+  { hex: "#8b5cf6", name: "Roxo" },
+  { hex: "#ec4899", name: "Rosa" },
+  { hex: "#ef4444", name: "Vermelho" },
+  { hex: "#f59e0b", name: "Laranja" },
+  { hex: "#10b981", name: "Esmeralda" },
+  { hex: "#14b8a6", name: "Teal" },
+  { hex: "#64748b", name: "Ardósia" },
+];
+
 const minutesToHours = (minutes: number) => minutes / 60;
 const hoursToMinutes = (hours: number) => Math.round(hours * 60);
-
-/* -------------------------------------------------------------------------- */
-/* COMPONENT                                                                  */
-/* -------------------------------------------------------------------------- */
 
 export function SubjectFormDialog({
   open,
   onClose,
   currentSubject,
-  potentialParents = [], 
+  potentialParents = [],
 }: SubjectFormDialogProps) {
   const isEditing = Boolean(currentSubject);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  /* ------------------------------ FORM STATE ------------------------------ */
+  // Form state
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
   const [difficulty, setDifficulty] = useState("3");
   const [icon, setIcon] = useState("");
-  const [parentId, setParentId] = useState<string>("root"); 
+  const [parentId, setParentId] = useState<string>("root");
+  const [goalHours, setGoalHours] = useState<number>(60);
+  const [color, setColor] = useState<string>(SUBJECT_COLORS[0].hex);
 
-  const [goalMinutes, setGoalMinutes] = useState("3600");
-  const [goalHours, setGoalHours] = useState(60);
-
-  /* ------------------------------------------------------------------------ */
-  /* SYNC PROPS → STATE                                                       */
-  /* ------------------------------------------------------------------------ */
+  // UI state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string | null>>({});
 
   useEffect(() => {
     if (!open) return;
 
     if (currentSubject) {
-      setTitle(currentSubject.title);
-      setCategory(currentSubject.category || "");
-      setDifficulty(String(currentSubject.difficulty));
-      setGoalMinutes(String(currentSubject.goalMinutes));
-      setGoalHours(minutesToHours(currentSubject.goalMinutes));
+      setTitle(currentSubject.title ?? "");
+      setCategory(currentSubject.category ?? "");
+      setDifficulty(String(currentSubject.difficulty ?? 3));
       setIcon(currentSubject.icon ?? "");
-      setParentId(currentSubject.parentId ?? "root");
+      setParentId(currentSubject.parentId ? currentSubject.parentId : "root");
+      setGoalHours(Number.isFinite(currentSubject.goalMinutes) ? minutesToHours(currentSubject.goalMinutes) : 60);
+      setColor(currentSubject.color ?? SUBJECT_COLORS[Math.floor(Math.random() * SUBJECT_COLORS.length)].hex);
     } else {
-      // Reset para criação
       setTitle("");
       setCategory("");
       setDifficulty("3");
-      setGoalMinutes("3600");
-      setGoalHours(60);
       setIcon("");
       setParentId("root");
+      setGoalHours(60);
+      setColor(SUBJECT_COLORS[Math.floor(Math.random() * SUBJECT_COLORS.length)].hex);
     }
+
+    setErrors({});
   }, [open, currentSubject]);
 
-  /* ------------------------------------------------------------------------ */
-  /* HANDLERS                                                                 */
-  /* ------------------------------------------------------------------------ */
+  const handleClose = useCallback(() => {
+    setErrors({});
+    onClose();
+  }, [onClose]);
+
+  const validate = useCallback(() => {
+    const e: Record<string, string | null> = {};
+    if (!title.trim()) e.title = "O título é obrigatório.";
+    if (!Number.isFinite(goalHours) || goalHours <= 0) e.goalHours = "A meta deve ser maior que 0.";
+    return e;
+  }, [title, goalHours]);
 
   const handleGoalHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const hours = Number(e.target.value); // Removemos o || 0 para permitir digitar e apagar
-    const validHours = isNaN(hours) ? 0 : hours;
-    
-    // Permitir até 10000 horas
-    const clamped = Math.min(Math.max(validHours, 0), 10000); 
-
+    const val = e.target.value;
+    if (val === "") {
+      setGoalHours(0);
+      return;
+    }
+    const parsed = Number(val);
+    if (Number.isNaN(parsed)) return;
+    const clamped = Math.min(Math.max(parsed, 0), 10000);
     setGoalHours(clamped);
-    if (clamped > 0) setGoalMinutes(String(hoursToMinutes(clamped)));
   };
 
   const handleSubmit = useCallback(
-    async (e: React.FormEvent<HTMLFormElement>) => {
-      e.preventDefault();
+    async (ev: React.FormEvent<HTMLFormElement>) => {
+      ev.preventDefault();
+      setErrors({});
+      const e = validate();
+      if (Object.keys(e).length > 0) {
+        setErrors(e);
+        return;
+      }
+
       setIsSubmitting(true);
 
-      const parsedGoalMinutes = Number(goalMinutes);
-
-      // Validação básica
-      if (!title.trim()) {
-        toast.error("O nome do assunto é obrigatório.");
-        setIsSubmitting(false);
-        return;
-      }
-
-      if (Number.isNaN(parsedGoalMinutes) || parsedGoalMinutes <= 0) {
-        toast.error("Defina uma meta de horas maior que zero.");
-        setIsSubmitting(false);
-        return;
-      }
+      const parsedGoalMinutes = hoursToMinutes(goalHours);
 
       const formData = new FormData();
       formData.set("title", title.trim());
-      formData.set("category", category.trim()); 
-      formData.set("difficulty", difficulty);
+      formData.set("category", (category || "").trim());
+      formData.set("difficulty", String(Number(difficulty) || 3));
       formData.set("goalMinutes", String(parsedGoalMinutes));
-      formData.set("icon", icon.trim());
-      
-      // ✅ CORREÇÃO CRÍTICA:
-      // O Zod schema aceita UUID ou string vazia "". 
-      // Se não enviarmos nada, o formData retorna null, que o Zod rejeita.
-      if (parentId && parentId !== "root") {
-        formData.set("parentId", parentId);
-      } else {
-        formData.set("parentId", ""); // Envia string vazia para indicar "sem pai"
-      }
+      formData.set("icon", (icon || "").trim());
+      formData.set("color", color); 
+      formData.set("parentId", parentId === "root" ? "" : parentId ?? "");
 
       if (isEditing && currentSubject) {
         formData.set("id", currentSubject.id);
       }
 
       const action = isEditing ? updateSubject : createSubject;
-      const toastId = toast.loading(
-        isEditing ? `Atualizando ${title}...` : "Criando tópico..."
-      );
+      const toastId = toast.loading(isEditing ? `Atualizando "${title}"...` : "Criando tópico...");
 
       try {
-        const result: ActionResult = await action(formData);
+        const result = (await action(formData)) as ActionResult;
 
-        if (result.success) {
-          toast.success(result.message ?? "Salvo com sucesso!", {
-            id: toastId,
-          });
-          onClose();
+        if (result?.success) {
+          toast.success(result.message ?? (isEditing ? "Atualizado!" : "Criado!"), { id: toastId });
+          handleClose();
         } else {
-          toast.error(result.message ?? "Erro ao salvar.", {
-            id: toastId,
-          });
+          toast.error(result?.message ?? "Erro ao salvar.", { id: toastId });
         }
       } catch (err) {
-        console.error(err);
-        toast.error("Erro de conexão com o servidor.", { id: toastId });
+        toast.error("Erro de conexão.", { id: toastId });
       } finally {
         setIsSubmitting(false);
       }
     },
-    [
-      title,
-      category,
-      difficulty,
-      goalMinutes,
-      icon,
-      parentId,
-      isEditing,
-      currentSubject,
-      onClose,
-    ]
+    [title, category, difficulty, goalHours, icon, color, parentId, isEditing, currentSubject, validate, handleClose]
   );
 
-  // Filtra para evitar que um tópico seja pai dele mesmo
-  const availableParents = potentialParents.filter(
-    (p) => p.id !== currentSubject?.id
-  );
-
-  /* ------------------------------------------------------------------------ */
-  /* JSX                                                                      */
-  /* ------------------------------------------------------------------------ */
+  const availableParents = potentialParents.filter((p) => p.id !== currentSubject?.id);
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md bg-card border-border">
-        <DialogHeader>
-          <DialogTitle className="text-primary flex items-center gap-2">
-            {isEditing ? <div className="p-1 bg-primary/10 rounded"><Hash className="w-4 h-4"/></div> : <div className="p-1 bg-primary/10 rounded"><FolderTree className="w-4 h-4"/></div>}
-            {isEditing
-              ? `Editar: ${title}`
-              : "Novo Tópico de Estudo"}
-          </DialogTitle>
-        </DialogHeader>
+    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
+      <DialogContent className="sm:max-w-md bg-background border-border/60 shadow-2xl p-0 overflow-hidden rounded-2xl">
+        
+        {/* HEADER COM COR DINÂMICA */}
+        <div className="p-6 pb-4 border-b border-border/40" style={{ backgroundColor: `${color}15` }}>
+            <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl font-bold" style={{ color: color }}>
+                <div className="p-2 rounded-xl bg-background shadow-sm border border-border/50">
+                    {isEditing ? <HashIcon className="w-5 h-5" /> : <FolderTree className="w-5 h-5" />}
+                </div>
+                {isEditing ? `Editar Tópico` : "Novo Tópico"}
+            </DialogTitle>
+            <DialogDescription className="text-foreground/60">
+                {isEditing ? "Ajuste os detalhes desta matéria." : "Crie uma nova matéria raiz ou subtópico de estudos."}
+            </DialogDescription>
+            </DialogHeader>
+        </div>
 
-        <form onSubmit={handleSubmit} className="mt-2 space-y-5">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6" noValidate>
           
-          {/* TITLE & PARENT (Hierarquia) */}
-          <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="subject-title" className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              Título da Matéria <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              id="subject-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Ex: React Query, Cálculo I, Inglês..."
+              autoFocus
+              className={cn("h-11 text-base bg-muted/20 focus-visible:ring-1", errors.title && "border-destructive focus-visible:ring-destructive")}
+            />
+            {errors.title && <p className="text-xs text-destructive mt-1 font-medium">{errors.title}</p>}
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase text-muted-foreground">
-                  Título do Tópico <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Ex: React Query, Cálculo I, Inglês..."
-                  autoFocus
-                  required
-                />
+              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <FolderTree className="h-3.5 w-3.5" /> Pertence a...
+              </Label>
+              <Select value={parentId} onValueChange={(v) => setParentId(v)}>
+                <SelectTrigger className="bg-muted/20 h-10">
+                  <SelectValue placeholder="-- Raiz principal --" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="root" className="font-semibold text-primary">-- Raiz principal --</SelectItem>
+                  {availableParents.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.icon ? `${p.icon} ` : ""}{p.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Label className="flex items-center gap-1 text-xs font-semibold uppercase text-muted-foreground">
-                      <FolderTree className="h-3 w-3" />
-                      Pertence a...
-                    </Label>
-                    <Select value={parentId} onValueChange={setParentId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione um pai" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="root">-- Raiz (Sem pai) --</SelectItem>
-                        {availableParents.map((parent) => (
-                          <SelectItem key={parent.id} value={parent.id}>
-                            {parent.icon ? `${parent.icon} ` : ""}{parent.title}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                </div>
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <HashIcon className="h-3.5 w-3.5" /> Categoria
+              </Label>
+              <Input 
+                value={category} 
+                onChange={(e) => setCategory(e.target.value)} 
+                placeholder="Ex: Tecnologia" 
+                className="bg-muted/20 h-10"
+              />
+            </div>
+          </div>
 
-                <div className="space-y-2">
-                    <Label className="text-xs font-semibold uppercase text-muted-foreground">
-                      Categoria (Tag)
-                    </Label>
-                    <Input
-                      value={category}
-                      onChange={(e) => setCategory(e.target.value)}
-                      placeholder="Ex: Tecnologia"
-                    />
+          {/* SELETOR DE CORES E EMOJI */}
+          <div className="grid grid-cols-5 gap-4">
+            <div className="col-span-1 space-y-2">
+                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block text-center">Ícone</Label>
+                <Input
+                    value={icon}
+                    onChange={(e) => setIcon(e.target.value)}
+                    placeholder="⚛️"
+                    className="h-10 text-center text-xl bg-muted/20 p-0"
+                />
+            </div>
+            
+            <div className="col-span-4 space-y-2">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Palette className="h-3.5 w-3.5" /> Cor da Matéria
+                </Label>
+                <div className="flex flex-wrap gap-2 pt-1">
+                    {SUBJECT_COLORS.map((c) => (
+                        <button
+                            key={c.hex}
+                            type="button"
+                            onClick={() => setColor(c.hex)}
+                            className={cn(
+                                "h-8 w-8 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-sm",
+                                // 🟢 CORREÇÃO: Usando outline nativo em vez de ring do tailwind
+                                color === c.hex ? "outline outline-2 outline-offset-2 scale-110" : "opacity-80 hover:opacity-100"
+                            )}
+                            style={{ backgroundColor: c.hex, outlineColor: c.hex }}
+                            title={c.name}
+                        >
+                            {color === c.hex && <Check className="h-4 w-4 text-white drop-shadow-md" />}
+                        </button>
+                    ))}
                 </div>
             </div>
           </div>
 
           <div className="h-px bg-border/50" />
 
-          {/* META & DIFICULDADE */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label className="flex items-center gap-1 text-xs font-semibold uppercase text-muted-foreground">
-                <Target className="h-3 w-3" />
-                Meta (Horas) <span className="text-red-500">*</span>
+              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                <span className="flex items-center gap-1.5"><Target className="h-3.5 w-3.5" /> Meta Total</span>
+                <span className="text-[10px] lowercase text-muted-foreground font-normal">{hoursToMinutes(goalHours)} min</span>
               </Label>
               <div className="relative">
-                  <Input
-                    type="number"
-                    min={1}
-                    value={goalHours}
-                    onChange={handleGoalHoursChange}
-                    className="font-bold text-primary pr-8"
-                    required
-                  />
-                  <span className="absolute right-3 top-2.5 text-xs text-muted-foreground font-bold">h</span>
+                <Input
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={goalHours}
+                  onChange={handleGoalHoursChange}
+                  className={cn("font-bold text-base pr-8 bg-muted/20 h-10", errors.goalHours && "border-destructive")}
+                />
+                <span className="absolute right-3 top-2.5 text-sm text-muted-foreground font-bold">h</span>
               </div>
-              <p className="text-[10px] text-muted-foreground text-right">
-                {goalMinutes} min totais
-              </p>
             </div>
 
             <div className="space-y-2">
-              <Label className="flex items-center gap-1 text-xs font-semibold uppercase text-muted-foreground">
-                <Gauge className="h-3 w-3" />
-                Dificuldade
+              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <Gauge className="h-3.5 w-3.5" /> Dificuldade
               </Label>
               <Select value={difficulty} onValueChange={setDifficulty}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-muted/20 h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -335,40 +349,18 @@ export function SubjectFormDialog({
             </div>
           </div>
 
-          {/* ICON */}
-          <div className="space-y-2">
-            <Label className="flex items-center gap-1 text-xs font-semibold uppercase text-muted-foreground">
-              <Hash className="h-3 w-3" />
-              Ícone (Emoji)
-            </Label>
-            <div className="flex gap-2">
-                <Input
-                  value={icon}
-                  onChange={(e) => setIcon(e.target.value)}
-                  placeholder="⚛️"
-                  className="flex-1"
-                />
-                <div className="w-10 h-10 flex items-center justify-center bg-secondary rounded border text-lg shrink-0">
-                    {icon || "?"}
-                </div>
-            </div>
-          </div>
-
-          <DialogFooter className="pt-2">
-            <Button type="button" variant="ghost" onClick={onClose}>
+          <DialogFooter className="pt-4 mt-2">
+            <Button type="button" variant="ghost" onClick={handleClose} disabled={isSubmitting} className="hover:bg-muted/50">
               Cancelar
             </Button>
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="shadow-md shadow-primary/20 hover:bg-primary/90 min-w-[140px]"
+              className="shadow-lg min-w-[140px] text-white"
+              style={{ backgroundColor: color }}
             >
-              {isSubmitting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="mr-2 h-4 w-4" />
-              )}
-              {isEditing ? "Salvar" : "Criar Tópico"}
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+              {isEditing ? "Salvar Alterações" : "Criar Tópico"}
             </Button>
           </DialogFooter>
         </form>

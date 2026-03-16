@@ -744,33 +744,61 @@ export async function verifyMasterPassword(password: string) {
 // 8. INTEGRAÇÕES (API KEYS)
 // ============================================================================
 export async function updateApiKeys(formData: FormData) {
-    const tmdbApiKey = formData.get("tmdbApiKey") as string;
-    const rawgApiKey = formData.get("rawgApiKey") as string;
-    const pluggyClientId = formData.get("pluggyClientId") as string;
-    const pluggyClientSecret = formData.get("pluggyClientSecret") as string;
+    try {
+        // 1. Captura os dados do formulário
+        // Os nomes aqui devem ser IGUAIS ao atributo 'name' dos seus inputs
+        const tmdbApiKey = formData.get("tmdbApiKey") as string;
+        const rawgApiKey = formData.get("rawgApiKey") as string;
+        const pluggyClientId = formData.get("pluggyClientId") as string;
+        const pluggySecret = formData.get("pluggySecret") as string;
+        
+        // Chaves de IA (caso queira salvar no mesmo form)
+        const openaiKey = formData.get("openaiKey") as string;
+        const groqKey = formData.get("groqKey") as string;
+        const googleKey = formData.get("googleKey") as string;
 
-    const existingSettings = await prisma.settings.findFirst();
+        // 2. Busca as configurações atuais
+        const existingSettings = await prisma.settings.findFirst();
 
-    const finalData = {
-        tmdbApiKey: tmdbApiKey || null,
-        rawgApiKey: rawgApiKey || null,
-        pluggyClientId: pluggyClientId || null,
-        pluggyClientSecret: pluggyClientSecret || null,
+        // 3. Monta o objeto de dados (limpando espaços em branco)
+        const finalData = {
+            tmdbApiKey: tmdbApiKey?.trim() || null,
+            rawgApiKey: rawgApiKey?.trim() || null,
+            pluggyClientId: pluggyClientId?.trim() || null,
+            pluggySecret: pluggySecret?.trim() || null,
+            openaiKey: openaiKey?.trim() || null,
+            groqKey: groqKey?.trim() || null,
+            googleKey: googleKey?.trim() || null,
+        }
+
+        if (existingSettings) {
+            // Atualiza se já existir
+            await prisma.settings.update({
+                where: { id: existingSettings.id },
+                data: finalData
+            });
+        } else {
+            // Cria do zero se não existir (precisa do usuário logado)
+            const user = await prisma.user.findFirst();
+            if (!user) throw new Error("Usuário não encontrado.");
+
+            await prisma.settings.create({
+                data: {
+                    ...finalData,
+                    userId: user.id,
+                    theme: "system",
+                    accentColor: "zinc"
+                }
+            });
+        }
+
+        revalidatePath("/settings");
+        return { success: true, message: "Integrações atualizadas com sucesso!" };
+
+    } catch (error) {
+        console.error("Erro ao salvar integrações:", error);
+        return { success: false, message: "Erro ao salvar no banco de dados." };
     }
-
-    if (existingSettings) {
-        await prisma.settings.update({
-            where: { id: existingSettings.id },
-            data: finalData
-        });
-    } else {
-        await prisma.settings.create({
-            data: finalData
-        });
-    }
-
-    revalidatePath("/settings");
-    return { success: true, message: "Chaves de API salvas com sucesso!" };
 }
 
 // ============================================================================

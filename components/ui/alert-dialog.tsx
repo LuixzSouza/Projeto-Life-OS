@@ -52,7 +52,7 @@ function AlertDialogPortal(
 }
 
 /* -------------------------------------------------------------------------------------------------
- * Overlay
+ * Overlay (Glassmorphism Premium)
  * -----------------------------------------------------------------------------------------------*/
 
 function AlertDialogOverlay({
@@ -63,10 +63,11 @@ function AlertDialogOverlay({
     <AlertDialogPrimitive.Overlay
       data-slot="alert-dialog-overlay"
       className={cn(
-        "fixed inset-0 z-50",
-        "bg-black/50 backdrop-blur-[2px]",
-        "data-[state=open]:animate-in data-[state=open]:fade-in-0",
-        "data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
+        // Z-INDEX 100 para a camada de sombra/desfoque
+        "fixed inset-0 z-[100]", 
+        "bg-background/80 backdrop-blur-md", 
+        "data-[state=open]:animate-in data-[state=closed]:animate-out",
+        "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         className
       )}
       {...props}
@@ -75,7 +76,7 @@ function AlertDialogOverlay({
 }
 
 /* -------------------------------------------------------------------------------------------------
- * Content
+ * Content (Centralização Estrita e Borda Arredondada)
  * -----------------------------------------------------------------------------------------------*/
 
 function AlertDialogContent({
@@ -88,23 +89,24 @@ function AlertDialogContent({
       <AlertDialogPrimitive.Content
         data-slot="alert-dialog-content"
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 w-full max-w-[calc(100%-2rem)]",
-          "-translate-x-1/2 -translate-y-1/2",
-          "rounded-xl border bg-background shadow-xl",
-          "grid gap-5 p-6 sm:max-w-lg",
-          "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
-          "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
-          "relative overflow-hidden",
+          // Z-INDEX 110 para a caixa do modal (sempre MAIOR que o overlay)
+          "fixed left-[50%] top-[50%] z-[110] translate-x-[-50%] translate-y-[-50%]",
+          "grid w-[95%] max-w-[450px]", 
+          "rounded-[2.5rem] border border-border/40 bg-background shadow-2xl", 
+          "p-0 overflow-hidden flex flex-col",
+          "data-[state=open]:animate-in data-[state=closed]:animate-out",
+          "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+          "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+          "duration-300",
           className
         )}
         {...props}
       >
-        {/* Accent gradient */}
+        {/* Efeito Glow / Acento Superior Opcional */}
         <div
           aria-hidden
-          className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,var(--primary),var(--primary)/40)]"
+          className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-primary/50 via-primary to-primary/50 opacity-20"
         />
-
         {props.children}
       </AlertDialogPrimitive.Content>
     </AlertDialogPortal>
@@ -123,8 +125,7 @@ function AlertDialogHeader({
     <div
       data-slot="alert-dialog-header"
       className={cn(
-        "flex flex-col gap-2",
-        "text-center sm:text-left",
+        "flex flex-col gap-3 px-8 pt-8 pb-6 text-center sm:text-center items-center bg-muted/5 border-b border-border/40",
         className
       )}
       {...props}
@@ -144,8 +145,7 @@ function AlertDialogFooter({
     <div
       data-slot="alert-dialog-footer"
       className={cn(
-        "flex flex-col-reverse gap-2 pt-2",
-        "sm:flex-row sm:justify-end sm:gap-3",
+        "flex flex-col-reverse sm:flex-row sm:justify-center gap-3 px-8 py-6 bg-background",
         className
       )}
       {...props}
@@ -154,7 +154,7 @@ function AlertDialogFooter({
 }
 
 /* -------------------------------------------------------------------------------------------------
- * Title
+ * Title (Tipografia Tática)
  * -----------------------------------------------------------------------------------------------*/
 
 function AlertDialogTitle({
@@ -165,8 +165,7 @@ function AlertDialogTitle({
     <AlertDialogPrimitive.Title
       data-slot="alert-dialog-title"
       className={cn(
-        "text-lg font-semibold leading-tight",
-        "text-foreground",
+        "text-2xl font-black uppercase tracking-tighter text-foreground leading-none",
         className
       )}
       {...props}
@@ -186,8 +185,7 @@ function AlertDialogDescription({
     <AlertDialogPrimitive.Description
       data-slot="alert-dialog-description"
       className={cn(
-        "text-sm leading-relaxed",
-        "text-muted-foreground",
+        "text-xs font-medium leading-relaxed text-muted-foreground max-w-[90%] mx-auto mt-2",
         className
       )}
       {...props}
@@ -196,7 +194,7 @@ function AlertDialogDescription({
 }
 
 /* -------------------------------------------------------------------------------------------------
- * Actions
+ * Actions (Botões com alturas e tracking consistentes)
  * -----------------------------------------------------------------------------------------------*/
 
 function AlertDialogAction({
@@ -207,7 +205,8 @@ function AlertDialogAction({
     <AlertDialogPrimitive.Action
       className={cn(
         buttonVariants({ variant: "default" }),
-        "shadow-sm",
+        "h-12 w-full sm:w-auto px-8 rounded-xl bg-foreground text-background hover:bg-primary hover:text-white shadow-lg",
+        "font-black uppercase tracking-widest text-[10px] transition-all active:scale-95",
         className
       )}
       {...props}
@@ -223,6 +222,8 @@ function AlertDialogCancel({
     <AlertDialogPrimitive.Cancel
       className={cn(
         buttonVariants({ variant: "outline" }),
+        "h-12 w-full sm:w-auto px-8 rounded-xl border-border/60 hover:bg-muted text-muted-foreground hover:text-foreground",
+        "font-black uppercase tracking-widest text-[10px] transition-all mt-0", 
         className
       )}
       {...props}

@@ -10,7 +10,6 @@ import { toast } from "sonner";
 import { 
     Loader2, 
     Image as ImageIcon, 
-    Link as LinkIcon, 
     DollarSign, 
     Tag, 
     PiggyBank,
@@ -21,7 +20,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Interface compatível com o banco
 export interface WishlistData {
     id?: string;
     name: string;
@@ -39,9 +37,6 @@ export function WishlistForm({ item, onClose }: { item?: WishlistData, onClose: 
     const [saved, setSaved] = useState(item?.saved || 0);
     const [priority, setPriority] = useState(item?.priority || "MEDIUM");
 
-    // Cálculo visual de progresso
-    const progress = price > 0 ? Math.min((saved / price) * 100, 100) : 0;
-
     const handleSubmit = async (formData: FormData) => {
         setIsLoading(true);
         formData.set("priority", priority);
@@ -49,7 +44,7 @@ export function WishlistForm({ item, onClose }: { item?: WishlistData, onClose: 
         try {
             if (item) {
                 await updateWishlist(formData);
-                toast.success("Meta atualizada!");
+                toast.success("Meta atualizada com sucesso!");
             } else {
                 await createWishlist(formData);
                 toast.success("Nova meta criada! 🚀");
@@ -66,128 +61,110 @@ export function WishlistForm({ item, onClose }: { item?: WishlistData, onClose: 
         <form action={handleSubmit} className="space-y-6">
             {item && <input type="hidden" name="id" value={item.id} />}
             
-            <div className="flex flex-col sm:flex-row gap-6">
+            <div className="flex flex-col md:flex-row gap-6 md:gap-8">
                 
-                {/* COLUNA 1: PREVIEW DA IMAGEM */}
-                <div className="w-full sm:w-[180px] flex flex-col gap-3 shrink-0">
-                    <div className="aspect-square w-full rounded-2xl border-2 border-dashed border-border bg-muted/30 flex items-center justify-center overflow-hidden relative group transition-colors hover:border-primary/50">
+                {/* COLUNA 1: PREVIEW DA IMAGEM (Fixa para não espremer) */}
+                <div className="w-full md:w-[240px] flex flex-col gap-4 shrink-0 mx-auto">
+                    <div className="aspect-square w-full md:max-w-[240px] max-w-[200px] mx-auto rounded-[2rem] border border-border/50 bg-muted/10 flex items-center justify-center overflow-hidden relative group transition-all hover:bg-muted/20 shadow-sm">
                         {previewUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" onError={() => setPreviewUrl("")} />
+                            <img src={previewUrl} alt="Preview" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" onError={() => setPreviewUrl("")} />
                         ) : (
-                            <div className="flex flex-col items-center text-muted-foreground gap-2">
-                                <ImageIcon className="h-8 w-8 opacity-50" />
-                                <span className="text-[10px] text-center px-2 font-medium">Link da Imagem</span>
+                            <div className="flex flex-col items-center text-muted-foreground/50 gap-3">
+                                <ImageIcon className="h-12 w-12 opacity-50" />
+                                <span className="text-[10px] uppercase font-black tracking-widest text-center px-4">URL da Imagem</span>
                             </div>
                         )}
                     </div>
                     
-                    <div className="relative">
-                        <LinkIcon className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                        <Input 
-                            name="imageUrl" 
-                            value={previewUrl} 
-                            onChange={(e) => setPreviewUrl(e.target.value)} 
-                            placeholder="URL da imagem..." 
-                            className="h-8 pl-8 text-xs bg-muted/30 border-border"
-                        />
+                    <div className="space-y-2 w-full md:max-w-[240px] max-w-[200px] mx-auto">
+                        <div className="relative">
+                            <ImageIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
+                            <Input 
+                                name="imageUrl" 
+                                value={previewUrl} 
+                                onChange={(e) => setPreviewUrl(e.target.value)} 
+                                placeholder="Cole o link da foto..." 
+                                className="h-12 pl-10 text-sm bg-muted/20 border-border/50 rounded-xl focus-visible:ring-primary/30 font-medium"
+                            />
+                        </div>
                     </div>
                 </div>
 
-                {/* COLUNA 2: DADOS DO PRODUTO */}
-                <div className="flex-1 space-y-5">
+                {/* COLUNA 2: DADOS DO PRODUTO (Flexível) */}
+                <div className="flex-1 space-y-5 min-w-0">
                     
                     {/* Nome */}
                     <div className="space-y-2">
-                        <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                            <Tag className="h-3.5 w-3.5" /> Nome do Item
-                        </Label>
-                        <Input 
-                            name="name" 
-                            defaultValue={item?.name} 
-                            placeholder="Ex: MacBook Pro M3, Viagem..." 
-                            required 
-                            autoFocus 
-                            className="font-semibold h-10 border-border bg-background focus-visible:ring-primary" 
-                        />
+                        <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">O que você deseja conquistar? *</Label>
+                        <div className="relative">
+                            <Tag className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
+                            <Input 
+                                name="name" 
+                                defaultValue={item?.name} 
+                                placeholder="Ex: MacBook Pro M3, Viagem para Paris..." 
+                                required 
+                                autoFocus={!item}
+                                className="pl-11 h-12 rounded-xl bg-muted/20 font-bold text-base border-border/50 focus-visible:ring-primary/30" 
+                            />
+                        </div>
                     </div>
 
                     {/* Valores */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Valor Total</Label>
+                            <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Valor Total (R$) *</Label>
                             <div className="relative group">
-                                <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                                <DollarSign className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50 group-focus-within:text-primary transition-colors" />
                                 <Input 
                                     name="price" 
                                     type="number" 
                                     step="0.01" 
-                                    value={price} 
+                                    value={price || ""} 
                                     onChange={(e) => setPrice(Number(e.target.value))}
                                     required 
-                                    className="pl-9 font-mono bg-muted/30 border-border"
+                                    className="h-12 pl-10 font-mono text-lg font-bold bg-muted/20 border-border/50 rounded-xl focus-visible:ring-primary/30"
                                     placeholder="0.00"
                                 />
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Já Guardado</Label>
+                            <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Já Guardado (R$)</Label>
                             <div className="relative group">
-                                <PiggyBank className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground group-focus-within:text-emerald-500 transition-colors" />
+                                <PiggyBank className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500/50 group-focus-within:text-emerald-500 transition-colors" />
                                 <Input 
                                     name="saved" 
                                     type="number" 
                                     step="0.01" 
-                                    value={saved}
+                                    value={saved || ""}
                                     onChange={(e) => setSaved(Number(e.target.value))}
-                                    className="pl-9 font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 border-emerald-500/20 focus-visible:ring-emerald-500"
+                                    className="h-12 pl-10 font-mono text-lg font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 border-emerald-500/20 rounded-xl focus-visible:ring-emerald-500/30"
                                     placeholder="0.00"
                                 />
                             </div>
                         </div>
                     </div>
 
-                    {/* Barra de Progresso */}
-                    <div className="space-y-1.5 bg-muted/30 p-3 rounded-lg border border-border">
-                        <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                            <span>Progresso</span>
-                            <span>{Math.round(progress)}%</span>
-                        </div>
-                        <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                             <div 
-                                className={cn("h-full transition-all duration-500", progress >= 100 ? 'bg-emerald-500' : 'bg-primary')} 
-                                style={{ width: `${progress}%` }} 
-                             />
-                        </div>
-                        <p className="text-[10px] text-muted-foreground text-right pt-0.5 font-mono">
-                            Faltam R$ {Math.max(0, price - saved).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </p>
-                    </div>
-
                     {/* Prioridade */}
-                    <div className="space-y-2">
-                        <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Prioridade</Label>
-                        <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-2 pt-1">
+                        <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Qual o grau de urgência?</Label>
+                        <div className="grid grid-cols-3 gap-3">
                             <button
                                 type="button"
                                 onClick={() => setPriority("HIGH")}
                                 className={cn(
-                                    "flex flex-col items-center justify-center gap-1 p-2 rounded-lg border text-xs font-medium transition-all",
-                                    priority === "HIGH" 
-                                        ? "bg-red-500/10 border-red-500/50 text-red-600 ring-1 ring-red-500" 
-                                        : "bg-background border-border text-muted-foreground hover:bg-muted"
+                                    "flex flex-col items-center justify-center gap-1 h-14 rounded-xl border text-xs font-bold transition-all active:scale-95",
+                                    priority === "HIGH" ? "bg-rose-500/10 border-rose-500/30 text-rose-600 shadow-sm" : "bg-muted/10 border-border/50 text-muted-foreground hover:bg-muted/30"
                                 )}
                             >
-                                <Flame className="h-4 w-4" /> Alta
+                                <Flame className={cn("h-4 w-4", priority === "HIGH" && "fill-rose-600/20")} /> Alta
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setPriority("MEDIUM")}
                                 className={cn(
-                                    "flex flex-col items-center justify-center gap-1 p-2 rounded-lg border text-xs font-medium transition-all",
-                                    priority === "MEDIUM" 
-                                        ? "bg-amber-500/10 border-amber-500/50 text-amber-600 ring-1 ring-amber-500" 
-                                        : "bg-background border-border text-muted-foreground hover:bg-muted"
+                                    "flex flex-col items-center justify-center gap-1 h-14 rounded-xl border text-xs font-bold transition-all active:scale-95",
+                                    priority === "MEDIUM" ? "bg-amber-500/10 border-amber-500/30 text-amber-600 shadow-sm" : "bg-muted/10 border-border/50 text-muted-foreground hover:bg-muted/30"
                                 )}
                             >
                                 <Scale className="h-4 w-4" /> Média
@@ -196,10 +173,8 @@ export function WishlistForm({ item, onClose }: { item?: WishlistData, onClose: 
                                 type="button"
                                 onClick={() => setPriority("LOW")}
                                 className={cn(
-                                    "flex flex-col items-center justify-center gap-1 p-2 rounded-lg border text-xs font-medium transition-all",
-                                    priority === "LOW" 
-                                        ? "bg-blue-500/10 border-blue-500/50 text-blue-600 ring-1 ring-blue-500" 
-                                        : "bg-background border-border text-muted-foreground hover:bg-muted"
+                                    "flex flex-col items-center justify-center gap-1 h-14 rounded-xl border text-xs font-bold transition-all active:scale-95",
+                                    priority === "LOW" ? "bg-blue-500/10 border-blue-500/30 text-blue-600 shadow-sm" : "bg-muted/10 border-border/50 text-muted-foreground hover:bg-muted/30"
                                 )}
                             >
                                 <Snowflake className="h-4 w-4" /> Baixa
@@ -208,21 +183,31 @@ export function WishlistForm({ item, onClose }: { item?: WishlistData, onClose: 
                     </div>
 
                     {/* Link da Loja */}
-                    <div className="space-y-1.5">
-                        <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Link da Loja</Label>
+                    <div className="space-y-2 pt-1">
+                        <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Link da Loja (Opcional)</Label>
                         <div className="relative">
-                            <ArrowUpRight className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                            <Input name="productUrl" defaultValue={item?.productUrl || ""} placeholder="https://amazon.com.br/..." className="h-9 pl-9 text-xs bg-muted/30 border-border" />
+                            <ArrowUpRight className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
+                            <Input 
+                                name="productUrl" 
+                                defaultValue={item?.productUrl || ""} 
+                                placeholder="https://mercadolivre.com.br/..." 
+                                className="h-12 pl-10 text-sm font-medium bg-muted/20 border-border/50 rounded-xl focus-visible:ring-primary/30" 
+                            />
                         </div>
                     </div>
                 </div>
             </div>
 
-            <DialogFooter className="border-t border-border pt-4">
-                <Button type="button" variant="ghost" onClick={onClose} disabled={isLoading}>Cancelar</Button>
-                <Button type="submit" className="bg-primary text-primary-foreground hover:bg-primary/90 min-w-[140px] shadow-sm" disabled={isLoading}>
-                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : (item ? "Salvar Alterações" : "Criar Meta")}
-                </Button>
+            <DialogFooter className="border-t border-border/40 pt-6 mt-4">
+                <div className="flex w-full justify-between sm:justify-end gap-3">
+                    <Button type="button" variant="ghost" onClick={onClose} disabled={isLoading} className="h-12 px-6 rounded-xl font-bold">
+                        Cancelar
+                    </Button>
+                    <Button type="submit" disabled={isLoading} className="h-12 px-8 rounded-xl font-bold bg-foreground text-background hover:bg-foreground/90 shadow-lg shadow-foreground/10 transition-all active:scale-95 w-full sm:w-auto">
+                        {isLoading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : null}
+                        {item ? "Salvar Alterações" : "Criar Meta"}
+                    </Button>
+                </div>
             </DialogFooter>
         </form>
     );

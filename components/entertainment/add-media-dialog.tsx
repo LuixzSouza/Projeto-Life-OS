@@ -1,37 +1,17 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Search,
-  Loader2,
-  Plus,
-  Film,
-  Music,
-  Gamepad2,
-  X,
-  Check,
-  ImageOff,
-} from "lucide-react";
-import {
-  searchMedia,
-  addMediaItem,
-  type SearchResult,
-  type MediaType,
-} from "@/app/(dashboard)/entertainment/actions";
+import { Search, Loader2, Plus, Film, Music, Gamepad2, X, Check, ImageOff } from "lucide-react";
+import { searchMedia, addMediaItem, type SearchResult, type MediaType } from "@/app/(dashboard)/entertainment/actions";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils"; // 🟢 IMPORTAÇÃO CORRIGIDA
 
 export function AddMediaDialog() {
   const [isOpen, setIsOpen] = useState(false);
@@ -46,17 +26,12 @@ export function AddMediaDialog() {
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
     if (!open) {
-      setTimeout(() => {
-        setResults([]);
-        setQuery("");
-      }, 300);
+      setTimeout(() => { setResults([]); setQuery(""); }, 300);
     }
   };
 
   useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 100);
-    }
+    if (isOpen) setTimeout(() => inputRef.current?.focus(), 100);
   }, [isOpen]);
 
   async function handleSearch(overrideType?: MediaType) {
@@ -98,7 +73,7 @@ export function AddMediaDialog() {
       );
       handleOpenChange(false);
     } else {
-      toast.error("Erro ao salvar o item.");
+      toast.error(result?.message || "Erro ao salvar o item.");
     }
 
     setIsSavingId(null);
@@ -110,180 +85,120 @@ export function AddMediaDialog() {
     inputRef.current?.focus();
   };
 
-  const getPlaceholder = () => {
-    switch (activeTab) {
-      case "GAME":
-        return "Ex: The Witcher 3, Zelda, Cyberpunk...";
-      case "ALBUM":
-        return "Ex: Pink Floyd, Daft Punk...";
-      default:
-        return "Ex: Interestelar, Matrix...";
-    }
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button
-          size="lg"
-          className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-md gap-2 font-semibold"
-        >
-          <Plus className="h-5 w-5" /> Adicionar novo
+        <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-md gap-2 font-semibold rounded-xl">
+          <Plus className="h-5 w-5" /> Buscar Obras
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-2xl p-0 gap-0 overflow-hidden border-border">
-        <div className="p-6 pb-4 bg-muted/40 border-b border-border">
+      <DialogContent className="sm:max-w-3xl p-0 gap-0 overflow-hidden border-border/60 shadow-2xl rounded-2xl">
+        <div className="p-6 pb-4 bg-muted/20 border-b border-border/50">
           <DialogHeader>
-            <DialogTitle className="text-xl">
-              Adicionar à coleção
-            </DialogTitle>
-            <DialogDescription>
-              Busque e salve seus favoritos rapidamente.
-            </DialogDescription>
+            <DialogTitle className="text-xl">Explorar Catálogo</DialogTitle>
+            <DialogDescription>Busque na base global do TMDB, RAWG e iTunes.</DialogDescription>
           </DialogHeader>
 
-          <Tabs
-            defaultValue="MOVIE"
-            onValueChange={handleTabChange}
-            className="w-full mt-4"
-          >
-            <TabsList className="grid w-full grid-cols-3 h-10">
-              <TabsTrigger value="MOVIE">
-                <Film className="h-4 w-4 mr-2" /> Filmes / TV
-              </TabsTrigger>
-              <TabsTrigger value="GAME">
-                <Gamepad2 className="h-4 w-4 mr-2" /> Jogos
-              </TabsTrigger>
-              <TabsTrigger value="ALBUM">
-                <Music className="h-4 w-4 mr-2" /> Álbuns
-              </TabsTrigger>
+          <Tabs defaultValue="MOVIE" onValueChange={handleTabChange} className="w-full mt-5">
+            <TabsList className="grid w-full grid-cols-3 h-11 bg-background border border-border/50 shadow-sm rounded-xl p-1">
+              <TabsTrigger value="MOVIE" className="rounded-lg text-xs"><Film className="h-4 w-4 mr-2" /> Filmes/Séries</TabsTrigger>
+              <TabsTrigger value="GAME" className="rounded-lg text-xs"><Gamepad2 className="h-4 w-4 mr-2" /> Jogos</TabsTrigger>
+              <TabsTrigger value="ALBUM" className="rounded-lg text-xs"><Music className="h-4 w-4 mr-2" /> Álbuns</TabsTrigger>
             </TabsList>
           </Tabs>
 
-          <div className="relative mt-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              ref={inputRef}
-              placeholder={getPlaceholder()}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              className="pl-9 pr-10 h-11"
-            />
-            {query && (
-              <button
-                onClick={clearSearch}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-
-          <div className="flex justify-end mt-3">
-            <Button
-              onClick={() => handleSearch()}
-              disabled={isLoadingSearch || !query.trim()}
-              size="sm"
-            >
-              {isLoadingSearch && (
-                <Loader2 className="h-3 w-3 animate-spin mr-2" />
-              )}
-              Pesquisar
+          <div className="relative mt-5 flex gap-2">
+            <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                ref={inputRef}
+                placeholder={activeTab === "GAME" ? "Ex: The Witcher 3, Cyberpunk..." : activeTab === "ALBUM" ? "Ex: Pink Floyd, Daft Punk..." : "Ex: Interestelar, Matrix..."}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                className="pl-9 pr-10 h-12 bg-background border-border/50 focus:border-primary/50 transition-all text-base rounded-xl shadow-sm"
+                />
+                {query && (
+                <button onClick={clearSearch} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground hover:bg-muted p-1 rounded-full transition-colors">
+                    <X className="h-4 w-4" />
+                </button>
+                )}
+            </div>
+            <Button onClick={() => handleSearch()} disabled={isLoadingSearch || !query.trim()} className="h-12 px-6 rounded-xl shadow-md">
+              {isLoadingSearch ? <Loader2 className="h-4 w-4 animate-spin" /> : "Pesquisar"}
             </Button>
           </div>
         </div>
 
-        <ScrollArea className="h-[380px] bg-background p-4">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            {isLoadingSearch &&
-              Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="space-y-2">
-                  <Skeleton className="w-full aspect-[2/3] rounded-lg" />
+        <ScrollArea className="h-[450px] bg-background p-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-5 pr-4">
+            {isLoadingSearch && Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="space-y-3">
+                  <Skeleton className="w-full aspect-[2/3] rounded-xl" />
                   <Skeleton className="h-4 w-3/4" />
                   <Skeleton className="h-3 w-1/2" />
                 </div>
-              ))}
+            ))}
 
-            {!isLoadingSearch &&
-              results.map((item) => {
+            {!isLoadingSearch && results.map((item) => {
                 const isSavingThis = isSavingId === item.id;
-
                 return (
-                  <div
-                    key={item.id}
-                    onClick={() => handleSave(item)}
-                    className={`group relative rounded-xl overflow-hidden border border-border cursor-pointer transition-all hover:shadow-lg hover:scale-[1.02] ${
-                      isSavingThis ? "opacity-60 pointer-events-none" : ""
-                    }`}
-                  >
-                    <div className="relative aspect-[2/3] bg-muted">
+                  <div key={item.id} onClick={() => handleSave(item)} className={cn("group relative rounded-xl overflow-hidden border border-border/50 cursor-pointer transition-all hover:shadow-xl hover:border-primary/30 hover:-translate-y-1 flex flex-col bg-card", isSavingThis && "opacity-60 pointer-events-none")}>
+                    
+                    {/* Imagem */}
+                    <div className={cn("relative bg-muted", item.type === "GAME" ? "aspect-video" : item.type === "ALBUM" ? "aspect-square" : "aspect-[2/3]")}>
                       {item.coverUrl ? (
-                        <img
-                          src={item.coverUrl}
-                          alt={item.title}
-                          className="object-cover w-full h-full transition-transform group-hover:scale-105"
-                        />
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={item.coverUrl} alt={item.title} className="object-cover w-full h-full transition-transform duration-700 group-hover:scale-105" />
                       ) : (
                         <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
-                          <ImageOff className="h-8 w-8" />
-                          <span className="text-[10px] uppercase font-semibold">
-                            Sem imagem
-                          </span>
+                          <ImageOff className="h-8 w-8 opacity-20" />
                         </div>
                       )}
 
-                      <div
-                        className={`absolute inset-0 flex items-center justify-center bg-black/50 transition-opacity ${
-                          isSavingThis
-                            ? "opacity-100"
-                            : "opacity-0 group-hover:opacity-100"
-                        }`}
-                      >
+                      {/* Hover Add Icon */}
+                      <div className={cn("absolute inset-0 flex items-center justify-center bg-black/60 transition-opacity duration-300", isSavingThis ? "opacity-100" : "opacity-0 group-hover:opacity-100")}>
                         {isSavingThis ? (
                           <Loader2 className="h-8 w-8 text-white animate-spin" />
                         ) : (
-                          <div className="bg-primary text-primary-foreground rounded-full p-2 shadow-lg">
-                            <Plus className="h-5 w-5" />
+                          <div className="bg-primary text-primary-foreground rounded-full p-3 shadow-2xl transform scale-75 group-hover:scale-100 transition-transform">
+                            <Plus className="h-6 w-6" />
                           </div>
                         )}
                       </div>
                     </div>
 
-                    <div className="p-3 bg-background border-t border-border">
-                      <p
-                        className="font-semibold truncate text-sm"
-                        title={item.title}
-                      >
-                        {item.title}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate mt-0.5">
-                        {item.subtitle}
-                      </p>
+                    {/* Textos */}
+                    <div className="p-3.5 bg-background border-t border-border/30 flex flex-col justify-between flex-1">
+                      <div>
+                          <h4 className="font-bold truncate text-sm" title={item.title}>{item.title}</h4>
+                          <p className="text-[11px] text-muted-foreground truncate mt-0.5">{item.creator || "Desconhecido"}</p>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between">
+                          <Badge variant="outline" className="text-[9px] font-mono border-primary/20 text-primary bg-primary/5">{item.type}</Badge>
+                          <span className="text-[10px] font-bold text-muted-foreground">{item.releaseYear || ""}</span>
+                      </div>
                     </div>
                   </div>
                 );
-              })}
-
-            {!isLoadingSearch && results.length === 0 && query && (
-              <div className="col-span-full py-12 text-center text-muted-foreground">
-                <p>Nenhum resultado encontrado.</p>
-                <p className="text-xs mt-1">
-                  Tente outro termo ou categoria.
-                </p>
-              </div>
-            )}
-
-            {!isLoadingSearch && results.length === 0 && !query && (
-              <div className="col-span-full py-16 flex flex-col items-center justify-center text-muted-foreground/70">
-                <Search className="h-10 w-10 mb-3" />
-                <p className="text-sm">
-                  Digite acima para iniciar uma busca.
-                </p>
-              </div>
-            )}
+            })}
           </div>
+
+          {!isLoadingSearch && results.length === 0 && query && (
+            <div className="h-full flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
+              <Search className="h-12 w-12 mb-4 opacity-20" />
+              <p className="font-medium text-foreground">Nenhum resultado encontrado.</p>
+              <p className="text-sm mt-1">Verifique a ortografia ou tente outro termo.</p>
+            </div>
+          )}
+
+          {!isLoadingSearch && results.length === 0 && !query && (
+            <div className="h-full flex flex-col items-center justify-center py-24 text-muted-foreground/50">
+              <Film className="h-16 w-16 mb-4 opacity-30" />
+              <p className="text-sm font-medium">Digite o nome da obra acima para começar.</p>
+            </div>
+          )}
         </ScrollArea>
       </DialogContent>
     </Dialog>

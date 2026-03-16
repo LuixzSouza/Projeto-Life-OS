@@ -21,147 +21,219 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { 
-  MoreVertical, 
+  MoreHorizontal, 
   Pencil, 
   Trash2, 
   AlertTriangle, 
-  Settings 
+  Link as LinkIcon,
+  Check,
+  Palette,
+  Settings2,
+  Loader2,
+  Copy
 } from "lucide-react";
 import { toast } from "sonner";
 import { updateProject, deleteProject } from "@/app/(dashboard)/projects/actions";
+import { cn } from "@/lib/utils";
+
+const PROJECT_COLORS = [
+  { name: "Indigo", value: "#6366f1", class: "bg-indigo-500" },
+  { name: "Red", value: "#ef4444", class: "bg-red-500" },
+  { name: "Orange", value: "#f97316", class: "bg-orange-500" },
+  { name: "Yellow", value: "#eab308", class: "bg-yellow-500" },
+  { name: "Green", value: "#22c55e", class: "bg-emerald-500" },
+  { name: "Cyan", value: "#06b6d4", class: "bg-cyan-500" },
+  { name: "Blue", value: "#3b82f6", class: "bg-blue-500" },
+  { name: "Purple", value: "#a855f7", class: "bg-purple-500" },
+  { name: "Pink", value: "#ec4899", class: "bg-pink-500" },
+  { name: "Zinc", value: "#71717a", class: "bg-zinc-500" },
+];
 
 interface ProjectSettingsProps {
   projectId: string;
   projectTitle: string;
   projectDescription: string | null;
+  projectColor?: string;
 }
 
 export function ProjectSettingsMenu({ 
   projectId, 
   projectTitle, 
-  projectDescription 
+  projectDescription,
+  projectColor = "#6366f1"
 }: ProjectSettingsProps) {
   const router = useRouter();
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedColor, setSelectedColor] = useState(projectColor);
 
-  // --- DELETE ACTION ---
   const handleDelete = async () => {
     setIsLoading(true);
     try {
       await deleteProject(projectId);
       toast.success("Projeto excluído com sucesso.");
-      router.push("/projects"); // Volta para a lista
+      router.push("/projects"); 
     } catch (error) {
-      console.error(error);
       toast.error("Erro ao excluir projeto.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // --- UPDATE ACTION ---
   const handleUpdate = async (formData: FormData) => {
     setIsLoading(true);
     try {
-      // Adiciona o ID ao formData para a Server Action saber quem atualizar
       formData.append("id", projectId);
-      
+      formData.set("color", selectedColor); 
       await updateProject(formData);
-      toast.success("Projeto atualizado!");
+      toast.success("Propriedades atualizadas!");
       setIsEditOpen(false);
-      router.refresh(); // Atualiza a página para mostrar novo título
+      router.refresh(); 
     } catch (error) {
-      console.error(error);
-      toast.error("Erro ao atualizar projeto.");
+      toast.error("Erro ao salvar alterações.");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(window.location.href);
+    toast.success("Link do projeto copiado!");
   };
 
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
-            <MoreVertical className="h-4 w-4" />
+          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-muted/80 transition-all active:scale-90">
+            <MoreHorizontal className="h-5 w-5 text-muted-foreground" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuLabel>Opções do Projeto</DropdownMenuLabel>
-          <DropdownMenuSeparator />
+        <DropdownMenuContent align="end" className="w-64 p-2 rounded-2xl shadow-xl border-border/40 backdrop-blur-lg">
+          <DropdownMenuLabel className="px-3 py-2">
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Opções do Projeto</span>
+          </DropdownMenuLabel>
           
-          <DropdownMenuItem onSelect={() => setIsEditOpen(true)}>
-            <Pencil className="mr-2 h-4 w-4" /> Editar Detalhes
+          <DropdownMenuItem onSelect={() => setIsEditOpen(true)} className="rounded-xl px-3 py-2.5 gap-3 cursor-pointer focus:bg-primary/5 group">
+            <Pencil className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" /> 
+            <span className="font-bold text-sm">Editar propriedades</span>
+          </DropdownMenuItem>
+
+          <DropdownMenuItem onSelect={handleCopyLink} className="rounded-xl px-3 py-2.5 gap-3 cursor-pointer group">
+            <Copy className="h-4 w-4 text-muted-foreground group-hover:text-blue-500 transition-colors" /> 
+            <span className="font-bold text-sm">Copiar link do board</span>
           </DropdownMenuItem>
           
-          <DropdownMenuSeparator />
+          <DropdownMenuSeparator className="my-2 bg-border/40" />
           
           <DropdownMenuItem 
             onSelect={() => setIsDeleteOpen(true)} 
-            className="text-destructive focus:text-destructive focus:bg-destructive/10"
+            className="rounded-xl px-3 py-2.5 gap-3 text-rose-500 focus:text-rose-500 focus:bg-rose-500/10 cursor-pointer"
           >
-            <Trash2 className="mr-2 h-4 w-4" /> Excluir Projeto
+            <Trash2 className="h-4 w-4" /> 
+            <span className="font-bold text-sm">Arquivar projeto</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
       {/* --- MODAL DE EDIÇÃO --- */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Editar Projeto</DialogTitle>
-            <DialogDescription>Altere o nome ou descrição do projeto.</DialogDescription>
-          </DialogHeader>
-          
-          <form action={handleUpdate} className="space-y-4 pt-2">
-            <div className="space-y-2">
-              <Label htmlFor="title">Nome do Projeto</Label>
-              <Input id="title" name="title" defaultValue={projectTitle} required />
+        <DialogContent className="fixed left-[50%] top-[50%] z-50 grid w-[95vw] sm:max-w-[480px] translate-x-[-50%] translate-y-[-50%] p-0 overflow-hidden border-border/40 shadow-2xl rounded-[2.5rem] bg-background">
+          <div className="bg-muted/20 p-8 border-b border-border/40 relative">
+            <div className="flex items-center gap-4 relative z-10">
+                <div className="h-12 w-12 rounded-2xl flex items-center justify-center bg-background border border-border/50 shadow-sm" style={{ color: selectedColor }}>
+                    <Settings2 className="h-6 w-6" />
+                </div>
+                <div>
+                    <DialogTitle className="text-2xl font-black uppercase tracking-tighter">Propriedades</DialogTitle>
+                    <DialogDescription className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Configurações de exibição</DialogDescription>
+                </div>
             </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="description">Descrição</Label>
-              <Input id="description" name="description" defaultValue={projectDescription || ""} />
+          </div>
+          
+          <form action={handleUpdate} className="p-8 space-y-8">
+            <div className="space-y-6">
+                <div className="space-y-2.5">
+                <Label htmlFor="title" className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Nome do Projeto</Label>
+                <Input id="title" name="title" defaultValue={projectTitle} required className="h-12 bg-muted/20 border-border/50 rounded-xl font-bold text-base focus-visible:ring-primary/30" />
+                </div>
+
+                <div className="space-y-4">
+                    <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1 flex items-center gap-2">
+                        <Palette className="h-3.5 w-3.5" /> Cor de Identidade
+                    </Label>
+                    <div className="grid grid-cols-5 gap-3 bg-muted/30 p-4 rounded-2xl border border-border/40">
+                        {PROJECT_COLORS.map((color) => (
+                        <button
+                            key={color.value}
+                            type="button"
+                            onClick={() => setSelectedColor(color.value)}
+                            className={cn(
+                            "h-8 w-8 rounded-full transition-all duration-300 hover:scale-110 active:scale-95 flex items-center justify-center shadow-sm",
+                            color.class,
+                            selectedColor === color.value ? "ring-4 ring-offset-2 ring-offset-background" : "opacity-60"
+                            )}
+                            style={{ ringColor: selectedColor === color.value ? color.value : undefined } as React.CSSProperties}
+                        >
+                            {selectedColor === color.value && <Check className="h-4 w-4 text-white animate-in zoom-in duration-200" />}
+                        </button>
+                        ))}
+                    </div>
+                </div>
+                
+                <div className="space-y-2.5">
+                <Label htmlFor="description" className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Descrição</Label>
+                <Textarea id="description" name="description" defaultValue={projectDescription || ""} className="resize-none min-h-[120px] bg-muted/20 border-border/50 rounded-xl font-medium p-4 focus-visible:ring-primary/30" />
+                </div>
             </div>
 
-            <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setIsEditOpen(false)}>Cancelar</Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? "Salvando..." : "Salvar Alterações"}
+            <DialogFooter className="pt-2">
+              <Button type="submit" disabled={isLoading} className="w-full h-14 rounded-2xl font-black uppercase tracking-widest text-xs shadow-lg transition-all active:scale-95" style={{ backgroundColor: selectedColor }}>
+                {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Salvar Alterações"}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* --- MODAL DE DELEÇÃO --- */}
+      {/* --- MODAL DE EXCLUSÃO (DANGER ZONE) --- */}
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-        <DialogContent className="border-destructive/20">
-          <DialogHeader>
-            <div className="flex items-center gap-2 text-destructive mb-2">
-              <AlertTriangle className="h-5 w-5" />
-              <DialogTitle className="text-destructive">Excluir Projeto?</DialogTitle>
+        <DialogContent className="fixed left-[50%] top-[50%] z-50 grid w-[95vw] sm:max-w-[420px] translate-x-[-50%] translate-y-[-50%] p-0 overflow-hidden bg-zinc-950 border-rose-500/20 shadow-2xl rounded-[2.5rem]">
+          <div className="p-8 space-y-6">
+            <div className="flex flex-col items-center text-center space-y-4">
+                <div className="h-16 w-16 rounded-3xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 animate-pulse">
+                    <AlertTriangle className="h-8 w-8" />
+                </div>
+                <div className="space-y-1.5">
+                    <DialogTitle className="text-2xl font-black uppercase tracking-tighter text-zinc-100">Cuidado Crítico</DialogTitle>
+                    <DialogDescription className="text-zinc-400 font-medium leading-relaxed">
+                        Você está prestes a excluir o projeto <strong className="text-zinc-100">{projectTitle}</strong>. Esta ação não pode ser desfeita.
+                    </DialogDescription>
+                </div>
             </div>
-            <DialogDescription>
-              Você tem certeza que deseja excluir <strong>{projectTitle}</strong>?
-              <br/>
-              Essa ação não pode ser desfeita e todas as tarefas serão perdidas.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <DialogFooter className="mt-4">
-            <Button variant="ghost" onClick={() => setIsDeleteOpen(false)}>Cancelar</Button>
-            <Button 
-                variant="destructive" 
-                onClick={handleDelete} 
-                disabled={isLoading}
-            >
-                {isLoading ? "Excluindo..." : "Sim, Excluir Projeto"}
-            </Button>
-          </DialogFooter>
+
+            <div className="bg-rose-500/5 rounded-2xl p-4 border border-rose-500/10">
+                <p className="text-[10px] font-black uppercase tracking-[0.15em] text-rose-500 mb-1">Impacto</p>
+                <p className="text-xs text-rose-200/60 font-medium">Todas as tarefas, quadros e histórico associados serão removidos permanentemente do banco de dados.</p>
+            </div>
+            
+            <div className="flex flex-col gap-3">
+                <Button 
+                    variant="destructive" 
+                    onClick={handleDelete} 
+                    disabled={isLoading}
+                    className="h-14 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl transition-all active:scale-95"
+                >
+                    {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Confirmar Exclusão"}
+                </Button>
+                <Button variant="ghost" onClick={() => setIsDeleteOpen(false)} className="h-12 text-zinc-400 hover:text-zinc-100 font-bold text-xs uppercase tracking-widest rounded-xl">
+                    Manter Projeto
+                </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </>

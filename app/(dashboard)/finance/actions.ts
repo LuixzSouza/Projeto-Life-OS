@@ -4,10 +4,18 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { fetchPluggyTransactions, createConnectToken, fetchPluggyAccounts } from "@/lib/pluggy";
 
+interface PluggyAccount {
+  id: string;
+  name: string;
+  number: string;
+  balance: number;
+  type: "BANK" | "CREDIT"; // O que o erro mostrou
+  subtype?: string;
+}
+
 // Helper para garantir que números venham corretos do formulário
 const parseAmount = (value: FormDataEntryValue | null) => {
   if (!value) return 0;
-  // Remove "R$", pontos de milhar e troca vírgula por ponto se necessário, ou apenas parseia
   const stringValue = value.toString().replace(/[^\d.,-]/g, '').replace(',', '.');
   const float = parseFloat(stringValue);
   return isNaN(float) ? 0 : float;
@@ -18,9 +26,7 @@ const parseAmount = (value: FormDataEntryValue | null) => {
 // =========================================================
 
 export async function updateSalary(amount: number) {
-  // Pega o primeiro usuário (Adapte se tiver sistema de Auth com ID real)
   const user = await prisma.user.findFirst();
-
   if (user) {
     await prisma.user.update({
       where: { id: user.id },
@@ -42,11 +48,17 @@ export async function createAccount(formData: FormData) {
   const balance = parseAmount(formData.get("balance"));
   const color = formData.get("color") as string;
 
-  // Assumindo single user ou pegando o primeiro
   const user = await prisma.user.findFirst();
 
   await prisma.account.create({
-    data: { name, type, balance, color, userId: user?.id },
+    data: { 
+        name, 
+        type, 
+        balance, 
+        color, 
+        userId: user?.id,
+        isConnected: false // Contas manuais começam desconectadas
+    },
   });
   revalidatePath("/finance");
 }
@@ -55,8 +67,6 @@ export async function updateAccount(formData: FormData) {
   const id = formData.get("id") as string;
   const name = formData.get("name") as string;
   const color = formData.get("color") as string;
-  // Nota: O saldo não é atualizado por aqui para manter consistência do histórico,
-  // a menos que seja uma correção manual explícita (que não implementamos aqui).
 
   await prisma.account.update({
     where: { id },
@@ -66,7 +76,6 @@ export async function updateAccount(formData: FormData) {
 }
 
 export async function deleteAccount(id: string) {
-    // Apaga transações primeiro para não deixar órfãos
     await prisma.transaction.deleteMany({ where: { accountId: id } });
     await prisma.account.delete({ where: { id } });
     revalidatePath("/finance");
@@ -80,7 +89,7 @@ export async function deleteAccount(id: string) {
 export async function createTransaction(formData: FormData) {
   const description = formData.get("description") as string;
   const amount = parseAmount(formData.get("amount"));
-  const type = formData.get("type") as string; // INCOME ou EXPENSE
+  const type = formData.get("type") as string; 
   const accountId = formData.get("accountId") as string;
   const category = formData.get("category") as string;
   const dateStr = formData.get("date") as string;
@@ -89,18 +98,17 @@ export async function createTransaction(formData: FormData) {
   if (!accountId || isNaN(amount)) throw new Error("Dados inválidos");
 
   await prisma.$transaction(async (tx) => {
-      // 1. Cria transação
       await tx.transaction.create({
         data: { description, amount, type, accountId, category, date },
       });
 
-      // 2. Atualiza Saldo da Conta
       const account = await tx.account.findUnique({ where: { id: accountId } });
-      if (account) {
+      
+      // Só atualizamos saldo manualmente se a conta NÃO for automática (Pluggy)
+      // Se for automática, o saldo virá da sincronização oficial
+      if (account && !account.isConnected) {
           const currentBalance = Number(account.balance);
-          const newBalance = type === 'INCOME' 
-            ? currentBalance + amount 
-            : currentBalance - amount;
+          const newBalance = type === 'INCOME' ? currentBalance + amount : currentBalance - amount;
           
           await tx.account.update({
               where: { id: accountId },
@@ -282,24 +290,22 @@ export async function deleteRecurring(id: string) {
 
 export async function createConnectTokenAction() {
   try {
-    const token = await createConnectToken();
-    return token;
+    return await createConnectToken();
   } catch (error) {
     console.error("Erro ao criar token Pluggy:", error);
-    throw new Error("Falha ao iniciar conexão bancária.");
+    throw new Error("Falha ao iniciar conexão bancária. Verifique suas chaves de API.");
   }
 }
 
 export async function linkAccountToPluggyAction(itemId: string) {
   try {
-    // 1. Buscar as contas que existem dentro desse "Item" (Conexão Bancária)
-    const pluggyAccounts = await fetchPluggyAccounts(itemId);
+    const user = await prisma.user.findFirst();
+    // Forçamos o tipo aqui para o TS saber o que esperar
+    const pluggyAccounts = await fetchPluggyAccounts(itemId) as PluggyAccount[];
 
-    // 2. Para cada conta encontrada, criar ou atualizar no nosso banco
     let createdCount = 0;
 
     for (const acc of pluggyAccounts) {
-      // Verifica se já existe uma conta com esse externalId
       const existing = await prisma.account.findFirst({
         where: { externalId: acc.id }
       });
@@ -307,27 +313,28 @@ export async function linkAccountToPluggyAction(itemId: string) {
       if (!existing) {
         await prisma.account.create({
           data: {
-            name: `${acc.name} (${acc.number})`, 
-            type: "CHECKING", 
+            name: `${acc.name} (${acc.number || 'Conta'})`, 
+            // CORREÇÃO: Comparamos acc.type com "BANK" (que é o que o Pluggy envia para contas corrente/poupança)
+            type: acc.type === 'BANK' ? 'CHECKING' : 'SAVINGS', 
             balance: acc.balance,
-            color: "#820ad1", // Roxo padrão, pode randomizar
+            color: "#820ad1", 
             isConnected: true,
             provider: "PLUGGY",
-            externalId: acc.id
+            externalId: acc.id,
+            userId: user?.id
           }
         });
         createdCount++;
       } else {
-        // Atualiza saldo se já existir
         await prisma.account.update({
-            where: { id: existing.id },
-            data: { balance: acc.balance }
-        })
+          where: { id: existing.id },
+          data: { balance: acc.balance }
+        });
       }
     }
 
     revalidatePath("/finance");
-    return { success: true, message: `${createdCount} contas vinculadas com sucesso!` };
+    return { success: true, message: `${createdCount} novas contas integradas!` };
 
   } catch (error) {
     console.error("Erro ao vincular conta:", error);
@@ -337,25 +344,27 @@ export async function linkAccountToPluggyAction(itemId: string) {
 
 export async function syncBankAccount(localAccountId: string) {
   try {
-    // 1. Achar a conta no seu banco para pegar o ID externo
     const account = await prisma.account.findUnique({ 
         where: { id: localAccountId } 
     });
 
     if (!account?.externalId) throw new Error("Conta não conectada.");
 
-    // 2. Buscar dados na API da Pluggy
     const externalTrans = await fetchPluggyTransactions(account.externalId);
 
-    // 3. Salvar no Prisma
     let count = 0;
-    
     for (const t of externalTrans) {
-      // Verifica se já existe essa transação
+      const date = new Date(t.date);
+      date.setHours(0,0,0,0);
+
       const exists = await prisma.transaction.findFirst({
         where: { 
+            accountId: localAccountId,
             description: t.description, 
-            date: new Date(t.date),
+            date: {
+                gte: date,
+                lte: new Date(date.getTime() + 24 * 60 * 60 * 1000)
+            },
             amount: Math.abs(t.amount) 
         }
       });
@@ -375,11 +384,22 @@ export async function syncBankAccount(localAccountId: string) {
       }
     }
 
+    // CORREÇÃO DO ANY: Usamos a interface PluggyAccount para o find
+    const pluggyAccounts = await fetchPluggyAccounts(account.externalId) as PluggyAccount[]; 
+    const currentPluggyAcc = pluggyAccounts.find((a: PluggyAccount) => a.id === account.externalId);
+    
+    if (currentPluggyAcc) {
+        await prisma.account.update({
+            where: { id: localAccountId },
+            data: { balance: currentPluggyAcc.balance }
+        });
+    }
+
     revalidatePath("/finance");
-    return { success: true, message: `${count} novas transações importadas.` };
+    return { success: true, message: `${count} novas transações sincronizadas.` };
 
   } catch (error) {
     console.error(error);
-    return { success: false, message: "Erro na sincronização." };
+    return { success: false, message: "Erro na sincronização automática." };
   }
 }

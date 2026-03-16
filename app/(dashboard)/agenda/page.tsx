@@ -3,181 +3,189 @@ import { Prisma } from "@prisma/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Target, CalendarClock, ListChecks, Clock, MapPin } from "lucide-react";
-import { format, isToday, parseISO } from 'date-fns';
+import { Target, CalendarClock, ListChecks, Clock, MapPin, Grid3X3, ListTodo, Sun, LayoutList, CalendarDays } from "lucide-react";
+import { format, isToday, parseISO, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { getRoutineItems } from "./actions";
 
-// Componentes Refatorados
 import { AgendaHeader } from "@/components/agenda/agenda-header";
 import { AgendaCalendar } from "@/components/agenda/agenda-calendar";
-import { EventList } from "@/components/agenda/event-list";
+import { EventList } from "@/components/agenda/event-list"; 
+import { AgendaWeekGrid } from "@/components/agenda/agenda-week-grid"; // 🟢 NOVO
+import { AgendaMonthGrid } from "@/components/agenda/agenda-month-grid"; // 🟢 NOVO
 import { TaskList } from "@/components/agenda/task-list";
 import { RoutineManager } from "@/components/agenda/routine-manager";
 
-// --- 1. CONFIGURAÇÃO DE TIPAGEM ---
 const projectSelect = { 
-    select: { title: true, color: true } 
+  select: { title: true, color: true } 
 } satisfies Prisma.ProjectArgs;
 
 type EventWithProject = Prisma.EventGetPayload<{
-    include: { project: typeof projectSelect }
+  include: { project: typeof projectSelect }
 }>;
-
-const formatEventDate = (date: Date) => {
-    if (isToday(date)) return "Hoje";
-    return format(date, "EEEE, d 'de' MMMM", { locale: ptBR });
-};
 
 interface AgendaPageProps {
   searchParams: Promise<{ date?: string }>;
 }
 
 export default async function AgendaPage({ searchParams }: AgendaPageProps) {
-    const params = await searchParams;
-    const selectedDate = params.date ? parseISO(params.date) : new Date();
-    const isSpecificDate = !!params.date;
-    const now = new Date();
-    
-    const startFilter = isSpecificDate 
-        ? new Date(selectedDate.setHours(0,0,0,0)) 
-        : new Date(); 
-    
-    const endFilter = isSpecificDate
-        ? new Date(selectedDate.setHours(23,59,59,999))
-        : undefined; 
+  const params = await searchParams;
+  const selectedDate = params.date ? parseISO(params.date) : new Date();
+  const isSpecificDate = !!params.date;
+  const now = new Date();
+  
+  // 🟢 CORREÇÃO: Vamos buscar o mês inteiro para alimentar a Semana e o Mês!
+  const monthStart = startOfWeek(startOfMonth(selectedDate), { weekStartsOn: 0 });
+  const monthEnd = endOfWeek(endOfMonth(selectedDate), { weekStartsOn: 0 });
 
-    // --- 2. BUSCA DE DADOS ---
-    const [events, futureEvents, pendingTasks, routineItems] = await Promise.all([
-        prisma.event.findMany({
-            where: { startTime: { gte: startFilter, lte: endFilter } },
-            orderBy: { startTime: 'asc' },
-            take: isSpecificDate ? 50 : 20,
-            include: { project: projectSelect }
-        }),
-        prisma.event.findMany({
-            where: { startTime: { gte: new Date() } },
-            select: { startTime: true }
-        }),
-        prisma.task.findMany({
-            where: { isDone: false },
-            orderBy: { dueDate: 'asc' },
-            take: 7, 
-            include: { project: projectSelect }, 
-        }),
-        getRoutineItems()
-    ]);
+  const [allEvents, pendingTasks, routineItems] = await Promise.all([
+    prisma.event.findMany({
+        where: { startTime: { gte: monthStart, lte: monthEnd } },
+        orderBy: { startTime: 'asc' },
+        include: { project: projectSelect }
+    }),
+    prisma.task.findMany({
+        where: { isDone: false },
+        orderBy: { dueDate: 'asc' },
+        take: 10, 
+        include: { project: projectSelect }, 
+    }),
+    getRoutineItems()
+  ]);
 
-    const bookedDays = futureEvents.map(e => e.startTime);
-    const remainingEventsCount = events.filter(e => e.startTime > now).length;
-    const nextUpEvent = events.find(e => e.startTime > now);
+  // Filtros rápidos
+  const bookedDays = allEvents.map(e => e.startTime);
+  const eventsToday = allEvents.filter(e => isSameDay(e.startTime, selectedDate));
+  const remainingEventsCount = eventsToday.filter(e => e.startTime > now).length;
+  const nextUpEvent = eventsToday.find(e => e.startTime > now);
 
-    // Agrupamento de Eventos
-    const groupedEvents = events.reduce((groups, event) => {
-        const key = formatEventDate(event.startTime);
-        if (!groups[key]) groups[key] = [];
-        groups[key].push(event as EventWithProject);
-        return groups;
-    }, {} as Record<string, EventWithProject[]>);
+  // GroupedEvents (apenas para alimentar o EventList diário sem quebrar)
+  const groupedEvents = {
+      [format(selectedDate, "EEEE, d 'de' MMMM", { locale: ptBR })]: eventsToday as EventWithProject[]
+  };
 
-    const sortedGroupKeys = Object.keys(groupedEvents); 
+  return (
+    <div className="min-h-screen bg-[#F4F4F5] dark:bg-[#09090B] pb-24 animate-in fade-in duration-500">
+      
+      <AgendaHeader isSpecificDate={isSpecificDate} date={selectedDate} />
 
-    return (
-        <div className="min-h-screen bg-background pb-24 animate-in fade-in duration-500">
-            <AgendaHeader isSpecificDate={isSpecificDate} date={selectedDate} />
+      <div className="px-4 md:px-8 py-6 space-y-8 max-w-[1600px] mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            
+            {/* SIDEBAR */}
+            <div className="lg:col-span-3 space-y-6">
+                <Card className="border-border/40 shadow-sm bg-card rounded-[1.5rem] overflow-hidden">
+                    <CardContent className="p-4 flex justify-center">
+                        <AgendaCalendar bookedDays={bookedDays} />
+                    </CardContent>
+                </Card>
 
-            <div className="px-6 md:px-8 py-8 space-y-10 max-w-[1600px] mx-auto" >
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                    
-                    {/* --- SIDEBAR (Calendário e Infos) --- */}
-                    <div className="lg:col-span-4 space-y-6">
-                        <Card className="border-border shadow-sm bg-card">
-                            <CardContent className="p-4 flex justify-center">
-                                <AgendaCalendar bookedDays={bookedDays} />
-                            </CardContent>
-                        </Card>
+                <Card className="border-border/40 shadow-sm bg-card rounded-[1.5rem] overflow-hidden">
+                    <CardHeader className="pb-3 border-b border-border/40 bg-muted/10">
+                        <CardTitle className="text-xs font-black uppercase tracking-widest flex items-center gap-2 text-foreground">
+                            <Target className="h-4 w-4 text-primary" /> Foco do Dia
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-4 space-y-5">
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-background shadow-sm p-4 rounded-xl border border-border/40 flex flex-col items-center text-center">
+                                <CalendarClock className="h-4 w-4 text-blue-500 mb-2" />
+                                <span className="text-2xl font-black tabular-nums leading-none">{remainingEventsCount}</span>
+                                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mt-1">Eventos hoje</span>
+                            </div>
+                            <div className="bg-background shadow-sm p-4 rounded-xl border border-border/40 flex flex-col items-center text-center">
+                                <ListChecks className="h-4 w-4 text-amber-500 mb-2" />
+                                <span className="text-2xl font-black tabular-nums leading-none">{pendingTasks.length}</span>
+                                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider mt-1">Tarefas ativas</span>
+                            </div>
+                        </div>
 
-                        {/* Widget de Foco */}
-                        <Card className="border-border shadow-sm bg-card overflow-hidden">
-                            <CardHeader className="pb-3 border-b border-border">
-                                <CardTitle className="text-base font-semibold flex items-center gap-2 text-foreground">
-                                    <Target className="h-5 w-5 text-primary" /> Visão do Dia
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-4 space-y-5">
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="bg-muted/50 p-3 rounded-xl border border-border flex flex-col">
-                                        <CalendarClock className="h-5 w-5 text-muted-foreground mb-2" />
-                                        <span className="text-2xl font-bold text-foreground leading-none">{remainingEventsCount}</span>
-                                        <span className="text-xs text-muted-foreground mt-1">Eventos restantes</span>
-                                    </div>
-                                    <div className="bg-muted/50 p-3 rounded-xl border border-border flex flex-col">
-                                        <ListChecks className="h-5 w-5 text-muted-foreground mb-2" />
-                                        <span className="text-2xl font-bold text-foreground leading-none">{pendingTasks.length}</span>
-                                        <span className="text-xs text-muted-foreground mt-1">Tarefas foco</span>
+                        <div>
+                            <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                                <Clock className="h-3 w-3" /> Próximo na Fila
+                            </h4>
+                            {nextUpEvent ? (
+                                <div className="bg-primary/5 border border-primary/20 p-3 rounded-xl border-l-4 border-l-primary hover:bg-primary/10 transition-colors cursor-pointer">
+                                    <p className="font-bold text-primary truncate text-sm">{nextUpEvent.title}</p>
+                                    <div className="flex items-center justify-between mt-2">
+                                        <Badge variant="outline" className="bg-background border-primary/20 text-primary text-[10px] font-mono px-1.5">
+                                            {format(nextUpEvent.startTime, 'HH:mm')}
+                                        </Badge>
+                                        {nextUpEvent.location && (
+                                            <p className="text-[10px] font-medium text-muted-foreground flex items-center gap-1 truncate max-w-[120px]">
+                                                <MapPin className="h-3 w-3" /> {nextUpEvent.location}
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
-
-                                <div>
-                                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Próximo na agenda</h4>
-                                    {nextUpEvent ? (
-                                        <div className="bg-primary/5 border border-primary/10 p-3 rounded-lg border-l-4 border-l-primary transition-all hover:shadow-sm">
-                                            <p className="font-semibold text-primary truncate">{nextUpEvent.title}</p>
-                                            <div className="flex items-center justify-between mt-2">
-                                                <p className="text-sm font-medium text-foreground flex items-center gap-1.5">
-                                                    <Clock className="h-4 w-4 text-muted-foreground" />
-                                                    {format(nextUpEvent.startTime, 'HH:mm')}
-                                                </p>
-                                                {nextUpEvent.location && (
-                                                    <p className="text-xs text-muted-foreground flex items-center gap-1 truncate max-w-[120px]">
-                                                        <MapPin className="h-3 w-3" /> {nextUpEvent.location}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="text-center py-4 bg-muted/30 rounded-lg border border-border">
-                                            <p className="text-sm text-muted-foreground italic">Nenhum evento próximo hoje.</p>
-                                        </div>
-                                    )}
+                            ) : (
+                                <div className="text-center py-4 bg-muted/20 rounded-xl border border-border/40 border-dashed">
+                                    <p className="text-xs font-medium text-muted-foreground">Sem compromissos hoje.</p>
                                 </div>
-                            </CardContent>
-                        </Card>
-                    </div>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
 
-                    {/* --- CONTEÚDO PRINCIPAL (Tabs) --- */}
-                    <div className="lg:col-span-8">
-                        <Card className="border-border shadow-sm bg-card h-full min-h-[600px] flex flex-col">
-                            <Tabs defaultValue="events" className="w-full flex-1 flex flex-col">
-                                <div className="px-6 py-4 border-b border-border flex flex-col sm:flex-row justify-between items-center bg-muted/10 gap-4">
-                                    <TabsList className="bg-muted p-1 rounded-lg h-auto w-full sm:w-auto">
-                                        <TabsTrigger value="events" className="rounded-md px-4 py-1.5 text-sm flex-1 sm:flex-none">Linha do Tempo</TabsTrigger>
-                                        <TabsTrigger value="tasks" className="rounded-md px-4 py-1.5 text-sm flex-1 sm:flex-none">Foco do Dia</TabsTrigger>
-                                        <TabsTrigger value="routine" className="rounded-md px-4 py-1.5 text-sm flex-1 sm:flex-none">Rotina</TabsTrigger>
-                                    </TabsList>
-                                    <Badge variant="outline" className="hidden sm:flex bg-background text-muted-foreground border-border">
-                                        {events.length} eventos
-                                    </Badge>
-                                </div>
-                                
-                                <TabsContent value="events" className="p-6 flex-1">
-                                    <EventList groupedEvents={groupedEvents} sortedKeys={sortedGroupKeys} />
-                                </TabsContent>
-                                
-                                <TabsContent value="tasks" className="flex-1">
-                                    <TaskList tasks={pendingTasks} />
-                                </TabsContent>
+            {/* ÁREA PRINCIPAL (TABS) */}
+            <div className="lg:col-span-9">
+                <Card className="border-border/40 shadow-xl bg-card h-[calc(100vh-140px)] min-h-[700px] flex flex-col rounded-[2rem] overflow-hidden">
+                    <Tabs defaultValue="day" className="w-full flex-1 flex flex-col h-full">
+                        
+                        {/* Controles de Visão (HUD) */}
+                        <div className="px-6 py-4 border-b border-border/40 flex flex-col sm:flex-row justify-between items-center bg-muted/10 gap-4">
+                            <TabsList className="bg-muted/50 p-1 rounded-xl h-12 w-full sm:w-auto shadow-inner border border-border/40 overflow-x-auto">
+                                <TabsTrigger value="day" className="rounded-lg px-6 text-[10px] font-black uppercase tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm">
+                                    <LayoutList className="h-4 w-4" /> O Dia
+                                </TabsTrigger>
+                                <TabsTrigger value="week" className="rounded-lg px-6 text-[10px] font-black uppercase tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm">
+                                    <CalendarDays className="h-4 w-4" /> Semana
+                                </TabsTrigger>
+                                <TabsTrigger value="month" className="rounded-lg px-6 text-[10px] font-black uppercase tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm">
+                                    <Grid3X3 className="h-4 w-4" /> Mês
+                                </TabsTrigger>
+                                <div className="h-6 w-px bg-border/60 mx-2 hidden sm:block" />
+                                <TabsTrigger value="tasks" className="rounded-lg px-6 text-[10px] font-black uppercase tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                                    <ListTodo className="h-4 w-4" /> Tarefas
+                                </TabsTrigger>
+                                <TabsTrigger value="routine" className="rounded-lg px-6 text-[10px] font-black uppercase tracking-widest gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                                    <Sun className="h-4 w-4" /> Rotina
+                                </TabsTrigger>
+                            </TabsList>
+                        </div>
+                        
+                        {/* VISÃO: DIA */}
+                        <TabsContent value="day" className="p-0 m-0 flex-1 overflow-hidden flex flex-col h-full data-[state=active]:flex">
+                            <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-background/50">
+                                <EventList groupedEvents={groupedEvents} sortedKeys={Object.keys(groupedEvents)} />
+                            </div>
+                        </TabsContent>
 
-                                <TabsContent value="routine" className="flex-1 flex flex-col">
-                                    <div className="p-6 h-full flex-1">
-                                        <RoutineManager items={routineItems} />
-                                    </div>
-                                </TabsContent>
-                            </Tabs>
-                        </Card>
-                    </div>
-                </div>
+                        {/* VISÃO: SEMANA */}
+                        <TabsContent value="week" className="p-0 m-0 flex-1 overflow-hidden flex flex-col h-full data-[state=active]:flex">
+                            <AgendaWeekGrid events={allEvents as EventWithProject[]} selectedDate={selectedDate} />
+                        </TabsContent>
+
+                        {/* VISÃO: MÊS */}
+                        <TabsContent value="month" className="p-0 m-0 flex-1 overflow-hidden flex flex-col h-full data-[state=active]:flex">
+                            <AgendaMonthGrid events={allEvents as EventWithProject[]} selectedDate={selectedDate} />
+                        </TabsContent>
+                        
+                        {/* VISÃO: TAREFAS */}
+                        <TabsContent value="tasks" className="p-6 m-0 flex-1 overflow-y-auto data-[state=active]:flex flex-col bg-background/50">
+                            <TaskList tasks={pendingTasks} />
+                        </TabsContent>
+
+                        {/* VISÃO: ROTINA */}
+                        <TabsContent value="routine" className="p-6 m-0 flex-1 overflow-y-auto data-[state=active]:flex flex-col bg-background/50">
+                            <RoutineManager items={routineItems} />
+                        </TabsContent>
+                    </Tabs>
+                </Card>
             </div>
         </div>
-    );
+      </div>
+    </div>
+  );
 }

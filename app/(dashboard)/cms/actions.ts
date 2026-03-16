@@ -3,7 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
-// Criar Site
+// Criar Site (Container)
 export async function createSite(formData: FormData) {
   const name = formData.get("name") as string;
   const url = formData.get("url") as string;
@@ -18,7 +18,27 @@ export async function createSite(formData: FormData) {
       siteId: site.id,
       slug: "home",
       content: JSON.stringify(
-        { title: "Bem vindo", description: "Edite este JSON no Life OS" },
+        { 
+            system: "Life OS CMS",
+            status: "online",
+            message: "Edite este JSON via terminal web." 
+        },
+        null,
+        2
+      )
+    }
+  });
+
+  // PREPARAÇÃO: Cria rota padrão para as variáveis de ambiente simuladas (Opcional, mas muito legal)
+  await prisma.sitePage.create({
+    data: {
+      siteId: site.id,
+      slug: "env-vars",
+      content: JSON.stringify(
+        { 
+            NEXT_PUBLIC_API_URL: "https://api.exemplo.com",
+            DATABASE_USER: "root_admin"
+        },
         null,
         2
       )
@@ -34,7 +54,7 @@ export async function deleteSite(siteId: string) {
   revalidatePath("/cms");
 }
 
-// Criar Nova Página (Slug automático)
+// Criar Nova Rota (Página/Endpoint)
 export async function createPage(formData: FormData) {
   const siteId = formData.get("siteId") as string;
 
@@ -43,42 +63,44 @@ export async function createPage(formData: FormData) {
     .toLowerCase()
     .trim()
     .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9\-]/g, ""); // opcional: limpa caracteres especiais
+    .replace(/[^a-z0-9\-]/g, ""); // Limpa caracteres especiais
+
+  if (!slug) throw new Error("O nome da rota não pode estar vazio.");
 
   // Verifica duplicidade
   const exists = await prisma.sitePage.findFirst({
     where: { siteId, slug }
   });
 
-  if (exists) throw new Error("Essa página já existe neste site.");
+  if (exists) throw new Error("A rota '/" + slug + "' já está em uso neste container.");
 
   await prisma.sitePage.create({
     data: {
       siteId,
       slug,
-      content: "{\n  \"message\": \"Novo conteúdo...\"\n}"
+      content: "{\n  \"status\": \"novo_endpoint\",\n  \"data\": []\n}"
     }
   });
 
   revalidatePath("/cms");
 }
 
-// Deletar Página
+// Deletar Página/Rota
 export async function deletePage(pageId: string) {
   await prisma.sitePage.delete({ where: { id: pageId } });
   revalidatePath("/cms");
 }
 
-// Salvar Conteúdo (JSON)
+// Salvar Conteúdo (Validação Estrita de JSON)
 export async function savePageContent(formData: FormData) {
   const pageId = formData.get("pageId") as string;
   const content = formData.get("content") as string;
 
-  // Valida JSON
+  // Validação dura para impedir que o banco quebre a aplicação cliente depois
   try {
     JSON.parse(content);
   } catch {
-    throw new Error("JSON Inválido. Corrija a sintaxe antes de salvar.");
+    throw new Error("SyntaxError: O payload fornecido não é um JSON válido.");
   }
 
   await prisma.sitePage.update({

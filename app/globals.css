@@ -316,3 +316,19 @@ body.privacy-mode-active .privacy-blur:hover {
   --primary: oklch(0.70 0.18 350);
   --ring: oklch(0.70 0.18 350);
 }
+
+
+@layer utilities {
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+  .preserve-3d {
+    transform-style: preserve-3d;
+  }
+  .backface-hidden {
+    backface-visibility: hidden;
+  }
+  .rotate-y-180 {
+    transform: rotateY(180deg);
+  }
+}

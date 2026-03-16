@@ -4,8 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Building2 } from "lucide-react";
 import { PortfolioData } from "@/types/portfolio";
 
 interface ExperienceFormProps {
@@ -14,43 +13,25 @@ interface ExperienceFormProps {
 }
 
 export function ExperienceForm({ data, onChange }: ExperienceFormProps) {
-  
   const addExperience = () => {
-    const newExp = {
-      id: crypto.randomUUID(),
-      company: "",
-      role: "",
-      startDate: "",
-      endDate: "",
-      location: "",
-      summary: "",
-      achievements: [],
-      stack: []
-    };
+    const newExp = { id: crypto.randomUUID(), company: "", role: "", startDate: "", endDate: "", location: "", summary: "", achievements: [], stack: [] };
     onChange({ ...data, experience: [...data.experience, newExp] });
   };
 
-  const removeExperience = (id: string) => {
-    onChange({ ...data, experience: data.experience.filter((exp) => exp.id !== id) });
-  };
+  const removeExperience = (id: string) => onChange({ ...data, experience: data.experience.filter((exp) => exp.id !== id) });
 
-  // Fixed Type: Explicitly allow string OR string array
   const updateExperience = (id: string, field: string, value: string | string[]) => {
     onChange({
       ...data,
-      experience: data.experience.map((exp) =>
-        exp.id === id ? { ...exp, [field]: value } : exp
-      ),
+      experience: data.experience.map((exp) => exp.id === id ? { ...exp, [field]: value } : exp),
     });
   };
 
-  // Helper para converter string separada por vírgula em array
   const handleStackChange = (id: string, value: string) => {
     const stackArray = value.split(",").map((s) => s.trim()).filter(Boolean);
     updateExperience(id, "stack", stackArray);
   };
 
-  // Helper para converter texto com quebra de linha em array de bullets
   const handleAchievementsChange = (id: string, value: string) => {
     const achievementsArray = value.split("\n").map((s) => s.trim()).filter(Boolean);
     updateExperience(id, "achievements", achievementsArray);
@@ -58,96 +39,92 @@ export function ExperienceForm({ data, onChange }: ExperienceFormProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <p className="text-xs text-muted-foreground">Liste suas experiências mais relevantes.</p>
-        <Button size="sm" variant="outline" onClick={addExperience} className="gap-2">
-          <Plus className="h-3 w-3" /> Adicionar
+      <div className="flex justify-between items-end border-b border-border/40 pb-4">
+        <div className="space-y-1">
+          <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground/80 flex items-center gap-2">
+            <Building2 className="h-4 w-4 text-primary" /> Histórico Profissional
+          </h3>
+          <p className="text-xs text-muted-foreground">Registre sua evolução de carreira.</p>
+        </div>
+        <Button size="sm" onClick={addExperience} className="h-10 rounded-xl font-black uppercase tracking-widest text-[10px] gap-2 shadow-lg hover:scale-105 transition-all">
+          <Plus className="h-4 w-4" /> Adicionar
         </Button>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-6">
         {data.experience.map((exp, index) => (
-          <Card key={exp.id} className="relative group border-border/60 bg-muted/10">
+          <div key={exp.id} className="relative group border border-border/40 bg-card rounded-[2rem] p-8 shadow-xl">
             <Button
-              size="icon"
-              variant="ghost"
-              className="absolute top-2 right-2 h-8 w-8 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+              size="icon" variant="destructive"
+              className="absolute -top-3 -right-3 h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
               onClick={() => removeExperience(exp.id)}
             >
               <Trash2 className="h-4 w-4" />
             </Button>
 
-            <CardContent className="p-4 space-y-4">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="bg-muted text-muted-foreground text-[10px] font-bold px-2 py-1 rounded">#{index + 1}</span>
+            <div className="mb-6">
+              <span className="bg-primary/10 text-primary text-[9px] uppercase tracking-widest font-black px-3 py-1 rounded-lg border border-primary/20">
+                POSIÇÃO #{index + 1}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Empresa / Instituição</Label>
+                <Input 
+                  value={exp.company} onChange={(e) => updateExperience(exp.id, "company", e.target.value)} 
+                  placeholder="Ex: Tech Solutions Inc." className="h-11 bg-muted/30 border-border/50 rounded-xl font-bold"
+                />
               </div>
-
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <Label className="text-xs">Empresa</Label>
-                  <Input 
-                    value={exp.company} 
-                    onChange={(e) => updateExperience(exp.id, "company", e.target.value)} 
-                    placeholder="Ex: Tech Solutions"
-                    className="bg-background"
-                  />
-                </div>
-                
-                <div className="space-y-1">
-                  <Label className="text-xs">Cargo</Label>
-                  <Input 
-                    value={exp.role} 
-                    onChange={(e) => updateExperience(exp.id, "role", e.target.value)} 
-                    placeholder="Ex: Senior Developer"
-                    className="bg-background"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Início</Label>
-                    <Input value={exp.startDate} onChange={(e) => updateExperience(exp.id, "startDate", e.target.value)} placeholder="MM/AAAA" className="bg-background" />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Fim</Label>
-                    <Input value={exp.endDate} onChange={(e) => updateExperience(exp.id, "endDate", e.target.value)} placeholder="MM/AAAA ou Atual" className="bg-background" />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs">Resumo Geral</Label>
-                  <Textarea 
-                    value={exp.summary} 
-                    onChange={(e) => updateExperience(exp.id, "summary", e.target.value)} 
-                    placeholder="Visão geral da sua responsabilidade..."
-                    className="min-h-[60px] bg-background text-sm"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs text-emerald-600 font-semibold">Conquistas (1 por linha)</Label>
-                  <Textarea 
-                    defaultValue={exp.achievements.join("\n")} 
-                    onBlur={(e) => handleAchievementsChange(exp.id, e.target.value)} 
-                    placeholder="• Aumentei a conversão em 20%&#10;• Liderança de squad com 5 devs..."
-                    className="min-h-[80px] bg-background text-sm"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs">Tech Stack (separado por vírgula)</Label>
-                  <Input 
-                    defaultValue={exp.stack.join(", ")} 
-                    onBlur={(e) => handleStackChange(exp.id, e.target.value)} 
-                    placeholder="React, Node.js, AWS..."
-                    className="bg-background"
-                  />
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Cargo Ocupado</Label>
+                <Input 
+                  value={exp.role} onChange={(e) => updateExperience(exp.id, "role", e.target.value)} 
+                  placeholder="Ex: Senior Developer" className="h-11 bg-muted/30 border-border/50 rounded-xl"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Período de Atuação</Label>
+                <div className="flex gap-2">
+                    <Input value={exp.startDate} onChange={(e) => updateExperience(exp.id, "startDate", e.target.value)} placeholder="Início" className="h-11 bg-muted/30 border-border/50 rounded-xl" />
+                    <Input value={exp.endDate} onChange={(e) => updateExperience(exp.id, "endDate", e.target.value)} placeholder="Fim (ou Atual)" className="h-11 bg-muted/30 border-border/50 rounded-xl" />
                 </div>
               </div>
-            </CardContent>
-          </Card>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Tecnologias Usadas</Label>
+                <Input 
+                  defaultValue={exp.stack.join(", ")} onBlur={(e) => handleStackChange(exp.id, e.target.value)} 
+                  placeholder="React, Node.js, AWS (separadas por vírgula)" className="h-11 bg-muted/30 border-border/50 rounded-xl font-mono text-xs"
+                />
+              </div>
+              
+              <div className="col-span-1 md:col-span-2 space-y-2 pt-2">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Resumo da Responsabilidade</Label>
+                <Textarea 
+                  value={exp.summary} onChange={(e) => updateExperience(exp.id, "summary", e.target.value)} 
+                  placeholder="Fui responsável por liderar a migração..." className="min-h-[80px] bg-muted/30 border-border/50 rounded-xl resize-none leading-relaxed"
+                />
+              </div>
+
+              <div className="col-span-1 md:col-span-2 space-y-2 bg-primary/5 p-4 rounded-[1.5rem] border border-primary/10">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-primary flex justify-between">
+                  <span>Conquistas e Métricas</span>
+                  <span className="text-muted-foreground/50 lowercase font-medium tracking-normal text-xs">Pressione ENTER para separar itens</span>
+                </Label>
+                <Textarea 
+                  defaultValue={exp.achievements.join("\n")} onBlur={(e) => handleAchievementsChange(exp.id, e.target.value)} 
+                  placeholder="Aumentei a conversão em 20% após reescrever o checkout..." className="min-h-[100px] bg-background border-border/40 rounded-xl text-sm resize-none"
+                />
+              </div>
+            </div>
+          </div>
         ))}
       </div>
+      {data.experience.length === 0 && (
+        <div className="text-center py-12 border-2 border-dashed border-border/40 rounded-[2rem] text-muted-foreground/50 text-sm font-black uppercase tracking-widest">
+          Nenhuma experiência registrada.
+        </div>
+      )}
     </div>
   );
 }

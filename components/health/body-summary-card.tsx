@@ -3,11 +3,18 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { 
+    Dialog, DialogContent, DialogHeader, DialogTitle, 
+    DialogTrigger, DialogDescription, DialogFooter 
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Scale, Pencil, ArrowRight, User, Loader2, Ruler, Target, Info, TrendingDown, TrendingUp, CheckCircle2 } from "lucide-react";
+import { 
+    Scale, Pencil, ArrowRight, User, Loader2, Ruler, 
+    Target, Info, TrendingDown, TrendingUp, CheckCircle2, 
+    Zap, Activity, ShieldAlert 
+} from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { saveBodyMeasurements } from "@/app/(dashboard)/health/actions";
@@ -24,6 +31,14 @@ interface BodyStatsProps {
     activityFactor?: number;
 }
 
+interface StatusConfig {
+    label: string;
+    color: string;
+    bg: string;
+    borderColor: string;
+    description: string;
+}
+
 export function BodySummaryCard({ 
     weight, height, age = 25, gender = 'MALE', 
     waist = 0, neck = 0, hip = 0, activityFactor = 1.2 
@@ -31,51 +46,52 @@ export function BodySummaryCard({
     const [open, setOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
-    // --- CÁLCULOS MATEMÁTICOS ---
+    // --- CÁLCULOS BIOMÉTRICOS ---
     const heightInMeters = height / 100;
     const bmi = (weight > 0 && height > 0) ? (weight / (heightInMeters * heightInMeters)) : 0;
     
-    // Gordura Estimada
     const genderFactor = gender === 'MALE' ? 1 : 0;
     const estimatedBodyFat = bmi > 0 ? (1.2 * bmi) + (0.23 * age) - (10.8 * genderFactor) - 5.4 : 0;
 
-    // Faixa de Peso Ideal (IMC 18.5 a 24.9)
     const minIdealWeight = 18.5 * (heightInMeters * heightInMeters);
     const maxIdealWeight = 24.9 * (heightInMeters * heightInMeters);
     
-    // Cálculo da Diferença para a Meta
     let goalDiff = 0;
     let goalLabel = "Manter";
     let GoalIcon = CheckCircle2;
     let goalColor = "text-emerald-500";
+    let goalBg = "bg-emerald-500/10";
 
     if (weight < minIdealWeight) {
         goalDiff = minIdealWeight - weight;
         goalLabel = "Ganhar";
         GoalIcon = TrendingUp;
         goalColor = "text-blue-500";
+        goalBg = "bg-blue-500/10";
     } else if (weight > maxIdealWeight) {
         goalDiff = weight - maxIdealWeight;
         goalLabel = "Perder";
         GoalIcon = TrendingDown;
-        goalColor = "text-amber-500";
+        goalColor = "text-rose-500";
+        goalBg = "bg-rose-500/10";
     }
 
-    // Configuração visual baseada no IMC
-    const getStatusConfig = (val: number) => {
-        if (val === 0) return { label: "N/A", color: "text-muted-foreground", bg: "bg-muted", fill: 0 };
-        if (val < 18.5) return { label: "Magreza", color: "text-blue-500", bg: "bg-blue-500", fill: 15 };
-        if (val < 24.9) return { label: "Saudável", color: "text-emerald-500", bg: "bg-emerald-500", fill: 50 };
-        if (val < 29.9) return { label: "Sobrepeso", color: "text-amber-500", bg: "bg-amber-500", fill: 85 };
-        return { label: "Obesidade", color: "text-rose-500", bg: "bg-rose-500", fill: 100 };
+    const getStatusConfig = (val: number): StatusConfig => {
+        if (val === 0) return { label: "N/A", color: "text-muted-foreground", bg: "bg-muted", borderColor: "border-muted", description: "Dados insuficientes" };
+        if (val < 18.5) return { label: "Abaixo do Peso", color: "text-blue-500", bg: "bg-blue-500", borderColor: "border-blue-500/20", description: "Abaixo da faixa saudável" };
+        if (val < 24.9) return { label: "Peso Ideal", color: "text-emerald-500", bg: "bg-emerald-500", borderColor: "border-emerald-500/20", description: "Composição corporal otimizada" };
+        if (val < 29.9) return { label: "Sobrepeso", color: "text-amber-500", bg: "bg-amber-500", borderColor: "border-amber-500/20", description: "Levemente acima da média" };
+        return { label: "Obesidade", color: "text-rose-500", bg: "bg-rose-500", borderColor: "border-rose-500/20", description: "Atenção: Risco à saúde detectado" };
     };
 
     const status = getStatusConfig(bmi);
 
-    const handleSubmit = async (formData: FormData) => {
+    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
         setIsLoading(true);
+        const formData = new FormData(event.currentTarget);
+        
         try {
-            // Preserva dados ocultos
             formData.append("gender", gender);
             formData.append("activityFactor", activityFactor.toString());
             if (waist) formData.append("waist", waist.toString());
@@ -85,169 +101,160 @@ export function BodySummaryCard({
             const result = await saveBodyMeasurements(formData);
 
             if (result.success) {
-                toast.success("Peso atualizado com sucesso!");
+                toast.success("Biometria atualizada!");
                 setOpen(false);
             } else {
                 toast.error(result.message);
             }
-        } catch (error) {
-            toast.error("Erro ao salvar medidas.");
+        } catch {
+            toast.error("Falha na comunicação com o servidor.");
         } finally {
             setIsLoading(false);
         }
     };
 
     return (
-        <Card className="relative h-full flex flex-col overflow-hidden border-border/60 bg-card/50 shadow-sm hover:shadow-lg transition-all duration-300 group">
+        <Card className="relative h-full flex flex-col overflow-hidden border-border/40 bg-card rounded-[2.5rem] shadow-2xl transition-all duration-500 group">
             
-            {/* Efeito de Fundo */}
-            <div className={cn("absolute top-0 right-0 w-64 h-64 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none opacity-10 transition-colors duration-500", status.bg)} />
+            {/* --- INDICADOR DE STATUS LATERAL --- */}
+            <div className={cn("absolute left-0 top-0 bottom-0 w-1.5 transition-colors duration-500", status.bg)} />
 
-            {/* --- HEADER --- */}
-            <CardHeader className="pb-2 flex flex-row items-start justify-between relative z-10 space-y-0">
-                <div className="space-y-1">
-                    <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                        <div className="p-1.5 bg-primary/10 rounded-md text-primary ring-1 ring-primary/20">
-                            <User className="h-3.5 w-3.5" />
-                        </div>
-                        Composição Corporal
-                    </CardTitle>
+            <CardHeader className="pb-4 flex flex-row items-center justify-between relative z-10 space-y-0 px-8 pt-8">
+                <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-muted/50 rounded-2xl text-foreground/70 border border-border/40 shadow-inner group-hover:scale-110 transition-transform duration-500">
+                        <Activity className="h-5 w-5" />
+                    </div>
+                    <div>
+                        <CardTitle className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Análise Corporal</CardTitle>
+                        <p className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest mt-0.5">Sincronizado</p>
+                    </div>
                 </div>
                 
-                {/* Botão de Edição */}
                 <Dialog open={open} onOpenChange={setOpen}>
                     <DialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full transition-colors -mr-2">
-                            <Pencil className="h-3.5 w-3.5" />
+                        <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl border-border/40 bg-background/50 hover:bg-primary hover:text-primary-foreground transition-all shadow-sm">
+                            <Pencil className="h-4 w-4" />
                         </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-[400px] rounded-xl">
-                        <DialogHeader>
-                            <DialogTitle className="flex items-center gap-2">
-                                <Scale className="h-5 w-5 text-primary" /> Atualizar Peso Rápido
-                            </DialogTitle>
-                            <DialogDescription>
-                                Atualize apenas o peso e altura. 
-                            </DialogDescription>
+                    <DialogContent className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] max-w-md rounded-[2.5rem] border-border/40 bg-card p-8 shadow-2xl z-[100]">
+                        <DialogHeader className="flex flex-col items-center text-center">
+                            <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-4 border border-primary/20">
+                                <Scale className="h-7 w-7" />
+                            </div>
+                            <DialogTitle className="text-2xl font-black uppercase tracking-tighter">Atualizar Biometria</DialogTitle>
+                            <DialogDescription className="text-sm font-medium">Insira as medidas atuais para recalcular seu IMC e metas.</DialogDescription>
                         </DialogHeader>
-                        <form action={handleSubmit} className="space-y-6 pt-2">
+                        <form onSubmit={handleSubmit} className="space-y-6 mt-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-bold uppercase text-muted-foreground">Peso (kg)</Label>
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Massa (kg)</Label>
                                     <div className="relative">
-                                        <Scale className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                        <Input name="weight" type="number" step="0.1" defaultValue={weight || ""} placeholder="0.0" className="pl-9 h-11 text-lg font-medium" required autoFocus />
+                                        <Input name="weight" type="number" step="0.1" defaultValue={weight || ""} placeholder="0.0" className="h-14 rounded-2xl bg-muted/40 border-border/60 shadow-inner font-bold text-center text-lg focus-visible:ring-primary/20" required autoFocus />
                                     </div>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-xs font-bold uppercase text-muted-foreground">Altura (cm)</Label>
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Estatura (cm)</Label>
                                     <div className="relative">
-                                        <Ruler className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                        <Input name="height" type="number" defaultValue={height || ""} placeholder="0" className="pl-9 h-11 text-lg font-medium" required />
+                                        <Input name="height" type="number" defaultValue={height || ""} placeholder="0" className="h-14 rounded-2xl bg-muted/40 border-border/60 shadow-inner font-bold text-center text-lg focus-visible:ring-primary/20" required />
                                     </div>
                                 </div>
                             </div>
-                            <Button className="w-full h-11 font-semibold shadow-md shadow-primary/20" disabled={isLoading}>
-                                {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "Salvar Alterações"}
+                            <Button type="submit" className="w-full h-14 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-widest text-[11px] shadow-lg shadow-primary/20 disabled:opacity-50" disabled={isLoading}>
+                                {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Confirmar Atualização"}
                             </Button>
                         </form>
                     </DialogContent>
                 </Dialog>
             </CardHeader>
             
-            {/* --- CONTEÚDO PRINCIPAL --- */}
-            <CardContent className="flex-1 flex flex-col gap-6 relative z-10 pt-2">
+            <CardContent className="flex-1 flex flex-col gap-8 px-8 pb-8 pt-2">
                 
-                {/* Linha 1: Dados Grandes */}
+                {/* --- DISPLAY PRINCIPAL --- */}
                 <div className="flex items-end justify-between">
-                    <div>
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-5xl font-black text-foreground tracking-tighter drop-shadow-sm">
+                    <div className="space-y-1">
+                        <div className="flex items-baseline gap-2">
+                            <span className="text-6xl font-black tracking-tighter text-foreground leading-none">
                                 {bmi.toFixed(1)}
                             </span>
-                            <span className="text-sm font-bold text-muted-foreground uppercase mb-1.5 ml-1">IMC</span>
+                            <div className="flex flex-col">
+                                <span className="text-xs font-black text-muted-foreground uppercase">Índice</span>
+                                <span className="text-xs font-black text-primary uppercase leading-none">IMC</span>
+                            </div>
                         </div>
-                        <div className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border", status.color.replace("text-", "bg-").replace("500", "500/10"), status.color.replace("text", "border").replace("500", "500/20"))}>
-                            <span className={cn("w-1.5 h-1.5 rounded-full", status.bg)}></span>
+                        <div className={cn("inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-[0.1em] mt-3 shadow-sm", status.borderColor, status.color, "bg-background/50")}>
+                            <Zap className="h-3 w-3 fill-current" />
                             {status.label}
                         </div>
                     </div>
 
-                    <div className="text-right space-y-1">
-                        <div className="flex flex-col items-end">
-                            <div className="flex items-baseline gap-1">
-                                <span className="text-3xl font-bold text-foreground/90">
-                                    {estimatedBodyFat > 0 ? estimatedBodyFat.toFixed(1) : '-'}
-                                </span>
-                                <span className="text-sm font-medium text-muted-foreground">%</span>
-                            </div>
-                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Gordura (Est.)</span>
+                    <div className="flex flex-col items-end gap-1">
+                        <div className="flex items-baseline gap-1">
+                            <span className="text-3xl font-black text-foreground/80 font-mono tracking-tighter">
+                                {estimatedBodyFat > 0 ? estimatedBodyFat.toFixed(1) : '--'}
+                            </span>
+                            <span className="text-xs font-bold text-muted-foreground uppercase">%</span>
                         </div>
+                        <span className="text-[10px] font-black text-muted-foreground/40 uppercase tracking-widest">Gordura Est.</span>
                     </div>
                 </div>
 
-                {/* Linha 2: Barra de Progresso Segmentada Customizada */}
-                <div className="space-y-2">
-                    <div className="h-2.5 w-full bg-secondary/50 rounded-full overflow-hidden flex relative">
-                        {/* Indicador de Posição */}
+                {/* --- ESCALA TÁTICA SEGMENTADA --- */}
+                <div className="space-y-3">
+                    <div className="flex justify-between items-center px-1">
+                        <span className="text-[9px] font-black text-muted-foreground/60 uppercase tracking-[0.2em]">Escala de Performance</span>
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger><Info className="h-3 w-3 text-muted-foreground/30 hover:text-primary transition-colors" /></TooltipTrigger>
+                                <TooltipContent className="bg-zinc-900 text-white border-none rounded-xl p-3 text-xs">
+                                    Normal: 18.5 - 24.9 | Sobrepeso: 25 - 29.9
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    </div>
+                    <div className="h-3 w-full bg-muted/30 rounded-full overflow-hidden flex gap-0.5 p-0.5 border border-border/40 shadow-inner relative">
+                        {/* Indicador Dinâmico */}
                         <div 
-                            className="absolute h-full w-1 bg-foreground z-10 shadow-[0_0_10px_rgba(0,0,0,0.5)] transition-all duration-1000 ease-out"
-                            style={{ left: `${Math.min(Math.max((bmi / 40) * 100, 0), 100)}%` }}
+                            className="absolute top-0 bottom-0 w-1.5 bg-foreground z-20 rounded-full border-2 border-background shadow-[0_0_15px_rgba(0,0,0,0.5)] transition-all duration-1000 ease-in-out"
+                            style={{ left: `calc(${Math.min(Math.max((bmi / 40) * 100, 0), 98)}% )` }}
                         />
-                        
-                        {/* Segmentos Coloridos */}
-                        <div className="h-full w-[46%] bg-blue-500/30 border-r border-background/20" /> {/* Magreza até 18.5 (aprox 46% de 40) */}
-                        <div className="h-full w-[16%] bg-emerald-500/40 border-r border-background/20" /> {/* Saudável até 24.9 */}
-                        <div className="h-full w-[13%] bg-amber-500/40 border-r border-background/20" /> {/* Sobrepeso até 29.9 */}
-                        <div className="h-full w-[25%] bg-rose-500/40" /> {/* Obesidade */}
-                    </div>
-                    <div className="flex justify-between text-[9px] font-bold text-muted-foreground/60 uppercase px-0.5 tracking-wide">
-                        <span>18.5</span>
-                        <span>25</span>
-                        <span>30</span>
-                        <span>40+</span>
+                        <div className="h-full flex-1 bg-blue-500/20 rounded-l-full" />
+                        <div className="h-full flex-1 bg-emerald-500/30" />
+                        <div className="h-full flex-1 bg-amber-500/30" />
+                        <div className="h-full flex-1 bg-rose-500/30 rounded-r-full" />
                     </div>
                 </div>
 
-                {/* Linha 3: Insight Inteligente (Peso Ideal) */}
-                <div className="bg-muted/30 border border-border/50 rounded-xl p-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className={cn("p-2 rounded-full bg-background border shadow-sm", goalColor)}>
-                            <GoalIcon className="h-4 w-4" />
+                {/* --- INSIGHT DE PESO IDEAL --- */}
+                <div className={cn("border border-border/40 rounded-3xl p-5 flex items-center justify-between shadow-inner transition-all", goalBg)}>
+                    <div className="flex items-center gap-4">
+                        <div className={cn("h-12 w-12 rounded-2xl bg-background border shadow-xl flex items-center justify-center shrink-0", goalColor)}>
+                            <GoalIcon className="h-6 w-6" />
                         </div>
-                        <div>
-                            <p className="text-[10px] uppercase font-bold text-muted-foreground">Peso Ideal ({minIdealWeight.toFixed(0)}-{maxIdealWeight.toFixed(0)}kg)</p>
-                            <p className="text-xs font-medium text-foreground">
+                        <div className="min-w-0">
+                            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Projeção de Saúde</p>
+                            <h4 className="text-sm font-bold text-foreground truncate mt-0.5">
                                 {goalDiff > 0 ? (
-                                    <>Precisa <span className={cn("font-bold", goalColor)}>{goalLabel} {goalDiff.toFixed(1)}kg</span></>
+                                    <>Ajuste de <span className={cn("font-black underline decoration-2 underline-offset-4", goalColor)}>{goalDiff.toFixed(1)}kg</span> necessário</>
                                 ) : (
-                                    <span className="text-emerald-500 font-bold">Peso Excelente!</span>
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-black">Nível de Atleta Detectado</span>
                                 )}
-                            </p>
+                            </h4>
                         </div>
                     </div>
-                    
-                    <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger>
-                                <Info className="h-4 w-4 text-muted-foreground/50 hover:text-foreground transition-colors" />
-                            </TooltipTrigger>
-                            <TooltipContent className="text-xs max-w-[200px]">
-                                Baseado na faixa de IMC saudável (18.5 - 24.9) para sua altura.
-                            </TooltipContent>
-                        </Tooltip>
-                    </TooltipProvider>
+                    <div className="text-right shrink-0">
+                        <span className="text-[10px] font-black text-muted-foreground/30 uppercase tracking-widest block">Meta Base</span>
+                        <span className="text-xs font-mono font-bold text-foreground/60 tracking-tighter">{minIdealWeight.toFixed(0)}-{maxIdealWeight.toFixed(0)}kg</span>
+                    </div>
                 </div>
 
-                {/* Footer Action */}
-                <div className="mt-auto pt-2">
-                    <Link href="/health/body" className="block">
-                        <Button variant="outline" size="sm" className="w-full h-9 text-xs font-medium border-dashed border-border/60 hover:bg-muted/50 hover:border-primary/30 hover:text-primary transition-all group/btn">
-                            Relatório Completo 
-                            <ArrowRight className="h-3 w-3 ml-2 opacity-50 group-hover/btn:translate-x-1 group-hover/btn:opacity-100 transition-all" />
-                        </Button>
-                    </Link>
-                </div>
+                {/* --- QUICK ACTION --- */}
+                <Link href="/health/body" className="block mt-auto group/btn">
+                    <div className="w-full h-12 rounded-2xl border border-dashed border-border/60 flex items-center justify-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground hover:bg-muted/50 hover:text-primary hover:border-primary/40 transition-all">
+                        Digitalizar Relatório Completo
+                        <ArrowRight className="h-3 w-3 group-hover/btn:translate-x-1 transition-transform" />
+                    </div>
+                </Link>
+
             </CardContent>
         </Card>
     );

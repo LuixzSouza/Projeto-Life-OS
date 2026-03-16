@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { RoutineItem } from "@prisma/client";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -23,7 +23,6 @@ import {
   DialogTitle,
   DialogDescription,
   DialogTrigger,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -37,41 +36,21 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
-  Clock,
-  BookOpen,
-  Dumbbell,
-  Home,
-  Coffee,
-  Briefcase,
-  Sun,
-  Plus,
-  Trash2,
-  Wand2,
-  Loader2,
-  LucideIcon,
-  Sparkles,
-  LayoutGrid,
-  CalendarDays,
-  MoreVertical,
+  Clock, BookOpen, Dumbbell, Home, Coffee, Briefcase, 
+  Sun, Plus, Trash2, Wand2, Loader2, LucideIcon, Sparkles, 
+  LayoutGrid, CalendarDays, MoreVertical, Edit2
 } from "lucide-react";
 import {
-  seedRoutine,
-  createRoutineItem,
-  updateRoutineItem,
-  deleteRoutineItem,
-  resetRoutine,
+  seedRoutine, createRoutineItem, updateRoutineItem, 
+  deleteRoutineItem, resetRoutine,
 } from "@/app/(dashboard)/agenda/actions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-// Tipagem e Configuração
+// --- TIPAGEM E CONFIGURAÇÃO ---
 type CategoryKey = "health" | "study" | "work" | "home" | "leisure";
 
 interface CategoryStyle {
@@ -83,41 +62,11 @@ interface CategoryStyle {
 }
 
 const CATEGORIES: Record<CategoryKey, CategoryStyle> = {
-  health: {
-    label: "Saúde",
-    icon: Dumbbell,
-    colorClass: "text-emerald-600 dark:text-emerald-400",
-    bgClass: "bg-emerald-500/10",
-    borderClass: "border-emerald-500/20",
-  },
-  study: {
-    label: "Estudos",
-    icon: BookOpen,
-    colorClass: "text-blue-600 dark:text-blue-400",
-    bgClass: "bg-blue-500/10",
-    borderClass: "border-blue-500/20",
-  },
-  work: {
-    label: "Trabalho",
-    icon: Briefcase,
-    colorClass: "text-violet-600 dark:text-violet-400",
-    bgClass: "bg-violet-500/10",
-    borderClass: "border-violet-500/20",
-  },
-  home: {
-    label: "Casa",
-    icon: Home,
-    colorClass: "text-orange-600 dark:text-orange-400",
-    bgClass: "bg-orange-500/10",
-    borderClass: "border-orange-500/20",
-  },
-  leisure: {
-    label: "Lazer",
-    icon: Coffee,
-    colorClass: "text-pink-600 dark:text-pink-400",
-    bgClass: "bg-pink-500/10",
-    borderClass: "border-pink-500/20",
-  },
+  health: { label: "Saúde", icon: Dumbbell, colorClass: "text-emerald-500", bgClass: "bg-emerald-500/10", borderClass: "border-emerald-500/20" },
+  study: { label: "Estudos", icon: BookOpen, colorClass: "text-blue-500", bgClass: "bg-blue-500/10", borderClass: "border-blue-500/20" },
+  work: { label: "Trabalho", icon: Briefcase, colorClass: "text-violet-500", bgClass: "bg-violet-500/10", borderClass: "border-violet-500/20" },
+  home: { label: "Casa", icon: Home, colorClass: "text-amber-500", bgClass: "bg-amber-500/10", borderClass: "border-amber-500/20" },
+  leisure: { label: "Lazer", icon: Coffee, colorClass: "text-pink-500", bgClass: "bg-pink-500/10", borderClass: "border-pink-500/20" },
 };
 
 const DAYS = [
@@ -130,12 +79,12 @@ const DAYS = [
   { id: "sun", label: "Domingo", short: "Dom" },
 ];
 
+// --- COMPONENTE PRINCIPAL ---
 export function RoutineManager({ items }: { items: RoutineItem[] }) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  // Dia atual para aba inicial
   const currentDayIndex = new Date().getDay();
   const jsDayToId = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
   const defaultTab = jsDayToId[currentDayIndex];
@@ -143,7 +92,7 @@ export function RoutineManager({ items }: { items: RoutineItem[] }) {
   const handleSeed = async () => {
     setIsLoading(true);
     await seedRoutine();
-    toast.success("Rotina padrão importada!");
+    toast.success("Rotina padrão importada com sucesso!");
     router.refresh();
     setIsLoading(false);
   };
@@ -151,116 +100,88 @@ export function RoutineManager({ items }: { items: RoutineItem[] }) {
   const handleReset = async () => {
     setIsLoading(true);
     await resetRoutine();
-    toast.success("Rotina zerada.");
+    toast.success("Rotina apagada do sistema.");
     router.refresh();
     setIsLoading(false);
   };
 
   return (
-    <div className="flex flex-col h-full w-full space-y-6">
-      {/* Header da Seção */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/40 pb-4">
-        <div className="space-y-1">
-          <h3 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <LayoutGrid className="h-5 w-5 text-primary" />
-            Minha Rotina
-          </h3>
-          <p className="text-sm text-muted-foreground">
-            Gerencie seus hábitos e blocos de tempo recorrentes.
-          </p>
+    <div className="flex flex-col h-[700px] w-full animate-in fade-in duration-500">
+      {/* HEADER */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/40 pb-6 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner border border-primary/20">
+            <LayoutGrid className="h-6 w-6" />
+          </div>
+          <div>
+            <h3 className="text-xl font-black uppercase tracking-tighter text-foreground">Protocolo Base</h3>
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">
+              Hábitos e blocos de tempo fixos
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
+        
+        <div className="flex items-center gap-3">
           {items.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="h-9 w-9">
+                <Button variant="outline" size="icon" className="h-11 w-11 rounded-xl hover:bg-muted border-border/60">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="w-48 rounded-xl border-border/60">
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <DropdownMenuItem
-                      onSelect={(e) => e.preventDefault()}
-                      className="text-destructive focus:text-destructive cursor-pointer"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" /> Zerar Rotina
+                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-rose-500 focus:text-rose-600 focus:bg-rose-500/10 cursor-pointer font-bold text-xs uppercase tracking-widest gap-2">
+                      <Trash2 className="h-4 w-4" /> Resetar Tudo
                     </DropdownMenuItem>
                   </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Zerar Rotina Completa?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Isso apagará todos os blocos de todos os dias. Esta ação
-                        é irreversível.
-                      </AlertDialogDescription>
+                  <AlertDialogContent className="rounded-[2.5rem] p-8 border-border/40 max-w-sm text-center">
+                    <AlertDialogHeader className="flex flex-col items-center">
+                      <div className="h-14 w-14 bg-rose-500/10 text-rose-500 flex items-center justify-center rounded-2xl mb-4"><Trash2 className="h-6 w-6"/></div>
+                      <AlertDialogTitle className="font-black uppercase tracking-tighter text-xl">Zerar Rotina?</AlertDialogTitle>
+                      <AlertDialogDescription className="text-xs font-medium">Isso apagará todos os blocos de todos os dias da semana. Irreversível.</AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={handleReset}
-                        className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-                      >
-                        {isLoading ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          "Confirmar Exclusão"
-                        )}
-                      </AlertDialogAction>
+                    <AlertDialogFooter className="sm:justify-center mt-6">
+                      <AlertDialogCancel className="rounded-xl text-[10px] font-black uppercase tracking-widest h-12 w-full sm:w-auto">Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleReset} className="bg-rose-500 hover:bg-rose-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest h-12 w-full sm:w-auto">Confirmar Exclusão</AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          <Button
-            size="sm"
-            onClick={() => setIsDialogOpen(true)}
-            className="h-9 gap-2 shadow-sm bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            <Plus className="h-4 w-4" /> Novo Bloco
+          <Button onClick={() => setIsDialogOpen(true)} className="h-11 px-5 rounded-xl bg-foreground text-background hover:bg-primary shadow-lg font-black uppercase tracking-widest text-[10px] gap-2 transition-all">
+            <Plus className="h-4 w-4 stroke-[3]" /> Novo Bloco
           </Button>
         </div>
       </div>
 
-      {/* Conteúdo Principal */}
+      {/* CONTEÚDO PRINCIPAL */}
       {items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 px-4 border-2 border-dashed border-border/60 rounded-xl bg-muted/5 animate-in fade-in zoom-in-95 duration-500">
-          <div className="bg-primary/10 p-4 rounded-full mb-4 ring-1 ring-primary/20">
-            <Wand2 className="h-8 w-8 text-primary" />
+        <div className="flex flex-col items-center justify-center flex-1 py-16 px-4 border-2 border-dashed border-border/40 rounded-[2rem] bg-muted/5 mt-6">
+          <div className="bg-primary/10 p-4 rounded-2xl mb-6 shadow-inner border border-primary/20">
+            <Wand2 className="h-8 w-8 text-primary animate-pulse" />
           </div>
-          <h4 className="text-lg font-semibold text-foreground mb-1">
-            Rotina Vazia
-          </h4>
-          <p className="text-muted-foreground text-sm text-center max-w-[280px] mb-6 leading-relaxed">
-            Você ainda não configurou sua rotina. Comece do zero ou use nosso modelo sugerido.
+          <h4 className="text-2xl font-black uppercase tracking-tighter text-foreground mb-2">Protocolo Vazio</h4>
+          <p className="text-muted-foreground text-xs font-medium text-center max-w-[300px] mb-8 leading-relaxed">
+            Você ainda não configurou uma rotina fixa. Use o nosso modelo de alta performance para começar.
           </p>
-          <Button
-            onClick={handleSeed}
-            disabled={isLoading}
-            variant="outline"
-            className="gap-2 border-primary/20 hover:bg-primary/5 text-primary"
-          >
-            {isLoading ? (
-              <Loader2 className="animate-spin h-4 w-4" />
-            ) : (
-              <Sparkles className="h-4 w-4" />
-            )}
+          <Button onClick={handleSeed} disabled={isLoading} variant="outline" className="h-12 px-6 rounded-xl gap-2 border-primary/30 hover:bg-primary/10 text-primary font-black uppercase tracking-widest text-[10px] shadow-sm transition-all">
+            {isLoading ? <Loader2 className="animate-spin h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
             Gerar Rotina Padrão
           </Button>
         </div>
       ) : (
-        <Tabs
-          defaultValue={defaultTab}
-          className="flex-1 flex flex-col min-h-0 w-full gap-4"
-        >
-          <ScrollArea className="w-full pb-2">
-            <TabsList className="bg-transparent p-0 h-auto gap-2 w-full justify-start">
+        <Tabs defaultValue={defaultTab} className="flex-1 flex flex-col min-h-0 w-full mt-6">
+          {/* TABS DE NAVEGAÇÃO DE DIAS */}
+          <ScrollArea className="w-full shrink-0">
+            <TabsList className="bg-transparent p-0 h-auto gap-2 w-full justify-start pb-2">
               {DAYS.map((day) => (
                 <TabsTrigger
                   key={day.id}
                   value={day.id}
-                  className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-primary/20 border border-transparent rounded-lg px-4 py-2 text-sm font-medium transition-all hover:bg-muted"
+                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md border border-border/40 rounded-xl px-5 h-11 text-[11px] font-black uppercase tracking-widest transition-all hover:bg-muted bg-background shadow-sm"
                 >
                   {day.label}
                 </TabsTrigger>
@@ -268,223 +189,200 @@ export function RoutineManager({ items }: { items: RoutineItem[] }) {
             </TabsList>
           </ScrollArea>
 
-          <div className="flex-1 bg-card border border-border/60 rounded-xl shadow-sm relative overflow-hidden min-h-[400px]">
+          {/* GRID DE HORÁRIOS */}
+          <div className="flex-1 bg-card border border-border/40 rounded-[2rem] shadow-sm relative overflow-hidden mt-4">
             {DAYS.map((day) => (
-              <TabsContent
-                key={day.id}
-                value={day.id}
-                className="h-full m-0 absolute inset-0 outline-none"
-              >
-                <ScrollArea className="h-full">
-                  <div className="p-6">
-                    <RoutineList
-                      items={items.filter((i) =>
-                        i.daysOfWeek.includes(day.id)
-                      )}
-                    />
-                  </div>
-                </ScrollArea>
+              <TabsContent key={day.id} value={day.id} className="h-full m-0 absolute inset-0 outline-none">
+                <RoutineGrid items={items.filter((i) => i.daysOfWeek.includes(day.id))} />
               </TabsContent>
             ))}
           </div>
         </Tabs>
       )}
 
-      {/* Modal de Criação */}
+      {/* MODAL DE CRIAÇÃO (NOVO DESIGN) */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden gap-0">
-          <DialogHeader className="p-6 pb-2">
+        <DialogContent className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] max-w-[500px] p-0 bg-background border-border/40 shadow-2xl rounded-[2.5rem] z-[100] overflow-hidden flex flex-col max-h-[90vh]">
+          <div className="p-6 border-b border-border/40 bg-muted/10 shrink-0">
             <div className="flex items-center gap-3">
-              <div className="bg-primary/10 p-2 rounded-lg">
-                <CalendarDays className="h-5 w-5 text-primary" />
+              <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner border border-primary/20">
+                <CalendarDays className="h-6 w-6" />
               </div>
               <div>
-                <DialogTitle>Novo Bloco de Rotina</DialogTitle>
-                <DialogDescription className="mt-1">
-                  Defina uma atividade recorrente para sua semana.
-                </DialogDescription>
+                <DialogTitle className="text-xl font-black uppercase tracking-tighter">Novo Bloco Fixo</DialogTitle>
+                <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">Configure um hábito recorrente</DialogDescription>
               </div>
             </div>
-          </DialogHeader>
-          <div className="p-6 pt-2">
-            <RoutineForm onClose={() => setIsDialogOpen(false)} />
           </div>
+          <RoutineForm onClose={() => setIsDialogOpen(false)} />
         </DialogContent>
       </Dialog>
     </div>
   );
 }
 
-// Lista de Itens (Renderização)
-function RoutineList({ items }: { items: RoutineItem[] }) {
-  const sortedItems = [...items].sort((a, b) =>
-    a.startTime.localeCompare(b.startTime)
-  );
+// --- SUBCOMPONENTE: ROUTINE GRID (TIMEBLOCKING) ---
+const START_HOUR = 5; // 05:00
+const END_HOUR = 23;  // 23:00
+const HOUR_HEIGHT = 80;
 
-  if (sortedItems.length === 0) {
+function RoutineGrid({ items }: { items: RoutineItem[] }) {
+  const hours = useMemo(() => {
+    const h = [];
+    for (let i = START_HOUR; i <= END_HOUR; i++) h.push(i);
+    return h;
+  }, []);
+
+  if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full py-24 text-muted-foreground/50">
-        <Sun className="h-12 w-12 mb-3 stroke-[1.5] opacity-50" />
-        <p className="text-base font-medium">Dia livre!</p>
-        <p className="text-xs">Nenhuma atividade planejada para hoje.</p>
+      <div className="flex flex-col items-center justify-center h-full py-20 text-muted-foreground/40 text-center">
+        <Sun className="h-16 w-16 mb-4 opacity-50" />
+        <h4 className="text-xl font-black uppercase tracking-tighter text-foreground/50">Dia Livre</h4>
+        <p className="text-[10px] font-bold uppercase tracking-widest mt-2">Nenhum protocolo para hoje</p>
       </div>
     );
   }
 
+  const getStyle = (start: string, end: string) => {
+    const [sH, sM] = start.split(":").map(Number);
+    const [eH, eM] = end.split(":").map(Number);
+    
+    const startMins = (sH - START_HOUR) * 60 + sM;
+    const durationMins = (eH * 60 + eM) - (sH * 60 + sM);
+    
+    return {
+      top: `${(startMins / 60) * HOUR_HEIGHT}px`,
+      height: `${Math.max((durationMins / 60) * HOUR_HEIGHT, 40)}px` 
+    };
+  };
+
   return (
-    <div className="space-y-4 relative pl-4">
-      {/* Linha do Tempo Visual */}
-      <div className="absolute left-[27px] top-2 bottom-2 w-px bg-border/60 -z-10 border-l border-dashed" />
-
-      {sortedItems.map((item) => {
-        const catKey =
-          item.category && CATEGORIES[item.category as CategoryKey]
-            ? (item.category as CategoryKey)
-            : "study";
-        const style = CATEGORIES[catKey];
-        const Icon = style.icon;
-
-        return (
-          <EditRoutineDialog key={item.id} item={item}>
-            <div className="group flex items-start gap-4 cursor-pointer">
-              {/* Ícone na Linha do Tempo */}
-              <div className="flex flex-col items-center pt-1">
-                <div
-                  className={cn(
-                    "p-2.5 rounded-xl border z-10 bg-card shadow-sm transition-all group-hover:scale-110 group-hover:shadow-md",
-                    style.colorClass,
-                    style.borderClass
-                  )}
-                >
-                  <Icon className="h-4 w-4" />
-                </div>
-              </div>
-
-              {/* Conteúdo do Card */}
-              <div
-                className={cn(
-                  "flex-1 p-4 rounded-xl border bg-card transition-all duration-200",
-                  "hover:border-primary/30 hover:shadow-md hover:translate-x-1",
-                  "flex flex-col gap-2 relative overflow-hidden"
-                )}
-              >
-                {/* Indicador lateral de categoria */}
-                <div
-                  className={cn(
-                    "absolute left-0 top-0 bottom-0 w-1 transition-colors",
-                    style.bgClass.replace("/10", "/40")
-                  )}
-                />
-
-                <div className="flex justify-between items-start pl-2">
-                  <div>
-                    <h4 className="font-semibold text-sm text-foreground leading-tight">
-                      {item.title}
-                    </h4>
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground/70 mt-1 block">
-                      {style.label}
-                    </span>
-                  </div>
-                  <Badge
-                    variant="secondary"
-                    className="font-mono text-[10px] h-6 px-2 bg-muted/50 border border-border/50 text-foreground"
-                  >
-                    <Clock className="h-3 w-3 mr-1.5 opacity-50" />
-                    {item.startTime} - {item.endTime}
-                  </Badge>
-                </div>
-
-                {item.description && (
-                  <p className="text-xs text-muted-foreground line-clamp-2 pl-2 border-l-2 border-border/40 ml-0.5">
-                    {item.description}
-                  </p>
-                )}
-              </div>
+    <div className="relative w-full h-full overflow-y-auto custom-scrollbar p-4">
+      <div className="relative w-full" style={{ height: `${(END_HOUR - START_HOUR + 1) * HOUR_HEIGHT}px` }}>
+        
+        {/* Background Régua */}
+        {hours.map((hour) => (
+          <div key={hour} className="absolute w-full flex items-start" style={{ top: `${(hour - START_HOUR) * HOUR_HEIGHT}px`, height: `${HOUR_HEIGHT}px` }}>
+            <div className="w-14 text-right pr-3 shrink-0 -mt-2">
+              <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40">{hour.toString().padStart(2, '0')}:00</span>
             </div>
-          </EditRoutineDialog>
-        );
-      })}
+            <div className="flex-1 border-t border-border/40 border-dashed" />
+          </div>
+        ))}
+
+        {/* Blocos de Rotina */}
+        <div className="absolute left-14 right-2 top-0 bottom-0">
+          {items.map((item) => {
+            const styleProps = getStyle(item.startTime, item.endTime);
+            const catKey = item.category && CATEGORIES[item.category as CategoryKey] ? (item.category as CategoryKey) : "study";
+            const theme = CATEGORIES[catKey];
+            const Icon = theme.icon;
+            const isCompact = parseFloat(styleProps.height) <= 50;
+
+            return (
+              <EditRoutineDialog key={item.id} item={item}>
+                <div 
+                  className={cn(
+                    "absolute left-2 right-2 rounded-xl border p-2.5 shadow-sm transition-all hover:shadow-lg hover:z-10 group cursor-pointer overflow-hidden",
+                    theme.bgClass, theme.borderClass
+                  )}
+                  style={styleProps}
+                >
+                  <div className={cn("absolute left-0 top-0 bottom-0 w-1.5 transition-all group-hover:w-2", theme.bgClass.replace("/10", "/50"))} />
+                  
+                  <div className="flex justify-between items-start h-full pl-2">
+                    <div className="flex flex-col min-w-0 h-full">
+                      <div className="flex items-center gap-2">
+                        <Icon className={cn("h-3 w-3 shrink-0", theme.colorClass)} />
+                        <h4 className="font-bold text-xs truncate text-foreground leading-tight">{item.title}</h4>
+                      </div>
+                      
+                      {!isCompact && (
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <span className={cn("text-[9px] font-black uppercase tracking-wider", theme.colorClass)}>{theme.label}</span>
+                          <span className="text-[9px] font-bold text-muted-foreground/60 uppercase tracking-widest tabular-nums border-l border-border pl-2">
+                            {item.startTime} - {item.endTime}
+                          </span>
+                        </div>
+                      )}
+                      
+                      {!isCompact && item.description && (
+                        <p className="text-[10px] text-muted-foreground/80 line-clamp-1 mt-1.5 font-medium">{item.description}</p>
+                      )}
+                    </div>
+
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-background/50 rounded-md p-1 backdrop-blur-sm">
+                      <Edit2 className="h-3 w-3 text-muted-foreground" />
+                    </div>
+                  </div>
+                </div>
+              </EditRoutineDialog>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
 
-// Dialog de Edição (Wrapper)
-function EditRoutineDialog({
-  item,
-  children,
-}: {
-  item: RoutineItem;
-  children: React.ReactNode;
-}) {
+// --- SUBCOMPONENTE: DIALOG DE EDIÇÃO ---
+function EditRoutineDialog({ item, children }: { item: RoutineItem; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden gap-0">
-        <DialogHeader className="p-6 pb-2 bg-muted/10 border-b border-border/40">
+      <DialogContent className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] max-w-[500px] p-0 bg-background border-border/40 shadow-2xl rounded-[2.5rem] z-[100] overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="p-6 border-b border-border/40 bg-muted/10 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="bg-primary/10 p-2 rounded-lg">
-              <Clock className="h-5 w-5 text-primary" />
+            <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner border border-primary/20">
+              <Clock className="h-6 w-6" />
             </div>
             <div>
-              <DialogTitle>Editar Bloco</DialogTitle>
-              <DialogDescription className="mt-1">
-                Atualize os detalhes desta atividade.
-              </DialogDescription>
+              <DialogTitle className="text-xl font-black uppercase tracking-tighter">Editar Bloco</DialogTitle>
+              <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">Ajuste os parâmetros da rotina</DialogDescription>
             </div>
           </div>
-        </DialogHeader>
-        <div className="p-6">
-          <RoutineForm item={item} onClose={() => setOpen(false)} />
         </div>
+        {/* O Form gerencia seu próprio scroll interno */}
+        <RoutineForm item={item} onClose={() => setOpen(false)} />
       </DialogContent>
     </Dialog>
   );
 }
 
-// Formulário Unificado (Create/Edit)
-function RoutineForm({
-  item,
-  onClose,
-}: {
-  item?: RoutineItem;
-  onClose: () => void;
-}) {
+// --- SUBCOMPONENTE: FORMULÁRIO (CREATE/EDIT) COM LAYOUT MELHORADO ---
+function RoutineForm({ item, onClose }: { item?: RoutineItem; onClose: () => void }) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedDays, setSelectedDays] = useState<string[]>(
-    item?.daysOfWeek
-      ? item.daysOfWeek.split(",")
-      : ["mon", "tue", "wed", "thu", "fri"]
-  );
+  const [selectedDays, setSelectedDays] = useState<string[]>(item?.daysOfWeek ? item.daysOfWeek.split(",") : ["mon", "tue", "wed", "thu", "fri"]);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const toggleDay = (dayId: string) => {
-    if (selectedDays.includes(dayId))
-      setSelectedDays(selectedDays.filter((d) => d !== dayId));
+    if (selectedDays.includes(dayId)) setSelectedDays(selectedDays.filter((d) => d !== dayId));
     else setSelectedDays([...selectedDays, dayId]);
   };
 
   const handleSubmit = async (formData: FormData) => {
     if (selectedDays.length === 0) {
-      toast.error("Selecione pelo menos um dia da semana!");
-      return;
+        toast.error("Selecione pelo menos um dia da semana.");
+        return; // ✅ CORREÇÃO: Resolve o erro TypeScript do 'action' do form
     }
+    
     setIsLoading(true);
     formData.append("daysOfWeek", selectedDays.join(","));
 
     try {
       if (item) {
         await updateRoutineItem(formData);
-        toast.success("Rotina atualizada!");
+        toast.success("Protocolo atualizado.");
       } else {
         await createRoutineItem(formData);
-        toast.success("Bloco criado!");
+        toast.success("Bloco adicionado.");
       }
       router.refresh();
       onClose();
     } catch {
-      toast.error("Erro ao salvar.");
+      toast.error("Erro ao sincronizar dados.");
     } finally {
       setIsLoading(false);
     }
@@ -493,178 +391,118 @@ function RoutineForm({
   const handleDelete = async () => {
     setIsLoading(true);
     await deleteRoutineItem(item!.id);
-    toast.success("Removido da rotina.");
+    toast.success("Bloco removido.");
     router.refresh();
-    setIsLoading(false);
     setIsDeleteDialogOpen(false);
     onClose();
   };
 
   return (
-    <form action={handleSubmit} className="space-y-6">
-      {item && <input type="hidden" name="id" value={item.id} />}
+    <form action={handleSubmit} className="flex flex-col h-full overflow-hidden">
+      
+      {/* CORPO ROLÁVEL DO FORMULÁRIO */}
+      <div className="p-6 overflow-y-auto custom-scrollbar space-y-6 flex-1">
+        {item && <input type="hidden" name="id" value={item.id} />}
 
-      <div className="grid grid-cols-2 gap-4">
+        {/* Atividade */}
         <div className="space-y-2">
-          <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-            Início
-          </Label>
-          <div className="relative">
-            <Clock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <Input
-              type="time"
-              name="startTime"
-              defaultValue={item?.startTime || "07:00"}
-              className="pl-9 bg-muted/20 border-border h-10"
-              required
-            />
-          </div>
+            <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">Identificação da Atividade</Label>
+            <Input name="title" defaultValue={item?.title} placeholder="Ex: Leitura Focada, Academia..." className="h-12 bg-muted/20 border-border/40 focus-visible:ring-primary/30 rounded-xl font-bold text-base" required />
         </div>
-        <div className="space-y-2">
-          <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-            Fim
-          </Label>
-          <div className="relative">
-            <Clock className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <Input
-              type="time"
-              name="endTime"
-              defaultValue={item?.endTime || "08:00"}
-              className="pl-9 bg-muted/20 border-border h-10"
-              required
-            />
-          </div>
-        </div>
-      </div>
 
-      <div className="space-y-2">
-        <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-          Atividade
-        </Label>
-        <Input
-          name="title"
-          defaultValue={item?.title}
-          placeholder="Ex: Academia, Leitura, Trabalho Focado"
-          className="bg-muted/20 border-border h-10 font-medium"
-          required
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-          Categoria
-        </Label>
-        <Select name="category" defaultValue={item?.category || "study"}>
-          <SelectTrigger className="bg-muted/20 border-border h-10">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="health">Saúde / Treino</SelectItem>
-            <SelectItem value="study">Estudos</SelectItem>
-            <SelectItem value="work">Trabalho</SelectItem>
-            <SelectItem value="home">Casa</SelectItem>
-            <SelectItem value="leisure">Lazer</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="space-y-3 p-4 bg-muted/10 rounded-xl border border-border/40">
-        <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-2">
-          Repetir em
-        </Label>
-        <div className="flex flex-wrap gap-2">
-          {DAYS.map((day) => (
-            <div
-              key={day.id}
-              onClick={(e) => {
-                e.preventDefault();
-                toggleDay(day.id);
-              }}
-              className={cn(
-                "cursor-pointer h-9 px-3 flex items-center justify-center rounded-lg text-xs font-bold border transition-all select-none",
-                selectedDays.includes(day.id)
-                  ? "bg-primary text-primary-foreground border-primary shadow-sm ring-2 ring-primary/20"
-                  : "bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground"
-              )}
-            >
-              {day.short}
+        {/* Time Grid (Início e Fim) */}
+        <div className="grid grid-cols-2 gap-4 bg-muted/10 p-4 rounded-[1.5rem] border border-border/40 shadow-inner">
+            <div className="space-y-2">
+                <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+                    <Clock className="h-3 w-3" /> Início
+                </Label>
+                <Input type="time" name="startTime" defaultValue={item?.startTime || "07:00"} className="h-12 bg-background border-border/40 focus-visible:ring-primary/30 rounded-xl font-mono font-black text-lg text-center" required />
             </div>
-          ))}
+            <div className="space-y-2">
+                <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+                    <Clock className="h-3 w-3" /> Fim
+                </Label>
+                <Input type="time" name="endTime" defaultValue={item?.endTime || "08:00"} className="h-12 bg-background border-border/40 focus-visible:ring-primary/30 rounded-xl font-mono font-black text-lg text-center" required />
+            </div>
+        </div>
+
+        {/* Categoria */}
+        <div className="space-y-2">
+            <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Categoria Tática</Label>
+            <Select name="category" defaultValue={item?.category || "study"}>
+            <SelectTrigger className="h-12 bg-muted/20 border-border/40 rounded-xl font-bold text-sm">
+                <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl">
+                {Object.entries(CATEGORIES).map(([key, cat]) => (
+                    <SelectItem key={key} value={key} className={cn("font-bold", cat.colorClass)}>
+                        {cat.label}
+                    </SelectItem>
+                ))}
+            </SelectContent>
+            </Select>
+        </div>
+
+        {/* Dias da Semana (Chips) */}
+        <div className="space-y-3">
+            <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Frequência (Ativo em)</Label>
+            <div className="flex flex-wrap gap-2">
+            {DAYS.map((day) => (
+                <div
+                key={day.id}
+                onClick={() => toggleDay(day.id)}
+                className={cn(
+                    "cursor-pointer h-10 px-4 flex items-center justify-center rounded-xl text-[10px] font-black uppercase tracking-widest transition-all select-none border-2",
+                    selectedDays.includes(day.id)
+                    ? "bg-primary text-primary-foreground border-primary shadow-md scale-105"
+                    : "bg-muted/30 text-muted-foreground border-transparent hover:border-primary/30"
+                )}
+                >
+                {day.short}
+                </div>
+            ))}
+            </div>
+        </div>
+
+        {/* Descrição */}
+        <div className="space-y-2 pb-2">
+            <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Anotações Adicionais</Label>
+            <Textarea name="description" defaultValue={item?.description || ""} rows={3} className="bg-muted/20 border-border/40 rounded-xl resize-none text-sm font-medium p-4 leading-relaxed" placeholder="Metas ou checklists da rotina..." />
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-          Notas (Opcional)
-        </Label>
-        <Textarea
-          name="description"
-          defaultValue={item?.description || ""}
-          rows={2}
-          className="bg-muted/20 border-border resize-none"
-          placeholder="Detalhes extras..."
-        />
-      </div>
-
-      <div className="pt-2 flex items-center justify-between border-t border-border/40 mt-4">
+      {/* RODAPÉ FIXO DO MODAL */}
+      <div className="p-6 pt-4 bg-background border-t border-border/40 flex items-center justify-between gap-3 shrink-0">
+        
         {item ? (
-          <AlertDialog
-            open={isDeleteDialogOpen}
-            onOpenChange={setIsDeleteDialogOpen}
-          >
+          <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
             <AlertDialogTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                className="text-destructive hover:text-destructive hover:bg-destructive/10 -ml-2"
-                disabled={isLoading}
-              >
-                <Trash2 className="h-4 w-4 mr-2" /> Excluir
+              <Button type="button" variant="outline" className="h-12 w-12 p-0 rounded-xl text-rose-500 border-rose-500/20 hover:bg-rose-500 hover:text-white transition-all shrink-0">
+                <Trash2 className="h-5 w-5" />
               </Button>
             </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Excluir Bloco?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Este item será removido da sua rotina permanentemente.
-                </AlertDialogDescription>
+            <AlertDialogContent className="rounded-[2.5rem] border-border/40 shadow-2xl p-8 max-w-sm fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[110]">
+              <AlertDialogHeader className="items-center text-center">
+                <div className="h-14 w-14 bg-rose-500/10 text-rose-500 flex items-center justify-center rounded-2xl mb-4"><Trash2 className="h-6 w-6"/></div>
+                <AlertDialogTitle className="font-black uppercase tracking-tighter text-xl">Apagar Bloco?</AlertDialogTitle>
+                <AlertDialogDescription className="text-xs font-medium">Isso removerá a atividade da sua rotina.</AlertDialogDescription>
               </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleDelete}
-                  className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-                >
-                  Confirmar Exclusão
-                </AlertDialogAction>
+              <AlertDialogFooter className="mt-6 gap-2 sm:justify-center">
+                <AlertDialogCancel className="h-11 rounded-xl text-[10px] font-black uppercase tracking-widest m-0 flex-1">Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} className="bg-rose-500 hover:bg-rose-600 text-white h-11 rounded-xl text-[10px] font-black uppercase tracking-widest flex-1">Excluir</AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
         ) : (
-          <div />
+            <div />
         )}
 
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={onClose}
-            className="text-muted-foreground"
-          >
+        <div className="flex gap-2 flex-1 justify-end">
+          <Button type="button" variant="ghost" onClick={onClose} className="h-12 px-6 rounded-xl text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:bg-muted hidden sm:flex">
             Cancelar
           </Button>
-          <Button
-            type="submit"
-            className="bg-primary text-primary-foreground hover:bg-primary/90 min-w-[120px] shadow-sm"
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2" /> Salvando
-              </>
-            ) : (
-              "Salvar"
-            )}
+          <Button type="submit" disabled={isLoading} className="h-12 w-full sm:w-auto px-8 rounded-xl bg-foreground text-background hover:bg-primary hover:text-white shadow-lg font-black uppercase tracking-widest text-[10px] transition-all active:scale-95">
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Gravar Dados"}
           </Button>
         </div>
       </div>

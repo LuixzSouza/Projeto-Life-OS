@@ -20,55 +20,52 @@ import {
     FileText, 
     Palette, 
     Loader2, 
-    CheckCircle2 
+    Check,
+    FolderPlus
 } from "lucide-react";
-// Verifique se este caminho está correto no seu projeto. 
-// Se não, ajuste para onde você criou a Server Action de projetos.
 import { createProject } from "@/app/(dashboard)/projects/actions"; 
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-// Cores disponíveis (Tipagem para segurança se usar TS estrito)
-type ProjectColor = { name: string; value: string; class: string };
+// Definição estrita do tipo para evitar 'any'
+interface ProjectColor {
+    name: string;
+    value: string;
+    class: string;
+    ringClass: string;
+}
 
 const PROJECT_COLORS: ProjectColor[] = [
-    { name: "Indigo", value: "#6366f1", class: "bg-indigo-500" },
-    { name: "Blue", value: "#3b82f6", class: "bg-blue-500" },
-    { name: "Emerald", value: "#10b981", class: "bg-emerald-500" },
-    { name: "Amber", value: "#f59e0b", class: "bg-amber-500" },
-    { name: "Rose", value: "#f43f5e", class: "bg-rose-500" },
-    { name: "Violet", value: "#8b5cf6", class: "bg-violet-500" },
+    { name: "Indigo", value: "#6366f1", class: "bg-indigo-500", ringClass: "focus-within:ring-indigo-500/30" },
+    { name: "Blue", value: "#3b82f6", class: "bg-blue-500", ringClass: "focus-within:ring-blue-500/30" },
+    { name: "Emerald", value: "#10b981", class: "bg-emerald-500", ringClass: "focus-within:ring-emerald-500/30" },
+    { name: "Amber", value: "#f59e0b", class: "bg-amber-500", ringClass: "focus-within:ring-amber-500/30" },
+    { name: "Rose", value: "#f43f5e", class: "bg-rose-500", ringClass: "focus-within:ring-rose-500/30" },
+    { name: "Violet", value: "#8b5cf6", class: "bg-violet-500", ringClass: "focus-within:ring-violet-500/30" },
 ];
 
 export function NewProjectDialog() {
     const [open, setOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    const [selectedColor, setSelectedColor] = useState(PROJECT_COLORS[0].value); // Estado para cor selecionada
+    const [selectedColor, setSelectedColor] = useState<ProjectColor>(PROJECT_COLORS[0]);
 
-    async function handleSubmit(formData: FormData) {
+    async function handleSubmit(formData: FormData): Promise<void> {
         setIsLoading(true);
-        
-        // Garante que a cor selecionada via state seja enviada se o radio falhar ou para consistência
-        if (!formData.get("color")) {
-            formData.set("color", selectedColor);
-        }
+        formData.set("color", selectedColor.value);
 
         try {
             const result = await createProject(formData);
             
-            // Se sua Server Action retornar erro, trate aqui
             if (result?.error) {
                 toast.error(result.error);
                 return;
             }
 
-            toast.success("Projeto criado com sucesso!");
+            toast.success("Projeto iniciado com sucesso! 🚀");
             setOpen(false);
-            
-            // Opcional: Resetar form se necessário, mas como o dialog desmonta/remonta, o state limpa.
         } catch (error) {
             console.error(error);
-            toast.error("Erro ao criar projeto. Tente novamente.");
+            toast.error("Ocorreu um erro ao criar o projeto.");
         } finally {
             setIsLoading(false);
         }
@@ -78,107 +75,113 @@ export function NewProjectDialog() {
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
                 <Button 
-                    size="sm" 
-                    className="gap-2 bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+                    className="gap-2 bg-foreground text-background hover:bg-foreground/90 shadow-lg rounded-xl px-5 h-11 transition-all active:scale-95"
                 >
-                    <Plus className="h-4 w-4" /> Novo Projeto
+                    <Plus className="h-4 w-4" /> 
+                    <span className="font-bold tracking-tight">Novo Projeto</span>
                 </Button>
             </DialogTrigger>
             
-            <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden gap-0 border-border shadow-lg">
-                
-                {/* Header Visual */}
-                <div className="bg-muted/30 border-b border-border p-6 flex flex-col items-center text-center">
-                    <div className="h-12 w-12 bg-background rounded-full flex items-center justify-center shadow-sm mb-3 border border-border animate-in zoom-in duration-300">
-                        <Sparkles className="h-6 w-6 text-primary" />
+            <DialogContent className="fixed left-[50%] top-[50%] z-50 grid w-[95vw] sm:max-w-[440px] translate-x-[-50%] translate-y-[-50%] p-0 overflow-hidden border-border/40 shadow-2xl rounded-[2rem] bg-background">
+                <DialogHeader className="p-8 pb-4">
+                    <div className="flex items-center gap-4">
+                        <div className={cn(
+                            "h-12 w-12 rounded-2xl flex items-center justify-center shadow-inner transition-colors duration-500",
+                            selectedColor.class,
+                            "bg-opacity-20"
+                        )}>
+                            <FolderPlus className={cn("h-6 w-6 transition-colors duration-500", selectedColor.class.replace('bg-', 'text-'))} />
+                        </div>
+                        <div className="space-y-1">
+                            <DialogTitle className="text-2xl font-black uppercase tracking-tighter">Criar Projeto</DialogTitle>
+                            <DialogDescription className="text-xs font-medium text-muted-foreground uppercase tracking-widest">Defina sua nova meta</DialogDescription>
+                        </div>
                     </div>
-                    <DialogTitle className="text-lg font-semibold text-foreground">Novo Projeto</DialogTitle>
-                    <DialogDescription className="text-sm text-muted-foreground mt-1 max-w-[280px]">
-                        Crie um espaço para organizar suas tarefas, ideias e metas.
-                    </DialogDescription>
-                </div>
+                </DialogHeader>
 
-                <form action={handleSubmit} className="p-6 space-y-5">
-                    {/* Nome */}
-                    <div className="space-y-2">
-                        <Label htmlFor="title" className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-2">
-                            <Type className="h-3.5 w-3.5" /> Nome do Projeto
+                <form action={handleSubmit} className="p-8 pt-2 space-y-6">
+                    {/* Nome do Projeto */}
+                    <div className={cn("space-y-2 transition-all duration-300", selectedColor.ringClass)}>
+                        <Label htmlFor="title" className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">
+                            Título
                         </Label>
-                        <Input 
-                            id="title" 
-                            name="title" 
-                            placeholder="Ex: Redesign do Site..." 
-                            required 
-                            autoFocus
-                            className="bg-muted/30 border-border focus-visible:ring-primary" 
-                        />
+                        <div className="relative group">
+                            <Type className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50 transition-colors group-focus-within:text-foreground" />
+                            <Input 
+                                id="title" 
+                                name="title" 
+                                placeholder="Dê um nome impactante..." 
+                                required 
+                                maxLength={40}
+                                className="h-12 pl-11 bg-muted/20 border-border/50 rounded-xl font-bold text-base focus-visible:ring-offset-0 focus-visible:ring-1 transition-all" 
+                            />
+                        </div>
                     </div>
 
                     {/* Descrição */}
-                    <div className="space-y-2">
-                        <Label htmlFor="description" className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-2">
-                            <FileText className="h-3.5 w-3.5" /> Descrição Curta
+                    <div className={cn("space-y-2 transition-all duration-300", selectedColor.ringClass)}>
+                        <Label htmlFor="description" className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">
+                            Descrição (Opcional)
                         </Label>
-                        <Input 
-                            id="description" 
-                            name="description" 
-                            placeholder="Objetivo principal..." 
-                            className="bg-muted/30 border-border focus-visible:ring-primary" 
-                        />
+                        <div className="relative group">
+                            <FileText className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50 transition-colors group-focus-within:text-foreground" />
+                            <Input 
+                                id="description" 
+                                name="description" 
+                                placeholder="Qual o grande objetivo?" 
+                                maxLength={80}
+                                className="h-12 pl-11 bg-muted/20 border-border/50 rounded-xl font-medium focus-visible:ring-offset-0 focus-visible:ring-1 transition-all" 
+                            />
+                        </div>
                     </div>
 
-                    {/* Cores */}
-                    <div className="space-y-3">
-                        <Label className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-2">
-                            <Palette className="h-3.5 w-3.5" /> Cor do Marcador
+                    {/* Color Picker Corrigido */}
+                    <div className="space-y-4">
+                        <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1 flex items-center gap-2">
+                            <Palette className="h-3.5 w-3.5" /> Identidade Visual
                         </Label>
-                        <div className="flex flex-wrap gap-3">
+                        <div className="flex justify-between items-center bg-muted/30 p-3 rounded-2xl border border-border/40">
                             {PROJECT_COLORS.map((color) => (
-                                <label 
-                                    key={color.value} 
-                                    className="relative cursor-pointer group"
-                                    onClick={() => setSelectedColor(color.value)}
+                                <button
+                                    key={color.value}
+                                    type="button"
+                                    onClick={() => setSelectedColor(color)}
+                                    className={cn(
+                                        "relative h-8 w-8 rounded-full transition-all duration-300 hover:scale-110 active:scale-95 flex items-center justify-center shadow-sm",
+                                        color.class,
+                                        selectedColor.value === color.value ? "ring-4 ring-offset-2 ring-offset-background" : "opacity-80"
+                                    )}
+                                    // A CORREÇÃO ESTÁ AQUI: Usando variável CSS ou propriedades padrão
+                                    style={{ ringColor: selectedColor.value === color.value ? color.value : undefined } as React.CSSProperties}
                                 >
-                                    <input 
-                                        type="radio" 
-                                        name="color" 
-                                        value={color.value} 
-                                        className="peer sr-only" 
-                                        checked={selectedColor === color.value}
-                                        onChange={() => setSelectedColor(color.value)}
-                                    />
-                                    <div className={cn(
-                                        `w-8 h-8 rounded-full ${color.class} border-2 border-transparent transition-all shadow-sm`,
-                                        "peer-checked:border-background peer-checked:ring-2 peer-checked:ring-offset-1 peer-checked:ring-primary hover:scale-110",
-                                        selectedColor === color.value ? "scale-110 ring-2 ring-primary ring-offset-2" : ""
-                                    )}>
-                                        {selectedColor === color.value && (
-                                            <div className="absolute inset-0 flex items-center justify-center">
-                                                <div className="h-2 w-2 bg-white rounded-full shadow-sm" />
-                                            </div>
-                                        )}
-                                    </div>
+                                    {selectedColor.value === color.value && (
+                                        <Check className="h-4 w-4 text-white animate-in zoom-in duration-200" />
+                                    )}
                                     <span className="sr-only">{color.name}</span>
-                                </label>
+                                </button>
                             ))}
                         </div>
                     </div>
 
-                    <DialogFooter className="pt-2">
+                    <DialogFooter className="pt-4">
                         <Button 
                             type="submit" 
                             disabled={isLoading} 
-                            className="w-full bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-md transition-all active:scale-[0.98]"
+                            className={cn(
+                                "w-full h-14 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl transition-all duration-500",
+                                selectedColor.class,
+                                "text-white hover:brightness-110 active:scale-95 disabled:opacity-50"
+                            )}
                         >
                             {isLoading ? (
                                 <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Criando...
+                                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                    Sincronizando...
                                 </>
                             ) : (
                                 <>
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Criar Projeto
+                                    <Sparkles className="mr-2 h-5 w-5 fill-current" />
+                                    Lançar Projeto
                                 </>
                             )}
                         </Button>

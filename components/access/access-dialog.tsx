@@ -19,60 +19,41 @@ export function AccessDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      {/* Trigger Button - Estilo Premium & Consistente */}
+      {/* TRIGGER BUTTON (Estilo Tático Premium) */}
       <DialogTrigger asChild>
         <Button
           className={cn(
-            "relative group gap-2 px-5 h-10",
-            "bg-primary text-primary-foreground hover:bg-primary/90",
-            "shadow-lg shadow-primary/20 transition-all duration-300",
-            "hover:shadow-primary/30 hover:-translate-y-0.5",
-            "border border-white/10"
+            "h-11 px-5 rounded-xl bg-foreground text-background hover:bg-primary hover:text-white shadow-lg",
+            "font-black uppercase tracking-widest text-[10px] gap-2 transition-all active:scale-95 group"
           )}
         >
-          <ShieldPlus className="h-4 w-4 transition-transform group-hover:scale-110" />
-          <span className="font-semibold tracking-tight">Novo Acesso</span>
+          <ShieldPlus className="h-4 w-4 stroke-[3] transition-transform group-hover:scale-110" />
+          <span>Novo Acesso</span>
         </Button>
       </DialogTrigger>
 
-      {/* Conteúdo do Modal */}
-      <DialogContent className="sm:max-w-[500px] p-0 gap-0 overflow-hidden border-border/60 bg-background/95 backdrop-blur-xl shadow-2xl duration-200">
-        
-        {/* Header Decorativo */}
-        <DialogHeader className="relative p-6 pb-6 border-b border-border/40 bg-muted/30 overflow-hidden shrink-0">
-          {/* Efeito de luz no fundo */}
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-gradient-to-b from-primary/5 to-transparent pointer-events-none" />
-          
-          <div className="relative z-10 flex items-start gap-5">
-            {/* Ícone com destaque */}
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-background border border-border shadow-sm ring-4 ring-muted/50">
-              <div className="relative">
-                <Lock className="h-6 w-6 text-primary" />
-                <div className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground rounded-full p-0.5 border-2 border-background">
-                    <KeyRound className="h-2.5 w-2.5" />
-                </div>
+      {/* CONTEÚDO DO MODAL (O design já vem do componente base Dialog) */}
+      <DialogContent className="p-0">
+        <DialogHeader>
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner border border-primary/20 relative">
+              <Lock className="h-6 w-6" />
+              {/* Micro-detalhe da chave no canto */}
+              <div className="absolute -bottom-1 -right-1 bg-primary text-primary-foreground rounded-full p-0.5 border-2 border-background">
+                  <KeyRound className="h-2.5 w-2.5" />
               </div>
             </div>
-
-            <div className="space-y-1.5 pt-0.5 text-left">
-              <DialogTitle className="text-xl font-bold tracking-tight text-foreground">
-                Adicionar ao Cofre
-              </DialogTitle>
-              <DialogDescription className="text-sm text-muted-foreground leading-relaxed">
-                Armazene credenciais de clientes ou pessoais com criptografia de ponta a ponta.
-              </DialogDescription>
+            <div>
+              <DialogTitle>Adicionar ao Cofre</DialogTitle>
+              <DialogDescription>Credenciais com criptografia ponta-a-ponta</DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
-        {/* Corpo do Formulário com Scroll para Mobile */}
-        {/* max-h-[80vh] e overflow-y-auto garantem que o modal não vaze da tela em celulares pequenos */}
+        {/* CONTAINER DO FORMULÁRIO (Com rolagem segura) */}
         <div className="p-6 max-h-[75vh] overflow-y-auto custom-scrollbar">
           <AccessForm onClose={() => setOpen(false)} />
         </div>
-
-        {/* Footer Decorativo */}
-        <div className="h-1 w-full bg-gradient-to-r from-transparent via-primary/20 to-transparent opacity-50 shrink-0" />
       </DialogContent>
     </Dialog>
   );

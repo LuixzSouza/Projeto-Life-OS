@@ -4,23 +4,41 @@ import { EntertainmentBoard } from "@/components/entertainment/entertainment-boa
 import { AddMediaDialog } from "@/components/entertainment/add-media-dialog";
 
 /* -------------------------------------------------------------------------- */
-/*                                   PAGE                                     */
+/* PAGE                                     */
 /* -------------------------------------------------------------------------- */
 /* Server Component — responsável apenas por buscar dados e estruturar layout */
 
 export default async function EntertainmentPage() {
-  // Busca todos os itens ordenados por criação (mais recentes primeiro)
-  const items = await prisma.mediaItem.findMany({
+  // 1. Busca os itens no banco, garantindo a tipagem correta
+  const rawItems = await prisma.mediaItem.findMany({
     orderBy: { createdAt: "desc" },
   });
+
+  // 2. Formata os dados para garantir que o Client Component não quebre com "nulls" não esperados
+  const items = rawItems.map(item => ({
+    id: item.id,
+    title: item.title,
+    type: item.type, // "MOVIE", "TV", "GAME", "ALBUM"
+    status: item.status, // "PLAN_TO_WATCH", "IN_PROGRESS", "COMPLETED", "DROPPED"
+    overview: item.overview || null,
+    coverUrl: item.coverUrl || null,
+    genres: item.genres || null,
+    creator: item.creator || null,
+    releaseYear: item.releaseYear || null,
+    externalId: item.externalId || null,
+    rating: item.rating,
+    notes: item.notes || null,
+    createdAt: item.createdAt.toISOString(),
+    updatedAt: item.updatedAt.toISOString(),
+  }));
 
   return (
     <div className="min-h-screen bg-background pb-24">
       {/* ------------------------------------------------------------------ */}
-      {/* HEADER                                                              */}
+      {/* HEADER                                                             */}
       {/* ------------------------------------------------------------------ */}
       <header className="border-b border-border/60 bg-gradient-to-b from-primary/5 to-background pt-10 pb-8 px-6 md:px-8">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 animate-in fade-in duration-500">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 animate-in fade-in duration-500 max-w-[1600px] mx-auto">
           
           <div className="flex items-center gap-4">
             {/* Ícone */}
@@ -34,12 +52,12 @@ export default async function EntertainmentPage() {
                 Entretenimento
               </h1>
               <p className="text-sm md:text-base font-medium text-muted-foreground max-w-xl">
-                Gerencie seus filmes, jogos e músicas em um painel unificado.
+                Seu catálogo pessoal. Acompanhe filmes, séries, jogos e álbuns que você consome.
               </p>
             </div>
           </div>
 
-          {/* Ação principal */}
+          {/* Ação principal (O Modal de Busca via API) */}
           <div className="shrink-0">
             <AddMediaDialog />
           </div>
@@ -47,9 +65,8 @@ export default async function EntertainmentPage() {
       </header>
 
       {/* ------------------------------------------------------------------ */}
-      {/* BOARD (Client Component)                                            */}
+      {/* BOARD (Client Component)                                           */}
       {/* ------------------------------------------------------------------ */}
-      {/* O board assume toda a interação, filtros e estados */}
       <main className="px-6 md:px-8 py-8 space-y-10 max-w-[1600px] mx-auto">
         <EntertainmentBoard initialItems={items} />
       </main>

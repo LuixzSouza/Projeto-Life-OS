@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button"; // Removido ButtonProps da importação
+import { Button } from "@/components/ui/button"; 
 import { Trash2, Loader2, AlertTriangle } from "lucide-react";
 import {
   AlertDialog,
@@ -19,14 +19,13 @@ import { deleteEvent } from "@/app/(dashboard)/agenda/actions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-// Solução: Extrair o tipo 'variant' diretamente das props do componente Button
 type ButtonVariant = React.ComponentProps<typeof Button>["variant"];
 
 interface EventDeleteButtonProps {
   eventId: string;
   eventTitle: string;
   className?: string;
-  variant?: ButtonVariant; // Uso do tipo inferido
+  variant?: ButtonVariant; 
 }
 
 export function EventDeleteButton({
@@ -43,12 +42,12 @@ export function EventDeleteButton({
     setIsDeleting(true);
     try {
       await deleteEvent(eventId);
-      toast.success("Evento removido com sucesso.");
+      toast.success("Alocação de tempo removida.");
       router.refresh();
       setOpen(false);
     } catch (error) {
       console.error(error);
-      toast.error("Não foi possível excluir o evento.");
+      toast.error("Falha ao excluir registro.");
     } finally {
       setIsDeleting(false);
     }
@@ -62,36 +61,35 @@ export function EventDeleteButton({
           size={variant === "ghost" ? "icon" : "default"}
           className={cn(
             "transition-all duration-200",
-            "text-muted-foreground hover:text-destructive hover:bg-destructive/10",
+            "text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10",
             className
           )}
         >
           <Trash2 className={cn("h-4 w-4", variant !== "ghost" && "mr-2")} />
-          {variant !== "ghost" && "Excluir"}
+          {variant !== "ghost" && <span className="text-[10px] font-black uppercase tracking-widest">Excluir</span>}
         </Button>
       </AlertDialogTrigger>
 
-      <AlertDialogContent className="sm:max-w-[450px] p-6 gap-6">
-        <AlertDialogHeader className="sm:text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 ring-1 ring-destructive/20">
-            <AlertTriangle className="h-6 w-6 text-destructive" />
+      {/* Modal Estilo HUD (Centralizado, Bordas Altas) */}
+      <AlertDialogContent className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 sm:max-w-[450px] p-8 gap-6 bg-background border-border/40 shadow-2xl rounded-[2.5rem] z-[100]">
+        <AlertDialogHeader className="sm:text-center flex flex-col items-center">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-rose-500/10 border border-rose-500/20 shadow-inner">
+            <AlertTriangle className="h-7 w-7 text-rose-500" />
           </div>
           
-          <AlertDialogTitle className="text-xl font-bold tracking-tight text-foreground">
-            Excluir compromisso?
+          <AlertDialogTitle className="text-2xl font-black uppercase tracking-tighter text-foreground">
+            Abortar Evento?
           </AlertDialogTitle>
           
-          <AlertDialogDescription className="text-muted-foreground text-sm leading-relaxed mt-2">
-            Você está prestes a remover <strong className="text-foreground">&quot;{eventTitle}&quot;</strong> da sua agenda. 
-            <br />
-            Esta ação é irreversível e liberará o horário agendado.
+          <AlertDialogDescription className="text-muted-foreground text-xs font-medium leading-relaxed mt-2 text-center">
+            O evento <strong className="text-foreground">&quot;{eventTitle}&quot;</strong> será removido permanentemente, liberando este bloco na sua linha do tempo.
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        <AlertDialogFooter className="sm:justify-center gap-3">
+        <AlertDialogFooter className="sm:justify-center gap-3 w-full">
           <AlertDialogCancel 
             disabled={isDeleting} 
-            className="w-full sm:w-auto mt-0 border-border hover:bg-muted"
+            className="w-full sm:w-auto h-12 rounded-xl text-[10px] font-black uppercase tracking-widest border-border/60 hover:bg-muted"
           >
             Cancelar
           </AlertDialogCancel>
@@ -102,14 +100,12 @@ export function EventDeleteButton({
               handleDelete();
             }}
             disabled={isDeleting}
-            className="w-full sm:w-auto bg-destructive hover:bg-destructive/90 text-destructive-foreground shadow-sm shadow-destructive/20"
+            className="w-full sm:w-auto h-12 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-[10px] font-black uppercase tracking-widest shadow-lg shadow-rose-500/20"
           >
             {isDeleting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Excluindo...
-              </>
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              "Sim, excluir permanentemente"
+              "Confirmar Exclusão"
             )}
           </AlertDialogAction>
         </AlertDialogFooter>

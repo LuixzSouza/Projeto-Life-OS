@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { Users, Star, Cake, Heart, TrendingUp, Sparkles } from "lucide-react";
+import { Users, Star, Cake, Heart, TrendingUp, Sparkles, CalendarHeart } from "lucide-react";
+import { Badge } from "@/components/ui/badge"; // 🟢 IMPORTAÇÃO CORRIGIDA AQUI
 import { FriendList } from "@/components/social/friend-list";
 import { FriendFormDialog } from "@/components/social/add-friend-dialog";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,16 +9,22 @@ import { cn } from "@/lib/utils";
 // --- Interfaces ---
 interface StatCardProps {
   title: string;
-  value: number;
+  value: number | string;
   icon: React.ElementType;
   description?: string;
+  colorClass?: string;
 }
 
 // --- Componente Local: Card de Estatística (Enterprise Design) ---
-function StatCard({ title, value, icon: Icon, description }: StatCardProps) {
+function StatCard({ 
+  title, 
+  value, 
+  icon: Icon, 
+  description, 
+  colorClass = "text-primary bg-primary/10 ring-primary/20" 
+}: StatCardProps) {
   return (
-    <Card className="group relative overflow-hidden bg-card border-border/60 hover:border-primary/50 transition-all duration-300 hover:shadow-md">
-      {/* Background Glow Effect on Hover */}
+    <Card className="group relative overflow-hidden bg-card border-border/60 hover:border-primary/30 transition-all duration-300 hover:shadow-lg">
       <div className="absolute -right-10 -top-10 h-32 w-32 bg-primary/5 rounded-full blur-3xl group-hover:bg-primary/10 transition-colors duration-500" />
       
       <CardContent className="p-6 relative z-10 flex items-start justify-between">
@@ -29,11 +36,11 @@ function StatCard({ title, value, icon: Icon, description }: StatCardProps) {
             {value}
           </h3>
           {description && (
-            <p className="text-xs text-muted-foreground pt-1">{description}</p>
+            <p className="text-xs text-muted-foreground pt-1 font-medium">{description}</p>
           )}
         </div>
         
-        <div className="p-3 rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20 shadow-sm group-hover:scale-110 transition-transform duration-300">
+        <div className={cn("p-3 rounded-xl ring-1 shadow-sm group-hover:scale-110 transition-transform duration-300", colorClass)}>
           <Icon className="h-6 w-6" />
         </div>
       </CardContent>
@@ -41,9 +48,9 @@ function StatCard({ title, value, icon: Icon, description }: StatCardProps) {
   );
 }
 
-// --- Página Principal ---
+// --- Página Principal (Server Component) ---
 export default async function SocialPage() {
-  // 1. Data Fetching (Mantendo lógica original)
+  // 1. Data Fetching
   const friends = await prisma.friend.findMany({
     orderBy: { name: 'asc' }
   });
@@ -51,10 +58,12 @@ export default async function SocialPage() {
   // 2. Business Logic
   const currentMonth = new Date().getMonth();
   const totalFriends = friends.length;
+  
   const closeFriends = friends.filter(f => f.proximity === 'CLOSE' || f.proximity === 'FAMILY').length;
+  
   const birthdaysThisMonth = friends.filter(f => {
     if (!f.birthday) return false;
-    return f.birthday.getMonth() === currentMonth;
+    return f.birthday.getUTCMonth() === currentMonth;
   }).length;
 
   // 3. Serialization
@@ -65,6 +74,18 @@ export default async function SocialPage() {
     updatedAt: f.updatedAt.toISOString(),
     imageUrl: f.imageUrl || null,
     giftIdeas: f.giftIdeas || null,
+    tags: f.tags || null,
+    nickname: f.nickname || null,
+    email: f.email || null,
+    phone: f.phone || null,
+    instagram: f.instagram || null,
+    linkedin: f.linkedin || null,
+    twitter: f.twitter || null,
+    jobTitle: f.jobTitle || null,
+    company: f.company || null,
+    pixKey: f.pixKey || null,
+    address: f.address || null,
+    notes: f.notes || null,
   }));
 
   return (
@@ -86,7 +107,6 @@ export default async function SocialPage() {
           </div>
           
           <div className="flex items-center gap-3">
-            {/* O componente Dialog já deve conter o botão com variant="default" (primary) */}
             <FriendFormDialog mode="create" />
           </div>
         </div>
@@ -101,18 +121,21 @@ export default async function SocialPage() {
             value={totalFriends}
             icon={TrendingUp}
             description="Contatos registrados na base"
+            colorClass="text-blue-600 bg-blue-50 ring-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:ring-blue-900/50"
           />
           <StatCard 
             title="Círculo Íntimo"
             value={closeFriends}
             icon={Heart}
             description="Familiares e amigos próximos"
+            colorClass="text-amber-600 bg-amber-50 ring-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-900/50"
           />
           <StatCard 
             title="Aniversários (Mês)"
             value={birthdaysThisMonth}
-            icon={Cake}
+            icon={CalendarHeart}
             description="Celebrações pendentes este mês"
+            colorClass="text-pink-600 bg-pink-50 ring-pink-200 dark:bg-pink-900/20 dark:text-pink-400 dark:ring-pink-900/50"
           />
         </section>
 
@@ -123,23 +146,21 @@ export default async function SocialPage() {
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
                 <Sparkles className="h-4 w-4 text-primary" />
               </div>
-              <h2 className="text-xl font-semibold text-foreground">
+              <h2 className="text-xl font-semibold text-foreground flex items-center gap-3">
                 Sua Rede
-                <span className="ml-3 text-sm font-medium text-muted-foreground bg-secondary px-2.5 py-0.5 rounded-full">
+                <Badge variant="secondary" className="px-2.5 py-0.5 rounded-full font-bold">
                   {totalFriends}
-                </span>
+                </Badge>
               </h2>
             </div>
             
-            {/* Filtro Visual (Placeholder para funcionalidade futura) */}
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors cursor-pointer">
-               <Star className="h-4 w-4" />
-               <span>Favoritos primeiro</span>
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground bg-muted/30 px-3 py-1.5 rounded-full cursor-default">
+               <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+               <span>Aniversariantes no topo</span>
             </div>
           </div>
           
-          {/* Container da Lista com Borda Suave */}
-          <div className="rounded-xl border border-border/60 bg-card/50 shadow-sm backdrop-blur-[2px]">
+          <div className="rounded-2xl bg-card/30 backdrop-blur-sm">
              <FriendList initialData={serializedFriends} />
           </div>
         </section>

@@ -8,41 +8,78 @@ import {
   LayoutDashboard, Wallet, BookOpen, Dumbbell, Briefcase, Calendar,
   Globe, Settings, BrainCircuit, LogOut, Lock, Zap, Battery, BatteryLow,
   PanelLeftClose, PanelLeftOpen, ChevronRight, Bookmark, Film, Users,
-  Shirt, Loader2, Menu, X, Home,
-  BriefcaseBusiness
+  Shirt, Loader2, Menu, X, Home, BriefcaseBusiness
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
-import { Sheet, SheetContent, SheetClose, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area"; // ✅ Importação corrigida
 import Image from "next/image";
 
-// --- TIPOS ---
+// --- INTERFACES ---
+interface UserData {
+  name: string;
+  avatarUrl?: string | null;
+  bio?: string | null;
+}
+
 interface SidebarItem {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   href: string;
 }
 
-// --- DADOS ---
-const sidebarItems: SidebarItem[] = [
-  { label: "Visão Geral", icon: LayoutDashboard, href: "/dashboard" },
-  { label: "Agenda", icon: Calendar, href: "/agenda" },
-  { label: "Assistente IA", icon: BrainCircuit, href: "/ai" },
-  { label: "Projetos", icon: Briefcase, href: "/projects" },
-  { label: "Financeiro", icon: Wallet, href: "/finance" },
-  { label: "Saúde", icon: Dumbbell, href: "/health" },
-  { label: "Estudos", icon: BookOpen, href: "/studies" },
-  { label: "Entretenimento", icon: Film, href: "/entertainment" },
-  { label: "Sites & CMS", icon: Globe, href: "/cms" },
-  { label: "Links & Apps", icon: Bookmark, href: "/links" },
-  { label: "Acessos", icon: Lock, href: "/access" },
-  { label: "Negócios", icon: BriefcaseBusiness, href: "/business" },
-  { label: "Conexões", icon: Users, href: "/social" },
-  { label: "Closet", icon: Shirt, href: "/wardrobe" },
-  { label: "Configurações", icon: Settings, href: "/settings" },
+interface SidebarGroup {
+  groupName: string;
+  items: SidebarItem[];
+}
+
+interface EnergyStatus {
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
+  label: string;
+}
+
+// --- DADOS ORGANIZADOS (PLANO CLEAR & CLEAN) ---
+const groupedSidebarItems: SidebarGroup[] = [
+  {
+    groupName: "Central",
+    items: [
+      { label: "Visão Geral", icon: LayoutDashboard, href: "/dashboard" },
+      { label: "Agenda", icon: Calendar, href: "/agenda" },
+      { label: "Assistente IA", icon: BrainCircuit, href: "/ai" },
+    ]
+  },
+  {
+    groupName: "Profissional",
+    items: [
+      { label: "Projetos", icon: Briefcase, href: "/projects" },
+      { label: "Negócios", icon: BriefcaseBusiness, href: "/business" },
+      { label: "Financeiro", icon: Wallet, href: "/finance" },
+    ]
+  },
+  {
+    groupName: "Pessoal",
+    items: [
+      { label: "Saúde", icon: Dumbbell, href: "/health" },
+      { label: "Estudos", icon: BookOpen, href: "/studies" },
+      { label: "Entretenimento", icon: Film, href: "/entertainment" },
+      { label: "Closet", icon: Shirt, href: "/wardrobe" },
+      { label: "Conexões", icon: Users, href: "/social" },
+    ]
+  },
+  {
+    groupName: "Sistema",
+    items: [
+      { label: "Sites & CMS", icon: Globe, href: "/cms" },
+      { label: "Links & Apps", icon: Bookmark, href: "/links" },
+      { label: "Acessos", icon: Lock, href: "/access" },
+      { label: "Configurações", icon: Settings, href: "/settings" },
+    ]
+  }
 ];
 
 const mobileNavItems = [
@@ -50,38 +87,43 @@ const mobileNavItems = [
   { label: "Agenda", icon: Calendar, href: "/agenda" },
   { label: "IA", icon: BrainCircuit, href: "/ai" },
   { label: "Config", icon: Settings, href: "/settings" },
-  { label: "Menu", icon: Menu, href: "#" }, // Aciona o Sheet
 ];
 
-// --- SUB-COMPONENTES (Definidos FORA do componente principal) ---
+// --- SUB-COMPONENTES ---
 
-// 1. Link da Sidebar (Reutilizável)
-const SidebarLink = ({ item, isCollapsed, isActive, onClick }: { item: SidebarItem, isCollapsed?: boolean, isActive: boolean, onClick?: () => void }) => {
+const SidebarLink = ({ 
+  item, 
+  isCollapsed, 
+  isActive, 
+  onClick 
+}: { 
+  item: SidebarItem; 
+  isCollapsed?: boolean; 
+  isActive: boolean; 
+  onClick?: () => void; 
+}) => {
   const LinkContent = (
     <Link
       href={item.href}
       onClick={onClick}
       className={cn(
-        "group flex items-center gap-3 rounded-lg py-2.5 transition-all duration-200 relative",
-        isCollapsed ? "justify-center px-0" : "px-3",
+        "group flex items-center gap-3 rounded-lg py-2 transition-all duration-200 relative",
+        isCollapsed ? "justify-center px-0 h-10 w-10 mx-auto" : "px-3 h-10",
         isActive
-          ? "bg-secondary text-primary font-semibold"
-          : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+          ? "bg-primary text-primary-foreground shadow-sm font-semibold"
+          : "text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
       )}
     >
       <item.icon className={cn(
-        "transition-colors",
-        isCollapsed ? "h-6 w-6" : "h-5 w-5",
-        isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
+        "shrink-0 transition-transform group-hover:scale-110",
+        isCollapsed ? "h-5 w-5" : "h-4 w-4",
+        isActive ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
       )} />
 
-      {!isCollapsed && <span className="relative z-10 whitespace-nowrap">{item.label}</span>}
-
-      {isActive && (
-        <div className={cn(
-          "absolute rounded-full bg-primary",
-          isCollapsed ? "left-1 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r-lg" : "right-3 w-1.5 h-1.5"
-        )}></div>
+      {!isCollapsed && <span className="text-sm truncate">{item.label}</span>}
+      
+      {isActive && !isCollapsed && (
+        <div className="absolute right-2 w-1 h-4 rounded-full bg-primary-foreground/40" />
       )}
     </Link>
   );
@@ -91,7 +133,7 @@ const SidebarLink = ({ item, isCollapsed, isActive, onClick }: { item: SidebarIt
       <TooltipProvider delayDuration={0}>
         <Tooltip>
           <TooltipTrigger asChild>{LinkContent}</TooltipTrigger>
-          <TooltipContent side="right" className="font-medium bg-foreground text-background border-0">
+          <TooltipContent side="right" className="bg-foreground text-background font-bold shadow-xl border-none">
             {item.label}
           </TooltipContent>
         </Tooltip>
@@ -102,91 +144,85 @@ const SidebarLink = ({ item, isCollapsed, isActive, onClick }: { item: SidebarIt
   return LinkContent;
 };
 
-// 2. Perfil do Usuário e Logout
-interface UserProfileSectionProps {
-  user: { name?: string; avatarUrl?: string | null } | null | undefined;
+const UserProfileSection = ({ 
+  user, 
+  isCollapsed, 
+  energyLevel, 
+  toggleEnergy, 
+  getEnergyIcon, 
+  handleLogout, 
+  isLoggingOut, 
+  initials 
+}: {
+  user?: UserData | null;
   isCollapsed: boolean;
   energyLevel: "high" | "medium" | "low";
   toggleEnergy: () => void;
-  getEnergyIcon: () => { icon: React.ComponentType<{ className?: string }>; color: string; label: string };
+  getEnergyIcon: () => EnergyStatus;
   handleLogout: (e: React.MouseEvent) => Promise<void>;
   isLoggingOut: boolean;
   initials: string;
-}
-
-const UserProfileSection = ({ 
-  user, isCollapsed, energyLevel, toggleEnergy, getEnergyIcon, handleLogout, isLoggingOut, initials 
-}: UserProfileSectionProps) => {
-  const EnergyStatus = getEnergyIcon();
+}) => {
+  const status = getEnergyIcon();
 
   return (
-    <div className="p-4 border-t border-border/50 bg-muted/20">
-      <Link href="/settings">
-        <div className={cn(
-          "relative group flex items-center rounded-xl hover:bg-background border border-transparent hover:border-border transition-all duration-200 cursor-pointer shadow-sm hover:shadow-md",
-          isCollapsed ? "justify-center p-2" : "gap-3 p-2"
-        )}>
-          <Avatar className={cn("border border-border transition-transform group-hover:scale-105", isCollapsed ? "h-9 w-9" : "h-9 w-9")}>
-            <AvatarImage src={user?.avatarUrl || ""} className="object-cover" />
-            <AvatarFallback className="bg-secondary font-bold text-xs text-muted-foreground">
-              {initials}
-            </AvatarFallback>
-          </Avatar>
+    <div className="mt-auto p-4 border-t border-border/50 bg-muted/10">
+      <div className={cn(
+        "flex items-center gap-3 p-2 rounded-xl transition-colors hover:bg-secondary/50 group relative",
+        isCollapsed && "justify-center"
+      )}>
+        <Avatar className="h-8 w-8 border border-border/50 shadow-sm">
+          <AvatarImage src={user?.avatarUrl || ""} className="object-cover" />
+          <AvatarFallback className="text-[10px] bg-secondary font-bold">{initials}</AvatarFallback>
+        </Avatar>
 
-          {!isCollapsed && (
-            <div className="flex flex-col truncate flex-1 min-w-0">
-              <span className="font-semibold text-sm text-foreground truncate leading-tight">
-                {user?.name || "Usuário"}
+        {!isCollapsed && (
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-bold truncate text-foreground leading-none">
+              {user?.name || "Usuário"}
+            </p>
+            <button 
+              onClick={toggleEnergy}
+              className="mt-1 flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+            >
+              <status.icon className={cn("h-3 w-3", status.color)} />
+              <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-tight">
+                {status.label}
               </span>
-              <div className="flex items-center gap-2 mt-0.5">
-                <div 
-                  className="flex items-center gap-1 cursor-pointer hover:bg-muted rounded px-1 -ml-1 transition-colors" 
-                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleEnergy(); }}
-                >
-                  <EnergyStatus.icon className={cn("h-3 w-3", EnergyStatus.color)} />
-                  <span className="text-[10px] text-muted-foreground">Estado</span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </Link>
+            </button>
+          </div>
+        )}
 
-      <div className={cn("mt-2 flex", isCollapsed ? "justify-center" : "justify-center")}>
-        <TooltipProvider>
-          <Tooltip delayDuration={500}>
-            <TooltipTrigger asChild>
-              <button
-                onClick={handleLogout}
-                disabled={isLoggingOut}
-                className={cn(
-                  "text-muted-foreground hover:text-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center w-full justify-center hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg",
-                  isCollapsed ? "p-2" : "gap-1.5 text-[10px] py-2"
-                )}
-              >
-                {isLoggingOut ? <Loader2 className="animate-spin h-3 w-3" /> : <LogOut className={cn("transition-transform group-hover:-translate-x-1", isCollapsed ? "h-5 w-5" : "h-3 w-3")} />}
-                {!isCollapsed && (isLoggingOut ? "Saindo..." : "Encerrar Sessão")}
-              </button>
-            </TooltipTrigger>
-            {isCollapsed && <TooltipContent side="right">Sair do Sistema</TooltipContent>}
-          </Tooltip>
-        </TooltipProvider>
+        {!isCollapsed && (
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+          >
+            {isLoggingOut ? <Loader2 className="h-3 w-3 animate-spin" /> : <LogOut className="h-3.5 w-3.5" />}
+          </Button>
+        )}
       </div>
+      
+      {isCollapsed && (
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={handleLogout}
+          className="h-8 w-8 mx-auto flex mt-2 text-muted-foreground hover:text-destructive"
+        >
+          <LogOut size={16} />
+        </Button>
+      )}
     </div>
   );
 };
 
 // --- COMPONENTE PRINCIPAL ---
 
-interface SidebarProps {
-  user?: {
-    name: string;
-    avatarUrl?: string | null;
-    bio?: string | null;
-  } | null;
-}
-
-export function Sidebar({ user }: SidebarProps) {
+export function Sidebar({ user }: { user?: UserData | null }) {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [energyLevel, setEnergyLevel] = useState<"high" | "medium" | "low">("high");
@@ -199,7 +235,7 @@ export function Sidebar({ user }: SidebarProps) {
     setEnergyLevel(levels[nextIndex]);
   };
 
-  const getEnergyIcon = () => {
+  const getEnergyIcon = (): EnergyStatus => {
     switch (energyLevel) {
       case "high": return { icon: Zap, color: "text-yellow-500", label: "Modo Turbo" };
       case "medium": return { icon: Battery, color: "text-emerald-500", label: "Estável" };
@@ -207,168 +243,163 @@ export function Sidebar({ user }: SidebarProps) {
     }
   };
 
-const handleLogout = async (e: React.MouseEvent) => {
+  const handleLogout = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (isLoggingOut) return;
-
     setIsLoggingOut(true);
-    toast.info("Desconectando...");
-    setIsSheetOpen(false);
-
+    toast.info("Encerrando sessão...");
     try {
       await signOut();
     } catch (error) {
-      // Verifica se o erro é apenas um redirecionamento do Next.js
-      if ((error as Error).message === "NEXT_REDIRECT") {
-          // Se for redirect, não é erro, deixa passar (o navegador vai mudar de página)
-          return; 
+      if ((error as Error).message !== "NEXT_REDIRECT") {
+        toast.error("Erro ao sair.");
+        setIsLoggingOut(false);
       }
-      
-      console.error("Logout Error:", error);
-      toast.error("Erro ao sair.");
-      setIsLoggingOut(false);
     }
   };
 
   const initials = user?.name ? user.name.substring(0, 2).toUpperCase() : "US";
-
-  // Agrupando props para passar para os componentes filhos
-  const userProps = {
-    user, isCollapsed, energyLevel, toggleEnergy, getEnergyIcon, handleLogout, isLoggingOut, initials
-  };
 
   return (
     <>
       {/* --- DESKTOP SIDEBAR --- */}
       <aside
         className={cn(
-          "hidden h-screen flex-col border-r border-zinc-200/50 dark:border-zinc-800/50 bg-background/95 backdrop-blur-xl md:flex sticky top-0 left-0 shrink-0 z-50 shadow-sm transition-all duration-300 ease-in-out",
-          isCollapsed ? "w-[80px]" : "w-[280px]"
+          "hidden h-screen flex-col border-r border-border/50 bg-card/30 backdrop-blur-xl md:flex sticky top-0 left-0 shrink-0 z-50 transition-all duration-300 ease-in-out shadow-sm",
+          isCollapsed ? "w-[80px]" : "w-[260px]"
         )}
       >
-        <div className={cn("flex h-16 items-center border-b border-border/50", isCollapsed ? "justify-center px-0" : "justify-between px-6")}>
-          {!isCollapsed && (
-            <div className="flex items-center gap-3 font-bold text-xl tracking-tight text-foreground select-none overflow-hidden whitespace-nowrap">
-              <Image width={40} height={40} src={"/logo.webp"} alt="Logo"/>
-              <span className="font-alt tracking-tight text-lg">Life OS</span>
+        {/* LOGO AREA */}
+        <div className={cn("flex h-16 items-center px-4 mb-2 border-b border-border/40", isCollapsed ? "justify-center" : "justify-between")}>
+          <div className="flex items-center gap-3 overflow-hidden select-none">
+            <div className="h-9 w-9 shrink-0 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
+               <Image width={24} height={24} src="/logo.webp" alt="Logo" className="brightness-200 invert" />
             </div>
+            {!isCollapsed && (
+              <span className="font-bold text-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/60">
+                Life OS
+              </span>
+            )}
+          </div>
+          {!isCollapsed && (
+            <Button variant="ghost" size="icon" onClick={() => setIsCollapsed(true)} className="h-8 w-8 text-muted-foreground hover:text-foreground">
+              <PanelLeftClose size={18} />
+            </Button>
           )}
-
-          {isCollapsed && (
-            <Image width={40} height={40} src={"/logo.webp"} alt="Logo"/>
-          )}
-
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className={cn("text-muted-foreground hover:text-foreground", isCollapsed && "hidden")}
-          >
-            {isCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
-          </Button>
         </div>
 
         {isCollapsed && (
-          <div className="w-full flex justify-center py-2 border-b border-border/50">
-            <Button variant="ghost" size="icon" onClick={() => setIsCollapsed(false)}>
-              <ChevronRight className="h-5 w-5 text-muted-foreground" />
-            </Button>
+          <div className="flex justify-center py-2 border-b border-border/40 mb-2">
+             <Button variant="ghost" size="icon" onClick={() => setIsCollapsed(false)} className="h-8 w-8 rounded-full text-muted-foreground">
+                <ChevronRight size={16} />
+             </Button>
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto py-6 px-3 scrollbar-thin scrollbar-thumb-zinc-200 dark:scrollbar-thumb-zinc-800 scrollbar-track-transparent">
-          <nav className="space-y-1">
-            {sidebarItems.map((item) => (
-              <SidebarLink
-                key={item.href}
-                item={item}
-                isCollapsed={isCollapsed}
-                isActive={pathname === item.href || pathname.startsWith(`${item.href}/`)}
-              />
+        {/* NAVIGATION GRUPADA COM SCROLLAREA */}
+        <ScrollArea className="flex-1 px-3">
+          <div className="space-y-6 py-4 pb-10">
+            {groupedSidebarItems.map((group) => (
+              <div key={group.groupName} className="space-y-1">
+                {!isCollapsed && (
+                  <h3 className="px-3 text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground/50 mb-2">
+                    {group.groupName}
+                  </h3>
+                )}
+                {group.items.map((item) => (
+                  <SidebarLink
+                    key={item.href}
+                    item={item}
+                    isCollapsed={isCollapsed}
+                    isActive={pathname === item.href || pathname.startsWith(`${item.href}/`)}
+                  />
+                ))}
+              </div>
             ))}
-          </nav>
-        </div>
+          </div>
+        </ScrollArea>
 
-        <UserProfileSection {...userProps} />
+        <UserProfileSection 
+          user={user}
+          isCollapsed={isCollapsed}
+          energyLevel={energyLevel}
+          toggleEnergy={toggleEnergy}
+          getEnergyIcon={getEnergyIcon}
+          handleLogout={handleLogout}
+          isLoggingOut={isLoggingOut}
+          initials={initials}
+        />
       </aside>
 
-      {/* --- MOBILE SHEET (MENU LATERAL) --- */}
+      {/* --- MOBILE MENU (SHEET) --- */}
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent side="left" className="w-[280px] sm:w-[300px] p-0 overflow-y-auto">
-          {/* CORREÇÃO ERRO 1: SheetHeader com SheetTitle oculto para acessibilidade */}
-          <SheetHeader className="h-16 flex items-center justify-between border-b border-border/50 px-6 flex-row">
-            <SheetTitle className="sr-only">Menu de Navegação</SheetTitle> {/* sr-only esconde visualmente mas mantém para leitores de tela */}
-            
-            <div className="flex items-center gap-3 font-bold text-xl tracking-tight text-foreground">
-              <Image width={40} height={40} src={"/logo.webp"} alt="Logo"/>
-              <span className="font-alt tracking-tight text-lg">Life OS</span>
-            </div>
-            
-            {/* Botão fechar customizado ou nativo do SheetClose */}
+        <SheetContent side="left" className="w-[280px] p-0 border-r-border/40 bg-background/95 backdrop-blur-2xl">
+          <SheetHeader className="h-16 px-6 border-b border-border/50 flex-row items-center gap-3">
+             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
+                <Image width={20} height={20} src="/logo.webp" alt="Logo" className="invert brightness-200" />
+             </div>
+             <SheetTitle className="text-lg font-bold">Life OS</SheetTitle>
           </SheetHeader>
+          
+          <ScrollArea className="h-[calc(100vh-140px)] px-3 py-6">
+             <div className="space-y-6">
+                {groupedSidebarItems.map((group) => (
+                  <div key={group.groupName} className="space-y-1">
+                    <h3 className="px-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 mb-2">
+                      {group.groupName}
+                    </h3>
+                    {group.items.map((item) => (
+                      <SidebarLink
+                        key={item.href}
+                        item={item}
+                        isActive={pathname === item.href}
+                        onClick={() => setIsSheetOpen(false)}
+                      />
+                    ))}
+                  </div>
+                ))}
+             </div>
+          </ScrollArea>
 
-          <div className="flex-1 overflow-y-auto py-6 px-3">
-            <nav className="space-y-1">
-              {sidebarItems.map((item) => (
-                <SidebarLink
-                  key={item.href}
-                  item={item}
-                  isCollapsed={false}
-                  isActive={pathname === item.href || pathname.startsWith(`${item.href}/`)}
-                  onClick={() => setIsSheetOpen(false)}
-                />
-              ))}
-            </nav>
-          </div>
-
-          <UserProfileSection {...userProps} isCollapsed={false} />
+          <UserProfileSection 
+            user={user}
+            isCollapsed={false}
+            energyLevel={energyLevel}
+            toggleEnergy={toggleEnergy}
+            getEnergyIcon={getEnergyIcon}
+            handleLogout={handleLogout}
+            isLoggingOut={isLoggingOut}
+            initials={initials}
+          />
         </SheetContent>
       </Sheet>
 
       {/* --- MOBILE BOTTOM NAV --- */}
-      <div className="md:hidden h-16" /> {/* Espaçador */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-xl border-t border-border/50 py-2 px-4 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
-        <div className="flex items-center justify-between">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-t border-border/50 pb-safe shadow-[0_-8px_30px_rgb(0,0,0,0.12)]">
+        <div className="flex items-center justify-around h-16 px-4">
           {mobileNavItems.map((item) => {
-            const isActive = item.href !== "#" && (pathname === item.href || pathname.startsWith(`${item.href}/`));
-
-            if (item.label === "Menu") {
-              return (
-                <button
-                  key={item.label}
-                  onClick={() => setIsSheetOpen(!isSheetOpen)}
-                  className={cn(
-                    "flex flex-col items-center justify-center h-14 w-14 rounded-2xl transition-all active:scale-95",
-                    isSheetOpen 
-                      ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25" 
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  {isSheetOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-                  <span className="text-[9px] mt-1 font-medium">Menu</span>
-                </button>
-              );
-            }
-
+            const isActive = pathname === item.href;
             return (
-              <Link
-                key={item.label}
-                href={item.href}
+              <Link 
+                key={item.label} 
+                href={item.href} 
                 className={cn(
-                  "flex flex-col items-center justify-center h-14 w-14 rounded-xl transition-all active:scale-95",
-                  isActive
-                    ? "text-primary bg-primary/10"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                  "flex flex-col items-center gap-1 transition-all duration-300 active:scale-90",
+                  isActive ? "text-primary scale-110" : "text-muted-foreground hover:text-foreground"
                 )}
-                onClick={() => setIsSheetOpen(false)}
               >
-                <item.icon className={cn("h-5 w-5", isActive && "fill-current")} />
-                <span className="text-[9px] mt-1 font-medium truncate w-full text-center">
-                  {item.label}
-                </span>
+                <item.icon size={20} className={cn(isActive && "fill-current")} />
+                <span className="text-[9px] font-bold uppercase tracking-tighter">{item.label}</span>
               </Link>
             );
           })}
+          <button 
+            onClick={() => setIsSheetOpen(true)} 
+            className="flex flex-col items-center gap-1 text-muted-foreground active:scale-90"
+          >
+            <Menu size={20} />
+            <span className="text-[9px] font-bold uppercase tracking-tighter">Menu</span>
+          </button>
         </div>
       </nav>
     </>

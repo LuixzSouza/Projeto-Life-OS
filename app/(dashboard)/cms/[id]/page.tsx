@@ -1,8 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
-import { SiteEditor } from "@/components/cms/site-editor";
+import { SiteEditor } from "@/components/cms/site-editor"; // Esse componente vamos melhorar no próximo passo!
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Globe, ExternalLink } from "lucide-react";
+import { ArrowLeft, Globe, ExternalLink, HardDrive } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 
@@ -10,8 +10,9 @@ interface SitePageProps {
   params: Promise<{ id: string }>;
 }
 
-export default async function SiteDetailsPage({ params }: SitePageProps) {
-  const { id } = await params;
+export default async function SiteDetailsPage(props: SitePageProps) {
+  const params = await props.params;
+  const { id } = params;
 
   const site = await prisma.managedSite.findUnique({
     where: { id },
@@ -23,87 +24,87 @@ export default async function SiteDetailsPage({ params }: SitePageProps) {
   if (!site) return notFound();
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#F4F4F5] dark:bg-[#080808] flex flex-col w-full overflow-x-hidden">
+      
       {/* ------------------------------------------------------------------ */}
-      {/* HEADER                                                              */}
+      {/* HEADER TÁTICO FULL WIDTH */}
       {/* ------------------------------------------------------------------ */}
-      <header className="border-b border-border/60 bg-gradient-to-b from-primary/10 via-background/95 to-background">
-        <div className="max-w-[1600px] mx-auto p-4 md:p-8 flex flex-col gap-4 animate-in fade-in duration-500">
-          <div className="flex items-center gap-3">
-            <Link href="/cms">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="gap-2 text-muted-foreground hover:text-primary"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Voltar
-              </Button>
+      <header className="sticky top-0 z-30 bg-[#F4F4F5]/80 dark:bg-[#080808]/80 backdrop-blur-xl border-b border-border/40 px-4 md:px-10 lg:px-14 py-4 flex flex-col gap-5 animate-in fade-in duration-500">
+        
+        {/* NAV & VOLTAR */}
+        <div className="flex items-center gap-4 border-b border-border/40 pb-4">
+            <Link href="/cms" className="h-9 w-9 flex items-center justify-center rounded-xl bg-muted/50 hover:bg-primary/10 hover:text-primary transition-all group">
+                <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
             </Link>
-
-            <div className="flex-1 flex flex-col gap-1">
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold tracking-tight">
-                  {site.name}
-                </h1>
-
-                <Badge
-                  variant="secondary"
-                  className="text-xs bg-primary/10 text-primary border border-primary/20"
-                >
-                  {site.pages.length} páginas
-                </Badge>
-              </div>
-
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Globe className="h-3.5 w-3.5" />
-                <span className="font-mono truncate max-w-[320px]">
-                  {site.url || "Sem URL configurada"}
-                </span>
-
-                {site.url && (
-                  <Link
-                    href={site.url}
-                    target="_blank"
-                    className="inline-flex items-center gap-1 text-primary hover:underline"
-                  >
-                    <ExternalLink className="h-3.5 w-3.5" />
-                    Abrir
-                  </Link>
-                )}
-              </div>
+            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+                <span className="hidden sm:inline">Headless CMS</span>
+                <span className="opacity-40 hidden sm:inline">/</span>
+                <span className="text-foreground">{site.name}</span>
             </div>
-          </div>
+        </div>
 
-          {/* ROTAS */}
-          <div className="flex flex-wrap gap-2 pt-2">
-            {site.pages.slice(0, 6).map((page) => (
-              <Badge
-                key={page.id}
-                variant="outline"
-                className="font-mono text-[11px] border-border/60 bg-muted/40"
-              >
-                /{page.slug}
-              </Badge>
-            ))}
+        {/* INFO DO PROJETO */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+                <div className="h-14 w-14 rounded-2xl bg-card border border-border/60 shadow-lg flex items-center justify-center text-foreground">
+                    <HardDrive className="h-6 w-6 opacity-80" />
+                </div>
+                
+                <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-2xl font-black tracking-tight uppercase">
+                            {site.name}
+                        </h1>
+                        <Badge variant="outline" className="text-[9px] uppercase font-black bg-primary/10 text-primary border-primary/20 px-2 h-5">
+                            {site.pages.length} Endpoints
+                        </Badge>
+                    </div>
 
-            {site.pages.length > 6 && (
-              <Badge
-                variant="outline"
-                className="text-[11px] border-border/60 bg-muted/40"
-              >
-                +{site.pages.length - 6}
-              </Badge>
-            )}
-          </div>
+                    <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
+                        <Globe className="h-3 w-3 opacity-50" />
+                        <span className="font-mono bg-muted/40 px-2 py-0.5 rounded border border-border/40 truncate max-w-[300px]">
+                            {site.url || "sys.local/env"}
+                        </span>
+                        
+                        {site.url && (
+                            <Link
+                                href={site.url}
+                                target="_blank"
+                                className="inline-flex items-center gap-1 text-primary hover:text-primary/70 transition-colors bg-primary/5 px-2 py-0.5 rounded border border-primary/10 ml-2"
+                                title="Abrir domínio externo"
+                            >
+                                <ExternalLink className="h-3 w-3" /> Live
+                            </Link>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* ROTAS RÁPIDAS (Badges) */}
+            <div className="hidden lg:flex flex-wrap gap-2 max-w-md justify-end">
+                {site.pages.slice(0, 5).map((page) => (
+                    <Badge
+                        key={page.id}
+                        variant="outline"
+                        className="font-mono text-[10px] font-bold border-border/40 bg-card/50 px-2 py-1 shadow-sm"
+                    >
+                        /{page.slug}
+                    </Badge>
+                ))}
+                {site.pages.length > 5 && (
+                    <Badge variant="outline" className="text-[10px] font-black border-border/40 bg-muted/40">
+                        +{site.pages.length - 5}
+                    </Badge>
+                )}
+            </div>
         </div>
       </header>
 
       {/* ------------------------------------------------------------------ */}
-      {/* EDITOR                                                              */}
+      {/* TERMINAL EDITOR */}
       {/* ------------------------------------------------------------------ */}
-      <main className="max-w-[1600px] mx-auto p-4 md:p-8">
-        <div className="flex-1 rounded-2xl border border-border/60 bg-card/80 backdrop-blur-[2px] shadow-sm overflow-hidden">
+      <main className="flex-1 w-full px-4 md:px-10 lg:px-14 py-8">
+        <div className="h-[calc(100vh-200px)] rounded-[2rem] border border-border/40 bg-card/80 backdrop-blur-xl shadow-2xl overflow-hidden flex flex-col">
           <SiteEditor site={site} />
         </div>
       </main>

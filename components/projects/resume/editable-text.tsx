@@ -9,7 +9,6 @@ interface EditableTextProps {
   className?: string;
   placeholder?: string;
   multiline?: boolean;
-  // Limitamos as tags permitidas para garantir a tipagem correta
   tagName?: "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "p" | "span" | "div";
 }
 
@@ -24,39 +23,35 @@ export function EditableText({
   const [isEditing, setIsEditing] = useState(false);
   const [tempValue, setTempValue] = useState(value);
   
-  // Ref genérica que aceita tanto Input quanto TextArea
-  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+  // Usamos Refs específicas e as acessamos com segurança no TypeScript
+  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Sincroniza o valor local se a prop mudar externamente
   useEffect(() => {
     setTempValue(value);
   }, [value]);
 
-  // Foco automático e cursor no final ao entrar no modo de edição
   useEffect(() => {
-    if (isEditing && inputRef.current) {
-      inputRef.current.focus();
-      // Tenta colocar o cursor no final (para inputs de texto)
-      if ('setSelectionRange' in inputRef.current) {
-        const length = inputRef.current.value.length;
-        inputRef.current.setSelectionRange(length, length);
+    if (isEditing) {
+      const activeElement = multiline ? textareaRef.current : inputRef.current;
+      if (activeElement) {
+        activeElement.focus();
+        const length = activeElement.value.length;
+        activeElement.setSelectionRange(length, length);
       }
     }
-  }, [isEditing]);
+  }, [isEditing, multiline]);
 
-  // Auto-resize para Textarea
   useEffect(() => {
-    if (isEditing && multiline && inputRef.current) {
-      inputRef.current.style.height = "auto";
-      inputRef.current.style.height = inputRef.current.scrollHeight + "px";
+    if (isEditing && multiline && textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [tempValue, isEditing, multiline]);
 
   const handleBlur = () => {
     setIsEditing(false);
-    if (tempValue.trim() !== value) {
-      onChange(tempValue);
-    }
+    if (tempValue.trim() !== value) onChange(tempValue);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -65,36 +60,30 @@ export function EditableText({
       handleBlur();
     }
     if (e.key === "Escape") {
-      // Cancela a edição e reverte o valor
       setTempValue(value);
       setIsEditing(false);
     }
   };
 
-  // Renderização do Input (Edição)
   if (isEditing) {
     const commonClasses = cn(
-      "w-full bg-transparent outline-none ring-1 ring-primary/30 rounded px-1 -ml-1 text-inherit font-inherit leading-inherit resize-none overflow-hidden",
+      "w-full bg-background outline-none ring-2 ring-primary/40 rounded-xl px-3 py-1 shadow-lg text-inherit font-inherit leading-inherit resize-none overflow-hidden",
       className
     );
 
-    if (multiline) {
-      return (
-        <textarea
-          ref={inputRef as React.RefObject<HTMLTextAreaElement>}
-          value={tempValue}
-          onChange={(e) => setTempValue(e.target.value)}
-          onBlur={handleBlur}
-          onKeyDown={handleKeyDown}
-          className={commonClasses}
-          rows={1}
-        />
-      );
-    }
-
-    return (
+    return multiline ? (
+      <textarea
+        ref={textareaRef}
+        value={tempValue}
+        onChange={(e) => setTempValue(e.target.value)}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
+        className={commonClasses}
+        rows={1}
+      />
+    ) : (
       <input
-        ref={inputRef as React.RefObject<HTMLInputElement>}
+        ref={inputRef}
         value={tempValue}
         onChange={(e) => setTempValue(e.target.value)}
         onBlur={handleBlur}
@@ -104,17 +93,15 @@ export function EditableText({
     );
   }
 
-  // Renderização do Texto (Visualização)
-  const Tag = tagName as React.ElementType; // Tipagem correta para JSX dinâmico
+  const Tag = tagName as React.ElementType;
 
   return (
     <Tag
       onDoubleClick={() => setIsEditing(true)}
-      title="Clique duas vezes para editar"
+      title="Clique duplo para editar"
       className={cn(
-        "cursor-text transition-colors rounded px-1 -ml-1 border border-transparent hover:border-dashed hover:border-primary/30 hover:bg-primary/5",
-        // Estilo para campo vazio (Placeholder visual)
-        !value && "text-muted-foreground/60 italic min-w-[100px] inline-block",
+        "cursor-text transition-all rounded-xl px-1 border border-transparent hover:border-dashed hover:border-primary/40 hover:bg-primary/5 py-0.5",
+        !value && "text-muted-foreground/40 italic min-w-[120px] inline-block bg-muted/20 border-dashed border-border/60",
         className
       )}
     >

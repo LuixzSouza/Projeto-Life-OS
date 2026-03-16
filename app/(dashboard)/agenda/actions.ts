@@ -2,32 +2,82 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { RoutineItem } from "@prisma/client";
+
+// --- EVENTOS (Agora com suporte a Timeblocking real) ---
 
 export async function createEvent(formData: FormData) {
   const title = formData.get("title") as string;
   const description = formData.get("description") as string;
   const dateStr = formData.get("date") as string;
   const timeStr = formData.get("time") as string;
-  const location = formData.get("location") as string; // Novo
-  const color = formData.get("color") as string;       // Novo
-  const notification = formData.get("notification") === "on"; // Novo
+  const endTimeStr = formData.get("endTime") as string; // 🟢 NOVO: Hora de fim
+  const location = formData.get("location") as string; 
+  const color = formData.get("color") as string;       
+  const notification = formData.get("notification") === "on"; 
 
   if (!title || !dateStr || !timeStr) {
-    throw new Error("Preencha os campos obrigatórios.");
+    throw new Error("Preencha os campos obrigatórios (Título, Data e Hora).");
   }
 
-  // Combina data e hora
+  // Combina data e hora de início
   const startTime = new Date(`${dateStr}T${timeStr}:00`);
+  
+  // 🟢 NOVO: Combina data e hora de fim (se não enviar, assume +1 hora)
+  let endTime = new Date(startTime);
+  if (endTimeStr) {
+      endTime = new Date(`${dateStr}T${endTimeStr}:00`);
+      if (endTime <= startTime) throw new Error("A hora final deve ser maior que a inicial.");
+  } else {
+      endTime.setHours(endTime.getHours() + 1);
+  }
 
   await prisma.event.create({
     data: {
       title,
       description: description || null,
       startTime,
+      endTime, // 🟢 NOVO (Atualize seu schema.prisma se necessário)
       location: location || null,
-      color: color || "#6366f1", // Default indigo
+      color: color || "#3B82F6", // Default Blue (Google Calendar vibe)
       emailAlert: notification,
+    },
+  });
+
+  revalidatePath("/agenda");
+}
+
+export async function updateEvent(formData: FormData) {
+  const id = formData.get("id") as string;
+  const title = formData.get("title") as string;
+  const description = formData.get("description") as string;
+  const dateStr = formData.get("date") as string;
+  const timeStr = formData.get("time") as string;
+  const endTimeStr = formData.get("endTime") as string; // 🟢 NOVO
+  const location = formData.get("location") as string;
+  const color = formData.get("color") as string;
+
+  if (!id || !title || !dateStr || !timeStr) {
+     throw new Error("Dados inválidos.");
+  }
+
+  const startTime = new Date(`${dateStr}T${timeStr}:00`);
+  
+  let endTime = new Date(startTime);
+  if (endTimeStr) {
+      endTime = new Date(`${dateStr}T${endTimeStr}:00`);
+  } else {
+      endTime.setHours(endTime.getHours() + 1);
+  }
+
+  await prisma.event.update({
+    where: { id },
+    data: {
+      title,
+      description: description || null,
+      startTime,
+      endTime,
+      location: location || null,
+      color: color || "#3B82F6",
     },
   });
 
@@ -39,35 +89,7 @@ export async function deleteEvent(eventId: string) {
   revalidatePath("/agenda");
 }
 
-// ATUALIZAR EVENTO
-export async function updateEvent(formData: FormData) {
-  const id = formData.get("id") as string;
-  const title = formData.get("title") as string;
-  const description = formData.get("description") as string;
-  const dateStr = formData.get("date") as string;
-  const timeStr = formData.get("time") as string;
-  const location = formData.get("location") as string;
-  const color = formData.get("color") as string;
-
-  if (!id || !title || !dateStr || !timeStr) {
-     throw new Error("Dados inválidos.");
-  }
-
-  const startTime = new Date(`${dateStr}T${timeStr}:00`);
-
-  await prisma.event.update({
-    where: { id },
-    data: {
-      title,
-      description: description || null,
-      startTime,
-      location: location || null,
-      color: color || "#6366f1",
-    },
-  });
-
-  revalidatePath("/agenda");
-}
+// --- TAREFAS ---
 
 export async function toggleTaskDone(taskId: string) {
   const task = await prisma.task.findUnique({
@@ -85,20 +107,20 @@ export async function toggleTaskDone(taskId: string) {
   revalidatePath("/agenda");
 }
 
-// Buscar itens de rotina
+// --- ROTINAS (Mantido intacto) ---
+
 export async function getRoutineItems() {
   return await prisma.routineItem.findMany({
     orderBy: { startTime: 'asc' }
   });
 }
 
-// SETUP AUTOMÁTICO DA SUA ROTINA (Execute uma vez)
 export async function seedRoutine() {
   const count = await prisma.routineItem.count();
   if (count > 0) return { success: false, message: "Rotina já existe!" };
 
   const routineData = [
-    // --- SEGUNDA A QUINTA ---
+    // ... [Seus dados de rotina mantidos exatamente iguais] ...
     { time: "06:30", end: "07:00", title: "Acordar & Hidratação", cat: "health", days: "mon,tue,wed,thu", desc: "1 copo de água + conversa com namorada." },
     { time: "07:00", end: "08:00", title: "Treino Matinal", cat: "health", days: "mon,tue,wed,thu", desc: "Academia, corrida ou musculação." },
     { time: "08:15", end: "08:45", title: "Café da Manhã", cat: "health", days: "mon,tue,wed,thu", desc: "Frutas, ovos, pão integral." },
@@ -107,18 +129,12 @@ export async function seedRoutine() {
     { time: "12:30", end: "14:00", title: "Estudo + Duolingo", cat: "study", days: "mon,tue,wed,thu", desc: "Revisão de código e inglês." },
     { time: "17:30", end: "22:00", title: "Faculdade (S.I.)", cat: "work", days: "mon,tue,wed,thu", desc: "Aulas presenciais. Foco total." },
     { time: "23:40", end: "00:00", title: "Leitura & Meditação", cat: "health", days: "mon,tue,wed,thu", desc: "Bíblia e respiração." },
-
-    // --- SEXTA ---
     { time: "09:00", end: "12:00", title: "Faxina Geral", cat: "home", days: "fri", desc: "Zerar a bagunça da semana." },
     { time: "12:30", end: "15:00", title: "Estudos / Portfólio", cat: "study", days: "fri", desc: "Foco na criação do portfólio." },
     { time: "15:15", end: "17:00", title: "Inglês & Revisão", cat: "study", days: "fri", desc: "Duolingo e revisão da semana." },
     { time: "21:00", end: "21:30", title: "Planejamento Semanal", cat: "work", days: "fri", desc: "Organizar agenda da próxima semana." },
-
-    // --- SÁBADO ---
     { time: "09:00", end: "12:00", title: "Tarefas Leves", cat: "home", days: "sat", desc: "Organizar mochila, plantas, caminhada." },
     { time: "14:00", end: "17:00", title: "Visita Namorada", cat: "leisure", days: "sat", desc: "Tempo de qualidade." },
-    
-    // --- DOMINGO ---
     { time: "09:00", end: "11:00", title: "Atividade Leve", cat: "health", days: "sun", desc: "Caminhada ou bicicleta." },
     { time: "13:00", end: "15:00", title: "Revisão & Planejamento", cat: "work", days: "sun", desc: "Ajustar planos e metas." },
   ];
@@ -138,15 +154,13 @@ export async function seedRoutine() {
   return { success: true, message: "Rotina importada com sucesso!" };
 }
 
-// --- CRUD DE ROTINA ---
-
 export async function createRoutineItem(formData: FormData) {
   const title = formData.get("title") as string;
   const startTime = formData.get("startTime") as string;
   const endTime = formData.get("endTime") as string;
   const description = formData.get("description") as string;
   const category = formData.get("category") as string;
-  const daysOfWeek = formData.get("daysOfWeek") as string; // Ex: "mon,tue"
+  const daysOfWeek = formData.get("daysOfWeek") as string;
 
   await prisma.routineItem.create({
     data: { title, startTime, endTime, description, category, daysOfWeek }

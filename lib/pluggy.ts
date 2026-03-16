@@ -1,35 +1,32 @@
 import { PluggyClient } from 'pluggy-sdk';
-
-// Variável singleton para armazenar a instância
-let pluggyClientInstance: PluggyClient | null = null;
+import { prisma } from './prisma';
 
 // Função auxiliar para pegar o cliente ou lançar erro se não configurado
-function getPluggyClient() {
-  if (pluggyClientInstance) return pluggyClientInstance;
+async function getPluggyClient() {
+  // 1. Busca as configurações salvas no banco
+  const settings = await prisma.settings.findFirst();
 
-  const clientId = process.env.PLUGGY_CLIENT_ID;
-  const clientSecret = process.env.PLUGGY_CLIENT_SECRET;
+  const clientId = settings?.pluggyClientId;
+  const clientSecret = settings?.pluggySecret;
 
   if (!clientId || !clientSecret) {
-    // Retorna null para podermos tratar o erro de forma amigável nas funções
-    console.warn("⚠️ AVISO: Credenciais da Pluggy não encontradas no .env. A integração bancária não funcionará.");
+    console.warn("⚠️ AVISO: Credenciais da Pluggy não configuradas no sistema.");
     return null;
   }
 
-  pluggyClientInstance = new PluggyClient({
+  // 2. Retorna uma nova instância com as chaves reais do banco
+  return new PluggyClient({
     clientId,
     clientSecret,
   });
-
-  return pluggyClientInstance;
 }
 
 // 1. Criar um "Connect Token" (Sessão para o Widget de Login)
 export async function createConnectToken() {
-  const client = getPluggyClient();
+  const client = await getPluggyClient();
   
   if (!client) {
-    throw new Error("Integração bancária não configurada (Faltam chaves no .env).");
+    throw new Error("Pluggy não configurada. Vá em Configurações > APIs.");
   }
 
   try {
@@ -37,13 +34,13 @@ export async function createConnectToken() {
     return data.accessToken;
   } catch (error) {
     console.error("Erro ao criar token Pluggy:", error);
-    throw new Error("Falha ao comunicar com a Pluggy.");
+    throw new Error("Falha ao comunicar com a Pluggy. Verifique suas chaves.");
   }
 }
 
 // 2. Buscar Contas conectadas após o login
 export async function fetchPluggyAccounts(itemId: string) {
-  const client = getPluggyClient();
+  const client = await getPluggyClient();
   if (!client) return [];
 
   try {
@@ -57,16 +54,16 @@ export async function fetchPluggyAccounts(itemId: string) {
 
 // 3. Buscar Transações (Sincronização)
 export async function fetchPluggyTransactions(accountId: string) {
-  const client = getPluggyClient();
+  const client = await getPluggyClient();
   if (!client) return [];
 
-  // Pega transações dos últimos 30 dias
+  // Pega transações dos últimos 30 dias por padrão
   const fromDate = new Date();
   fromDate.setDate(fromDate.getDate() - 30);
   
   try {
     const transactions = await client.fetchTransactions(accountId, {
-      from: fromDate.toISOString().split('T')[0] // YYYY-MM-DD
+      from: fromDate.toISOString().split('T')[0] // Formato YYYY-MM-DD
     });
     return transactions.results;
   } catch (error) {

@@ -1,101 +1,46 @@
 import { prisma } from "@/lib/prisma";
 import { TaskInput } from "@/components/projects/task-input";
-import { TaskItem } from "@/components/projects/task-item";
 import { ProjectSettingsMenu } from "@/components/projects/project-settings-menu";
-import { SortSelect } from "@/components/projects/sort-select";
+import { TaskReorderList } from "@/components/projects/task-reorder-list"; 
+import { ProjectNotes } from "@/components/projects/project-notes";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
-import { CardContent, Card } from "@/components/ui/card";
 import { 
-  ArrowLeft, Search, List, AlignJustify, CheckCircle2, X, Filter, 
-  Calendar, Flag, Star, Pin, Clock, Target, Sparkles,
-  Grid3x3, Zap, TrendingUp, AlertCircle, FileText, CalendarDays
+  ArrowLeft, Search, SlidersHorizontal, 
+  FileText, ListTodo, LayoutGrid, List, AlignJustify,
+  Sparkles, Hash, Target
 } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Prisma } from "@prisma/client";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import React, { CSSProperties } from "react";
 
-type FilterType = "all" | "active" | "completed" | "pinned" | "starred" | "overdue";
-type ViewType = "list" | "compact" | "grid";
-type SortType = "priority" | "dueDate" | "createdAt" | "title";
+// --- TYPES ---
+type FilterType = "all" | "active" | "completed";
+type SortType = "priority" | "dueDate" | "createdAt" | "order";
+type ViewMode = "list" | "grid" | "compact";
 
 interface ProjectDetailPageProps {
   params: Promise<{ slug: string }>;
   searchParams: Promise<{
     q?: string;
-    view?: ViewType;
     filter?: FilterType;
     sort?: SortType;
+    tab?: "list" | "notes";
+    view?: ViewMode;
   }>;
 }
-
-interface StatCardProps {
-  label: string;
-  value: number | string;
-  icon: React.ReactNode;
-  color: string;
-  trend?: number;
-}
-
-function StatCard({ label, value, icon, color, trend }: StatCardProps) {
-  return (
-    <Card className="group relative overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all hover:scale-[1.02] hover:border-primary/30 hover:shadow-lg">
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-      <CardContent className="relative p-5">
-        <div className="flex items-center justify-between">
-          <div className="space-y-1.5">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</p>
-            <p className="text-2xl font-bold tracking-tight" style={{ color }}>{value}</p>
-            {trend !== undefined && (
-              <p className={cn(
-                "text-xs font-medium flex items-center gap-1",
-                trend > 0 ? "text-green-500" : 
-                trend < 0 ? "text-red-500" : "text-muted-foreground"
-              )}>
-                {trend > 0 ? <TrendingUp className="h-3 w-3" /> : 
-                 trend < 0 ? <AlertCircle className="h-3 w-3" /> : 
-                 <span className="h-3 w-3" />}
-                {trend > 0 ? "+" : ""}{trend}%
-              </p>
-            )}
-          </div>
-          <div 
-            className="p-2.5 rounded-xl shadow-sm transition-all group-hover:scale-110 group-hover:shadow-md"
-            style={{ 
-              backgroundColor: `${color}15`,
-              border: `1px solid ${color}30`
-            }}
-          >
-            <div className="text-foreground" style={{ color }}>
-              {icon}
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-const FILTER_CONFIG = {
-  all: { label: "Todas", icon: <List className="h-4 w-4" />, color: "bg-primary/10 text-primary" },
-  active: { label: "Pendentes", icon: <Target className="h-4 w-4" />, color: "bg-blue-500/10 text-blue-600" },
-  completed: { label: "Concluídas", icon: <CheckCircle2 className="h-4 w-4" />, color: "bg-green-500/10 text-green-600" },
-  pinned: { label: "Fixadas", icon: <Pin className="h-4 w-4" />, color: "bg-amber-500/10 text-amber-600" },
-  starred: { label: "Destacadas", icon: <Star className="h-4 w-4" />, color: "bg-yellow-500/10 text-yellow-600" },
-  overdue: { label: "Atrasadas", icon: <Clock className="h-4 w-4" />, color: "bg-red-500/10 text-red-600" },
-} as const;
-
-const VIEW_CONFIG = {
-  list: { label: "Lista", icon: <List className="h-4 w-4" /> },
-  compact: { label: "Compacto", icon: <AlignJustify className="h-4 w-4" /> },
-  grid: { label: "Grade", icon: <Grid3x3 className="h-4 w-4" /> },
-} as const;
 
 export default async function ProjectDetailPage(props: ProjectDetailPageProps) {
   const params = await props.params;
@@ -103,477 +48,306 @@ export default async function ProjectDetailPage(props: ProjectDetailPageProps) {
 
   const { slug } = params;
   const searchQuery = searchParams?.q ?? "";
-  const viewMode: ViewType = searchParams?.view ?? "list";
-  const currentFilter: FilterType = searchParams?.filter ?? "all";
-  const sortBy: SortType = searchParams?.sort ?? "priority";
+  const currentFilter: FilterType = searchParams?.filter ?? "active"; 
+  const sortBy: SortType = searchParams?.sort ?? "order";
+  const activeTab = searchParams?.tab ?? "list";
+  const viewMode: ViewMode = searchParams?.view ?? "list";
 
   const isInbox = slug === "inbox";
-  let projectTitle = "Inbox";
-  let projectDescription: string | null = "Tarefas rápidas e não categorizadas.";
-  let dbProjectId: string | null = null;
-  let projectColor = "#6366f1";
-
-  try {
-    if (!isInbox) {
-      const project = await prisma.project.findUnique({
-        where: { slug },
-        select: { 
-          id: true, 
-          title: true, 
-          description: true, 
-          color: true,
-          createdAt: true 
-        },
-      });
-      
-      if (!project) return notFound();
-      
-      projectTitle = project.title;
-      projectDescription = project.description;
-      dbProjectId = project.id;
-      projectColor = project.color || "#6366f1";
-    }
-  } catch (err) {
-    console.error(err);
-    return notFound();
-  }
-
-  const now = new Date();
   
+  const project = !isInbox ? await prisma.project.findUnique({
+    where: { slug },
+    select: { id: true, title: true, description: true, color: true, createdAt: true },
+  }) : null;
+
+  if (!isInbox && !project) return notFound();
+
+  const projectTitle = project?.title ?? "Inbox Global";
+  const projectDescription = project?.description ?? "Captura rápida de ideias e tarefas pendentes.";
+  const dbProjectId = project?.id ?? null;
+  const projectColor = project?.color ?? "#6366f1";
+
   const where: Prisma.TaskWhereInput = {
     projectId: dbProjectId,
     ...(searchQuery ? { 
-      OR: [
-        { title: { contains: searchQuery, mode: 'insensitive' } }, 
-        { description: { contains: searchQuery, mode: 'insensitive' } }
-      ] 
+        OR: [
+            { title: { contains: searchQuery } }, 
+            { description: { contains: searchQuery } }
+        ] 
     } : {}),
     ...(currentFilter === "active" ? { isDone: false } : {}),
     ...(currentFilter === "completed" ? { isDone: true } : {}),
-    ...(currentFilter === "pinned" ? { isPinned: true } : {}),
-    ...(currentFilter === "starred" ? { isStarred: true } : {}),
-    ...(currentFilter === "overdue" ? { 
-      dueDate: { lt: now }, 
-      isDone: false 
-    } : {}),
   };
 
-  const orderBy: Prisma.TaskOrderByWithRelationInput[] = [];
-  
-  if (sortBy === "priority") orderBy.push({ priority: "desc" }, { dueDate: "asc" });
-  else if (sortBy === "dueDate") orderBy.push({ dueDate: "asc" }, { priority: "desc" });
-  else if (sortBy === "createdAt") orderBy.push({ createdAt: "desc" }, { priority: "desc" });
-  else if (sortBy === "title") orderBy.push({ title: "asc" }, { priority: "desc" });
+  const orderBy: Prisma.TaskOrderByWithRelationInput[] = 
+    sortBy === "priority" ? [{ priority: "desc" }, { createdAt: "asc" }] :
+    sortBy === "dueDate" ? [{ dueDate: "asc" }] : 
+    sortBy === "order" ? [{ order: "asc" }, { createdAt: "desc" }] : [{ createdAt: "desc" }];
 
-  const tasks = await prisma.task.findMany({
-    where,
-    orderBy,
-    select: {
-      id: true, 
-      title: true, 
-      description: true, 
-      isDone: true, 
-      priority: true,
-      status: true, 
-      dueDate: true, 
-      image: true, 
-      createdAt: true, 
-      updatedAt: true,
-      isPinned: true, 
-      isStarred: true, 
-      progress: true, 
-      estimatedTime: true,
-      projectId: true,
-    },
-  });
+  const [tasks, allStats] = await Promise.all([
+    prisma.task.findMany({ where, orderBy }),
+    prisma.task.groupBy({ 
+        by: ['isDone'], 
+        where: { projectId: dbProjectId }, 
+        _count: { isDone: true } 
+    })
+  ]);
 
-  const allTasks = await prisma.task.findMany({
-    where: { projectId: dbProjectId },
-    select: { 
-      isDone: true, 
-      isPinned: true, 
-      isStarred: true, 
-      dueDate: true, 
-      progress: true 
-    },
-  });
+  const doneCount = allStats.find(s => s.isDone)?._count.isDone ?? 0;
+  const pendingCount = allStats.find(s => !s.isDone)?._count.isDone ?? 0;
+  const totalCount = doneCount + pendingCount;
+  const progressPercent = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
 
-  const total = allTasks.length;
-  const done = allTasks.filter((t) => t.isDone).length;
-  const pinned = allTasks.filter((t) => t.isPinned).length;
-  const starred = allTasks.filter((t) => t.isStarred).length;
-  const progressAvg = total > 0 ? Math.round(allTasks.reduce((acc, t) => acc + t.progress, 0) / total) : 0;
-  const overdue = allTasks.filter((t) => t.dueDate && t.dueDate < now && !t.isDone).length;
-  const progress = total ? Math.round((done / total) * 100) : 0;
-
-  const buildUrl = (newParams: { q?: string; view?: ViewType; filter?: FilterType; sort?: SortType }) => {
-    const p = { 
-      q: searchQuery, 
-      view: viewMode, 
-      filter: currentFilter, 
-      sort: sortBy, 
-      ...newParams 
-    };
-    
+  const buildUrl = (updates: Record<string, string>) => {
     const usp = new URLSearchParams();
+    if (searchQuery) usp.set("q", searchQuery);
+    if (currentFilter !== "active") usp.set("filter", currentFilter);
+    if (sortBy !== "order") usp.set("sort", sortBy);
+    if (activeTab !== "list") usp.set("tab", activeTab);
+    if (viewMode !== "list") usp.set("view", viewMode);
     
-    if (p.q) usp.set("q", p.q);
-    if (p.view !== "list") usp.set("view", p.view);
-    if (p.filter !== "all") usp.set("filter", p.filter);
-    if (p.sort !== "priority") usp.set("sort", p.sort);
-    
-    const queryString = usp.toString();
-    return `/projects/${encodeURIComponent(slug)}${queryString ? `?${queryString}` : ""}`;
+    Object.entries(updates).forEach(([k, v]) => usp.set(k, v));
+    return `/projects/${slug}?${usp.toString()}`;
   };
 
   return (
-    <TooltipProvider>
-      <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/5">
-        {/* Enhanced Header with Gradient */}
-        <header 
-          className=" z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
-          style={{
-            background: `linear-gradient(135deg, ${projectColor}08 0%, transparent 50%, ${projectColor}05 100%)`,
-          }}
-        >
-          <div className="max-w-7xl mx-auto px-6 py-6 space-y-5">
-            {/* Navigation and Title */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Link 
-                  href="/projects" 
-                  className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary p-2 hover:bg-primary/10 rounded-lg transition-all hover:scale-105"
-                >
-                  <ArrowLeft className="h-4 w-4" /> 
-                  <span className="font-medium">Voltar</span>
-                </Link>
-                
-                <div className="h-6 w-px bg-gradient-to-b from-transparent via-border to-transparent" />
-                
-                <div className="flex items-center gap-3">
-                  <div 
-                    className="h-3 w-3 rounded-full shadow-md"
-                    style={{ 
-                      backgroundColor: projectColor,
-                      boxShadow: `0 0 12px ${projectColor}60`
-                    }} 
-                  />
-                  <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-foreground truncate">
-                      {projectTitle}
-                    </h1>
-                    <p className="text-sm text-muted-foreground truncate max-w-md">
-                      {projectDescription}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              {!isInbox && dbProjectId && (
-                <ProjectSettingsMenu 
-                  projectId={dbProjectId} 
-                  projectTitle={projectTitle} 
-                  projectDescription={projectDescription}
-                  projectColor={projectColor}
-                />
-              )}
-            </div>
-
-            {/* Statistics Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3 mt-6">
-              <StatCard 
-                label="Total" 
-                value={total} 
-                icon={<FileText className="h-4 w-4" />} 
-                color={projectColor} 
-              />
-              <StatCard 
-                label="Concluídas" 
-                value={done} 
-                icon={<CheckCircle2 className="h-4 w-4" />} 
-                color="#10b981" 
-                trend={progress} 
-              />
-              <StatCard 
-                label="Progresso Médio" 
-                value={`${progressAvg}%`} 
-                icon={<TrendingUp className="h-4 w-4" />} 
-                color="#8b5cf6" 
-              />
-              <StatCard 
-                label="Fixadas" 
-                value={pinned} 
-                icon={<Pin className="h-4 w-4" />} 
-                color="#f59e0b" 
-              />
-              <StatCard 
-                label="Destacadas" 
-                value={starred} 
-                icon={<Star className="h-4 w-4" />} 
-                color="#fbbf24" 
-              />
-              <StatCard 
-                label="Atrasadas" 
-                value={overdue} 
-                icon={<AlertCircle className="h-4 w-4" />} 
-                color="#ef4444" 
-              />
-            </div>
-
-            {/* Project Progress Bar */}
-            <div className="mt-6 space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">Progresso do Projeto</span>
-                  <Badge variant="outline" className="text-xs">
-                    {done}/{total} concluídas
-                  </Badge>
-                </div>
-                <span className="text-sm font-bold text-primary">{progress}%</span>
-              </div>
-              <div className="relative">
-                <Progress 
-                  value={progress} 
-                  className="h-2.5 bg-gradient-to-r from-muted to-muted/50" 
-                />
-                <div 
-                  className="absolute inset-0 h-2.5 rounded-full opacity-20"
-                  style={{
-                    background: `linear-gradient(90deg, ${projectColor}20, ${projectColor}40)`,
-                  }}
-                />
-              </div>
-            </div>
+    <div className="min-h-screen bg-background flex flex-col w-full">
+      
+      {/* 1. NAVBAR - FULL WIDTH */}
+      <nav className="sticky top-0 z-30 bg-background/60 backdrop-blur-xl border-b border-border/40 px-4 md:px-8 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Link href="/projects" className="h-9 w-9 flex items-center justify-center rounded-xl bg-muted/50 hover:bg-primary/10 hover:text-primary transition-all group">
+            <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
+          </Link>
+          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+            <span className="hidden sm:inline">Navegação</span>
+            <span className="opacity-40 hidden sm:inline">/</span>
+            <span className="text-foreground">{projectTitle}</span>
           </div>
-        </header>
+        </div>
 
-        <main className="max-w-7xl mx-auto px-6 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            {/* Sidebar Filters */}
-            <aside className="lg:col-span-1 space-y-6">
-              <Card className="sticky top-24 border-border/50 bg-card/50 backdrop-blur-sm shadow-lg">
-                <CardContent className="p-6 space-y-6">
-                  {/* Search Section */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Search className="h-4 w-4 text-primary" />
-                      <label className="text-sm font-medium">Buscar Tarefas</label>
+        <div className="flex items-center gap-3">
+          {!isInbox && dbProjectId && (
+            <ProjectSettingsMenu 
+              projectId={dbProjectId} projectTitle={projectTitle} 
+              projectDescription={projectDescription} projectColor={projectColor}
+            />
+          )}
+          <Button size="sm" className="h-9 rounded-xl bg-primary shadow-lg shadow-primary/20 gap-2 px-4">
+            <Sparkles className="h-3.5 w-3.5 text-white" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-white">Life AI</span>
+          </Button>
+        </div>
+      </nav>
+
+      {/* 2. HERO SECTION */}
+      <header className="relative pt-12 pb-8 px-4 md:px-10 lg:px-14 w-full">
+        <div 
+            className="absolute -top-40 -left-40 w-[600px] h-[600px] blur-[160px] opacity-[0.07] rounded-full pointer-events-none"
+            style={{ backgroundColor: projectColor }}
+        />
+
+        <div className="relative flex flex-col lg:flex-row lg:items-end justify-between gap-10">
+            <div className="space-y-5 flex-1 min-w-0">
+                <div className="flex items-center gap-3">
+                    <div className="h-16 w-16 rounded-[1.75rem] flex items-center justify-center shadow-2xl border border-white/10" style={{ backgroundColor: projectColor }}>
+                        <Hash className="h-8 w-8 text-white" />
                     </div>
-                    <form method="GET" className="relative group">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                      <Input 
-                        name="q" 
-                        defaultValue={searchQuery} 
-                        placeholder="Pesquisar..." 
-                        className="pl-9 bg-background/50 border-border/50 focus:border-primary/50 transition-all"
-                      />
-                      {searchQuery && (
+                    <div className="flex flex-col">
+                        <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mb-1">Setor Operacional</span>
+                        <div className="px-3 py-0.5 rounded-full bg-muted/50 border border-border/40 w-fit text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                            {isInbox ? "Privado / Inbox" : "Projeto Ativo"}
+                        </div>
+                    </div>
+                </div>
+
+                <h1 className="text-5xl md:text-8xl font-black tracking-tighter text-foreground leading-[0.85] animate-in fade-in slide-in-from-left-4 duration-700">
+                    {projectTitle}
+                </h1>
+
+                <p className="text-lg md:text-2xl text-muted-foreground/70 max-w-4xl font-medium leading-relaxed">
+                    {projectDescription}
+                </p>
+            </div>
+
+            {!isInbox && (
+                <div className="bg-card border border-border/40 rounded-[2.5rem] p-8 shadow-2xl min-w-[320px] lg:mb-2 backdrop-blur-sm">
+                    <div className="flex justify-between items-end mb-5">
+                        <div className="space-y-1">
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Sincronização</span>
+                            <div className="text-5xl font-black font-mono tracking-tighter">{progressPercent}%</div>
+                        </div>
+                        <Target className="h-8 w-8 text-primary opacity-30" />
+                    </div>
+                    <Progress 
+                        value={progressPercent} 
+                        className="h-2.5 bg-muted/40" 
+                        style={{ "--progress-foreground": projectColor } as React.CSSProperties} 
+                    />
+                    <div className="mt-6 flex gap-8 text-[10px] font-black uppercase tracking-widest border-t border-border/40 pt-5">
+                        <div className="flex flex-col gap-1.5">
+                            <span className="text-muted-foreground/40 italic">Finalizado</span>
+                            <span className="text-foreground text-base">{doneCount}</span>
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                            <span className="text-muted-foreground/40 italic">Pendentes</span>
+                            <span className="text-foreground text-base">{pendingCount}</span>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+      </header>
+
+      {/* 3. WORKSPACE */}
+      <main className="flex-1 bg-muted/20 border-t border-border/40 rounded-t-[3rem] md:rounded-t-[5rem] shadow-[0_-20px_100px_-20px_rgba(0,0,0,0.1)]">
+        <div className="w-full px-4 md:px-10 lg:px-14 py-12">
+          
+          <Tabs defaultValue={activeTab} className="w-full">
+            
+            {/* TABS E FILTROS */}
+            <div className="flex flex-col xl:flex-row gap-8 items-start xl:items-center justify-between mb-12">
+              <TabsList className="bg-muted/50 p-1.5 rounded-2xl border border-border/40 h-auto">
+                <TabsTrigger asChild value="list" className="rounded-xl px-10 py-3.5 font-black text-[10px] uppercase tracking-[0.2em] data-[state=active]:bg-background data-[state=active]:shadow-2xl transition-all">
+                  <Link href={buildUrl({tab: "list"})} scroll={false}>
+                    <ListTodo className="h-4 w-4 mr-2" /> Tarefas
+                  </Link>
+                </TabsTrigger>
+                <TabsTrigger asChild value="notes" className="rounded-xl px-10 py-3.5 font-black text-[10px] uppercase tracking-[0.2em] data-[state=active]:bg-background data-[state=active]:shadow-2xl transition-all">
+                  <Link href={buildUrl({tab: "notes"})} scroll={false}>
+                    <FileText className="h-4 w-4 mr-2" /> Notas
+                  </Link>
+                </TabsTrigger>
+              </TabsList>
+
+              <div className="flex items-center gap-4 w-full sm:w-auto">
+                <div className="flex bg-muted/50 p-1.5 rounded-2xl border border-border/40 shadow-inner">
+                    {[
+                        { mode: 'list', icon: List },
+                        { mode: 'grid', icon: LayoutGrid },
+                        { mode: 'compact', icon: AlignJustify }
+                    ].map((item) => (
                         <Link 
-                          href={buildUrl({ q: "" })} 
-                          className="absolute right-3 top-1/2 -translate-y-1/2"
-                        >
-                          <X className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
-                        </Link>
-                      )}
-                      <input type="hidden" name="filter" value={currentFilter} />
-                      <input type="hidden" name="view" value={viewMode} />
-                      <input type="hidden" name="sort" value={sortBy} />
-                    </form>
-                  </div>
-
-                  <Separator className="bg-border/30" />
-
-                  {/* Filters Section */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Filter className="h-4 w-4 text-primary" />
-                      <h3 className="text-sm font-medium">Filtros</h3>
-                    </div>
-                    <div className="space-y-1">
-                      {(Object.entries(FILTER_CONFIG) as [FilterType, typeof FILTER_CONFIG[FilterType]][]).map(([key, config]) => (
-                        <Link key={key} href={buildUrl({ filter: key })}>
-                          <Button
-                            variant="ghost"
+                            key={item.mode}
+                            href={buildUrl({view: item.mode as ViewMode})} 
                             className={cn(
-                              "w-full justify-start gap-3 h-9 text-sm font-normal transition-all",
-                              currentFilter === key && config.color,
-                              currentFilter !== key && "hover:bg-primary/5"
+                                "p-2.5 rounded-xl transition-all", 
+                                viewMode === item.mode ? "bg-background shadow-xl text-primary scale-110" : "text-muted-foreground hover:text-foreground"
                             )}
-                          >
-                            {config.icon}
-                            {config.label}
-                            {(key === "overdue" && overdue > 0) || (key === "pinned" && pinned > 0) ? (
-                              <Badge 
-                                variant="secondary" 
-                                className={cn(
-                                  "ml-auto text-xs",
-                                  key === "overdue" && "bg-red-500/10 text-red-600",
-                                  key === "pinned" && "bg-amber-500/10 text-amber-600"
-                                )}
-                              >
-                                {key === "overdue" ? overdue : pinned}
-                              </Badge>
-                            ) : null}
-                          </Button>
+                        >
+                            <item.icon className="h-4.5 w-4.5" />
                         </Link>
-                      ))}
-                    </div>
-                  </div>
-
-                  <Separator className="bg-border/30" />
-
-                  {/* Sort Section */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-primary" />
-                      <h3 className="text-sm font-medium">Ordenar por</h3>
-                    </div>
-                    <SortSelect sortBy={sortBy} slug={slug} />
-                  </div>
-
-                  <Separator className="bg-border/30" />
-
-                  {/* View Toggle */}
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-medium">Visualização</h3>
-                    <div className="grid gap-1 p-1 rounded-lg bg-muted/30">
-                      {(Object.entries(VIEW_CONFIG) as [ViewType, typeof VIEW_CONFIG[ViewType]][]).map(([key, config]) => (
-                        <Tooltip key={key}>
-                          <TooltipTrigger asChild>
-                            <Link href={buildUrl({ view: key })} className="flex-1">
-                              <Button
-                                size="sm"
-                                variant={viewMode === key ? "default" : "ghost"}
-                                className={cn(
-                                  "w-full gap-2 transition-all",
-                                  viewMode === key && "shadow-sm"
-                                )}
-                              >
-                                {config.icon}
-                                <span className="hidden sm:inline">{config.label}</span>
-                              </Button>
-                            </Link>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>{config.label}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      ))}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </aside>
-
-            {/* Main Content */}
-            <section className="lg:col-span-3 space-y-6">
-              {/* Tasks Header */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <Target className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-bold tracking-tight">Tarefas</h2>
-                    <p className="text-sm text-muted-foreground">
-                      {tasks.length} {tasks.length === 1 ? 'tarefa' : 'tarefas'} encontradas
-                    </p>
-                  </div>
+                    ))}
                 </div>
-                
-                <div className="flex items-center gap-2">
-                  <Badge 
-                    variant="outline" 
-                    className={cn(
-                      "transition-colors",
-                      currentFilter !== "all" && FILTER_CONFIG[currentFilter].color
-                    )}
-                  >
-                    {FILTER_CONFIG[currentFilter].icon}
-                    <span className="ml-1">{FILTER_CONFIG[currentFilter].label}</span>
-                  </Badge>
-                </div>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="h-12 rounded-2xl border-border/40 bg-background/50 gap-4 font-black text-[10px] uppercase tracking-[0.2em] px-8 shadow-sm hover:shadow-xl transition-all">
+                      <SlidersHorizontal className="h-4 w-4 text-primary" />
+                      {currentFilter === 'all' ? 'Tudo' : currentFilter === 'active' ? 'Faltam' : 'Feito'}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-64 rounded-[1.75rem] p-3 border-border/40 shadow-2xl backdrop-blur-xl bg-background/95">
+                    <DropdownMenuLabel className="text-[9px] font-black uppercase tracking-[0.25em] text-muted-foreground/50 py-4 px-4 text-center">Filtro de Visualização</DropdownMenuLabel>
+                    <DropdownMenuSeparator className="bg-border/40" />
+                    <Link href={buildUrl({filter: "active"})}><DropdownMenuCheckboxItem checked={currentFilter === "active"} className="rounded-xl py-4 cursor-pointer font-bold uppercase text-[10px] tracking-widest mb-1">Pendentes</DropdownMenuCheckboxItem></Link>
+                    <Link href={buildUrl({filter: "completed"})}><DropdownMenuCheckboxItem checked={currentFilter === "completed"} className="rounded-xl py-4 cursor-pointer font-bold uppercase text-[10px] tracking-widest mb-1">Concluídas</DropdownMenuCheckboxItem></Link>
+                    <Link href={buildUrl({filter: "all"})}><DropdownMenuCheckboxItem checked={currentFilter === "all"} className="rounded-xl py-4 cursor-pointer font-bold uppercase text-[10px] tracking-widest">Todos</DropdownMenuCheckboxItem></Link>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+
+            {/* ABA TAREFAS */}
+            <TabsContent value="list" className="space-y-12 outline-none">
+              
+              <div className="relative group w-full">
+                <Search className="absolute left-7 top-1/2 -translate-y-1/2 h-6 w-6 text-muted-foreground/20 group-focus-within:text-primary group-focus-within:scale-110 transition-all duration-300" />
+                <form className="w-full">
+                  <Input 
+                    name="q" placeholder="Buscar em inteligência e operações..." defaultValue={searchQuery}
+                    className="h-20 pl-20 pr-8 bg-background border-border/40 rounded-[2rem] shadow-2xl focus-visible:ring-primary/10 focus-visible:border-primary/40 transition-all text-xl font-medium placeholder:text-muted-foreground/10"
+                  />
+                  <input type="hidden" name="filter" value={currentFilter} />
+                  <input type="hidden" name="sort" value={sortBy} />
+                  <input type="hidden" name="view" value={viewMode} />
+                </form>
               </div>
 
-              {/* Tasks Card */}
-              <Card className="border-border/50 bg-card/50 backdrop-blur-sm shadow-lg overflow-hidden">
-                <CardContent className="p-0">
-                  {tasks.length === 0 ? (
-                    <EmptyState search={!!searchQuery} currentFilter={currentFilter} />
-                  ) : (
-                    <div className={cn(
-                      "p-4",
-                      viewMode === "grid" 
-                        ? "grid grid-cols-1 md:grid-cols-2 gap-4" 
-                        : viewMode === "compact" 
-                        ? "space-y-2" 
-                        : "space-y-3"
-                    )}>
-                      {tasks.map((task) => (
-                        <TaskItem key={task.id} task={task} viewMode={viewMode} />
-                      ))}
+              <div className="grid grid-cols-1 gap-16">
+                <section className="space-y-8">
+                    <div className="flex items-center gap-4 px-4">
+                        <div className="h-3 w-3 rounded-full bg-primary animate-pulse shadow-[0_0_10px_rgba(var(--primary),0.5)]" />
+                        <span className="text-[11px] font-black uppercase tracking-[0.3em] text-muted-foreground/60 italic">Comando de Entrada</span>
                     </div>
-                  )}
-                </CardContent>
-                
-                {/* Task Input */}
-                <div 
-                  className="p-4 border-t bg-gradient-to-r from-primary/5 via-transparent to-transparent"
-                  style={{
-                    borderTopColor: `${projectColor}20`
-                  }}
-                >
-                  <TaskInput projectId={isInbox ? "inbox" : dbProjectId!} />
+                    <TaskInput projectId={isInbox ? "inbox" : dbProjectId!} />
+                </section>
+
+                {tasks.length === 0 ? (
+                  <EmptyState search={!!searchQuery} currentFilter={currentFilter} />
+                ) : (
+                  <TaskReorderList initialTasks={tasks} viewMode={viewMode} />
+                )}
+
+              </div>
+            </TabsContent>
+
+            {/* ABA DE NOTAS / MEMÓRIA */}
+            <TabsContent value="notes" className="outline-none">
+                <div className="bg-card border border-border/40 rounded-[4rem] p-10 md:p-20 shadow-2xl relative overflow-hidden min-h-[75vh]">
+                    <div className="absolute -top-40 -right-40 p-8 opacity-[0.02] rotate-12 pointer-events-none">
+                        <FileText className="h-[700px] w-[700px]" />
+                    </div>
+                    
+                    <div className="max-w-6xl relative z-10 h-full flex flex-col">
+                        <div className="flex items-center gap-5 mb-14">
+                            <div className="h-16 w-16 rounded-3xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
+                                <Sparkles className="h-8 w-8" />
+                            </div>
+                            <div>
+                                <h2 className="text-4xl font-black tracking-tight uppercase italic text-foreground">Setor de Memória</h2>
+                                <p className="text-sm font-bold text-muted-foreground/40 uppercase tracking-[0.4em]">Arquivamento de Conhecimento Estratégico</p>
+                            </div>
+                        </div>
+
+                        {isInbox ? (
+                          <div className="flex-1 flex items-center justify-center bg-muted/10 border border-dashed border-border/40 rounded-[3rem] p-10">
+                            <p className="text-muted-foreground font-black uppercase tracking-widest text-sm opacity-50">O Setor de Memória não está disponível na Caixa de Entrada Global.</p>
+                          </div>
+                        ) : (
+                          <ProjectNotes 
+                            projectId={dbProjectId!} 
+                            initialNotes={projectDescription || ""} 
+                          />
+                        )}
+
+                    </div>
                 </div>
-              </Card>
-            </section>
-          </div>
-        </main>
-      </div>
-    </TooltipProvider>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </main>
+    </div>
   );
 }
 
 function EmptyState({ search, currentFilter }: { search: boolean; currentFilter: FilterType }) {
-  const messages = {
-    all: "Nenhuma tarefa encontrada. Comece criando uma nova tarefa!",
-    active: "🎉 Excelente! Todas as tarefas estão concluídas.",
-    completed: "Nenhuma tarefa concluída ainda. Continue trabalhando!",
-    pinned: "Nenhuma tarefa fixada. Fixe tarefas importantes para vê-las aqui.",
-    starred: "Nenhuma tarefa destacada. Destaque tarefas importantes!",
-    overdue: "🎊 Perfeito! Nenhuma tarefa atrasada."
-  };
-
-  const icons = {
-    all: <FileText className="h-12 w-12 text-muted-foreground" />,
-    active: <CheckCircle2 className="h-12 w-12 text-green-400" />,
-    completed: <Target className="h-12 w-12 text-blue-400" />,
-    pinned: <Pin className="h-12 w-12 text-amber-400" />,
-    starred: <Star className="h-12 w-12 text-yellow-400" />,
-    overdue: <Sparkles className="h-12 w-12 text-green-400" />
-  };
-
   return (
-    <div className="py-16 text-center">
-      <div 
-        className="mx-auto w-20 h-20 rounded-2xl flex items-center justify-center mb-6"
-        style={{
-          background: "linear-gradient(135deg, var(--primary)/10, var(--primary)/5)"
-        }}
-      >
-        {icons[currentFilter]}
+    <div className="col-span-full py-48 flex flex-col items-center justify-center text-center px-6">
+      <div className="h-32 w-32 rounded-[3rem] bg-muted/40 flex items-center justify-center mb-10 text-muted-foreground/5 border border-border/40 shadow-inner">
+        {search ? <Search className="h-12 w-12" /> : <Target className="h-12 w-12" />}
       </div>
-      <h3 className="text-xl font-semibold mb-2">
-        {search ? "Nenhum resultado encontrado" : messages[currentFilter]}
-      </h3>
-      <p className="text-muted-foreground max-w-md mx-auto">
+      <h3 className="text-3xl font-black tracking-tighter mb-4 uppercase italic opacity-20">Sector Deactivated</h3>
+      <p className="text-muted-foreground/40 max-w-[360px] font-bold text-sm uppercase tracking-[0.2em] leading-relaxed">
         {search 
-          ? "Tente usar palavras-chave diferentes ou ajustar os filtros." 
-          : currentFilter !== "all" 
-            ? "Tente mudar o filtro para ver todas as tarefas." 
-            : "Use o campo acima para criar sua primeira tarefa."
-        }
+            ? "O scanner não detectou frequências compatíveis." 
+            : "Todos os subsistemas operando em silêncio. Sem pendências."}
       </p>
+      {search && (
+        <Button variant="link" asChild className="mt-10 text-primary font-black uppercase tracking-[0.4em] text-[11px]">
+          <Link href="?">Reiniciar Scanner</Link>
+        </Button>
+      )}
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
 // =========================================================
-// HELPERS
+// HELPERS (Utilitários para ler FormData)
 // =========================================================
 
 function getString(formData: FormData, key: string): string | null {
@@ -17,6 +17,7 @@ function getString(formData: FormData, key: string): string | null {
 function getBoolean(formData: FormData, key: string): boolean {
   const value = formData.get(key);
   if (typeof value === "string") {
+    // Checkbox envia "on" ou "true"
     return value === "true" || value === "on";
   }
   return false;
@@ -45,7 +46,7 @@ function getDate(value: string | null): Date | null {
 }
 
 // =========================================================
-// SLUG
+// SLUG GENERATOR
 // =========================================================
 
 function createSlug(title: string) {
@@ -67,6 +68,7 @@ async function generateUniqueSlug(title: string, projectId?: string) {
       where: { slug },
     });
 
+    // Se não existe, ou se é o próprio projeto que estamos editando, o slug é válido
     if (!existing || existing.id === projectId) break;
 
     slug = `${base}-${count++}`;
@@ -76,7 +78,7 @@ async function generateUniqueSlug(title: string, projectId?: string) {
 }
 
 // =========================================================
-// ENUMS
+// ENUMS (Configurações fixas)
 // =========================================================
 
 const TASK_PRIORITIES = ["HIGH", "MEDIUM", "LOW"] as const;
@@ -93,7 +95,7 @@ const JOB_STATUS = [
 const JOB_TYPES = ["JOB", "FREELANCE"] as const;
 
 // =========================================================
-// 1. PROJETOS
+// 1. AÇÕES DE PROJETOS
 // =========================================================
 
 export async function createProject(
@@ -102,7 +104,7 @@ export async function createProject(
   try {
     const title = getString(formData, "title");
     const description = getString(formData, "description");
-    const color = getString(formData, "color") ?? "#6366f1";
+    const color = getString(formData, "color") ?? "#6366f1"; // Cor padrão (Indigo)
 
     if (!title) {
       return { error: "O título do projeto é obrigatório." };
@@ -120,7 +122,6 @@ export async function createProject(
     });
 
     revalidatePath("/projects");
-
     return {};
   } catch (error) {
     console.error(error);
@@ -132,6 +133,7 @@ export async function updateProject(formData: FormData) {
   const id = getString(formData, "id");
   const title = getString(formData, "title");
   const description = getString(formData, "description");
+  const color = getString(formData, "color");
 
   if (!id || !title)
     throw new Error("ID e título são obrigatórios.");
@@ -144,6 +146,7 @@ export async function updateProject(formData: FormData) {
       title,
       slug,
       description,
+      color: color ?? undefined, // Atualiza cor se enviada
     },
   });
 
@@ -158,6 +161,7 @@ export async function deleteProject(projectId: string) {
 
   if (!project) return;
 
+  // Deleta tarefas vinculadas primeiro (se não tiver Cascade no banco)
   await prisma.task.deleteMany({
     where: { projectId },
   });
@@ -170,7 +174,7 @@ export async function deleteProject(projectId: string) {
 }
 
 // =========================================================
-// 2. TAREFAS - FUNÇÕES ATUALIZADAS
+// 2. AÇÕES DE TAREFAS (CRUD Básico)
 // =========================================================
 
 export async function createTask(formData: FormData) {
@@ -184,17 +188,8 @@ export async function createTask(formData: FormData) {
 
   if (!title) throw new Error("O título da tarefa é obrigatório.");
 
-  const priority = getEnumValue(
-    priorityRaw,
-    TASK_PRIORITIES,
-    "MEDIUM"
-  );
-
-  const status = getEnumValue(
-    statusRaw,
-    TASK_STATUSES,
-    "TODO"
-  );
+  const priority = getEnumValue(priorityRaw, TASK_PRIORITIES, "MEDIUM");
+  const status = getEnumValue(statusRaw, TASK_STATUSES, "TODO");
 
   await prisma.task.create({
     data: {
@@ -205,30 +200,28 @@ export async function createTask(formData: FormData) {
       image,
       dueDate: getDate(dueDateRaw),
       projectId: projectId === "inbox" ? null : projectId,
+      // Novos campos iniciam com padrão (definido no schema ou aqui)
+      isPinned: false,
+      isStarred: false,
+      progress: 0,
     },
   });
 
   revalidatePath("/projects");
+  if (projectId && projectId !== "inbox") {
+    // Tenta revalidar a página específica do projeto se possível, 
+    // mas o revalidatePath acima já cobre a maioria dos casos.
+  }
 }
 
 export async function updateTask(formData: FormData) {
   const id = getString(formData, "id");
   const title = getString(formData, "title");
 
-  if (!id || !title)
-    throw new Error("ID e título são obrigatórios.");
+  if (!id || !title) throw new Error("ID e título são obrigatórios.");
 
-  const priority = getEnumValue(
-    getString(formData, "priority"),
-    TASK_PRIORITIES,
-    "MEDIUM"
-  );
-
-  const status = getEnumValue(
-    getString(formData, "status"),
-    TASK_STATUSES,
-    "TODO"
-  );
+  const priority = getEnumValue(getString(formData, "priority"), TASK_PRIORITIES, "MEDIUM");
+  const status = getEnumValue(getString(formData, "status"), TASK_STATUSES, "TODO");
 
   const isPinned = getBoolean(formData, "isPinned");
   const isStarred = getBoolean(formData, "isStarred");
@@ -259,7 +252,8 @@ export async function toggleTask(taskId: string, isDone: boolean) {
     where: { id: taskId },
     data: { 
       isDone: !isDone,
-      status: !isDone ? "DONE" : "TODO"
+      status: !isDone ? "DONE" : "TODO",
+      progress: !isDone ? 100 : 0 // Sincroniza progresso com checkbox
     },
   });
 
@@ -275,7 +269,7 @@ export async function deleteTask(taskId: string) {
 }
 
 // =========================================================
-// 3. FUNÇÕES ADICIONAIS PARA NOVAS FUNCIONALIDADES
+// 3. AÇÕES RÁPIDAS DE TAREFAS (Interatividade UI)
 // =========================================================
 
 export async function toggleTaskPin(taskId: string, isPinned: boolean) {
@@ -283,7 +277,6 @@ export async function toggleTaskPin(taskId: string, isPinned: boolean) {
     where: { id: taskId },
     data: { isPinned: !isPinned },
   });
-
   revalidatePath("/projects");
 }
 
@@ -292,7 +285,6 @@ export async function toggleTaskStar(taskId: string, isStarred: boolean) {
     where: { id: taskId },
     data: { isStarred: !isStarred },
   });
-
   revalidatePath("/projects");
 }
 
@@ -301,36 +293,26 @@ export async function updateTaskProgress(taskId: string, progress: number) {
     where: { id: taskId },
     data: { 
       progress,
-      status: progress === 100 ? "DONE" : progress > 0 ? "IN_PROGRESS" : "TODO"
+      // Atualiza status automaticamente baseado no progresso
+      status: progress === 100 ? "DONE" : progress > 0 ? "IN_PROGRESS" : "TODO",
+      isDone: progress === 100
     },
   });
-
   revalidatePath("/projects");
 }
 
 // =========================================================
-// 4. JOB TRACKER
+// 4. JOB TRACKER (Vagas)
 // =========================================================
 
 export async function createJob(formData: FormData) {
   const company = getString(formData, "company");
   const role = getString(formData, "role");
 
-  if (!company || !role)
-    throw new Error("Empresa e cargo são obrigatórios.");
+  if (!company || !role) throw new Error("Empresa e cargo são obrigatórios.");
 
-  const status =
-    getEnumValue(
-      getString(formData, "status"),
-      JOB_STATUS,
-      "APPLIED"
-    ) ?? "APPLIED";
-
-  const type = getEnumValue(
-    getString(formData, "type"),
-    JOB_TYPES,
-    "JOB"
-  );
+  const status = getEnumValue(getString(formData, "status"), JOB_STATUS, "APPLIED") ?? "APPLIED";
+  const type = getEnumValue(getString(formData, "type"), JOB_TYPES, "JOB");
 
   const user = await prisma.user.findFirst();
 
@@ -355,8 +337,7 @@ export async function updateJob(formData: FormData) {
   const company = getString(formData, "company");
   const role = getString(formData, "role");
 
-  if (!id || !company || !role)
-    throw new Error("Campos obrigatórios ausentes.");
+  if (!id || !company || !role) throw new Error("Campos obrigatórios ausentes.");
 
   await prisma.jobApplication.update({
     where: { id },
@@ -366,16 +347,8 @@ export async function updateJob(formData: FormData) {
       jobUrl: getString(formData, "jobUrl"),
       salary: getString(formData, "salary"),
       requirements: getString(formData, "requirements"),
-      status: getEnumValue(
-        getString(formData, "status"),
-        JOB_STATUS,
-        "APPLIED"
-      ),
-      type: getEnumValue(
-        getString(formData, "type"),
-        JOB_TYPES,
-        "JOB"
-      ),
+      status: getEnumValue(getString(formData, "status"), JOB_STATUS, "APPLIED"),
+      type: getEnumValue(getString(formData, "type"), JOB_TYPES, "JOB"),
     },
   });
 
@@ -391,14 +364,27 @@ export async function deleteJob(jobId: string) {
 }
 
 // =========================================================
-// 5. FUNÇÕES DE SINCRONIZAÇÃO PARA DADOS EXISTENTES
+// 5. MANUTENÇÃO (Sincronização de dados antigos)
 // =========================================================
 
 export async function syncExistingTasks() {
-  // Atualiza todas as tarefas existentes para terem os novos campos com valores padrão
+  // AVISO: O Prisma Schema diz que esses campos são obrigatórios, 
+  // mas estamos buscando por null para corrigir dados antigos/sujos no banco.
+  // Usamos 'as unknown' para permitir passar 'null' onde o TS espera boolean/number.
+  
   await prisma.task.updateMany({
+    where: {
+      OR: [
+        // Type Assertion: null -> unknown -> boolean
+        { isPinned: null as unknown as boolean }, 
+        // Type Assertion: null -> unknown -> number
+        { progress: null as unknown as number }
+      ]
+    },
     data: {
-      status: "TODO",
+      // Nota: Cuidado ao resetar status para "TODO". 
+      // Se quiser preservar o status atual de tarefas antigas, remova a linha abaixo.
+      status: "TODO", 
       isPinned: false,
       isStarred: false,
       progress: 0,
@@ -406,4 +392,37 @@ export async function syncExistingTasks() {
   });
 
   revalidatePath("/projects");
+}
+
+export async function updateTasksOrder(orderedIds: string[]) {
+  try {
+    // Atualiza a ordem de cada tarefa em paralelo usando transação
+    const transactions = orderedIds.map((id, index) => 
+      prisma.task.update({
+        where: { id },
+        data: { order: index } // Certifique-se de ter um campo 'order: Float' no seu schema.prisma
+      })
+    );
+    
+    await prisma.$transaction(transactions);
+    return { success: true };
+  } catch (error) {
+    console.error("Erro ao reordenar tarefas:", error);
+    return { error: "Falha na sincronização da ordem." };
+  }
+}
+
+export async function updateProjectNotes(projectId: string, notes: string) {
+  try {
+    await prisma.project.update({
+      where: { id: projectId },
+      data: { description: notes } // Aqui você pode usar 'description' ou um campo 'notes' se tiver criado
+    });
+    
+    // Revalida a página para atualizar o cache
+    revalidatePath("/projects/[slug]", "page");
+    return { success: true };
+  } catch (error) {
+    return { error: "Falha técnica ao salvar os registros." };
+  }
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { 
   Bar, 
   BarChart, 
@@ -15,7 +16,9 @@ import {
 import { TrendingUp, TrendingDown, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// --- 1. TIPAGEM ESTRITA ---
+/* -------------------------------------------------------------------------------------------------
+ * 1. TIPAGEM E COMPONENTES AUXILIARES
+ * -----------------------------------------------------------------------------------------------*/
 
 export interface FinanceData {
   name: string;
@@ -25,69 +28,28 @@ export interface FinanceData {
 }
 
 interface CustomCursorProps {
-  x?: number;
-  y?: number;
-  width?: number;
-  height?: number;
-  stroke?: string;
-  fill?: string;
+  x?: number; y?: number; width?: number; height?: number;
 }
 
 interface FinanceChartTooltipProps extends TooltipProps<number, string> {
   label?: string; 
-  payload?: Array<{
-    value: number;
-    payload: FinanceData;
-    color?: string;
-    dataKey?: string | number;
-  }>;
+  payload?: Array<{ value: number; payload: FinanceData }>;
 }
-
-interface FinanceChartProps {
-  data: FinanceData[];
-  title?: string;
-  className?: string;
-}
-
-// --- 2. COMPONENTES VISUAIS ---
 
 const CustomTooltip = ({ active, payload, label }: FinanceChartTooltipProps) => {
   if (active && payload && payload.length > 0) {
     const data = payload[0];
-    const financeData = data.payload;
-    const isIncome = financeData.type === 'INCOME';
+    const isIncome = data.payload.type === 'INCOME';
 
     return (
-      <div className="flex flex-col gap-2 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/95 p-3 shadow-xl backdrop-blur-sm min-w-[160px]">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-2">
-          <span className="text-[10px] uppercase text-zinc-500 font-bold tracking-widest">
-            {label}
-          </span>
-          {isIncome ? (
-            <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
-          ) : (
-            <TrendingDown className="h-3.5 w-3.5 text-rose-500" />
-          )}
+      <div className="flex flex-col gap-2 rounded-xl border border-border/40 bg-background/95 p-3 shadow-2xl backdrop-blur-md min-w-[160px]">
+        <div className="flex items-center justify-between border-b border-border/40 pb-2">
+          <span className="text-[10px] uppercase text-muted-foreground font-black tracking-widest">{label}</span>
+          {isIncome ? <TrendingUp className="h-3.5 w-3.5 text-emerald-500" /> : <TrendingDown className="h-3.5 w-3.5 text-rose-500" />}
         </div>
-
-        {/* Valor */}
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span 
-              className={cn(
-                "h-2 w-2 rounded-full ring-2 ring-offset-1 ring-offset-white dark:ring-offset-zinc-900",
-                isIncome ? "bg-emerald-500 ring-emerald-500/30" : "bg-rose-500 ring-rose-500/30"
-              )}
-            />
-            <span className="text-xs text-zinc-600 dark:text-zinc-400 font-medium">
-              {isIncome ? 'Entrada' : 'Saída'}
-            </span>
-          </div>
-          <span className={cn(
-            "font-bold font-mono text-sm tracking-tight",
-            isIncome ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
-          )}>
+          <span className="text-xs text-muted-foreground font-bold uppercase tracking-tighter">{isIncome ? 'Entrada' : 'Saída'}</span>
+          <span className={cn("font-black font-mono text-sm tracking-tight", isIncome ? "text-emerald-500" : "text-rose-500")}>
             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(data.value)}
           </span>
         </div>
@@ -97,131 +59,58 @@ const CustomTooltip = ({ active, payload, label }: FinanceChartTooltipProps) => 
   return null;
 };
 
-const CustomCursor = (props: CustomCursorProps) => {
-  const { x, y, width, height } = props;
-  
-  if (typeof x !== 'number' || typeof y !== 'number' || typeof width !== 'number' || typeof height !== 'number') {
-    return null;
-  }
-
-  return (
-    <rect 
-      x={x} 
-      y={y} 
-      width={width} 
-      height={height} 
-      className="fill-zinc-100 dark:fill-zinc-800/60 transition-all duration-200"
-      rx={6} 
-    />
-  );
+const CustomCursor = ({ x, y, width, height }: CustomCursorProps) => {
+  if (typeof x !== 'number') return null;
+  return <rect x={x} y={y} width={width} height={height} className="fill-muted/30 transition-all duration-200" rx={8} />;
 };
 
-// --- 3. COMPONENTE PRINCIPAL ---
+/* -------------------------------------------------------------------------------------------------
+ * 2. COMPONENTE DE CONTEÚDO (O Gráfico em si)
+ * -----------------------------------------------------------------------------------------------*/
 
-export function FinanceChart({ data, title = "Fluxo de Caixa", className }: FinanceChartProps) {
+function FinanceChartContent({ data, title = "Fluxo de Caixa", className }: { data: FinanceData[], title?: string, className?: string }) {
   const isEmpty = !data || data.length === 0 || data.every(d => d.total === 0);
 
   if (isEmpty) {
     return (
-      <div className={cn("h-[250px] w-full flex flex-col items-center justify-center text-zinc-500 bg-zinc-50/50 dark:bg-zinc-900/30 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800 animate-in fade-in zoom-in duration-500", className)}>
-        <div className="p-3 bg-white dark:bg-zinc-900 rounded-full mb-3 shadow-sm ring-1 ring-zinc-100 dark:ring-zinc-800">
-            <Activity className="h-5 w-5 text-zinc-400" />
-        </div>
-        <p className="font-medium text-xs text-zinc-400">Sem dados para exibir</p>
+      <div className={cn("h-[250px] w-full flex flex-col items-center justify-center bg-muted/5 rounded-[2rem] border-2 border-dashed border-border/40", className)}>
+        <Activity className="h-6 w-6 text-muted-foreground/40 mb-2" />
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40">Dados insuficientes</p>
       </div>
     );
   }
 
   return (
-    <div className={cn("w-full space-y-4", className)}>
-      
-      {/* Header Minimalista */}
+    <div className={cn("w-full space-y-6", className)}>
       <div className="flex items-center justify-between px-2">
-         <h4 className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">{title}</h4>
-         <div className="flex gap-3 text-[10px] font-medium">
-            <span className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400">
-               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.6)]" />
-               Entradas
-            </span>
-            <span className="flex items-center gap-1.5 text-zinc-500 dark:text-zinc-400">
-               <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.6)]" />
-               Saídas
-            </span>
-         </div>
+        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{title}</h4>
+        <div className="flex gap-4 text-[9px] font-black uppercase tracking-widest">
+          <span className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" /> Entradas</span>
+          <span className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-[0_0_8px_#f43f5e]" /> Saídas</span>
+        </div>
       </div>
 
-      {/* CORREÇÃO CRÍTICA: Container com altura e largura explícitas 
-          para evitar erro de renderização do Recharts.
-      */}
-      <div style={{ width: '100%', height: 250, minHeight: 250 }}>
+      <div style={{ width: '100%', height: 250 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 10, right: 0, left: -24, bottom: 0 }}>
-            
+          <BarChart data={data} margin={{ top: 0, right: 0, left: -25, bottom: 0 }}>
             <defs>
               <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#10b981" stopOpacity={1} />
-                <stop offset="100%" stopColor="#10b981" stopOpacity={0.6} />
+                <stop offset="100%" stopColor="#10b981" stopOpacity={0.4} />
               </linearGradient>
               <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#f43f5e" stopOpacity={1} />
-                <stop offset="100%" stopColor="#f43f5e" stopOpacity={0.6} />
+                <stop offset="100%" stopColor="#f43f5e" stopOpacity={0.4} />
               </linearGradient>
             </defs>
-
-            <CartesianGrid 
-              strokeDasharray="3 3" 
-              vertical={false} 
-              stroke="currentColor" 
-              className="text-zinc-200 dark:text-zinc-800 opacity-50" 
-            />
-            
-            <XAxis 
-              dataKey="name" 
-              tick={{ fill: 'currentColor', fontSize: 10, fontWeight: 500 }} 
-              tickLine={false} 
-              axisLine={false} 
-              tickMargin={12}
-              className="text-zinc-400 dark:text-zinc-500"
-            />
-            
-            <YAxis
-              tick={{ fill: 'currentColor', fontSize: 10, fontFamily: 'monospace' }} 
-              tickLine={false} 
-              axisLine={false} 
-              tickFormatter={(value) => {
-                  if (value === 0) return "0";
-                  if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
-                  return value;
-              }}
-              className="text-zinc-400 dark:text-zinc-500"
-            />
-            
-            <Tooltip 
-              content={<CustomTooltip />} 
-              cursor={<CustomCursor />} 
-              animationDuration={200}
-              isAnimationActive={true}
-              // Importante para tooltips não ficarem cortados nas bordas
-              allowEscapeViewBox={{ x: true, y: true }}
-            />
-            
-            <ReferenceLine y={0} stroke="hsl(var(--border))" strokeOpacity={0.5} />
-
-            <Bar 
-              dataKey="total" 
-              radius={[4, 4, 2, 2]} 
-              barSize={32} 
-              animationDuration={1000}
-              animationEasing="ease-out"
-            >
+            <CartesianGrid strokeDasharray="4 4" vertical={false} className="stroke-muted/30" />
+            <XAxis dataKey="name" tick={{ fill: 'currentColor', fontSize: 10, fontWeight: 900 }} tickLine={false} axisLine={false} tickMargin={15} className="text-muted-foreground uppercase tracking-tighter" />
+            <YAxis tick={{ fill: 'currentColor', fontSize: 10, fontFamily: 'monospace' }} tickLine={false} axisLine={false} tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} className="text-muted-foreground" />
+            <Tooltip content={<CustomTooltip />} cursor={<CustomCursor />} animationDuration={300} isAnimationActive={true} allowEscapeViewBox={{ x: true, y: true }} />
+            <ReferenceLine y={0} stroke="currentColor" className="text-border" />
+            <Bar dataKey="total" radius={[6, 6, 2, 2]} barSize={35} animationDuration={1500} animationEasing="ease-out">
               {data.map((entry, index) => (
-                <Cell 
-                  key={`cell-${index}`} 
-                  fill={entry.type === 'INCOME' ? 'url(#incomeGradient)' : 'url(#expenseGradient)'}
-                  className="transition-all duration-300 hover:opacity-80 cursor-pointer outline-none focus:outline-none"
-                  style={{ outline: 'none' }}
-                  strokeWidth={0}
-                />
+                <Cell key={`cell-${index}`} fill={entry.type === 'INCOME' ? 'url(#incomeGradient)' : 'url(#expenseGradient)'} className="hover:opacity-80 transition-opacity cursor-crosshair" />
               ))}
             </Bar>
           </BarChart>
@@ -229,4 +118,23 @@ export function FinanceChart({ data, title = "Fluxo de Caixa", className }: Fina
       </div>
     </div>
   );
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * 3. WRAPPER DINÂMICO (A Solução para o Erro)
+ * -----------------------------------------------------------------------------------------------*/
+
+// Carregamos o conteúdo do gráfico desativando o SSR
+// Isso remove o erro de width(-1) e evita o uso de useEffect/setState no mount
+const FinanceChartDynamic = dynamic(() => Promise.resolve(FinanceChartContent), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[250px] w-full bg-muted/5 animate-pulse rounded-[2rem] border border-border/40 flex items-center justify-center">
+      <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/30">Carregando Módulo_Financeiro...</span>
+    </div>
+  ),
+});
+
+export function FinanceChart(props: { data: FinanceData[], title?: string, className?: string }) {
+  return <FinanceChartDynamic {...props} />;
 }

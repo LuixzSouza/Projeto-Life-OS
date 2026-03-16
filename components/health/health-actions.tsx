@@ -2,107 +2,110 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { CalendarDays, Moon, User, Dumbbell, Footprints, Plus } from "lucide-react";
+import { 
+    Dialog, DialogContent, DialogHeader, DialogTitle, 
+    DialogTrigger, DialogDescription 
+} from "@/components/ui/dialog";
+import { 
+    CalendarDays, Moon, User, Dumbbell, Footprints, 
+    Plus, LayoutDashboard, ChevronRight, Activity,
+    ClipboardSignature, Timer
+} from "lucide-react";
 import Link from "next/link";
 import { GymForm } from "@/components/health/gym/gym-form";
 import { RunForm } from "@/components/health/running/run-form";
 import { cn } from "@/lib/utils";
+
+// --- CONFIGURAÇÃO DE NAVEGAÇÃO ---
+const navItems = [
+    { label: "Dashboard", href: "/health", icon: LayoutDashboard, color: "text-primary" },
+    { label: "Treino", href: "/health/gym", icon: Dumbbell, color: "text-rose-500" },
+    { label: "Corrida", href: "/health/running", icon: Footprints, color: "text-blue-500" },
+    { label: "Nutrição", href: "/health/nutrition", icon: CalendarDays, color: "text-emerald-500" },
+    { label: "Sono", href: "/health/sleep", icon: Moon, color: "text-indigo-500" },
+    { label: "Corpo", href: "/health/body", icon: User, color: "text-amber-500" },
+];
 
 export function HealthActions() {
     const [gymOpen, setGymOpen] = useState(false);
     const [runOpen, setRunOpen] = useState(false);
 
     return (
-        <div className="flex flex-wrap gap-3 items-center">
+        <div className="flex flex-col sm:flex-row gap-4 items-center w-full sm:w-auto">
             
-            {/* Navegação Rápida (Abas Secundárias) */}
-            <div className="flex items-center gap-2 mr-2 bg-muted/30 p-1 rounded-lg border border-border/50 overflow-x-auto no-scrollbar max-w-full">
-                <Link href="/health/gym">
-                    <Button variant="ghost" size="sm" className="h-8 gap-2 text-muted-foreground hover:text-foreground hover:bg-background shadow-none transition-all">
-                        <Dumbbell className="h-4 w-4 text-primary" /> 
-                        <span className="hidden sm:inline font-medium">Treino</span>
-                    </Button>
-                </Link>
-                <div className="w-px h-4 bg-border/60" />
-                <Link href="/health/running">
-                    <Button variant="ghost" size="sm" className="h-8 gap-2 text-muted-foreground hover:text-foreground hover:bg-background shadow-none transition-all">
-                        <Footprints className="h-4 w-4 text-blue-500" /> 
-                        <span className="hidden sm:inline font-medium">Corrida</span>
-                    </Button>
-                </Link>
-                <div className="w-px h-4 bg-border/60" />
-                <Link href="/health/nutrition">
-                    <Button variant="ghost" size="sm" className="h-8 gap-2 text-muted-foreground hover:text-foreground hover:bg-background shadow-none transition-all">
-                        <CalendarDays className="h-4 w-4 text-emerald-500" /> 
-                        <span className="hidden sm:inline font-medium">Nutrição</span>
-                    </Button>
-                </Link>
-                <div className="w-px h-4 bg-border/60" />
-                <Link href="/health/sleep">
-                    <Button variant="ghost" size="sm" className="h-8 gap-2 text-muted-foreground hover:text-foreground hover:bg-background shadow-none transition-all">
-                        <Moon className="h-4 w-4 text-indigo-500" /> 
-                        <span className="hidden sm:inline font-medium">Sono</span>
-                    </Button>
-                </Link>
-                <div className="w-px h-4 bg-border/60" />
-                <Link href="/health/body">
-                    <Button variant="ghost" size="sm" className="h-8 gap-2 text-muted-foreground hover:text-foreground hover:bg-background shadow-none transition-all">
-                        <User className="h-4 w-4 text-rose-500" /> 
-                        <span className="hidden sm:inline font-medium">Corpo</span>
-                    </Button>
-                </Link>
-            </div>
+            {/* --- DOCK DE NAVEGAÇÃO (SEGMENTED CONTROL STYLE) --- */}
+            <nav className="flex items-center gap-1 bg-muted/40 p-1.5 rounded-[1.25rem] border border-border/40 shadow-inner overflow-x-auto no-scrollbar max-w-full">
+                {navItems.map((item) => (
+                    <Link key={item.href} href={item.href}>
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-9 px-3 gap-2 text-muted-foreground hover:text-foreground hover:bg-background rounded-xl transition-all shadow-none group"
+                        >
+                            <item.icon className={cn("h-4 w-4 transition-transform group-hover:scale-110", item.color)} />
+                            <span className="hidden lg:inline text-[10px] font-black uppercase tracking-widest">{item.label}</span>
+                        </Button>
+                    </Link>
+                ))}
+            </nav>
 
-            {/* Separador Visual (Desktop) */}
-            <div className="hidden md:block h-8 w-px bg-border/60 mx-1" />
-
-            {/* Ações Principais (Modais) */}
-            <div className="flex gap-2">
-                {/* Modal de Treino de Força */}
+            {/* --- SEÇÃO DE AÇÕES RÁPIDAS --- */}
+            <div className="flex items-center gap-2 shrink-0">
+                
+                {/* REGISTRAR TREINO */}
                 <Dialog open={gymOpen} onOpenChange={setGymOpen}>
                     <DialogTrigger asChild>
-                        <Button size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-md h-9 px-4 transition-all active:scale-95 font-semibold">
-                            <Plus className="h-4 w-4 mr-1.5" /> Registrar Treino
+                        <Button className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-lg shadow-primary/20 h-10 rounded-2xl px-5 font-black uppercase tracking-widest text-[10px] gap-2 transition-all active:scale-95">
+                            <Plus className="h-4 w-4 stroke-[3]" />
+                            Log Treino
                         </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto p-0 gap-0 bg-background border-border shadow-2xl rounded-xl">
-                        <div className="p-6 border-b border-border/40 bg-muted/10">
-                            <DialogTitle className="flex items-center gap-2 text-xl font-bold">
-                                <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                                    <Dumbbell className="h-5 w-5" /> 
+                    
+                    <DialogContent className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] max-w-[600px] max-h-[90vh] overflow-hidden p-0 gap-0 bg-background border-border/40 shadow-2xl rounded-[2.5rem] z-[100]">
+                        <div className="p-8 border-b border-border/40 bg-muted/10">
+                            <div className="flex items-center gap-4">
+                                <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20 shadow-inner">
+                                    <ClipboardSignature className="h-6 w-6" />
                                 </div>
-                                Ficha de Treino
-                            </DialogTitle>
+                                <div>
+                                    <DialogTitle className="text-xl font-black uppercase tracking-tighter">Ficha de Performance</DialogTitle>
+                                    <DialogDescription className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-1">Sessão de treinamento de força</DialogDescription>
+                                </div>
+                            </div>
                         </div>
-                        <div className="p-6">
+                        <div className="p-8 overflow-y-auto custom-scrollbar max-h-[calc(90vh-120px)]">
                             <GymForm onSuccess={() => setGymOpen(false)} />
                         </div>
                     </DialogContent>
                 </Dialog>
 
-                {/* Modal de Corrida */}
+                {/* REGISTRAR CORRIDA */}
                 <Dialog open={runOpen} onOpenChange={setRunOpen}>
                     <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" className="h-9 gap-2 border-primary/20 hover:border-primary/40 hover:bg-primary/5 text-primary transition-all">
-                            <Footprints className="h-4 w-4" /> 
-                            <span className="hidden sm:inline">Nova Corrida</span>
+                        <Button variant="outline" className="border-border/60 bg-background/50 hover:bg-muted text-foreground shadow-sm h-10 rounded-2xl px-5 font-black uppercase tracking-widest text-[10px] gap-2 transition-all active:scale-95">
+                            <Timer className="h-4 w-4 text-blue-500 stroke-[2.5]" />
+                            Nova Corrida
                         </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden bg-background border-border shadow-2xl rounded-xl">
-                        <div className="p-6 border-b border-border/40 bg-muted/10">
-                            <DialogTitle className="flex items-center gap-2 text-xl font-bold">
-                                <div className="p-2 bg-blue-500/10 rounded-lg text-blue-600 dark:text-blue-400">
-                                    <Footprints className="h-5 w-5" /> 
+                    
+                    <DialogContent className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] max-w-[480px] p-0 overflow-hidden bg-background border-border/40 shadow-2xl rounded-[2.5rem] z-[100]">
+                        <div className="p-8 border-b border-border/40 bg-blue-500/[0.03]">
+                            <div className="flex items-center gap-4">
+                                <div className="h-12 w-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500 border border-blue-500/20 shadow-inner">
+                                    <Activity className="h-6 w-6" />
                                 </div>
-                                Registrar Corrida
-                            </DialogTitle>
+                                <div>
+                                    <DialogTitle className="text-xl font-black uppercase tracking-tighter">Métrica de Endurance</DialogTitle>
+                                    <DialogDescription className="text-xs font-bold text-muted-foreground uppercase tracking-widest mt-1">Registro de cardio e percurso</DialogDescription>
+                                </div>
+                            </div>
                         </div>
-                        <div className="p-6">
+                        <div className="p-8">
                             <RunForm onSuccess={() => setRunOpen(false)} />
                         </div>
                     </DialogContent>
                 </Dialog>
+
             </div>
         </div>
     );

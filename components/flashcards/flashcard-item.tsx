@@ -10,7 +10,7 @@ import {
   Edit2,
   Loader2,
   Save,
-  X,
+  AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface FlashcardItemProps {
   card: Flashcard;
@@ -34,6 +44,8 @@ interface FlashcardItemProps {
 export function FlashcardItem({ card, index, total, deckId }: FlashcardItemProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Estados locais para o formulário de edição
@@ -59,117 +71,152 @@ export function FlashcardItem({ card, index, total, deckId }: FlashcardItemProps
   }
 
   async function handleDelete() {
-    if (!confirm("Tem certeza que deseja excluir este cartão?")) return;
-    
     setIsDeleting(true);
     const result = await deleteCard(card.id, deckId);
     
     if (result.success) {
-      toast.success("Cartão removido.");
+      toast.success("Cartão removido permanentemente.");
+      setIsDeleteDialogOpen(false);
     } else {
-      toast.error("Erro ao remover.");
+      toast.error("Erro ao remover o cartão.");
       setIsDeleting(false);
     }
   }
 
   return (
     <>
-      <div className="group relative flex flex-col sm:flex-row gap-0 rounded-xl border border-border/60 bg-card hover:border-primary/30 hover:shadow-md transition-all duration-300 overflow-hidden">
-        {/* Número do Card */}
-        <div className="sm:w-12 bg-muted/30 sm:border-r border-border/40 flex items-center justify-center py-2 sm:py-0 transition-colors group-hover:bg-primary/5 group-hover:border-primary/20">
-          <span className="text-xs font-mono font-bold text-muted-foreground/50 group-hover:text-primary/70">
+      <div className="group relative flex flex-col md:flex-row gap-0 rounded-2xl border border-border/60 bg-card hover:border-primary/40 hover:shadow-xl transition-all duration-300 overflow-hidden mt-4">
+        
+        {/* NÚMERO DO CARD */}
+        <div className="md:w-16 bg-muted/40 md:border-r border-b md:border-b-0 border-border/40 flex items-center justify-center py-3 md:py-0 transition-colors group-hover:bg-primary/5 group-hover:border-primary/20 shrink-0">
+          <span className="text-sm font-mono font-bold text-muted-foreground/60 group-hover:text-primary/80 transition-colors">
             #{(total - index).toString().padStart(2, "0")}
           </span>
         </div>
 
-        {/* Conteúdo */}
-        <div className="flex-1 grid sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-border/40">
-          <div className="p-5 space-y-2">
-            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-primary/40 group-hover:bg-primary transition-colors" />
-              Frente
+        {/* CONTEÚDO (FRENTE E VERSO) */}
+        <div className="flex-1 grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-border/40">
+          
+          {/* FRENTE */}
+          <div className="p-6 md:p-8 space-y-4 bg-background/50">
+            <p className="text-[10px] uppercase font-black text-muted-foreground tracking-[0.2em] flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-primary/40 group-hover:bg-primary shadow-[0_0_8px_rgba(var(--primary),0.5)] transition-all" />
+              Pergunta
             </p>
-            <p className="font-medium text-foreground text-sm leading-relaxed">
+            <p className="font-semibold text-foreground text-base md:text-lg leading-relaxed whitespace-pre-wrap">
               {card.term}
             </p>
           </div>
 
-          <div className="p-5 space-y-2 bg-muted/5 group-hover:bg-muted/10 transition-colors">
-            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/40 group-hover:bg-emerald-500 transition-colors" />
-              Verso
+          {/* VERSO */}
+          <div className="p-6 md:p-8 space-y-4 bg-muted/20 group-hover:bg-muted/40 transition-colors">
+            <p className="text-[10px] uppercase font-black text-muted-foreground tracking-[0.2em] flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-indigo-500/40 group-hover:bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)] transition-all" />
+              Resposta
             </p>
-            <p className="text-sm text-muted-foreground leading-relaxed">
+            <p className="text-sm md:text-base text-muted-foreground leading-relaxed whitespace-pre-wrap">
               {card.definition}
             </p>
           </div>
         </div>
 
-        {/* Ações (Hover) */}
-        <div className="absolute top-2 right-2 flex gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity bg-background/50 backdrop-blur-sm p-1 rounded-lg border border-border/50 sm:border-transparent sm:bg-transparent">
+        {/* AÇÕES NO HOVER (Desktop) / SEMPRE VISÍVEIS (Mobile) */}
+        <div className="absolute top-3 right-3 flex gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 backdrop-blur-md p-1.5 rounded-xl border border-border/50 md:border-border/30 shadow-sm">
           <Button
             size="icon"
             variant="ghost"
-            className="h-7 w-7 text-muted-foreground hover:text-primary hover:bg-primary/10"
+            className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg"
             onClick={() => setIsEditing(true)}
-            title="Editar"
+            title="Editar Cartão"
           >
-            <Edit2 className="h-3.5 w-3.5" />
+            <Edit2 className="h-4 w-4" />
           </Button>
           
           <Button
             size="icon"
             variant="ghost"
-            className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-            onClick={handleDelete}
-            disabled={isDeleting}
-            title="Remover"
+            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg"
+            onClick={() => setIsDeleteDialogOpen(true)}
+            title="Remover Cartão"
           >
-            {isDeleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+            <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
+      {/* -------------------------------------------------------- */}
       {/* DIALOG DE EDIÇÃO */}
+      {/* -------------------------------------------------------- */}
       <Dialog open={isEditing} onOpenChange={setIsEditing}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Edit2 className="h-5 w-5 text-primary" />
-              Editar Cartão
-            </DialogTitle>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-xl p-0 overflow-hidden border-border/60 shadow-2xl rounded-2xl">
+          <div className="p-6 border-b border-border/40 bg-muted/10">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-xl font-bold">
+                  <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                    <Edit2 className="h-5 w-5" />
+                  </div>
+                  Editar Cartão #{(total - index).toString().padStart(2, "0")}
+                </DialogTitle>
+              </DialogHeader>
+          </div>
 
-          <div className="space-y-4 py-2">
+          <div className="p-6 space-y-6 bg-background">
             <div className="space-y-2">
-              <Label>Frente (Termo)</Label>
+              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Frente (Pergunta)</Label>
               <Input 
                 value={term} 
                 onChange={(e) => setTerm(e.target.value)} 
-                className="font-medium"
+                className="font-semibold text-base h-12 bg-muted/20 border-border/60 focus-visible:ring-primary/30"
               />
             </div>
+            
             <div className="space-y-2">
-              <Label>Verso (Definição)</Label>
+              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Verso (Resposta Detalhada)</Label>
               <Textarea 
                 value={definition} 
                 onChange={(e) => setDefinition(e.target.value)} 
-                className="min-h-[100px] resize-none leading-relaxed"
+                className="min-h-[160px] resize-none leading-relaxed text-base bg-muted/20 border-border/60 focus-visible:ring-primary/30 p-4"
               />
             </div>
           </div>
 
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="ghost" onClick={() => setIsEditing(false)}>
+          <DialogFooter className="p-4 bg-muted/10 border-t border-border/40 flex justify-end gap-3 shrink-0">
+            <Button variant="ghost" onClick={() => setIsEditing(false)} className="hover:bg-muted/50">
               Cancelar
             </Button>
-            <Button onClick={handleSave} disabled={isSaving} className="gap-2">
-              {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            <Button onClick={handleSave} disabled={isSaving} className="shadow-lg shadow-primary/20 min-w-[140px] font-bold">
+              {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
               Salvar Alterações
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* -------------------------------------------------------- */}
+      {/* ALERT DE EXCLUSÃO SEGURO */}
+      {/* -------------------------------------------------------- */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent className="border-destructive/30 rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive text-xl">
+              <AlertTriangle className="h-6 w-6" /> Remover Cartão?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-base text-foreground/80 mt-2">
+              Tem certeza que deseja deletar este flashcard? Esta ação não pode ser desfeita e você perderá o histórico de aprendizado desta carta.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-6 gap-2">
+            <AlertDialogCancel className="h-11 rounded-xl font-bold">Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+                onClick={handleDelete} 
+                disabled={isDeleting}
+                className="h-11 rounded-xl font-bold bg-destructive hover:bg-destructive/90 text-white shadow-lg shadow-destructive/20 min-w-[120px]"
+            >
+              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sim, Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

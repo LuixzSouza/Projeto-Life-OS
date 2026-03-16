@@ -40,6 +40,7 @@ model User {
   settings        Settings?
   bodyMeasurements BodyMeasurement[]
   clients          Client[]
+  mediaItems    MediaItem[]
 }
 
 model UserStats {
@@ -324,6 +325,7 @@ model Project {
   description String?
   status      String   @default("ACTIVE")
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
   color       String?  @default("#6366f1")
 
   userId      String?
@@ -353,7 +355,8 @@ model Task {
   progress      Int      @default(0)
   estimatedTime Int?     // em minutos
   createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  updatedAt     DateTime @default(now()) @updatedAt
+  order       Float    @default(0)
 }
 
 // =========================================================
@@ -507,38 +510,43 @@ model RoutineItem {
 // =========================================================
 
 model Settings {
-  id              String   @id @default(uuid())
-  theme           String   @default("system")
-  accentColor     String   @default("zinc")
-  language        String   @default("pt-BR")
-
-  currency        String   @default("BRL") 
-  workStart       String   @default("09:00") 
-  workEnd         String   @default("18:00") 
-
-  aiProvider      String   @default("ollama")
-  aiModel         String   @default("llama3")
-  aiPersona       String?  
-  aiUsage         String?  
-
-  userId          String?  @unique 
-  user            User?    @relation(fields: [userId], references: [id])
-
-  tmdbApiKey      String?  @map("tmdb_api_key")
-  rawgApiKey      String?  @map("rawg_api_key")
-  pluggyClientId  String?  @map("pluggy_client_id")
-  pluggySecret    String?  @map("pluggy_client_secret")
-  openaiKey       String?  
-  groqKey         String?  
-  googleKey       String?  
+  id                String   @id @default(uuid())
+  theme             String   @default("system")
+  accentColor       String   @default("zinc")
+  language          String   @default("pt-BR")
+  currency          String   @default("BRL")
   
-  storagePath     String?  @default("D:/LifeOS_Data")
+  // Horários de trabalho
+  workStart         String   @default("09:00")
+  workEnd           String   @default("18:00")
 
-  updatedAt       DateTime @updatedAt
-  onboardingCompleted Boolean @default(false)
+  // Inteligência Artificial
+  aiProvider        String   @default("ollama")
+  aiModel           String   @default("llama3")
+  aiPersona         String?
+  aiUsage           String?  // Dica: use Json para estatísticas complexas se preferir
+  
+  // Chaves de API (Removido @map para simplificar e evitar confusão no código)
+  openaiKey         String?
+  groqKey           String?
+  googleKey         String?
+  tmdbApiKey        String?
+  rawgApiKey        String?
+  pluggyClientId    String?
+  pluggySecret      String?
 
-  autoLockMinutes Int      @default(15)
-  privacyMode     Boolean  @default(false)
+  // Localização de dados (Cuidado com caminhos absolutos como D:/ se for rodar em Linux/Docker)
+  storagePath       String?  @default("D:/LifeOS_Data")
+
+  // Metadados e Segurança
+  updatedAt         DateTime @updatedAt
+  onboardingCompleted Boolean  @default(false)
+  autoLockMinutes   Int      @default(15)
+  privacyMode       Boolean  @default(false)
+
+  // Relacionamento (Tornado obrigatório para garantir integridade)
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // =========================================================
@@ -610,16 +618,30 @@ model SavedLink {
 }
 
 model MediaItem {
-  id         String   @id @default(uuid())
-  type       String   
-  title      String
-  subtitle   String?  
-  coverUrl   String?  
-  rating     Int      @default(0) 
-  category   String?  
-  externalId String?  
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id          String   @id @default(uuid())
+  userId      String?  
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // --- Identificação Básica ---
+  title       String
+  type        String   
+  status      String   @default("PLAN_TO_WATCH") 
+  
+  // --- Metadados ---
+  overview    String?  @map("subtitle") // 🟢 SALVA-VIDAS: Preserva seus subtítulos!
+  coverUrl    String?  
+  genres      String?  @map("category") // 🟢 SALVA-VIDAS: Preserva suas categorias!
+  creator     String?  
+  releaseYear String?  
+  externalId  String?  
+  
+  // --- Interação Pessoal ---
+  rating      Int      @default(0) 
+  notes       String?  
+
+  // --- Sistema ---
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model Friend {
@@ -628,6 +650,7 @@ model Friend {
   nickname  String?   
   email     String?
   phone     String?   
+  tags      String?
   birthday  DateTime?
   instagram String?
   linkedin  String?

@@ -7,7 +7,7 @@ import { ProductComparator } from "./product-comparator";
 import { ProfileSelector, InvestorProfile } from "./profile-selector";
 import { MarketItem } from "@/lib/market-service"; 
 import { Card, CardContent } from "@/components/ui/card";
-import { Calculator, Target, TrendingUp, Sparkles, Scale } from "lucide-react";
+import { Calculator, Target, TrendingUp, Scale } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface InvestmentDashboardProps {
@@ -36,45 +36,45 @@ export function InvestmentDashboard({ initialMarketData }: InvestmentDashboardPr
         <div className="space-y-10 pb-24 animate-in fade-in duration-700">
 
             {/* KPI CARDS (Strategic Summary) */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                 <SummaryCard 
                     icon={Target}
-                    label="Meta do Perfil"
+                    title="Meta do Perfil"
                     value={`${selectedRate.toFixed(2)}%`}
-                    subtext="a.a. estimado"
-                    colorClass="text-primary bg-primary/10 border-primary/20"
+                    subtitle="a.a. estimado"
+                    theme="primary"
                 />
                 <SummaryCard 
                     icon={Calculator}
-                    label="Ganho Real (Acima da Inflação)"
+                    title="Ganho Real (Acima da Inflação)"
                     value={`+${realGain.toFixed(2)}%`}
-                    subtext="Poder de compra real"
-                    colorClass="text-blue-600 dark:text-blue-400 bg-blue-500/10 border-blue-500/20"
+                    subtitle="Poder de compra real"
+                    theme="blue"
                 />
                 <SummaryCard 
                     icon={TrendingUp}
-                    label="Referência de Mercado (CDI)"
+                    title="Referência (CDI Atual)"
                     value={`${cdiRate}%`}
-                    subtext="Benchmark básico"
-                    colorClass="text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20"
+                    subtitle="Benchmark básico"
+                    theme="emerald"
                 />
             </div>
 
             {/* MAIN CONTENT TABS */}
             <Tabs defaultValue="PLANNER" className="space-y-8">
                 <div className="flex justify-center">
-                    <TabsList className="grid w-full max-w-md grid-cols-2 bg-muted/50 p-1.5 rounded-2xl border border-border/50">
+                    <TabsList className="grid w-full max-w-[500px] grid-cols-2 bg-muted/30 p-1.5 rounded-2xl border border-border/50 shadow-inner h-auto gap-4">
                         <TabsTrigger 
                             value="PLANNER" 
-                            className="rounded-xl font-bold data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm transition-all py-2.5"
+                            className="rounded-xl font-bold text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-md transition-all py-3"
                         >
-                            <Target className="h-4 w-4 mr-2" /> Planejador de Futuro
+                            <Target className="h-4 w-4 mr-2" /> Planejador
                         </TabsTrigger>
                         <TabsTrigger 
                             value="PRODUCTS" 
-                            className="rounded-xl font-bold data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm transition-all py-2.5"
+                            className="rounded-xl font-bold text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-md transition-all py-3"
                         >
-                            <Scale className="h-4 w-4 mr-2" /> Comparar Produtos
+                            <Scale className="h-4 w-4 mr-2" /> Comparador
                         </TabsTrigger>
                     </TabsList>
                 </div>
@@ -82,16 +82,18 @@ export function InvestmentDashboard({ initialMarketData }: InvestmentDashboardPr
                 {/* ABA 1: PLANEJADOR */}
                 <TabsContent value="PLANNER" className="space-y-8 focus-visible:outline-none animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className="flex flex-col gap-8">
-                        <section>
-                            <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-4 ml-1">
-                                1. Defina seu Perfil de Investidor
+                        <section className="bg-card p-6 md:p-8 rounded-[2rem] border border-border/40 shadow-sm">
+                            <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-6 flex items-center gap-2">
+                                <div className="h-5 w-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs">1</div>
+                                Defina seu Perfil de Risco
                             </h3>
                             <ProfileSelector currentProfile={profile} onSelect={setProfile} />
                         </section>
                         
-                        <section>
-                            <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-4 ml-1">
-                                2. Simule seus Resultados
+                        <section className="bg-card p-6 md:p-8 rounded-[2rem] border border-border/40 shadow-sm">
+                            <h3 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-6 flex items-center gap-2">
+                                <div className="h-5 w-5 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs">2</div>
+                                Simulação de Juros Compostos
                             </h3>
                             <InvestmentPlanner rate={selectedRate} />
                         </section>
@@ -100,39 +102,77 @@ export function InvestmentDashboard({ initialMarketData }: InvestmentDashboardPr
 
                 {/* ABA 2: PRODUTOS */}
                 <TabsContent value="PRODUCTS" className="space-y-6 focus-visible:outline-none animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="bg-card border border-border/60 rounded-2xl p-6 md:p-8 flex flex-col md:flex-row gap-6 items-center justify-between shadow-sm">
+                    <div className="bg-card border border-border/40 rounded-[2rem] p-6 md:p-8 flex flex-col lg:flex-row gap-6 items-start lg:items-center justify-between shadow-sm">
                         <div className="space-y-2">
-                            <h3 className="text-2xl font-bold text-foreground">Calculadora de Renda Fixa</h3>
-                            <p className="text-muted-foreground max-w-xl text-base leading-relaxed">
-                                Descubra o que rende mais no seu bolso: produtos isentos de IR (LCI/LCA) ou produtos tributados (CDB/LC) com taxas mais altas.
+                            <h3 className="text-2xl font-extrabold text-foreground">Calculadora de Renda Fixa</h3>
+                            <p className="text-muted-foreground max-w-2xl text-sm font-medium leading-relaxed">
+                                Descubra o que rende mais no seu bolso: produtos isentos de IR (como LCI/LCA) ou produtos tributados (como CDB/LC) que oferecem taxas brutas mais altas.
                             </p>
                         </div>
-                        <div className="flex items-center gap-2 text-sm font-medium bg-muted/50 px-4 py-2 rounded-lg border border-border/50">
-                            <TrendingUp className="h-4 w-4 text-emerald-500" />
-                            CDI Atual: <span className="font-bold text-foreground">{cdiRate}%</span>
+                        <div className="flex items-center gap-3 text-sm font-bold bg-emerald-500/10 text-emerald-600 px-5 py-3 rounded-xl border border-emerald-500/20 shrink-0">
+                            <TrendingUp className="h-5 w-5" />
+                            CDI Atual: <span className="font-black font-mono text-lg ml-1">{cdiRate}%</span>
                         </div>
                     </div>
                     
-                    <ProductComparator cdi={cdiRate} />
+                    <div className="bg-card rounded-[2rem] border border-border/40 p-2 sm:p-6 shadow-sm">
+                        <ProductComparator cdi={cdiRate} />
+                    </div>
                 </TabsContent>
             </Tabs>
         </div>
     );
 }
 
-// --- SUB-COMPONENTES ---
+// --- SUB-COMPONENTES DE UI ---
 
-function SummaryCard({ icon: Icon, label, value, subtext, colorClass }: { icon: React.ElementType, label: string, value: string, subtext: string, colorClass: string }) {
+interface SummaryCardProps {
+    icon: React.ElementType;
+    title: string;
+    value: string;
+    subtitle: string;
+    theme: "primary" | "blue" | "emerald";
+}
+
+function SummaryCard({ icon: Icon, title, value, subtitle, theme }: SummaryCardProps) {
+    // Mapeamento seguro de cores do Tailwind
+    const themes = {
+        primary: {
+            bg: "bg-primary/10",
+            border: "border-primary/20",
+            text: "text-primary",
+            cardBorder: "hover:border-primary/30"
+        },
+        blue: {
+            bg: "bg-blue-500/10",
+            border: "border-blue-500/20",
+            text: "text-blue-500 dark:text-blue-400",
+            cardBorder: "hover:border-blue-500/30"
+        },
+        emerald: {
+            bg: "bg-emerald-500/10",
+            border: "border-emerald-500/20",
+            text: "text-emerald-600 dark:text-emerald-400",
+            cardBorder: "hover:border-emerald-500/30"
+        }
+    };
+
+    const t = themes[theme];
+
     return (
-        <Card className={cn("border bg-card/50 backdrop-blur-sm shadow-sm hover:shadow-md transition-all duration-300 group", colorClass.split(" ")[2])}>
-            <CardContent className="p-6 flex items-start gap-5">
-                <div className={cn("p-3.5 rounded-2xl transition-transform group-hover:scale-110 duration-300", colorClass.split(" ")[1], colorClass.split(" ")[0])}>
-                    <Icon className="h-7 w-7" />
+        <Card className={cn("rounded-[2rem] border border-border/40 bg-card shadow-sm transition-all duration-300 hover:shadow-md hover:-translate-y-1 group", t.cardBorder)}>
+            <CardContent className="p-6 flex flex-col justify-between h-full min-h-[160px]">
+                <div className="flex justify-between items-start mb-4">
+                    <div className={cn("p-3.5 rounded-2xl shadow-sm border transition-transform duration-300 group-hover:scale-110", t.bg, t.border, t.text)}>
+                        <Icon className="h-6 w-6" />
+                    </div>
                 </div>
-                <div>
-                    <p className="text-sm font-semibold text-muted-foreground mb-1">{label}</p>
-                    <p className="text-3xl font-black tracking-tight text-foreground">{value}</p>
-                    <p className="text-xs font-medium text-muted-foreground/80 mt-1">{subtext}</p>
+                <div className="space-y-1 mt-auto">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</p>
+                    <div className="text-3xl font-black font-mono tracking-tighter text-foreground">
+                        {value}
+                    </div>
+                    <p className="text-xs font-bold text-muted-foreground/60 mt-1">{subtitle}</p>
                 </div>
             </CardContent>
         </Card>

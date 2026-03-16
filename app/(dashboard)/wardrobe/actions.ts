@@ -3,7 +3,13 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
+// --- TIPOS ---
 type WardrobeStatus = "IN_CLOSET" | "LAUNDRY" | "REPAIR" | "DONATED" | "WISH_LIST";
+
+// Array com os status válidos para validação de segurança
+const VALID_STATUSES: WardrobeStatus[] = ["IN_CLOSET", "LAUNDRY", "REPAIR", "DONATED", "WISH_LIST"];
+
+// --- HELPERS ---
 
 // Helper para converter string vazia em null
 function getValue(formData: FormData, key: string): string | null {
@@ -12,7 +18,7 @@ function getValue(formData: FormData, key: string): string | null {
   return value.trim();
 }
 
-// CORREÇÃO AQUI: Tipagem explícita em vez de 'any'
+// Tipagem explícita e limpeza de moeda BR
 function parsePrice(value: FormDataEntryValue | null): number | null {
   if (!value || typeof value !== "string") return null;
   
@@ -23,7 +29,20 @@ function parsePrice(value: FormDataEntryValue | null): number | null {
   return isNaN(parsed) ? null : parsed;
 }
 
-// Helper para pegar usuário
+// Helper de Segurança para Status
+function parseStatus(value: FormDataEntryValue | null): WardrobeStatus {
+  if (!value || typeof value !== "string") return "IN_CLOSET";
+  
+  const statusStr = value.toUpperCase() as WardrobeStatus;
+  
+  // Se o status enviado for válido, retorna ele. Senão, fallback para IN_CLOSET.
+  if (VALID_STATUSES.includes(statusStr)) {
+    return statusStr;
+  }
+  return "IN_CLOSET";
+}
+
+// Helper para pegar usuário (Simulação/Pronto para Auth Real)
 async function getAuthenticatedUserId() {
   const user = await prisma.user.findFirst();
   return user?.id;
@@ -33,15 +52,15 @@ async function getAuthenticatedUserId() {
 export async function createWardrobeItem(formData: FormData) {
   try {
     const userId = await getAuthenticatedUserId();
-    if (!userId) return { success: false, message: "Usuário não encontrado." };
+    if (!userId) return { success: false, message: "Usuário não autenticado." };
 
     const name = formData.get("name") as string;
-    if (!name) return { success: false, message: "Nome da peça é obrigatório." };
+    if (!name) return { success: false, message: "O nome da peça é obrigatório." };
 
     await prisma.wardrobeItem.create({
       data: {
-        userId,
-        name,
+        userId: userId,
+        name: name,
         category: (formData.get("category") as string) || "OUTROS",
         
         // Detalhes Opcionais
@@ -51,11 +70,9 @@ export async function createWardrobeItem(formData: FormData) {
         season: getValue(formData, "season"),
         imageUrl: getValue(formData, "imageUrl"),
         
-        // Numéricos e Enums
+        // Numéricos, Booleanos e Enums
         price: parsePrice(formData.get("price")),
-        // ✅ CORREÇÃO: Forçamos o tipo com any para o Prisma aceitar
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        status: ((formData.get("status") as string) || "IN_CLOSET") as any,
+        status: parseStatus(formData.get("status")), // ✅ Validação segura, sem 'any'
         isFavorite: formData.get("isFavorite") === "true",
       }
     });
@@ -65,7 +82,7 @@ export async function createWardrobeItem(formData: FormData) {
 
   } catch (error) {
     console.error("Erro ao criar peça:", error);
-    return { success: false, message: "Erro ao salvar item." };
+    return { success: false, message: "Falha ao salvar a peça." };
   }
 }
 
@@ -76,10 +93,13 @@ export async function updateWardrobeItem(formData: FormData) {
     if (!userId) return { success: false, message: "Erro de autenticação." };
 
     const id = formData.get("id") as string;
-    if (!id) return { success: false, message: "ID inválido." };
+    if (!id) return { success: false, message: "ID do item não encontrado." };
 
     await prisma.wardrobeItem.update({
-      where: { id, userId },
+      where: { 
+        id: id,
+        userId: userId // Proteção: garante que o item pertence ao usuário logado
+      },
       data: {
         name: formData.get("name") as string,
         category: formData.get("category") as string,
@@ -91,47 +111,52 @@ export async function updateWardrobeItem(formData: FormData) {
         imageUrl: getValue(formData, "imageUrl"),
         
         price: parsePrice(formData.get("price")),
-        // ✅ CORREÇÃO: Forçamos o tipo com any
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        status: (formData.get("status") as string) as any,
+        status: parseStatus(formData.get("status")), // ✅ Validação segura
       }
     });
 
     revalidatePath("/wardrobe");
-    return { success: true, message: "Peça atualizada!" };
+    return { success: true, message: "Detalhes da peça atualizados!" };
 
   } catch (error) {
-    console.error("Erro ao atualizar:", error);
-    return { success: false, message: "Erro ao atualizar item." };
+    console.error("Erro ao atualizar peça:", error);
+    return { success: false, message: "Falha ao atualizar o item." };
   }
 }
 
-// --- 3. DELETE (REMOVER) ---
+// --- 3. DELETE (REMOVER PEÇA) ---
 export async function deleteWardrobeItem(id: string) {
   try {
     const userId = await getAuthenticatedUserId();
     if (!userId) return { success: false, message: "Erro de autenticação." };
 
     await prisma.wardrobeItem.delete({
-      where: { id, userId }
+      where: { 
+        id: id,
+        userId: userId 
+      }
     });
 
     revalidatePath("/wardrobe");
     return { success: true, message: "Peça removida do closet." };
 
   } catch (error) {
-    return { success: false, message: "Erro ao excluir." };
+    console.error("Erro ao excluir peça:", error);
+    return { success: false, message: "Erro ao excluir a peça." };
   }
 }
 
-// --- 4. TOGGLE FAVORITE (Ação Rápida) ---
+// --- 4. TOGGLE FAVORITE (Ação Rápida no Card) ---
 export async function toggleFavoriteItem(id: string, currentState: boolean) {
   try {
     const userId = await getAuthenticatedUserId();
     if (!userId) return { success: false };
 
     await prisma.wardrobeItem.update({
-      where: { id, userId },
+      where: { 
+        id: id,
+        userId: userId 
+      },
       data: { isFavorite: !currentState }
     });
 
@@ -142,23 +167,29 @@ export async function toggleFavoriteItem(id: string, currentState: boolean) {
   }
 }
 
-// --- 5. REGISTRAR USO (Para o Cost Per Wear) ---
+// --- 5. REGISTRAR USO (Para cálculo de Cost Per Wear) ---
 export async function wearItem(id: string) {
     try {
         const userId = await getAuthenticatedUserId();
-        if (!userId) return { success: false };
+        if (!userId) return { success: false, message: "Não autenticado." };
     
         await prisma.wardrobeItem.update({
-          where: { id, userId },
+          where: { 
+            id: id,
+            userId: userId 
+          },
           data: { 
               wearCount: { increment: 1 }, 
-              lastWorn: new Date()         
+              lastWorn: new Date(),
+              // Opcional: Se a pessoa usar a peça, garante que ela está "No Closet" 
+              // e não "Na Lavanderia" ou "Emprestada"
+              status: "IN_CLOSET" 
           }
         });
     
         revalidatePath("/wardrobe");
         return { success: true, message: "Uso registrado! 👗" };
       } catch (error) {
-        return { success: false, message: "Erro ao registrar uso." };
+        return { success: false, message: "Erro ao registrar o uso da peça." };
       }
 }

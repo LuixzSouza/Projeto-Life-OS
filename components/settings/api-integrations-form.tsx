@@ -13,7 +13,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
   Globe, Film, Gamepad2, Banknote, Loader2, Shield, 
   ExternalLink, Eye, EyeOff, Copy, Check, Info, 
-  Key, Database, Lock, TestTube2, Sparkles
+  Key, Database, Lock, TestTube2, Sparkles,
+  Bot
 } from "lucide-react";
 import { useFormStatus } from "react-dom";
 import { updateApiKeys } from "@/app/(dashboard)/settings/actions";
@@ -32,8 +33,9 @@ type APIProvider = {
   label: string;
   icon: React.ElementType;
   description: string;
-  category: 'content' | 'finance' | 'developer';
-  status: 'active' | 'inactive' | 'error';
+  category: 'content' | 'finance' | 'developer' | 'ai';
+  // MELHORIA: Tornamos o status opcional aqui para o TypeScript não reclamar no array
+  status?: 'active' | 'inactive' | 'error' | 'pending'; 
   link: { url: string; label: string };
   secret?: boolean;
   validation?: RegExp;
@@ -45,9 +47,10 @@ const StatusIndicator = ({ status }: { status: APIProvider['status'] }) => {
     active: { color: "bg-emerald-500", label: "Ativo" },
     inactive: { color: "bg-zinc-300 dark:bg-zinc-700", label: "Inativo" },
     error: { color: "bg-rose-500", label: "Erro" },
+    pending: { color: "bg-amber-500", label: "Pendente" },
   };
   
-  const { color, label } = config[status];
+  const { color, label } = config[status || 'inactive'];
   return (
     <div className="flex items-center gap-2">
       <div className={`h-2 w-2 rounded-full ${color}`} />
@@ -79,7 +82,8 @@ const SubmitButton: React.FC = () => {
 const APIInputField: React.FC<{
   field: APIProvider;
   defaultValue?: string | null;
-}> = ({ field, defaultValue }) => {
+  onChangeValue: (id: string, newValue: string) => void; 
+}> = ({ field, defaultValue, onChangeValue }) => {
   const [revealed, setRevealed] = useState(false);
   const [value, setValue] = useState(defaultValue ?? "");
   const [testing, setTesting] = useState(false);
@@ -88,47 +92,42 @@ const APIInputField: React.FC<{
 
   const handleCopy = async () => {
     if (!value) return;
-    
     try {
       await navigator.clipboard.writeText(value);
       setCopied(true);
-      toast.success("Chave copiada!", {
-        description: "A chave foi copiada para a área de transferência",
-      });
-      
+      toast.success("Chave copiada!");
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.error("Erro ao copiar");
-    }
+    } catch { toast.error("Erro ao copiar"); }
   };
 
   const handleTest = async () => {
-    if (!value) {
-      toast.error("Campo vazio", {
-        description: "Insira uma chave para testar",
-      });
-      return;
-    }
-
+    if (!value) { toast.error("Campo vazio"); return; }
     setTesting(true);
-    
-    // Simulação de teste
     await new Promise(resolve => setTimeout(resolve, 1500));
-    
     const isValid = value.length > 10;
-    
-    if (isValid) {
-      toast.success("Conexão estabelecida!", {
-        description: `A chave ${field.name} está funcionando corretamente`,
-      });
-    } else {
-      toast.error("Chave inválida", {
-        description: "A chave parece estar incorreta ou expirada",
-      });
-    }
-    
+    if (isValid) toast.success("Conexão estabelecida!");
+    else toast.error("Chave inválida");
     setTesting(false);
   };
+
+  // MELHORIA: Atualiza o estado local e avisa o form pai ao mesmo tempo
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setValue(val);
+    onChangeValue(field.id, val);
+  };
+  // MELHORIA: Se desativar, limpa a chave para apagar no banco de dados
+  const toggleActive = () => {
+    const newState = !active;
+    setActive(newState);
+    if (!newState) {
+      setValue("");
+      onChangeValue(field.id, "");
+    }
+  };
+
+  // Define o status visual baseado se está ativo e tem texto
+  const currentStatus = active ? (value.trim() ? "active" : "pending") : "inactive";
 
   return (
     <Card className="overflow-hidden border-border/50 hover:border-primary/30 transition-all duration-300 group">
@@ -141,17 +140,12 @@ const APIInputField: React.FC<{
             <div>
               <div className="flex items-center gap-2">
                 <CardTitle className="text-sm font-semibold">{field.label}</CardTitle>
-                <StatusIndicator status={field.status} />
+                <StatusIndicator status={currentStatus} />
               </div>
               <CardDescription className="text-xs mt-1">{field.description}</CardDescription>
             </div>
           </div>
-          <Link
-            href={field.link.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-2 hover:bg-muted rounded-lg transition-colors shrink-0"
-          >
+          <Link href={field.link.url} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-muted rounded-lg transition-colors shrink-0">
             <ExternalLink className="h-4 w-4 text-muted-foreground hover:text-primary" />
           </Link>
         </div>
@@ -161,28 +155,15 @@ const APIInputField: React.FC<{
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label htmlFor={field.id} className="text-xs font-medium flex items-center gap-1">
-              <Key className="h-3 w-3" />
-              Chave da API
+              <Key className="h-3 w-3" /> Chave da API
             </Label>
-            
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setActive(!active)}
-                className={cn(
-                  "text-xs px-3 py-1 rounded-full transition-colors",
-                  active
-                    ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-                )}
-              >
+              <button type="button" onClick={toggleActive} className={cn("text-xs px-3 py-1 rounded-full transition-colors", active ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20" : "bg-muted text-muted-foreground hover:bg-muted/80")}>
                 {active ? "Ativo" : "Inativo"}
               </button>
-              
               {field.secret && (
                 <Badge variant="outline" className="text-xs py-1 px-2 border-amber-500/30 text-amber-600">
-                  <Lock className="h-3 w-3 mr-1" />
-                  Secreta
+                  <Lock className="h-3 w-3 mr-1" /> Secreta
                 </Badge>
               )}
             </div>
@@ -191,53 +172,23 @@ const APIInputField: React.FC<{
           <div className="relative">
             <Input
               id={field.id}
-              name={field.id}
               type={revealed ? "text" : "password"}
               placeholder={field.secret ? "••••••••••••••••" : "Insira sua chave da API..."}
               value={value}
-              onChange={(e) => setValue(e.target.value)}
-              className={cn(
-                "font-mono text-sm pr-32 transition-all",
-                !active && "opacity-50 bg-muted/50",
-                field.secret && "border-amber-500/30 focus-visible:border-amber-500/50"
-              )}
+              onChange={handleChange}
+              className={cn("font-mono text-sm pr-32 transition-all", !active && "opacity-50 bg-muted/50", field.secret && "border-amber-500/30 focus-visible:border-amber-500/50")}
               disabled={!active}
             />
             
             <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => setRevealed(!revealed)}
-                className="h-8 w-8 p-0"
-              >
+              <Button type="button" variant="ghost" size="sm" onClick={() => setRevealed(!revealed)} className="h-8 w-8 p-0">
                 {revealed ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </Button>
-              
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={handleCopy}
-                className="h-8 w-8 p-0"
-              >
+              <Button type="button" variant="ghost" size="sm" onClick={handleCopy} className="h-8 w-8 p-0">
                 {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
               </Button>
-              
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={handleTest}
-                disabled={testing || !value}
-                className="h-8 w-8 p-0"
-              >
-                {testing ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <TestTube2 className="h-4 w-4" />
-                )}
+              <Button type="button" variant="ghost" size="sm" onClick={handleTest} disabled={testing || !value} className="h-8 w-8 p-0">
+                {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <TestTube2 className="h-4 w-4" />}
               </Button>
             </div>
           </div>
@@ -246,9 +197,7 @@ const APIInputField: React.FC<{
         {field.secret && (
           <Alert variant="warning" className="border-amber-500/30 bg-amber-50/10">
             <Info className="h-4 w-4" />
-            <AlertDescription className="text-xs text-amber-600">
-              Esta é uma chave secreta. Nunca a compartilhe ou exponha publicamente.
-            </AlertDescription>
+            <AlertDescription className="text-xs text-amber-600">Esta é uma chave secreta. Nunca a compartilhe publicamente.</AlertDescription>
           </Alert>
         )}
       </CardContent>
@@ -260,232 +209,110 @@ const APIInputField: React.FC<{
 export default function APIIntegrationsForm({ settings }: APIIntegrationsFormProps) {
   const [activeTab, setActiveTab] = useState<string>("content");
 
-  // Dados das APIs organizados por categoria
+  const [formValues, setFormValues] = useState<Record<string, string>>({
+    tmdbApiKey: getSettingValue(settings, "tmdbApiKey") || "",
+    rawgApiKey: getSettingValue(settings, "rawgApiKey") || "",
+    pluggyClientId: getSettingValue(settings, "pluggyClientId") || "",
+    pluggySecret: getSettingValue(settings, "pluggySecret") || "",
+    openaiKey: getSettingValue(settings, "openaiKey") || "",
+    groqKey: getSettingValue(settings, "groqKey") || "",
+    googleKey: getSettingValue(settings, "googleKey") || "",
+  });
+
+  const handleUpdateValue = (id: string, newValue: string) => {
+    setFormValues(prev => ({ ...prev, [id]: newValue }));
+  };
+
   const apiProviders: APIProvider[] = [
-    {
-      id: "tmdbApiKey",
-      name: "tmdb",
-      label: "The Movie Database",
-      icon: Film,
-      description: "Filmes, séries e conteúdo multimídia",
-      category: "content",
-      status: getSettingValue(settings, "tmdbApiKey") ? "active" : "inactive",
-      link: { url: "https://www.themoviedb.org/settings/api", label: "Dashboard TMDB" },
-    },
-    {
-      id: "rawgApiKey",
-      name: "rawg",
-      label: "RAWG Video Games",
-      icon: Gamepad2,
-      description: "Catálogo completo de jogos e informações",
-      category: "content",
-      status: getSettingValue(settings, "rawgApiKey") ? "active" : "inactive",
-      link: { url: "https://rawg.io/apidocs", label: "Documentação RAWG" },
-    },
-    {
-      id: "pluggyClientId",
-      name: "pluggy-client",
-      label: "Pluggy Client ID",
-      icon: Banknote,
-      description: "Identificador público para integração financeira",
-      category: "finance",
-      status: getSettingValue(settings, "pluggyClientId") ? "active" : "inactive",
-      link: { url: "https://dashboard.pluggy.ai/settings/api-keys", label: "Pluggy Dashboard" },
-    },
-    {
-      id: "pluggyClientSecret",
-      name: "pluggy-secret",
-      label: "Pluggy Client Secret",
-      icon: Shield,
-      description: "Chave secreta para autenticação financeira",
-      category: "finance",
-      status: getSettingValue(settings, "pluggyClientSecret") ? "active" : "inactive",
-      link: { url: "https://dashboard.pluggy.ai/settings/api-keys", label: "Pluggy Dashboard" },
-      secret: true,
-    },
+    { id: "tmdbApiKey", name: "tmdb", label: "The Movie Database", icon: Film, description: "Filmes, séries e conteúdo multimídia", category: "content", link: { url: "https://www.themoviedb.org/settings/api", label: "Dashboard" } },
+    { id: "rawgApiKey", name: "rawg", label: "RAWG Video Games", icon: Gamepad2, description: "Catálogo completo de jogos", category: "content", link: { url: "https://rawg.io/apidocs", label: "Dashboard" } },
+    { id: "pluggyClientId", name: "pluggy-client", label: "Pluggy Client ID", icon: Banknote, description: "Identificador público financeiro", category: "finance", link: { url: "https://dashboard.pluggy.ai/", label: "Pluggy" } },
+    { id: "pluggySecret", name: "pluggy-secret", label: "Pluggy Client Secret", icon: Shield, description: "Chave secreta financeira", category: "finance", link: { url: "https://dashboard.pluggy.ai/", label: "Pluggy" }, secret: true },
+    { id: "openaiKey", name: "openai", label: "OpenAI", icon: Bot, description: "ChatGPT Inteligência Artificial", category: "ai", link: { url: "https://platform.openai.com/api-keys", label: "OpenAI" }, secret: true },
+    { id: "groqKey", name: "groq", label: "Groq Cloud", icon: Bot, description: "IA ultra-rápida (Llama 3)", category: "ai", link: { url: "https://console.groq.com/keys", label: "Groq" }, secret: true },
+    { id: "googleKey", name: "google", label: "Google Gemini", icon: Bot, description: "IA avançada do Google", category: "ai", link: { url: "https://aistudio.google.com/app/apikey", label: "Gemini" }, secret: true },
   ];
 
   const contentAPIs = apiProviders.filter(api => api.category === "content");
   const financeAPIs = apiProviders.filter(api => api.category === "finance");
+  const aiAPIs = apiProviders.filter(api => api.category === "ai");
 
   const handleSubmit = async (formData: FormData) => {
     try {
       const result = await updateApiKeys(formData);
-      
-      if (result.success) {
-        toast.success("Configurações salvas", {
-          description: "Todas as chaves foram atualizadas com sucesso",
-        });
-      } else {
-        throw new Error(result.message);
-      }
-    } catch (error) {
-      toast.error("Erro ao salvar", {
-        description: error instanceof Error ? error.message : "Tente novamente",
-      });
-    }
+      if (result.success) toast.success("Configurações salvas!");
+      else throw new Error(result.message);
+    } catch (error) { toast.error("Erro ao salvar"); }
   };
 
   return (
     <div className="space-y-8">
-      {/* Cabeçalho */}
       <div className="space-y-2">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <Sparkles className="h-6 w-6 text-primary" />
-          </div>
+          <div className="p-2 rounded-lg bg-primary/10"><Sparkles className="h-6 w-6 text-primary" /></div>
           <div>
             <h2 className="text-2xl font-bold tracking-tight">Integrações API</h2>
-            <p className="text-muted-foreground">
-              Configure suas chaves de API para conectar serviços externos
-            </p>
+            <p className="text-muted-foreground">Configure suas chaves de API para conectar serviços externos</p>
           </div>
         </div>
-        
         <Alert className="border-primary/20 bg-primary/5">
-          <Globe className="h-4 w-4" />
-          <AlertDescription className="text-sm">
-            As chaves são armazenadas de forma segura no seu banco de dados e usadas apenas no servidor
-          </AlertDescription>
+          <Globe className="h-4 w-4" /><AlertDescription className="text-sm">As chaves são armazenadas localmente de forma segura.</AlertDescription>
         </Alert>
       </div>
 
-      {/* Navegação por abas */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 lg:w-auto">
-          <TabsTrigger value="content" className="gap-2">
-            <Film className="h-4 w-4" />
-            Conteúdo Digital
-            <Badge variant="secondary" className="ml-2">
-              {contentAPIs.length}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="finance" className="gap-2">
-            <Banknote className="h-4 w-4" />
-            Financeiro
-            <Badge variant="secondary" className="ml-2">
-              {financeAPIs.length}
-            </Badge>
-          </TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 lg:w-auto">
+          <TabsTrigger value="content" className="gap-2"><Film className="h-4 w-4" /> Conteúdo</TabsTrigger>
+          <TabsTrigger value="ai" className="gap-2"><Bot className="h-4 w-4" /> IA</TabsTrigger>
+          <TabsTrigger value="finance" className="gap-2"><Banknote className="h-4 w-4" /> Financeiro</TabsTrigger>
         </TabsList>
 
-        {/* Aba de Conteúdo */}
-        <TabsContent value="content" className="space-y-6 pt-6">
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-lg font-semibold">APIs de Conteúdo Digital</h3>
-              <p className="text-sm text-muted-foreground">
-                Conecte serviços para enriquecer seu catálogo pessoal de mídia
-              </p>
-            </div>
-            
+        <form action={handleSubmit} className="mt-6 space-y-6">
+          {apiProviders.map((api) => (
+            <input key={api.id} type="hidden" name={api.id} value={formValues[api.id]} />
+          ))}
+
+          <TabsContent value="content" className="space-y-4 m-0">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {contentAPIs.map((api) => (
-                <APIInputField
-                  key={api.id}
-                  field={api}
-                  defaultValue={getSettingValue(settings, api.id)}
-                />
+                <APIInputField key={api.id} field={api} defaultValue={getSettingValue(settings, api.id)} onChangeValue={handleUpdateValue} />
               ))}
             </div>
-          </div>
-        </TabsContent>
+          </TabsContent>
 
-        {/* Aba Financeira */}
-        <TabsContent value="finance" className="space-y-6 pt-6">
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-lg font-semibold">Integrações Financeiras</h3>
-              <p className="text-sm text-muted-foreground">
-                Conecte serviços para agregação de dados financeiros
-              </p>
+          <TabsContent value="ai" className="space-y-4 m-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {aiAPIs.map((api) => (
+                <APIInputField key={api.id} field={api} defaultValue={getSettingValue(settings, api.id)} onChangeValue={handleUpdateValue} />
+              ))}
             </div>
-            
+          </TabsContent>
+
+          <TabsContent value="finance" className="space-y-4 m-0">
             <div className="grid grid-cols-1 gap-4">
               {financeAPIs.map((api) => (
-                <APIInputField
-                  key={api.id}
-                  field={api}
-                  defaultValue={getSettingValue(settings, api.id)}
-                />
+                <APIInputField key={api.id} field={api} defaultValue={getSettingValue(settings, api.id)} onChangeValue={handleUpdateValue} />
               ))}
             </div>
-          </div>
-        </TabsContent>
+          </TabsContent>
+
+          <Card className="border-border/50">
+            <CardHeader>
+              <CardTitle className="text-base">Salvar Configurações</CardTitle>
+              <CardDescription className="text-sm">As alterações entram em vigor imediatamente após salvar.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+                <p className="text-xs text-muted-foreground flex items-center gap-2"><Database className="h-4 w-4" /> Armazenamento local seguro</p>
+                <div className="flex gap-3 w-full sm:w-auto">
+                  <Button type="button" variant="outline" onClick={() => window.location.reload()}>Recarregar</Button>
+                  <SubmitButton />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </form>
       </Tabs>
-
-      {/* Formulário e ações */}
-      <Card className="border-border/50">
-        <CardHeader>
-          <CardTitle className="text-base">Salvar Configurações</CardTitle>
-          <CardDescription className="text-sm">
-            Após salvar, as chaves estarão disponíveis imediatamente para uso
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form action={handleSubmit} className="space-y-6">
-            {/* Campos ocultos para cada API */}
-            {apiProviders.map((api) => (
-              <input
-                key={api.id}
-                type="hidden"
-                name={api.id}
-                value={getSettingValue(settings, api.id) || ""}
-              />
-            ))}
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-              <div className="text-sm text-muted-foreground space-y-1">
-                <p className="flex items-center gap-2">
-                  <Database className="h-4 w-4" />
-                  Armazenamento local seguro
-                </p>
-                <p className="text-xs">
-                  Atualizações são aplicadas instantaneamente
-                </p>
-              </div>
-              
-              <div className="flex gap-3 w-full sm:w-auto">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => window.location.reload()}
-                  className="flex-1 sm:flex-none"
-                >
-                  Recarregar
-                </Button>
-                <SubmitButton />
-              </div>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-
-      {/* Dicas e informações */}
-      <Card className="bg-muted/30 border-dashed">
-        <CardContent className="pt-6">
-          <div className="space-y-3">
-            <h4 className="font-medium flex items-center gap-2">
-              <Info className="h-4 w-4" />
-              Boas práticas de segurança
-            </h4>
-            <ul className="text-sm text-muted-foreground space-y-2">
-              <li className="flex items-start gap-2">
-                <div className="h-1.5 w-1.5 rounded-full bg-primary mt-1.5" />
-                Nunca compartilhe suas chaves secretas publicamente
-              </li>
-              <li className="flex items-start gap-2">
-                <div className="h-1.5 w-1.5 rounded-full bg-primary mt-1.5" />
-                Revogue chaves antigas ou não utilizadas
-              </li>
-              <li className="flex items-start gap-2">
-                <div className="h-1.5 w-1.5 rounded-full bg-primary mt-1.5" />
-                Use variáveis de ambiente em produção
-              </li>
-            </ul>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
