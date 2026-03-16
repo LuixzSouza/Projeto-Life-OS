@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,18 +31,61 @@ export interface WishlistData {
 }
 
 export function WishlistForm({ item, onClose }: { item?: WishlistData, onClose: () => void }) {
-    const [isLoading, setIsLoading] = useState(false);
-    const [previewUrl, setPreviewUrl] = useState(item?.imageUrl || "");
-    const [price, setPrice] = useState(item?.price || 0);
-    const [saved, setSaved] = useState(item?.saved || 0);
-    const [priority, setPriority] = useState(item?.priority || "MEDIUM");
+    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [previewUrl, setPreviewUrl] = useState<string>(item?.imageUrl || "");
+    const [price, setPrice] = useState<number>(item?.price ?? 0);
+    const [saved, setSaved] = useState<number>(item?.saved ?? 0);
+    const [priority, setPriority] = useState<string>(item?.priority || "MEDIUM");
+
+    const priceRef = useRef<HTMLInputElement | null>(null);
+    const savedRef = useRef<HTMLInputElement | null>(null);
+
+    // Mantém o cursor no final somente se o input suportar setSelectionRange
+    useEffect(() => {
+        const el = priceRef.current;
+        if (!el) return;
+
+        const t = window.setTimeout(() => {
+            try {
+                // setSelectionRange não é suportado por inputs type=number — verificamos antes
+                if (typeof el.setSelectionRange === "function" && el.type !== "number") {
+                    const len = el.value.length;
+                    el.setSelectionRange(len, len);
+                }
+            } catch (err) {
+                // silenciosamente ignoramos qualquer erro — não queremos quebrar a UI por aqui
+                // eslint-disable-next-line no-console
+                console.debug("Não foi possível ajustar cursor do price input:", err);
+            }
+        }, 0);
+        return () => clearTimeout(t);
+    }, [price]);
+
+    useEffect(() => {
+        const el = savedRef.current;
+        if (!el) return;
+
+        const t = window.setTimeout(() => {
+            try {
+                if (typeof el.setSelectionRange === "function" && el.type !== "number") {
+                    const len = el.value.length;
+                    el.setSelectionRange(len, len);
+                }
+            } catch (err) {
+                // eslint-disable-next-line no-console
+                console.debug("Não foi possível ajustar cursor do saved input:", err);
+            }
+        }, 0);
+        return () => clearTimeout(t);
+    }, [saved]);
 
     const handleSubmit = async (formData: FormData) => {
         setIsLoading(true);
         formData.set("priority", priority);
-        
+
         try {
             if (item) {
+                formData.set("id", item.id || "");
                 await updateWishlist(formData);
                 toast.success("Meta atualizada com sucesso!");
             } else {
@@ -51,6 +94,7 @@ export function WishlistForm({ item, onClose }: { item?: WishlistData, onClose: 
             }
             onClose();
         } catch (error) {
+            console.error(error);
             toast.error("Erro ao salvar meta.");
         } finally {
             setIsLoading(false);
@@ -58,12 +102,11 @@ export function WishlistForm({ item, onClose }: { item?: WishlistData, onClose: 
     };
 
     return (
-        <form action={handleSubmit} className="space-y-6">
+        <form action={handleSubmit} className="space-y-6" noValidate>
             {item && <input type="hidden" name="id" value={item.id} />}
-            
+
             <div className="flex flex-col md:flex-row gap-6 md:gap-8">
-                
-                {/* COLUNA 1: PREVIEW DA IMAGEM (Fixa para não espremer) */}
+                {/* COLUNA 1: PREVIEW DA IMAGEM */}
                 <div className="w-full md:w-[240px] flex flex-col gap-4 shrink-0 mx-auto">
                     <div className="aspect-square w-full md:max-w-[240px] max-w-[200px] mx-auto rounded-[2rem] border border-border/50 bg-muted/10 flex items-center justify-center overflow-hidden relative group transition-all hover:bg-muted/20 shadow-sm">
                         {previewUrl ? (
@@ -86,14 +129,14 @@ export function WishlistForm({ item, onClose }: { item?: WishlistData, onClose: 
                                 onChange={(e) => setPreviewUrl(e.target.value)} 
                                 placeholder="Cole o link da foto..." 
                                 className="h-12 pl-10 text-sm bg-muted/20 border-border/50 rounded-xl focus-visible:ring-primary/30 font-medium"
+                                autoComplete="off"
                             />
                         </div>
                     </div>
                 </div>
 
-                {/* COLUNA 2: DADOS DO PRODUTO (Flexível) */}
+                {/* COLUNA 2: DADOS DO PRODUTO */}
                 <div className="flex-1 space-y-5 min-w-0">
-                    
                     {/* Nome */}
                     <div className="space-y-2">
                         <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">O que você deseja conquistar? *</Label>
@@ -117,28 +160,31 @@ export function WishlistForm({ item, onClose }: { item?: WishlistData, onClose: 
                             <div className="relative group">
                                 <DollarSign className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50 group-focus-within:text-primary transition-colors" />
                                 <Input 
+                                    ref={priceRef}
                                     name="price" 
                                     type="number" 
                                     step="0.01" 
                                     value={price || ""} 
-                                    onChange={(e) => setPrice(Number(e.target.value))}
+                                    onChange={(e) => setPrice(Number(e.target.value))} 
                                     required 
                                     className="h-12 pl-10 font-mono text-lg font-bold bg-muted/20 border-border/50 rounded-xl focus-visible:ring-primary/30"
                                     placeholder="0.00"
                                 />
                             </div>
                         </div>
+
                         <div className="space-y-2">
                             <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Já Guardado (R$)</Label>
                             <div className="relative group">
                                 <PiggyBank className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500/50 group-focus-within:text-emerald-500 transition-colors" />
                                 <Input 
+                                    ref={savedRef}
                                     name="saved" 
                                     type="number" 
                                     step="0.01" 
-                                    value={saved || ""}
-                                    onChange={(e) => setSaved(Number(e.target.value))}
-                                    className="h-12 pl-10 font-mono text-lg font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 border-emerald-500/20 rounded-xl focus-visible:ring-emerald-500/30"
+                                    value={saved || ""} 
+                                    onChange={(e) => setSaved(Number(e.target.value))} 
+                                    className="h-12 pl-10 font-mono text-lg font-bold text-emerald-600 bg-emerald-500/5 border-emerald-500/20 rounded-xl focus-visible:ring-emerald-500/30"
                                     placeholder="0.00"
                                 />
                             </div>
@@ -192,6 +238,7 @@ export function WishlistForm({ item, onClose }: { item?: WishlistData, onClose: 
                                 defaultValue={item?.productUrl || ""} 
                                 placeholder="https://mercadolivre.com.br/..." 
                                 className="h-12 pl-10 text-sm font-medium bg-muted/20 border-border/50 rounded-xl focus-visible:ring-primary/30" 
+                                autoComplete="off"
                             />
                         </div>
                     </div>

@@ -1,10 +1,8 @@
 import { prisma } from "@/lib/prisma";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
-    Activity, Utensils, Droplets, Zap, Moon, Target, 
-    Dumbbell, Calculator, LucideIcon, BrainCircuit,
-    Layers, ClipboardList, ShieldCheck, TrendingUp
+    Activity, Utensils, Droplets, Moon, 
+    Dumbbell, Target, ShieldCheck, RefreshCcw
 } from "lucide-react";
 import Link from "next/link"; 
 
@@ -17,17 +15,16 @@ import { FoodLogger } from "@/components/health/nutrition/food-logger";
 import { ActivityFeed } from "@/components/health/activity-feed";
 import { HealthActions } from "@/components/health/health-actions";
 import { cn } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
 
 // --- PROTOCOLOS DE TIPAGEM ESTREITA ---
-type StatusColor = "rose" | "blue" | "amber" | "emerald" | "indigo";
+type StatusColor = "rose" | "blue" | "amber" | "emerald" | "indigo" | "zinc";
 type Gender = "MALE" | "FEMALE";
 
 interface MetricCardProps {
     label: string;
     value: number | string;
     unit: string;
-    icon: LucideIcon;
+    icon: React.ElementType;
     color: StatusColor;
 }
 
@@ -54,63 +51,47 @@ export default async function HealthPage() {
         const activityFactor = lastBodySnapshot?.activity || 1.2;
 
         return (
-            <div className="min-h-screen bg-[#F4F4F5] dark:bg-[#09090B] w-full pb-10 text-foreground selection:bg-primary/20">
-                
-                {/* --- TOPBAR HUD --- */}
-                <header className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border/40 px-6 py-4">
-                    <div className="flex items-center justify-between gap-4">
+            <div className="min-h-screen bg-background w-full pb-12">
+                <div className=" mx-auto p-6 md:p-8 space-y-8">
+                    
+                    {/* --- HEADER CLEAN --- */}
+                    <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-border/40">
                         <div className="flex items-center gap-4">
-                            <div className="h-10 w-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shadow-[0_0_15px_rgba(var(--primary),0.1)]">
-                                <Activity className="h-5 w-5" />
+                            <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                                <Activity className="h-6 w-6" />
                             </div>
                             <div>
-                                <h1 className="text-lg font-black uppercase tracking-tighter leading-none flex items-center gap-2">
-                                    Biometric Console
-                                    <Badge variant="outline" className="text-[8px] h-4 font-black bg-primary/5 border-primary/20 text-primary">v2.4.0</Badge>
-                                </h1>
-                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1 opacity-60 italic">Sincronização biométrica ativa</p>
+                                <h1 className="text-2xl font-bold tracking-tight text-foreground">Saúde & Bem-estar</h1>
+                                <p className="text-sm text-muted-foreground mt-1">Acompanhe suas métricas corporais, treinos e nutrição.</p>
                             </div>
                         </div>
+                        <HealthActions />
+                    </header>
 
-                        <div className="flex items-center gap-3">
-                            <div className="hidden md:flex items-center gap-1 bg-muted/30 p-1 rounded-xl border border-border/40">
-                                <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase tracking-widest px-4">Análise</Button>
-                                <Button variant="ghost" size="sm" className="h-8 text-[9px] font-black uppercase tracking-widest px-4">Histórico</Button>
-                            </div>
-                            <HealthActions />
-                        </div>
-                    </div>
-                </header>
-
-                <main className="w-full p-6 space-y-6 animate-in fade-in duration-1000">
-                    
-                    {/* --- GRID 1: MÉTRICAS RÁPIDAS (Layout Fluido) --- */}
-                    <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-                        <QuickMetric label="Massa Corporal" value={weight} unit="kg" icon={Target} color="rose" />
-                        <QuickMetric label="Hidratação" value={waterTotal} unit="ml" icon={Droplets} color="blue" />
-                        <QuickMetric label="Volume Treino" value={workouts.length} unit="logs" icon={Dumbbell} color="amber" />
-                        <QuickMetric label="Refeições" value={meals.length} unit="hoje" icon={Utensils} color="emerald" />
-                        <QuickMetric label="Eficiência Sono" value={lastSleep?.value || 0} unit="hrs" icon={Moon} color="indigo" />
+                    {/* --- GRID 1: MÉTRICAS RÁPIDAS (Overview Diário) --- */}
+                    <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <QuickMetric label="Peso Atual" value={weight} unit="kg" icon={Target} color="zinc" />
+                        <QuickMetric label="Água Consumida" value={waterTotal} unit="ml" icon={Droplets} color="blue" />
+                        <QuickMetric label="Qualidade do Sono" value={lastSleep?.value || 0} unit="hrs" icon={Moon} color="indigo" />
+                        <QuickMetric label="Refeições Hoje" value={meals.length} unit="logs" icon={Utensils} color="emerald" />
                     </section>
 
-                    {/* --- GRID 2: CORE ANALYSIS (O Coração do Dashboard) --- */}
-                    <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                    {/* --- GRID 2: CONTEÚDO PRINCIPAL (Layout 2/3 e 1/3) --- */}
+                    <section className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
                         
-                        {/* 2.1: Composição e Medidas (Grid dentro do Bento) */}
-                        <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-6 bg-muted/20 p-2 rounded-[2rem] border border-border/40">
-                            <div className="h-full">
+                        {/* COLUNA ESQUERDA: Análise Corporal e Histórico de Treinos */}
+                        <div className="lg:col-span-2 space-y-8">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <BodySummaryCard 
                                     weight={weight} 
                                     height={height} 
                                     gender={gender}
-                                    age={25}
+                                    age={25} // Ajuste conforme a necessidade do seu banco
                                     waist={lastBodySnapshot?.waist || 0}
                                     neck={lastBodySnapshot?.neck || 0}
                                     hip={lastBodySnapshot?.hip || 0}
                                     activityFactor={activityFactor}
                                 />
-                            </div>
-                            <div className="h-full">
                                 <CaloriesCard 
                                     weight={weight} 
                                     height={height} 
@@ -119,95 +100,88 @@ export default async function HealthPage() {
                                     activityFactor={activityFactor}
                                 />
                             </div>
-                        </div>
 
-                        {/* 2.2: Status de Tanque e Recuperação */}
-                        <div className="lg:col-span-4 flex flex-col gap-6">
-                            <div className="flex-1"><HydrationCard total={waterTotal} /></div>
-                            <div className="flex-1"><SleepCard value={lastSleep?.value || 0} /></div>
-                        </div>
-                    </section>
-
-                    {/* --- GRID 3: TERMINAL DE LOGS (Lado a Lado Estrito) --- */}
-                    <section className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                        
-                        {/* LOG NUTRICIONAL */}
-                        <div className="flex flex-col gap-4">
-                            <div className="flex items-center gap-3 px-2">
-                                <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                                    <ClipboardList className="h-4 w-4" />
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-2">
+                                    <Dumbbell className="h-5 w-5 text-muted-foreground" />
+                                    <h2 className="text-lg font-semibold tracking-tight">Últimos Treinos</h2>
                                 </div>
-                                <h2 className="text-xs font-black uppercase tracking-[0.2em] text-foreground/70">Fluxo Nutricional</h2>
-                            </div>
-                            <div className="flex-1 border border-border/40 rounded-[2rem] overflow-hidden bg-card/50">
-                                <FoodLogger meals={meals} />
+                                <div className="border border-border/40 rounded-[1.5rem] overflow-hidden bg-card/50 shadow-sm">
+                                    <ActivityFeed initialWorkouts={workouts} />
+                                </div>
                             </div>
                         </div>
 
-                        {/* LOG DE ATIVIDADE */}
-                        <div className="flex flex-col gap-4">
-                            <div className="flex items-center gap-3 px-2">
-                                <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500 border border-blue-500/20">
-                                    <BrainCircuit className="h-4 w-4" />
+                        {/* COLUNA DIREITA: Widgets Diários (Água, Sono, Comida) */}
+                        <div className="space-y-6">
+                            <HydrationCard total={waterTotal} />
+                            <SleepCard value={lastSleep?.value || 0} />
+                            
+                            <div className="space-y-4 pt-2">
+                                <div className="flex items-center gap-2">
+                                    <Utensils className="h-5 w-5 text-muted-foreground" />
+                                    <h2 className="text-lg font-semibold tracking-tight">Diário Nutricional</h2>
                                 </div>
-                                <h2 className="text-xs font-black uppercase tracking-[0.2em] text-foreground/70">Commit de Atividades</h2>
-                            </div>
-                            <div className="flex-1 border border-border/40 rounded-[2rem] overflow-hidden bg-card/50">
-                                <ActivityFeed initialWorkouts={workouts} />
+                                <div className="border border-border/40 rounded-[1.5rem] overflow-hidden bg-card/50 shadow-sm">
+                                    <FoodLogger meals={meals} />
+                                </div>
                             </div>
                         </div>
 
                     </section>
-                </main>
+                </div>
             </div>
         );
 
     } catch (error) {
-        console.error("Critical Failure:", error);
+        console.error("Erro ao carregar dados de saúde:", error);
         return <HealthErrorState />;
     }
 }
 
-// --- UI COMPONENTS REFINADOS (SEM ANY) ---
+// --- UI COMPONENTS REFINADOS E SÓBRIOS ---
 
 function QuickMetric({ label, value, unit, icon: Icon, color }: MetricCardProps) {
     const theme: Record<StatusColor, string> = {
-        rose: "text-rose-500 bg-rose-500/10 border-rose-500/20",
-        blue: "text-blue-500 bg-blue-500/10 border-blue-500/20",
-        amber: "text-amber-500 bg-amber-500/10 border-amber-500/20",
-        emerald: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
-        indigo: "text-indigo-500 bg-indigo-500/10 border-indigo-500/20",
+        zinc: "text-zinc-500 bg-zinc-500/10",
+        rose: "text-rose-500 bg-rose-500/10",
+        blue: "text-blue-500 bg-blue-500/10",
+        amber: "text-amber-500 bg-amber-500/10",
+        emerald: "text-emerald-500 bg-emerald-500/10",
+        indigo: "text-indigo-500 bg-indigo-500/10",
     };
 
     return (
-        <div className="bg-card border border-border/40 p-5 rounded-[1.5rem] flex items-center justify-between shadow-sm hover:border-primary/30 transition-all group overflow-hidden relative">
-            <div className="flex flex-col gap-1 relative z-10">
-                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">{label}</span>
-                <div className="flex items-baseline gap-1.5">
-                    <span className="text-2xl font-mono font-black tracking-tighter tabular-nums">{value}</span>
-                    <span className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-tighter">{unit}</span>
+        <div className="bg-card border border-border/40 p-4 rounded-2xl flex flex-col gap-3 shadow-sm hover:border-border/80 transition-colors">
+            <div className="flex items-center gap-2">
+                <div className={cn("p-2 rounded-lg", theme[color])}>
+                    <Icon className="h-4 w-4" />
                 </div>
+                <span className="text-xs font-medium text-muted-foreground">{label}</span>
             </div>
-            <div className={cn("h-12 w-12 rounded-2xl flex items-center justify-center border transition-all group-hover:scale-110 group-hover:rotate-6", theme[color])}>
-                <Icon className="h-6 w-6" />
+            <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-bold tracking-tight">{value}</span>
+                <span className="text-xs font-medium text-muted-foreground">{unit}</span>
             </div>
-            {/* Glow Effect */}
-            <div className={cn("absolute -bottom-4 -right-4 w-12 h-12 blur-2xl opacity-20", theme[color].split(' ')[1])} />
         </div>
     );
 }
 
 function HealthErrorState() {
     return (
-        <div className="min-h-screen w-full flex flex-col items-center justify-center p-8 bg-background">
-            <div className="p-6 rounded-[2.5rem] bg-rose-500/5 border border-rose-500/10 flex flex-col items-center gap-6 shadow-2xl">
-                <ShieldCheck className="h-16 w-16 text-rose-500 animate-pulse" />
-                <div className="text-center space-y-2">
-                    <h2 className="text-2xl font-black uppercase tracking-tighter">Erro de Comunicação Biológica</h2>
-                    <p className="text-muted-foreground text-xs font-bold uppercase tracking-widest max-w-[300px]">Link com os sensores de dados foi interrompido.</p>
+        <div className="min-h-[80vh] w-full flex flex-col items-center justify-center p-8">
+            <div className="p-8 rounded-3xl bg-muted/30 border border-border/40 flex flex-col items-center gap-4 text-center max-w-md">
+                <div className="h-16 w-16 bg-rose-500/10 text-rose-500 flex items-center justify-center rounded-full mb-2">
+                    <ShieldCheck className="h-8 w-8" />
                 </div>
-                <Link href="/health">
-                    <Button className="rounded-xl font-black uppercase tracking-widest text-[10px] h-12 px-10 shadow-xl shadow-primary/20">Reiniciar Bios</Button>
+                <h2 className="text-xl font-bold tracking-tight">Falha ao carregar dados</h2>
+                <p className="text-muted-foreground text-sm">
+                    Não foi possível sincronizar suas informações de saúde no momento. Verifique sua conexão com o banco de dados.
+                </p>
+                <Link href="/health" className="mt-4">
+                    <Button variant="outline" className="gap-2 rounded-xl">
+                        <RefreshCcw className="h-4 w-4" /> Tentar Novamente
+                    </Button>
                 </Link>
             </div>
         </div>

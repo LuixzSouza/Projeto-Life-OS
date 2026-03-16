@@ -530,6 +530,8 @@ model Settings {
   openaiKey         String?
   groqKey           String?
   googleKey         String?
+  deepseekKey       String? 
+  mistralKey        String?
   tmdbApiKey        String?
   rawgApiKey        String?
   pluggyClientId    String?

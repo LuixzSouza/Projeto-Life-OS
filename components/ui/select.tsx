@@ -130,7 +130,8 @@ function SelectContent({
         align={align}
         className={cn(
           /* Base */
-          "relative z-50 min-w-[8rem] overflow-hidden rounded-md border",
+          // z aumentado para garantir que fique acima de modais/dialogs
+          "relative z-[9999] min-w-[8rem] overflow-hidden rounded-md border",
 
           /* Cores */
           "bg-popover text-popover-foreground",
@@ -138,8 +139,8 @@ function SelectContent({
           /* Sombra enterprise */
           "shadow-lg",
 
-          /* Altura dinâmica */
-          "max-h-(--radix-select-content-available-height)",
+          /* Altura dinâmica (corrigido para sintaxe Tailwind válida) */
+          "max-h-[var(--radix-select-content-available-height)]",
 
           /* Animações */
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
@@ -164,7 +165,7 @@ function SelectContent({
 
         <SelectPrimitive.Viewport
           className={cn(
-            "p-1",
+            "p-1 pointer-events-auto", // garante que o dropdown receba eventos
             position === "popper" &&
               "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)] scroll-my-1"
           )}
@@ -241,9 +242,7 @@ function SelectItem({
         </SelectPrimitive.ItemIndicator>
       </span>
 
-      <SelectPrimitive.ItemText>
-        {children}
-      </SelectPrimitive.ItemText>
+      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
     </SelectPrimitive.Item>
   );
 }

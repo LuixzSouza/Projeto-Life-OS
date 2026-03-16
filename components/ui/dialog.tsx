@@ -64,7 +64,7 @@ const DialogOverlay = React.forwardRef<
     ref={ref}
     data-slot="dialog-overlay"
     className={cn(
-      "fixed inset-0 z-[100]", // Z-index alto para cobrir qualquer elemento
+      "fixed inset-0 z-[50]", // Z-index alto para cobrir qualquer elemento
       "bg-background/80 backdrop-blur-md", // Desfoque de vidro (Glassmorphism)
       "data-[state=open]:animate-in data-[state=closed]:animate-out",
       "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",

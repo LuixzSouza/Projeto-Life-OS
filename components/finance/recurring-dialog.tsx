@@ -1,27 +1,79 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Plus, CalendarClock, Trash2, AlertCircle } from "lucide-react";
+import { Loader2, Plus, CalendarClock, Trash2, AlertCircle, DollarSign } from "lucide-react";
 import { createRecurring, updateRecurring, deleteRecurring } from "@/app/(dashboard)/finance/actions";
 import { toast } from "sonner";
+import { useCallback } from "react";
 
 export interface RecurringItemData { id: string; title: string; amount: number; dayOfMonth: number; category: string; }
 interface RecurringDialogProps { trigger?: React.ReactNode; item?: RecurringItemData; }
 
 export function RecurringDialog({ trigger, item }: RecurringDialogProps) {
-    const [open, setOpen] = useState(false);
-    const [isLoading, setIsLoading] = useState(false);
-    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+    const [open, setOpen] = useState<boolean>(false);
+    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState<boolean>(false);
 
-    async function handleSubmit(formData: FormData) {
+    // --- amount: armazenamos centavos como string ("100" => R$1,00)
+    const [amountDigits, setAmountDigits] = useState<string>(() => {
+        if (item?.amount === undefined || item?.amount === null) return "";
+        const cents = Math.round(Number(item.amount) * 100);
+        return String(cents);
+    });
+
+    const rawAmount: string = amountDigits ? (Number(amountDigits) / 100).toFixed(2) : "";
+    const formattedAmount: string = amountDigits
+        ? new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(rawAmount))
+        : "";
+
+    const amountRef = useRef<HTMLInputElement | null>(null);
+
+    // Mantém cursor no final após formatação (melhora UX)
+    useEffect(() => {
+        const el = amountRef.current;
+        if (!el) return;
+        const t = window.setTimeout(() => {
+            const len = el.value.length;
+            el.setSelectionRange(len, len);
+        }, 0);
+        return () => clearTimeout(t);
+    }, [formattedAmount]);
+
+    const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const onlyDigits = e.target.value.replace(/\D/g, "");
+        setAmountDigits(onlyDigits.slice(0, 12)); // limite opcional
+    };
+
+    const handleAmountPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+        const text = e.clipboardData.getData("text");
+        const onlyDigits = text.replace(/\D/g, "");
+        if (!onlyDigits) {
+            e.preventDefault();
+            return;
+        }
+        e.preventDefault();
+        setAmountDigits(onlyDigits.slice(0, 12));
+    };
+
+    const handleAmountKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        const allowed = ["Backspace","Delete","ArrowLeft","ArrowRight","Tab","Home","End"];
+        if (allowed.includes(e.key)) return;
+        if (/^\d$/.test(e.key)) return;
+        if (e.key === "." || e.key === ",") { e.preventDefault(); return; }
+        e.preventDefault();
+    };
+
+    const handleSubmit = async (formData: FormData) => {
         setIsLoading(true);
         try {
+            // setamos o amount transformado (ponto decimal) para o backend
+            formData.set("amount", rawAmount);
             if (item) {
                 formData.append("id", item.id);
                 await updateRecurring(formData);
@@ -31,7 +83,8 @@ export function RecurringDialog({ trigger, item }: RecurringDialogProps) {
                 toast.success("Custo fixo adicionado!");
             }
             setOpen(false);
-        } catch {
+        } catch (err) {
+            console.error(err);
             toast.error("Erro ao salvar.");
         } finally {
             setIsLoading(false);
@@ -46,7 +99,8 @@ export function RecurringDialog({ trigger, item }: RecurringDialogProps) {
             toast.success("Custo recorrente removido.");
             setIsDeleteDialogOpen(false);
             setOpen(false);
-        } catch {
+        } catch (err) {
+            console.error(err);
             toast.error("Erro ao excluir.");
         } finally {
             setIsLoading(false);
@@ -63,7 +117,9 @@ export function RecurringDialog({ trigger, item }: RecurringDialogProps) {
                         </Button>
                     )}
                 </DialogTrigger>
-                <DialogContent className="sm:max-w-[425px] rounded-[2rem] p-0 overflow-hidden shadow-2xl border-border/40">
+
+                {/* REMOVIDO overflow-hidden para evitar cortar dropdowns */}
+                <DialogContent className="sm:max-w-[425px] rounded-[2rem] p-0 shadow-2xl border-border/40">
                     <div className="bg-muted/10 p-6 border-b border-border/40">
                         <DialogHeader>
                             <DialogTitle className="flex items-center gap-3 text-xl font-extrabold">
@@ -76,7 +132,7 @@ export function RecurringDialog({ trigger, item }: RecurringDialogProps) {
                         </DialogHeader>
                     </div>
 
-                    <form action={handleSubmit} className="space-y-5 p-6 bg-background">
+                    <form action={handleSubmit} className="space-y-5 p-6 bg-background" noValidate>
                         <div className="space-y-2">
                             <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Nome da Despesa</Label>
                             <Input name="title" placeholder="Ex: Netflix, Internet, Aluguel..." defaultValue={item?.title} required className="h-12 rounded-xl bg-muted/20 font-medium" />
@@ -85,8 +141,25 @@ export function RecurringDialog({ trigger, item }: RecurringDialogProps) {
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Valor Mensal</Label>
-                                <Input name="amount" type="number" step="0.01" placeholder="0.00" defaultValue={item?.amount} required className="h-12 rounded-xl bg-muted/20 font-mono font-bold" />
+                                <div className="relative">
+                                    <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground/50" />
+                                    {/* Input VISÍVEL: formatado (pt-BR). */}
+                                    <Input
+                                        ref={amountRef}
+                                        type="text"
+                                        placeholder="0,00"
+                                        value={formattedAmount}
+                                        onChange={handleAmountChange}
+                                        onPaste={handleAmountPaste}
+                                        onKeyDown={handleAmountKeyDown}
+                                        className="pl-11 h-12 rounded-xl bg-muted/20 font-mono font-bold"
+                                        inputMode="decimal"
+                                    />
+                                    {/* Hidden: valor real enviado ao servidor */}
+                                    <input type="hidden" name="amount" value={rawAmount} />
+                                </div>
                             </div>
+
                             <div className="space-y-2">
                                 <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Dia do Vencimento</Label>
                                 <Input name="dayOfMonth" type="number" min="1" max="31" placeholder="Dia (1-31)" defaultValue={item?.dayOfMonth} required className="h-12 rounded-xl bg-muted/20 font-mono font-bold" />
@@ -95,9 +168,10 @@ export function RecurringDialog({ trigger, item }: RecurringDialogProps) {
 
                         <div className="space-y-2">
                             <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Categoria</Label>
+                            {/* Forçamos z para garantir que o Select abra acima do Dialog */}
                             <Select name="category" defaultValue={item?.category || "Assinaturas"}>
                                 <SelectTrigger className="h-12 rounded-xl bg-muted/20 font-medium"><SelectValue /></SelectTrigger>
-                                <SelectContent className="rounded-xl">
+                                <SelectContent className="rounded-xl z-[9999]">
                                     <SelectItem value="Moradia">🏠 Moradia</SelectItem>
                                     <SelectItem value="Assinaturas">📺 Assinaturas</SelectItem>
                                     <SelectItem value="Serviços">💡 Serviços Essenciais</SelectItem>
@@ -113,7 +187,7 @@ export function RecurringDialog({ trigger, item }: RecurringDialogProps) {
                                     <Trash2 className="h-4 w-4 mr-2" /> Excluir
                                 </Button>
                             ) : <div />}
-                            
+
                             <div className="flex gap-2">
                                 <Button type="button" variant="ghost" className="rounded-xl font-bold" onClick={() => setOpen(false)}>Cancelar</Button>
                                 <Button type="submit" disabled={isLoading} className="bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-bold shadow-lg shadow-primary/20 min-w-[120px]">

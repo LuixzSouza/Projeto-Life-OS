@@ -1,15 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { BodyDashboard } from "@/components/health/body/body-dashboard";
-import { User, AlertCircle, Activity, ChevronLeft } from "lucide-react";
+import { User, ShieldCheck, RefreshCcw, ChevronLeft } from "lucide-react";
 import { Metadata } from "next";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
-// Importamos a tipagem correta
 import { BodyStats } from "@/lib/body-math";
+import { HealthActions } from "@/components/health/health-actions";
 
 export const metadata: Metadata = {
-  title: "Composição Corporal | Health",
+  title: "Composição Corporal | Life OS",
   description: "Acompanhamento de medidas, simetria e bioimpedância.",
 };
 
@@ -31,12 +30,10 @@ export default async function BodyPage() {
         gender: (latestMeasurement.gender as 'MALE' | 'FEMALE') || 'MALE',
         activityFactor: latestMeasurement.activity || 1.2,
         
-        // Conversão de data para string (YYYY-MM-DD)
+        // Conversão segura de data
         birthDate: latestMeasurement.birthDate 
             ? latestMeasurement.birthDate.toISOString().split('T')[0] 
             : undefined,
-        
-        // --- REMOVIDO: age: 25 (Isso causava o erro, pois a idade agora é calculada via birthDate) ---
         
         // Medidas Essenciais
         neck: latestMeasurement.neck || 0,
@@ -60,7 +57,6 @@ export default async function BodyPage() {
       currentStats = {
         weight: 0, height: 0, waist: 0, neck: 0, hip: 0,
         gender: 'MALE', activityFactor: 1.2
-        // birthDate fica undefined aqui, o componente lidará com isso
       };
     }
 
@@ -69,60 +65,72 @@ export default async function BodyPage() {
     hasError = true;
   }
 
+  // --- ESTADO DE ERRO SÓBRIO ---
   if (hasError) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 bg-background">
-        <Card className="max-w-md w-full border-destructive/20 bg-destructive/5 shadow-lg">
-          <CardContent className="pt-8 pb-8 flex flex-col items-center text-center gap-4">
-            <div className="p-4 bg-destructive/10 rounded-full">
-              <AlertCircle className="h-10 w-10 text-destructive" />
+        <div className="min-h-[80vh] w-full flex flex-col items-center justify-center p-8 bg-background">
+            <div className="p-8 rounded-3xl bg-muted/30 border border-border/40 flex flex-col items-center gap-4 text-center max-w-md shadow-sm">
+                <div className="h-16 w-16 bg-rose-500/10 text-rose-500 flex items-center justify-center rounded-full mb-2">
+                    <ShieldCheck className="h-8 w-8" />
+                </div>
+                <h2 className="text-xl font-bold tracking-tight">Falha de Leitura</h2>
+                <p className="text-muted-foreground text-sm">
+                    Não foi possível recuperar suas métricas corporais no momento.
+                </p>
+                <Link href="/health" className="mt-4">
+                    <Button variant="outline" className="gap-2 rounded-xl">
+                        <RefreshCcw className="h-4 w-4" /> Voltar
+                    </Button>
+                </Link>
             </div>
-            <div className="space-y-2">
-              <h2 className="text-xl font-bold text-foreground">Sistema Indisponível</h2>
-              <p className="text-sm text-muted-foreground">Não foi possível conectar ao banco de dados.</p>
-            </div>
-            <Link href="/health"><Button variant="outline">Voltar</Button></Link>
-          </CardContent>
-        </Card>
-      </div>
+        </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <header className="border-b border-border/60 bg-gradient-to-b from-primary/5 to-background pt-8 pb-8 px-6 md:px-8 z-20 backdrop-blur-md">
-        <div className="max-w-[1600px] mx-auto space-y-6">
-            <div>
-                <Link href="/health">
-                    <Button variant="ghost" size="sm" className="pl-2 pr-4 h-8 gap-1 text-muted-foreground hover:text-foreground hover:bg-primary/5 transition-all group rounded-full">
-                        <ChevronLeft className="h-4 w-4 group-hover:-translate-x-1 transition-transform" />
-                        <span className="text-xs font-medium uppercase tracking-wide">Voltar para Health Center</span>
-                    </Button>
-                </Link>
-            </div>
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                <div className="space-y-2">
-                    <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground flex items-center gap-3">
-                    <div className="p-2.5 bg-primary rounded-xl shadow-lg shadow-primary/20 text-primary-foreground">
-                        <User className="h-6 w-6" />
-                    </div>
-                    Composição Corporal
-                    </h1>
-                    <p className="text-muted-foreground text-lg max-w-2xl">
-                    Análise avançada de bioimpedância, simetria muscular e métricas de longevidade.
-                    </p>
+    <div className="min-h-screen bg-background w-full pb-12">
+        <div className="w-full p-6 md:p-8 space-y-8">
+            
+            {/* --- HEADER FULL-WIDTH --- */}
+            <header className="flex flex-col gap-4 pb-6 border-b border-border/40">
+                
+                {/* 🟢 Botão de Voltar (Acima do título, discreto) */}
+                <div>
+                    <Link href="/health">
+                        <Button variant="ghost" size="sm" className="-ml-3 text-muted-foreground hover:text-foreground gap-1.5 h-8 px-3 rounded-lg">
+                            <ChevronLeft className="h-4 w-4" />
+                            Voltar para Overview
+                        </Button>
+                    </Link>
                 </div>
-                <div className="flex items-center gap-2 px-4 py-2 bg-background/50 backdrop-blur-sm border border-border/50 rounded-full shadow-sm">
-                    <Activity className="h-4 w-4 text-primary animate-pulse" />
-                    <span className="text-sm font-medium text-muted-foreground">Status: <span className="text-foreground font-semibold">Monitorando</span></span>
-                </div>
-            </div>
-        </div>
-      </header>
 
-      <main className="px-6 md:px-8 py-8 space-y-10 max-w-[1600px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
-        <BodyDashboard stats={currentStats!} />
-      </main>
+                <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6">
+                    {/* Título e Ícone */}
+                    <div className="flex items-center gap-4 shrink-0">
+                        <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                            <User className="h-6 w-6" />
+                        </div>
+                        <div>
+                            <h1 className="text-2xl font-bold tracking-tight text-foreground">Composição Corporal</h1>
+                            <p className="text-sm text-muted-foreground mt-1">
+                                Acompanhamento de medidas, proporções e simetria.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Componente de Ações (Menu e Registro) */}
+                    <div className="w-full xl:w-auto">
+                        <HealthActions />
+                    </div>
+                </div>
+            </header>
+
+            {/* --- DASHBOARD PRINCIPAL --- */}
+            <main className="animate-in fade-in duration-500">
+                <BodyDashboard stats={currentStats!} />
+            </main>
+            
+        </div>
     </div>
   );
 }

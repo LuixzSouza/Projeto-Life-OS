@@ -68,10 +68,18 @@ export async function updateAccount(formData: FormData) {
   const name = formData.get("name") as string;
   const color = formData.get("color") as string;
 
+  // Ler e parsear o balance enviado pelo formulário
+  const balance = parseAmount(formData.get("balance"));
+
   await prisma.account.update({
     where: { id },
-    data: { name, color }
+    data: {
+      name,
+      color,
+      balance, 
+    },
   });
+
   revalidatePath("/finance");
 }
 

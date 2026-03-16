@@ -1,4 +1,4 @@
-'use client'
+"use client"
 
 import { useState, useMemo } from "react"
 import { useFormStatus } from "react-dom"
@@ -37,7 +37,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
-import { Badge } from "../ui/badge"
+import { Badge } from "@/components/ui/badge"
 
 // --- TYPES ---
 interface InvoiceData { id: string; title: string; value: number; dueDate: Date; status: string; paidAt?: Date | null; }
@@ -65,6 +65,43 @@ const toInputDate = (date: Date) => {
   d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
   return d.toISOString().split('T')[0];
 }
+
+// 🟢 NOVO: GERADOR DE MENSAGEM DINÂMICA
+const generateChargeMessage = (clientName: string, billing: BillingData): string => {
+    // Pega só o primeiro nome
+    const firstName = clientName.split(" ")[0];
+    
+    // Saudação por horário
+    const hour = new Date().getHours();
+    let greeting = "Bom dia";
+    if (hour >= 12 && hour < 18) greeting = "Boa tarde";
+    else if (hour >= 18) greeting = "Boa noite";
+
+    // Variações de texto para não soar robótico
+    const intros = [
+        `td beleza? passando pra te lembrar do acerto referente ao projeto *${billing.title}*.`,
+        `tudo bem por aí? Passando pra deixar o resumo das parcelas do *${billing.title}*.`,
+        `espero que esteja tudo ótimo! Segue a atualização do nosso projeto *${billing.title}*.`,
+        `passando rapidamente para atualizar o status do *${billing.title}*.`
+    ];
+    const randomIntro = intros[Math.floor(Math.random() * intros.length)];
+
+    // Ordena e formata a lista de faturas
+    const sortedInvoices = [...billing.invoices].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+    const total = sortedInvoices.length;
+
+    const invoiceLines = sortedInvoices.map((inv, index) => {
+        const val = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(inv.value);
+        const status = inv.status === 'PAID' ? '✅' : new Date(inv.dueDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+        return `${index + 1}/${total} ${val} - ${status}`;
+    }).join('\n');
+
+    // Chave PIX (Pode ser puxada do settings depois, mas deixei a sua hardcoded)
+    const pixKey = "11561195618";
+
+    return `Oi ${firstName}, ${greeting}! ${randomIntro}\n\n${invoiceLines}\n\nSegue o PIX: ${pixKey}\nObrigado!`;
+};
+
 
 // --- COMPONENTES AUXILIARES ---
 interface SubmitButtonProps {
@@ -98,21 +135,18 @@ export function BusinessView({ initialClients }: { initialClients: ClientData[] 
   const [editingInvoice, setEditingInvoice] = useState<InvoiceData | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'CLIENT' | 'BILLING', id: string, name: string } | null>(null)
 
-  // 🟢 SOLUÇÃO PARA O ERRO DO USEEFFECT: 
-  // Funções diretas para abrir o modal de cliente já setando o estado corretamente
   const handleOpenNewClientModal = () => {
     setEditingClient(null)
-    setPhoneValue("") // Limpa a máscara
+    setPhoneValue("") 
     setIsClientModalOpen(true)
   }
 
   const handleOpenEditClientModal = (client: ClientData) => {
     setEditingClient(client)
-    setPhoneValue(maskPhone(client.phone || "")) // Aplica a máscara do banco
+    setPhoneValue(maskPhone(client.phone || "")) 
     setIsClientModalOpen(true)
   }
 
-  // Filtros e Ações...
   const filteredClients = useMemo(() => {
     if (!searchTerm) return initialClients;
     const lower = searchTerm.toLowerCase();
@@ -122,13 +156,20 @@ export function BusinessView({ initialClients }: { initialClients: ClientData[] 
     );
   }, [initialClients, searchTerm]);
 
-  const handleWhatsappCharge = (phone: string, clientName: string, invoiceTitle: string, value: number) => {
-    const rawPhone = clearMask(phone)
-    const formattedValue = formatCurrency(value)
-    const message = `Olá ${clientName}, tudo bem? Passando para lembrar sobre a fatura *${invoiceTitle}* no valor de *${formattedValue}*.`
-    const url = `https://wa.me/55${rawPhone}?text=${encodeURIComponent(message)}`
-    window.open(url, '_blank')
-  }
+  // 🟢 ATUALIZADO: Agora usa o gerador de mensagem
+  const handleWhatsappCharge = (phone: string, clientName: string, billing: BillingData) => {
+    const rawPhone = clearMask(phone);
+    const message = generateChargeMessage(clientName, billing);
+    const url = `https://wa.me/55${rawPhone}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+  };
+
+  // 🟢 NOVO: Função para apenas copiar a mensagem
+  const handleCopyChargeMessage = (clientName: string, billing: BillingData) => {
+      const message = generateChargeMessage(clientName, billing);
+      navigator.clipboard.writeText(message);
+      toast.success("Resumo de cobrança copiado!");
+  };
 
   const handleCopyPhone = (phone: string, id: string) => {
     navigator.clipboard.writeText(clearMask(phone))
@@ -264,18 +305,31 @@ export function BusinessView({ initialClients }: { initialClients: ClientData[] 
                                             {formatCurrency(billing.totalValue)}
                                         </p>
                                     </div>
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover/billing:opacity-100 transition-opacity">
-                                                <MoreHorizontal size={14} />
-                                            </Button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" className="rounded-xl shadow-lg">
-                                            <DropdownMenuItem onClick={() => setEditingBilling(billing)} className="cursor-pointer font-medium">Ajustar Título/Status</DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem className="text-destructive cursor-pointer font-medium" onClick={() => setDeleteTarget({ type: 'BILLING', id: billing.id, name: billing.title })}>Excluir Projeto</DropdownMenuItem>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
+                                    <div className="flex gap-1 items-center">
+                                        {/* 🟢 NOVO BOTÃO: Copia a mensagem dinâmica do projeto */}
+                                        <Button 
+                                            variant="ghost" 
+                                            size="icon" 
+                                            className="h-7 w-7 text-blue-500 hover:text-blue-600 hover:bg-blue-500/10 opacity-0 group-hover/billing:opacity-100 transition-opacity" 
+                                            onClick={() => handleCopyChargeMessage(client.name, billing)}
+                                            title="Copiar Resumo da Cobrança"
+                                        >
+                                            <Copy size={13} />
+                                        </Button>
+
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover/billing:opacity-100 transition-opacity">
+                                                    <MoreHorizontal size={14} />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="rounded-xl shadow-lg">
+                                                <DropdownMenuItem onClick={() => setEditingBilling(billing)} className="cursor-pointer font-medium">Ajustar Título/Status</DropdownMenuItem>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem className="text-destructive cursor-pointer font-medium" onClick={() => setDeleteTarget({ type: 'BILLING', id: billing.id, name: billing.title })}>Excluir Projeto</DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Progress value={progress} className="h-1.5 flex-1 bg-muted" indicatorClassName={isCompleted ? "bg-emerald-500" : "bg-primary"} />
@@ -318,7 +372,13 @@ export function BusinessView({ initialClients }: { initialClients: ClientData[] 
                                           {!isPaid && (
                                               <div className="flex items-center gap-1 opacity-0 group-hover/inv:opacity-100 transition-opacity">
                                                   {client.phone && (
-                                                      <Button size="icon" variant="ghost" className="h-7 w-7 text-emerald-600 hover:bg-emerald-50" onClick={() => handleWhatsappCharge(client.phone!, client.name, invoice.title, invoice.value)}>
+                                                      <Button 
+                                                        size="icon" 
+                                                        variant="ghost" 
+                                                        className="h-7 w-7 text-emerald-600 hover:bg-emerald-50" 
+                                                        title="Enviar no WhatsApp"
+                                                        onClick={() => handleWhatsappCharge(client.phone!, client.name, billing)} // 🟢 Agora envia a mensagem pronta
+                                                      >
                                                           <Phone size={14} />
                                                       </Button>
                                                   )}
@@ -454,7 +514,7 @@ export function BusinessView({ initialClients }: { initialClients: ClientData[] 
                             <SelectTrigger className="rounded-xl h-12 bg-muted/20">
                                 <SelectValue />
                             </SelectTrigger>
-                            <SelectContent className="rounded-xl">
+                            <SelectContent className="rounded-xl z-[100]">
                                 <SelectItem value="MONTHLY">Mensal</SelectItem>
                                 <SelectItem value="ANNUAL">Anual</SelectItem>
                             </SelectContent>
@@ -519,7 +579,7 @@ export function BusinessView({ initialClients }: { initialClients: ClientData[] 
                         <SelectTrigger className="rounded-xl h-12 bg-muted/20">
                             <SelectValue />
                         </SelectTrigger>
-                        <SelectContent className="rounded-xl">
+                        <SelectContent className="rounded-xl z-[100]">
                             <SelectItem value="PENDING">Aguardando</SelectItem>
                             <SelectItem value="PAID">Pago / Recebido</SelectItem>
                             <SelectItem value="CANCELED">Cancelado</SelectItem>
@@ -568,7 +628,7 @@ export function BusinessView({ initialClients }: { initialClients: ClientData[] 
                         <SelectTrigger className="rounded-xl h-12 bg-muted/20">
                             <SelectValue placeholder="Selecione..." />
                         </SelectTrigger>
-                        <SelectContent className="rounded-xl">
+                        <SelectContent className="rounded-xl z-[100]">
                             <SelectItem value="ACTIVE">Em Andamento</SelectItem>
                             <SelectItem value="COMPLETED">Concluído</SelectItem>
                             <SelectItem value="CANCELED">Cancelado</SelectItem>

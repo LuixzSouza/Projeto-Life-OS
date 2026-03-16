@@ -1,4 +1,3 @@
-// app/login/LoginPageClient.tsx
 "use client";
 
 import { useState, useEffect, KeyboardEvent } from "react";
@@ -15,7 +14,6 @@ import {
     Command, 
     BrainCircuit, 
     AlertCircle,
-    CheckCircle2,
     ArrowUp
 } from "lucide-react";
 import { toast } from "sonner";
@@ -81,19 +79,36 @@ export default function LoginPageClient() {
         setError(null);
         
         try {
-            const result = await authenticate(null, formData);
+            // 🟢 CORREÇÃO 1: Usamos 'undefined as never' para satisfazer o TypeScript
+            // sem precisar usar o 'any', respeitando a tipagem da sua AuthState.
+            const result = await authenticate(undefined as never, formData);
             
-            if (result?.error) {
+            // 🟢 CORREÇÃO 2: Removemos a checagem de 'success', pois a sua action
+            // só retorna um objeto se houver 'error'.
+            if (result && result.error) {
                 setError(result.error);
                 toast.error(result.error);
                 setIsLoading(false);
-                // Vibrar celular se estiver em mobile (feedback tátil)
+                
+                // Feedback tátil em dispositivos móveis
                 if (typeof navigator !== 'undefined' && navigator.vibrate) {
                     navigator.vibrate(200); 
                 }
             }
-        } catch (err) {
-            setError("Ocorreu um erro inesperado. Tente novamente.");
+
+        } catch (err: unknown) {
+            // O Next.js usa exceções para fazer o redirect.
+            const isRedirectError = err instanceof Error && (err.message === 'NEXT_REDIRECT' || err.message.includes('NEXT_REDIRECT'));
+            
+            if (isRedirectError) {
+                // Se caiu no erro de redirect, significa que o login FUNCIONOU!
+                toast.success("Acesso Liberado!");
+                throw err; // Devolve o controle pro Next.js ir para o /dashboard
+            }
+
+            // Se não for redirect, é um erro de servidor/conexão
+            console.error("Erro no login:", err);
+            setError("Ocorreu um erro ao tentar conectar. Verifique o servidor.");
             setIsLoading(false);
         }
     };
@@ -132,7 +147,7 @@ export default function LoginPageClient() {
                                     type="email" 
                                     placeholder="seu.email.admin@lifeos.local" 
                                     required 
-                                    autoFocus // Foco automático ao carregar
+                                    autoFocus 
                                     autoComplete="email"
                                     disabled={isLoading}
                                     onChange={handleInputChange}
@@ -154,7 +169,7 @@ export default function LoginPageClient() {
                                         autoComplete="current-password"
                                         disabled={isLoading}
                                         onKeyDown={handleKeyDown}
-                                        onKeyUp={handleKeyDown} // Garante detecção ao soltar a tecla
+                                        onKeyUp={handleKeyDown} 
                                         onChange={handleInputChange}
                                         className={cn(
                                             "bg-zinc-900/50 border-white/10 text-white placeholder:text-zinc-600 focus:border-indigo-500 focus:ring-indigo-500/20 h-12 pr-10 transition-all",
@@ -166,6 +181,7 @@ export default function LoginPageClient() {
                                         disabled={isLoading}
                                         onClick={() => setShowPassword(!showPassword)}
                                         className="absolute right-3 top-3 text-zinc-500 hover:text-white transition-colors disabled:opacity-50"
+                                        title={showPassword ? "Ocultar senha" : "Mostrar senha"}
                                     >
                                         {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                                     </button>
@@ -187,19 +203,21 @@ export default function LoginPageClient() {
                             </div>
                         </div>
 
-                        {/* Mensagem de Erro Inline (Além do Toast) */}
+                        {/* Mensagem de Erro Inline */}
                         <AnimatePresence>
                             {error && (
                                 <motion.div
                                     initial={{ opacity: 0, height: 0 }}
                                     animate={{ opacity: 1, height: "auto" }}
                                     exit={{ opacity: 0, height: 0 }}
-                                    className="rounded-lg bg-red-500/10 border border-red-500/20 p-3 flex items-start gap-3"
+                                    className="overflow-hidden"
                                 >
-                                    <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
-                                    <div className="text-sm text-red-200">
-                                        <span className="font-bold text-red-400 block mb-0.5">Falha no Login</span>
-                                        {error}
+                                    <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-3 mt-2 flex items-start gap-3">
+                                        <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+                                        <div className="text-sm text-red-200">
+                                            <span className="font-bold text-red-400 block mb-0.5">Falha no Login</span>
+                                            {error}
+                                        </div>
                                     </div>
                                 </motion.div>
                             )}
@@ -211,7 +229,7 @@ export default function LoginPageClient() {
                             disabled={isLoading}
                         >
                             {isLoading ? (
-                                <Loader2 className="h-5 w-5 animate-spin" /> 
+                                <span className="flex items-center gap-2"><Loader2 className="h-5 w-5 animate-spin" /> Autenticando...</span>
                             ) : (
                                 <span className="flex items-center gap-2">Iniciar Sessão <ArrowRight className="h-4 w-4" /></span>
                             )}

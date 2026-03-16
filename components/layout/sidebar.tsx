@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "@/app/auth-actions";
 import {
   LayoutDashboard, Wallet, BookOpen, Dumbbell, Briefcase, Calendar,
-  Globe, Settings, BrainCircuit, LogOut, Lock, Zap, Battery, BatteryLow,
-  PanelLeftClose, PanelLeftOpen, ChevronRight, Bookmark, Film, Users,
-  Shirt, Loader2, Menu, X, Home, BriefcaseBusiness
+  Globe, Settings, BrainCircuit, LogOut, Lock, PanelLeftClose, 
+  ChevronRight, Bookmark, Film, Users, Shirt, Loader2, Menu, Home, 
+  BriefcaseBusiness, ChevronDown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { ScrollArea } from "@/components/ui/scroll-area"; // ✅ Importação corrigida
+import { ScrollArea } from "@/components/ui/scroll-area";
 import Image from "next/image";
 
 // --- INTERFACES ---
@@ -26,10 +26,16 @@ interface UserData {
   bio?: string | null;
 }
 
+interface SubItem {
+  label: string;
+  href: string;
+}
+
 interface SidebarItem {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   href: string;
+  subItems?: SubItem[];
 }
 
 interface SidebarGroup {
@@ -37,13 +43,7 @@ interface SidebarGroup {
   items: SidebarItem[];
 }
 
-interface EnergyStatus {
-  icon: React.ComponentType<{ className?: string }>;
-  color: string;
-  label: string;
-}
-
-// --- DADOS ORGANIZADOS (PLANO CLEAR & CLEAN) ---
+// --- DADOS ORGANIZADOS COM SUB-LINKS ---
 const groupedSidebarItems: SidebarGroup[] = [
   {
     groupName: "Central",
@@ -58,14 +58,25 @@ const groupedSidebarItems: SidebarGroup[] = [
     items: [
       { label: "Projetos", icon: Briefcase, href: "/projects" },
       { label: "Negócios", icon: BriefcaseBusiness, href: "/business" },
-      { label: "Financeiro", icon: Wallet, href: "/finance" },
+      { label: "Financeiro", icon: Wallet, href: "/finance", subItems: [{ label: "Investmentos", href: "/finance/investments" },{ label: "Mercado Financeiro", href: "/finance/market" },{ label: "Transações", href: "/finance/transactions" },] },
     ]
   },
   {
     groupName: "Pessoal",
     items: [
-      { label: "Saúde", icon: Dumbbell, href: "/health" },
-      { label: "Estudos", icon: BookOpen, href: "/studies" },
+      { 
+        label: "Saúde", 
+        icon: Dumbbell, 
+        href: "/health",
+        subItems: [
+          { label: "Treino", href: "/health/gym" },
+          { label: "Corrida", href: "/health/running" },
+          { label: "Nutrição", href: "/health/nutrition" },
+          { label: "Sono", href: "/health/sleep" },
+          { label: "Corpo", href: "/health/body" },
+        ]
+      },
+      { label: "Estudos", icon: BookOpen, href: "/studies", subItems: [{ label: "Flash Cards", href: "/flashcards" }] },
       { label: "Entretenimento", icon: Film, href: "/entertainment" },
       { label: "Closet", icon: Shirt, href: "/wardrobe" },
       { label: "Conexões", icon: Users, href: "/social" },
@@ -91,105 +102,155 @@ const mobileNavItems = [
 
 // --- SUB-COMPONENTES ---
 
-const SidebarLink = ({ 
-  item, 
-  isCollapsed, 
-  isActive, 
-  onClick 
-}: { 
-  item: SidebarItem; 
-  isCollapsed?: boolean; 
-  isActive: boolean; 
-  onClick?: () => void; 
+const SidebarLink = ({
+  item,
+  isCollapsed,
+  isActive,
+  currentPath,
+  onClick
+}: {
+  item: SidebarItem
+  isCollapsed?: boolean
+  isActive: boolean
+  currentPath: string
+  onClick?: () => void
 }) => {
-  const LinkContent = (
-    <Link
-      href={item.href}
-      onClick={onClick}
-      className={cn(
-        "group flex items-center gap-3 rounded-lg py-2 transition-all duration-200 relative",
-        isCollapsed ? "justify-center px-0 h-10 w-10 mx-auto" : "px-3 h-10",
-        isActive
-          ? "bg-primary text-primary-foreground shadow-sm font-semibold"
-          : "text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
-      )}
-    >
-      <item.icon className={cn(
-        "shrink-0 transition-transform group-hover:scale-110",
-        isCollapsed ? "h-5 w-5" : "h-4 w-4",
-        isActive ? "text-primary-foreground" : "text-muted-foreground group-hover:text-foreground"
-      )} />
 
-      {!isCollapsed && <span className="text-sm truncate">{item.label}</span>}
-      
-      {isActive && !isCollapsed && (
-        <div className="absolute right-2 w-1 h-4 rounded-full bg-primary-foreground/40" />
+  const hasSubItems = !!item.subItems?.length
+  const [isOpen, setIsOpen] = useState(() => currentPath.startsWith(item.href))
+
+  const toggle = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    setIsOpen((v) => !v)
+  }
+
+  const content = (
+    <div className="w-full">
+
+      {/* ROW */}
+      <div className="flex items-center gap-1">
+
+        {/* LINK PRINCIPAL */}
+        <Link
+          href={item.href}
+          onClick={onClick}
+          className={cn(
+            "group flex flex-1 items-center gap-3 rounded-lg py-2 transition-all duration-200",
+            isCollapsed ? "justify-center px-0 h-10 w-10 mx-auto" : "px-3 h-10",
+            isActive
+              ? "bg-primary text-primary-foreground shadow-sm font-semibold"
+              : "text-muted-foreground hover:bg-secondary/80 hover:text-foreground"
+          )}
+        >
+          <item.icon
+            className={cn(
+              "shrink-0 transition-transform group-hover:scale-110",
+              isCollapsed ? "h-5 w-5" : "h-4 w-4"
+            )}
+          />
+
+          {!isCollapsed && (
+            <span className="text-sm truncate flex-1">
+              {item.label}
+            </span>
+          )}
+        </Link>
+
+        {/* BOTÃO DA SETA */}
+        {!isCollapsed && hasSubItems && (
+          <button
+            onClick={toggle}
+            className={cn(
+              "p-2 rounded-md hover:bg-secondary transition-transform",
+              isOpen && "rotate-180"
+            )}
+          >
+            <ChevronDown className="h-3 w-3 opacity-50" />
+          </button>
+        )}
+
+      </div>
+
+      {/* SUBMENU */}
+      {!isCollapsed && hasSubItems && isOpen && (
+        <div className="mt-1 ml-6 pl-4 border-l border-border/40 flex flex-col gap-1 animate-in fade-in slide-in-from-top-1 duration-200">
+          {item.subItems!.map((sub) => {
+
+            const isSubActive = currentPath === sub.href
+
+            return (
+              <Link
+                key={sub.href}
+                href={sub.href}
+                onClick={onClick}
+                className={cn(
+                  "block py-1.5 text-xs transition-colors rounded-md px-2",
+                  isSubActive
+                    ? "text-primary font-bold bg-primary/5"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                )}
+              >
+                {sub.label}
+              </Link>
+            )
+          })}
+        </div>
       )}
-    </Link>
-  );
+
+    </div>
+  )
 
   if (isCollapsed) {
     return (
       <TooltipProvider delayDuration={0}>
         <Tooltip>
-          <TooltipTrigger asChild>{LinkContent}</TooltipTrigger>
-          <TooltipContent side="right" className="bg-foreground text-background font-bold shadow-xl border-none">
+          <TooltipTrigger asChild>
+            {content}
+          </TooltipTrigger>
+          <TooltipContent side="right">
             {item.label}
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
-    );
+    )
   }
 
-  return LinkContent;
-};
+  return content
+}
 
 const UserProfileSection = ({ 
   user, 
   isCollapsed, 
-  energyLevel, 
-  toggleEnergy, 
-  getEnergyIcon, 
   handleLogout, 
   isLoggingOut, 
   initials 
 }: {
   user?: UserData | null;
   isCollapsed: boolean;
-  energyLevel: "high" | "medium" | "low";
-  toggleEnergy: () => void;
-  getEnergyIcon: () => EnergyStatus;
   handleLogout: (e: React.MouseEvent) => Promise<void>;
   isLoggingOut: boolean;
   initials: string;
 }) => {
-  const status = getEnergyIcon();
-
   return (
-    <div className="mt-auto p-4 border-t border-border/50 bg-muted/10">
+    <div className="mt-auto p-4 border-t border-border/50 bg-muted/5">
       <div className={cn(
         "flex items-center gap-3 p-2 rounded-xl transition-colors hover:bg-secondary/50 group relative",
         isCollapsed && "justify-center"
       )}>
-        <Avatar className="h-8 w-8 border border-border/50 shadow-sm">
+        <Avatar className="h-9 w-9 border border-border/50 shadow-sm">
           <AvatarImage src={user?.avatarUrl || ""} className="object-cover" />
-          <AvatarFallback className="text-[10px] bg-secondary font-bold">{initials}</AvatarFallback>
+          <AvatarFallback className="text-xs bg-secondary font-bold text-muted-foreground">{initials}</AvatarFallback>
         </Avatar>
 
         {!isCollapsed && (
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold truncate text-foreground leading-none">
+            <p className="text-sm font-bold truncate text-foreground leading-tight">
               {user?.name || "Usuário"}
             </p>
-            <button 
-              onClick={toggleEnergy}
-              className="mt-1 flex items-center gap-1.5 hover:opacity-80 transition-opacity"
-            >
-              <status.icon className={cn("h-3 w-3", status.color)} />
-              <span className="text-[9px] font-medium text-muted-foreground uppercase tracking-tight">
-                {status.label}
-              </span>
-            </button>
+            <p className="text-[10px] font-medium text-muted-foreground truncate uppercase tracking-widest mt-0.5">
+              {user?.bio || "Administrador"}
+            </p>
           </div>
         )}
 
@@ -199,9 +260,9 @@ const UserProfileSection = ({
             size="icon" 
             onClick={handleLogout}
             disabled={isLoggingOut}
-            className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
           >
-            {isLoggingOut ? <Loader2 className="h-3 w-3 animate-spin" /> : <LogOut className="h-3.5 w-3.5" />}
+            {isLoggingOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
           </Button>
         )}
       </div>
@@ -211,9 +272,9 @@ const UserProfileSection = ({
           variant="ghost" 
           size="icon" 
           onClick={handleLogout}
-          className="h-8 w-8 mx-auto flex mt-2 text-muted-foreground hover:text-destructive"
+          className="h-9 w-9 mx-auto flex mt-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
         >
-          <LogOut size={16} />
+          <LogOut size={18} />
         </Button>
       )}
     </div>
@@ -225,23 +286,8 @@ const UserProfileSection = ({
 export function Sidebar({ user }: { user?: UserData | null }) {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [energyLevel, setEnergyLevel] = useState<"high" | "medium" | "low">("high");
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
-
-  const toggleEnergy = () => {
-    const levels: ("high" | "medium" | "low")[] = ["high", "medium", "low"];
-    const nextIndex = (levels.indexOf(energyLevel) + 1) % levels.length;
-    setEnergyLevel(levels[nextIndex]);
-  };
-
-  const getEnergyIcon = (): EnergyStatus => {
-    switch (energyLevel) {
-      case "high": return { icon: Zap, color: "text-yellow-500", label: "Modo Turbo" };
-      case "medium": return { icon: Battery, color: "text-emerald-500", label: "Estável" };
-      case "low": return { icon: BatteryLow, color: "text-rose-500", label: "Recarregar" };
-    }
-  };
 
   const handleLogout = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -272,11 +318,11 @@ export function Sidebar({ user }: { user?: UserData | null }) {
         {/* LOGO AREA */}
         <div className={cn("flex h-16 items-center px-4 mb-2 border-b border-border/40", isCollapsed ? "justify-center" : "justify-between")}>
           <div className="flex items-center gap-3 overflow-hidden select-none">
-            <div className="h-9 w-9 shrink-0 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
-               <Image width={24} height={24} src="/logo.webp" alt="Logo" className="brightness-200 invert" />
+            <div className="shrink-0 flex items-center justify-center">
+               <Image width={28} height={28} src="/logo.webp" alt="Logo" className="dark:invert" />
             </div>
             {!isCollapsed && (
-              <span className="font-bold text-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/60">
+              <span className="font-extrabold text-lg tracking-tight text-foreground">
                 Life OS
               </span>
             )}
@@ -290,13 +336,12 @@ export function Sidebar({ user }: { user?: UserData | null }) {
 
         {isCollapsed && (
           <div className="flex justify-center py-2 border-b border-border/40 mb-2">
-             <Button variant="ghost" size="icon" onClick={() => setIsCollapsed(false)} className="h-8 w-8 rounded-full text-muted-foreground">
+             <Button variant="ghost" size="icon" onClick={() => setIsCollapsed(false)} className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground">
                 <ChevronRight size={16} />
              </Button>
           </div>
         )}
 
-        {/* NAVIGATION GRUPADA COM SCROLLAREA */}
         <ScrollArea className="flex-1 px-3">
           <div className="space-y-6 py-4 pb-10">
             {groupedSidebarItems.map((group) => (
@@ -311,7 +356,8 @@ export function Sidebar({ user }: { user?: UserData | null }) {
                     key={item.href}
                     item={item}
                     isCollapsed={isCollapsed}
-                    isActive={pathname === item.href || pathname.startsWith(`${item.href}/`)}
+                    isActive={pathname === item.href}
+                    currentPath={pathname}
                   />
                 ))}
               </div>
@@ -322,9 +368,6 @@ export function Sidebar({ user }: { user?: UserData | null }) {
         <UserProfileSection 
           user={user}
           isCollapsed={isCollapsed}
-          energyLevel={energyLevel}
-          toggleEnergy={toggleEnergy}
-          getEnergyIcon={getEnergyIcon}
           handleLogout={handleLogout}
           isLoggingOut={isLoggingOut}
           initials={initials}
@@ -333,15 +376,13 @@ export function Sidebar({ user }: { user?: UserData | null }) {
 
       {/* --- MOBILE MENU (SHEET) --- */}
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent side="left" className="w-[280px] p-0 border-r-border/40 bg-background/95 backdrop-blur-2xl">
-          <SheetHeader className="h-16 px-6 border-b border-border/50 flex-row items-center gap-3">
-             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-                <Image width={20} height={20} src="/logo.webp" alt="Logo" className="invert brightness-200" />
-             </div>
-             <SheetTitle className="text-lg font-bold">Life OS</SheetTitle>
+        <SheetContent side="left" className="w-[280px] p-0 border-r-border/40 bg-background/95 backdrop-blur-2xl flex flex-col">
+          <SheetHeader className="h-16 px-6 border-b border-border/50 flex-row items-center gap-3 space-y-0 text-left">
+             <Image width={24} height={24} src="/logo.webp" alt="Logo" className="dark:invert" />
+             <SheetTitle className="text-lg font-extrabold mt-0">Life OS</SheetTitle>
           </SheetHeader>
           
-          <ScrollArea className="h-[calc(100vh-140px)] px-3 py-6">
+          <ScrollArea className="flex-1 px-3 py-6">
              <div className="space-y-6">
                 {groupedSidebarItems.map((group) => (
                   <div key={group.groupName} className="space-y-1">
@@ -353,6 +394,7 @@ export function Sidebar({ user }: { user?: UserData | null }) {
                         key={item.href}
                         item={item}
                         isActive={pathname === item.href}
+                        currentPath={pathname}
                         onClick={() => setIsSheetOpen(false)}
                       />
                     ))}
@@ -364,9 +406,6 @@ export function Sidebar({ user }: { user?: UserData | null }) {
           <UserProfileSection 
             user={user}
             isCollapsed={false}
-            energyLevel={energyLevel}
-            toggleEnergy={toggleEnergy}
-            getEnergyIcon={getEnergyIcon}
             handleLogout={handleLogout}
             isLoggingOut={isLoggingOut}
             initials={initials}
