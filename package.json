@@ -4,12 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "lint": "eslint",
+    "postinstall": "prisma generate",
     "db:migrate": "npx prisma migrate dev",
     "db:up": "echo 'Usando SQLite. O banco de dados é inicializado com npx prisma migrate dev.'"
   },
