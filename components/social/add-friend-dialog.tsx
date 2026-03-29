@@ -8,10 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, User, Briefcase, Heart, X, Plus } from "lucide-react";
+import { Loader2, User, Briefcase, Heart, X, Plus, Tags } from "lucide-react";
 import { toast } from "sonner";
 import { createFriend, updateFriend } from "@/app/(dashboard)/social/actions";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 export interface FriendData {
   id?: string;
@@ -31,7 +32,7 @@ export interface FriendData {
   address?: string | null;
   notes?: string | null;
   giftIdeas?: string | null;
-  tags?: string | null; // 🟢 Novo campo adicionado
+  tags?: string | null; 
 }
 
 interface FriendFormProps {
@@ -41,30 +42,72 @@ interface FriendFormProps {
   onOpenChange?: (open: boolean) => void;
 }
 
+// Helper seguro para formatar a data que vem do banco
+const safelyFormatDate = (dateString?: string | null) => {
+  if (!dateString) return "";
+  try {
+    return new Date(dateString).toISOString().split('T')[0];
+  } catch {
+    return ""; // Se vier lixo do banco, não quebra a tela
+  }
+};
+
 export function FriendFormDialog({ mode, initialData, open: controlledOpen, onOpenChange }: FriendFormProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setOpen = onOpenChange || setInternalOpen;
   
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [tagInput, setTagInput] = useState("");
+  
+  // 🟢 ESTADO CONTROLADO BLINDADO CONTRA PERDA DE DADOS NAS ABAS
+  const [formData, setFormData] = useState<Partial<FriendData>>({});
   const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
 
-  // Carrega as tags se estiver editando
+  // Sincroniza os dados iniciais quando o modal abre
   useEffect(() => {
-    if (initialData?.tags && mode === 'edit') {
-      setTags(initialData.tags.split(",").map(t => t.trim()).filter(Boolean));
-    } else {
-      setTags([]);
-    }
-  }, [initialData, mode, open]);
+    if (open) {
+      setFormData({
+        name: initialData?.name || "",
+        nickname: initialData?.nickname || "",
+        proximity: initialData?.proximity || "CASUAL",
+        imageUrl: initialData?.imageUrl || "",
+        phone: initialData?.phone || "",
+        instagram: initialData?.instagram || "",
+        jobTitle: initialData?.jobTitle || "",
+        company: initialData?.company || "",
+        linkedin: initialData?.linkedin || "",
+        birthday: safelyFormatDate(initialData?.birthday),
+        pixKey: initialData?.pixKey || "",
+        notes: initialData?.notes || "",
+      });
 
+      if (initialData?.tags) {
+        setTags(initialData.tags.split(",").map(t => t.trim()).filter(Boolean));
+      } else {
+        setTags([]);
+      }
+      setTagInput("");
+    }
+  }, [initialData, open]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSelectChange = (name: keyof FriendData, value: string) => {
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  // Previne que o Enter envie o formulário acidentalmente
   const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement> | React.MouseEvent) => {
     if ('key' in e && e.key !== 'Enter') return;
-    e.preventDefault();
+    e.preventDefault(); 
     
-    if (tagInput.trim() && !tags.includes(tagInput.trim())) {
-      setTags([...tags, tagInput.trim()]);
+    const newTag = tagInput.trim();
+    if (newTag && !tags.includes(newTag)) {
+      setTags([...tags, newTag]);
       setTagInput("");
     }
   };
@@ -73,19 +116,31 @@ export function FriendFormDialog({ mode, initialData, open: controlledOpen, onOp
     setTags(tags.filter(t => t !== tagToRemove));
   };
 
-  const handleSubmit = async (formData: FormData) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault(); // Previne o reload padrão da página
+    
+    if (!formData.name?.trim()) {
+        toast.error("O nome é obrigatório.");
+        return;
+    }
+
     setIsSubmitting(true);
     
-    // Injeta as tags no formulário antes de enviar
-    formData.append("tags", tags.join(", "));
+    // Constrói o payload a partir do estado React (ignora as abas escondidas do HTML)
+    const payload = new FormData();
+    Object.entries(formData).forEach(([key, value]) => {
+        if (value) payload.append(key, value);
+    });
+    
+    payload.append("tags", tags.join(", "));
     
     if (mode === "edit" && initialData?.id) {
-      formData.append("id", initialData.id);
+      payload.append("id", initialData.id);
     }
 
     try {
       const action = mode === "create" ? createFriend : updateFriend;
-      const result = await action(formData);
+      const result = await action(payload);
       
       if (result.success) {
         toast.success(result.message);
@@ -94,7 +149,7 @@ export function FriendFormDialog({ mode, initialData, open: controlledOpen, onOp
         toast.error(result.message);
       }
     } catch (error) {
-      toast.error("Ocorreu um erro inesperado.");
+      toast.error("Ocorreu um erro inesperado ao salvar.");
     } finally {
       setIsSubmitting(false);
     }
@@ -103,160 +158,165 @@ export function FriendFormDialog({ mode, initialData, open: controlledOpen, onOp
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       {mode === "create" && (
-        <Button onClick={() => setOpen(true)} className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20">
+        <Button onClick={() => setOpen(true)} className="gap-2 font-medium rounded-lg shadow-sm">
           <Plus className="h-4 w-4" /> Novo Contato
         </Button>
       )}
       
-      <DialogContent className="max-w-2xl p-0 overflow-hidden bg-background border-border/60">
-        <DialogHeader className="p-6 pb-4 border-b border-border/40 bg-muted/10">
+      <DialogContent className="sm:max-w-2xl p-0 overflow-hidden bg-background border-border/40 shadow-2xl rounded-2xl">
+        <DialogHeader className="p-6 pb-4 border-b border-border/40 bg-muted/10 text-left">
           <DialogTitle className="text-xl">
-            {mode === "create" ? "Adicionar Nova Conexão" : "Editar Perfil"}
+            {mode === "create" ? "Adicionar Conexão" : "Editar Perfil"}
           </DialogTitle>
-          <DialogDescription>
-            Salve as informações importantes para nunca perder o contexto dessa amizade ou parceiro de negócios.
+          <DialogDescription className="mt-1">
+            Salve informações importantes para manter o contexto das suas relações.
           </DialogDescription>
         </DialogHeader>
 
-        <form action={handleSubmit}>
-          <Tabs defaultValue="perfil" className="w-full">
-            <div className="px-6 pt-4">
-              <TabsList className="grid w-full grid-cols-3 bg-muted/50">
-                <TabsTrigger value="perfil" className="gap-2"><User className="h-4 w-4"/> Perfil</TabsTrigger>
-                <TabsTrigger value="contato" className="gap-2"><Briefcase className="h-4 w-4"/> Profissional</TabsTrigger>
-                <TabsTrigger value="contexto" className="gap-2"><Heart className="h-4 w-4"/> Contexto</TabsTrigger>
+        <form onSubmit={handleSubmit} className="flex flex-col max-h-[75vh]">
+          <Tabs defaultValue="perfil" className="flex flex-col h-full">
+            <div className="px-6 pt-4 shrink-0">
+              <TabsList className="grid w-full grid-cols-3 bg-muted/50 p-1 rounded-lg">
+                <TabsTrigger value="perfil" className="gap-2 rounded-md text-xs font-medium"><User className="h-3.5 w-3.5"/> Perfil</TabsTrigger>
+                <TabsTrigger value="contato" className="gap-2 rounded-md text-xs font-medium"><Briefcase className="h-3.5 w-3.5"/> Profissional</TabsTrigger>
+                <TabsTrigger value="contexto" className="gap-2 rounded-md text-xs font-medium"><Heart className="h-3.5 w-3.5"/> Contexto</TabsTrigger>
               </TabsList>
             </div>
 
-            {/* --- ABA 1: PERFIL ESSENCIAL --- */}
-            <TabsContent value="perfil" className="p-6 space-y-4 focus-visible:outline-none focus-visible:ring-0">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2 col-span-2 md:col-span-1">
-                  <Label htmlFor="name">Nome Completo *</Label>
-                  <Input id="name" name="name" defaultValue={initialData?.name} required placeholder="Ex: João Silva" />
-                </div>
-                <div className="space-y-2 col-span-2 md:col-span-1">
-                  <Label htmlFor="nickname">Apelido (Como você o chama)</Label>
-                  <Input id="nickname" name="nickname" defaultValue={initialData?.nickname || ""} placeholder="Ex: Jão" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2 col-span-2 md:col-span-1">
-                  <Label htmlFor="proximity">Círculo de Proximidade</Label>
-                  <Select name="proximity" defaultValue={initialData?.proximity || "CASUAL"}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o nível" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="FAMILY">Família</SelectItem>
-                      <SelectItem value="CLOSE">Amigo Próximo</SelectItem>
-                      <SelectItem value="WORK">Trabalho / Negócios</SelectItem>
-                      <SelectItem value="CASUAL">Conhecido / Casual</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2 col-span-2 md:col-span-1">
-                  <Label htmlFor="imageUrl">Foto (URL da imagem)</Label>
-                  <Input id="imageUrl" name="imageUrl" defaultValue={initialData?.imageUrl || ""} placeholder="https://..." />
-                </div>
-              </div>
-            </TabsContent>
-
-            {/* --- ABA 2: CONTATO E PROFISSIONAL --- */}
-            <TabsContent value="contato" className="p-6 space-y-4 focus-visible:outline-none focus-visible:ring-0">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="phone">WhatsApp / Telefone</Label>
-                  <Input id="phone" name="phone" defaultValue={initialData?.phone || ""} placeholder="(00) 00000-0000" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="instagram">Instagram</Label>
-                  <Input id="instagram" name="instagram" defaultValue={initialData?.instagram || ""} placeholder="@usuario" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="jobTitle">Cargo / Ocupação</Label>
-                  <Input id="jobTitle" name="jobTitle" defaultValue={initialData?.jobTitle || ""} placeholder="Ex: Desenvolvedor Front-end" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="company">Empresa / Instituição</Label>
-                  <Input id="company" name="company" defaultValue={initialData?.company || ""} placeholder="Ex: Google, UNIVÁS..." />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="linkedin">LinkedIn URL</Label>
-                <Input id="linkedin" name="linkedin" defaultValue={initialData?.linkedin || ""} placeholder="https://linkedin.com/in/..." />
-              </div>
-            </TabsContent>
-
-            {/* --- ABA 3: CONTEXTO, TAGS E NOTAS --- */}
-            <TabsContent value="contexto" className="p-6 space-y-4 focus-visible:outline-none focus-visible:ring-0">
-              
-              {/* O NOVO SISTEMA DE TAGS */}
-              <div className="space-y-2 bg-primary/5 p-4 rounded-xl border border-primary/10">
-                <Label>Tags & Contexto (Onde se conheceram, Interesses)</Label>
-                <div className="flex gap-2">
-                  <Input 
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    onKeyDown={handleAddTag}
-                    placeholder="Ex: Cliente, League of Legends, Faculdade..."
-                    className="bg-background"
-                  />
-                  <Button type="button" variant="secondary" onClick={handleAddTag}>Adicionar</Button>
-                </div>
-                {tags.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {tags.map(tag => (
-                      <Badge key={tag} className="gap-1 pr-1.5 py-1 bg-primary text-primary-foreground hover:bg-primary/90">
-                        {tag}
-                        <button type="button" onClick={() => removeTag(tag)} className="rounded-full hover:bg-background/20 p-0.5 transition-colors">
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    ))}
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                {/* --- ABA 1: PERFIL ESSENCIAL --- */}
+                <TabsContent value="perfil" className="p-6 space-y-5 m-0 focus-visible:outline-none">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2 col-span-2 md:col-span-1">
+                      <Label htmlFor="name" className="text-xs font-semibold text-muted-foreground">Nome Completo <span className="text-rose-500">*</span></Label>
+                      <Input id="name" name="name" value={formData.name || ""} onChange={handleChange} required placeholder="Ex: João Silva" className="rounded-lg h-10 bg-muted/20" />
+                    </div>
+                    <div className="space-y-2 col-span-2 md:col-span-1">
+                      <Label htmlFor="nickname" className="text-xs font-semibold text-muted-foreground">Apelido</Label>
+                      <Input id="nickname" name="nickname" value={formData.nickname || ""} onChange={handleChange} placeholder="Ex: Jão" className="rounded-lg h-10 bg-muted/20" />
+                    </div>
                   </div>
-                )}
-                <p className="text-[10px] text-muted-foreground mt-1">Pressione Enter para adicionar a Tag.</p>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="birthday">Data de Aniversário</Label>
-                  {/* Se o banco for data, o input type date formata o value nativo */}
-                  <Input id="birthday" name="birthday" type="date" defaultValue={initialData?.birthday ? initialData.birthday.split('T')[0] : ""} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="pixKey">Chave Pix (Para rachar contas)</Label>
-                  <Input id="pixKey" name="pixKey" defaultValue={initialData?.pixKey || ""} placeholder="CPF, Email, Telefone..." />
-                </div>
-              </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2 col-span-2 md:col-span-1">
+                      <Label className="text-xs font-semibold text-muted-foreground">Círculo de Proximidade</Label>
+                      <Select value={formData.proximity} onValueChange={(v) => handleSelectChange("proximity", v)}>
+                        <SelectTrigger className="rounded-lg h-10 bg-muted/20">
+                          <SelectValue placeholder="Selecione o nível" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-lg">
+                          <SelectItem value="FAMILY">Família</SelectItem>
+                          <SelectItem value="CLOSE">Amigo Próximo</SelectItem>
+                          <SelectItem value="WORK">Trabalho / Negócios</SelectItem>
+                          <SelectItem value="CASUAL">Conhecido / Casual</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2 col-span-2 md:col-span-1">
+                      <Label htmlFor="imageUrl" className="text-xs font-semibold text-muted-foreground">Foto (URL)</Label>
+                      <Input id="imageUrl" name="imageUrl" value={formData.imageUrl || ""} onChange={handleChange} placeholder="https://..." className="rounded-lg h-10 bg-muted/20 font-mono text-xs" />
+                    </div>
+                  </div>
+                </TabsContent>
 
-              <div className="space-y-2">
-                <Label htmlFor="notes">Anotações e Histórico</Label>
-                <Textarea 
-                  id="notes" 
-                  name="notes" 
-                  defaultValue={initialData?.notes || ""} 
-                  placeholder="Escreva detalhes úteis: como vocês se conheceram, gostos pessoais, alergias a comidas..."
-                  className="resize-none h-20"
-                />
-              </div>
-            </TabsContent>
+                {/* --- ABA 2: CONTATO E PROFISSIONAL --- */}
+                <TabsContent value="contato" className="p-6 space-y-5 m-0 focus-visible:outline-none">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="phone" className="text-xs font-semibold text-muted-foreground">WhatsApp / Telefone</Label>
+                      <Input id="phone" name="phone" value={formData.phone || ""} onChange={handleChange} placeholder="(00) 00000-0000" className="rounded-lg h-10 bg-muted/20" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="instagram" className="text-xs font-semibold text-muted-foreground">Instagram</Label>
+                      <Input id="instagram" name="instagram" value={formData.instagram || ""} onChange={handleChange} placeholder="@usuario" className="rounded-lg h-10 bg-muted/20" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="jobTitle" className="text-xs font-semibold text-muted-foreground">Cargo / Ocupação</Label>
+                      <Input id="jobTitle" name="jobTitle" value={formData.jobTitle || ""} onChange={handleChange} placeholder="Ex: Engenheiro de Software" className="rounded-lg h-10 bg-muted/20" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="company" className="text-xs font-semibold text-muted-foreground">Empresa</Label>
+                      <Input id="company" name="company" value={formData.company || ""} onChange={handleChange} placeholder="Ex: Google" className="rounded-lg h-10 bg-muted/20" />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="linkedin" className="text-xs font-semibold text-muted-foreground">LinkedIn (URL)</Label>
+                    <Input id="linkedin" name="linkedin" value={formData.linkedin || ""} onChange={handleChange} placeholder="https://linkedin.com/in/..." className="rounded-lg h-10 bg-muted/20 font-mono text-xs" />
+                  </div>
+                </TabsContent>
+
+                {/* --- ABA 3: CONTEXTO E ANOTAÇÕES --- */}
+                <TabsContent value="contexto" className="p-6 space-y-5 m-0 focus-visible:outline-none">
+                  
+                  <div className="space-y-3 bg-muted/10 p-5 rounded-xl border border-border/40">
+                    <Label className="text-xs font-semibold text-foreground flex items-center gap-2">
+                        <Tags className="h-3.5 w-3.5 text-primary" /> Tags & Classificações
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input 
+                        value={tagInput}
+                        onChange={(e) => setTagInput(e.target.value)}
+                        onKeyDown={handleAddTag}
+                        placeholder="Ex: Cliente, Faculdade, Futebol..."
+                        className="bg-background rounded-lg h-9 text-sm"
+                      />
+                      <Button type="button" variant="secondary" onClick={handleAddTag} className="h-9 px-4 rounded-lg">Adicionar</Button>
+                    </div>
+                    {tags.length > 0 ? (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {tags.map(tag => (
+                          <Badge key={tag} variant="secondary" className="gap-1 pr-1.5 py-1 bg-background border-border/60 hover:bg-muted font-medium">
+                            {tag}
+                            <button type="button" onClick={() => removeTag(tag)} className="rounded-full hover:bg-destructive/10 hover:text-destructive p-0.5 transition-colors">
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                        <p className="text-[11px] text-muted-foreground">Aperte <kbd className="px-1.5 py-0.5 bg-background border rounded mx-1">Enter</kbd> para adicionar uma tag.</p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="birthday" className="text-xs font-semibold text-muted-foreground">Data de Aniversário</Label>
+                      <Input id="birthday" name="birthday" type="date" value={formData.birthday || ""} onChange={handleChange} className="rounded-lg h-10 bg-muted/20" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="pixKey" className="text-xs font-semibold text-muted-foreground">Chave Pix</Label>
+                      <Input id="pixKey" name="pixKey" value={formData.pixKey || ""} onChange={handleChange} placeholder="CPF, Email, Celular..." className="rounded-lg h-10 bg-muted/20" />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="notes" className="text-xs font-semibold text-muted-foreground">Anotações e Histórico</Label>
+                    <Textarea 
+                      id="notes" 
+                      name="notes" 
+                      value={formData.notes || ""} 
+                      onChange={handleChange}
+                      placeholder="Como vocês se conheceram? Gostos pessoais, alergias a comidas, etc."
+                      className="resize-none h-24 rounded-xl bg-muted/20 p-4 text-sm"
+                    />
+                  </div>
+                </TabsContent>
+            </div>
+
+            <DialogFooter className="p-6 border-t border-border/40 bg-muted/5 shrink-0 flex-row justify-end gap-3">
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)} className="rounded-lg h-10 px-6">
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isSubmitting} className="min-w-[140px] rounded-lg h-10 shadow-sm">
+                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Salvar Perfil
+              </Button>
+            </DialogFooter>
           </Tabs>
-
-          <DialogFooter className="p-6 pt-4 border-t border-border/40 bg-muted/10">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={isSubmitting} className="min-w-[120px]">
-              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar Perfil"}
-            </Button>
-          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

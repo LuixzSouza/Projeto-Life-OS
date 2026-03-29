@@ -4,21 +4,21 @@ import { EntertainmentBoard } from "@/components/entertainment/entertainment-boa
 import { AddMediaDialog } from "@/components/entertainment/add-media-dialog";
 
 /* -------------------------------------------------------------------------- */
-/* PAGE                                     */
+/* PAGE                                                                       */
 /* -------------------------------------------------------------------------- */
 /* Server Component — responsável apenas por buscar dados e estruturar layout */
 
 export default async function EntertainmentPage() {
-  // 1. Busca os itens no banco, garantindo a tipagem correta
+  // 1. Busca os itens no banco
   const rawItems = await prisma.mediaItem.findMany({
     orderBy: { createdAt: "desc" },
   });
 
   // 2. Formata os dados para garantir que o Client Component não quebre com "nulls" não esperados
-  const items = rawItems.map(item => ({
+  const items = rawItems.map((item) => ({
     id: item.id,
     title: item.title,
-    type: item.type, // "MOVIE", "TV", "GAME", "ALBUM"
+    type: item.type, // "MOVIE", "TV_SHOW", "GAME", "ALBUM", "BOOK"
     status: item.status, // "PLAN_TO_WATCH", "IN_PROGRESS", "COMPLETED", "DROPPED"
     overview: item.overview || null,
     coverUrl: item.coverUrl || null,
@@ -33,43 +33,37 @@ export default async function EntertainmentPage() {
   }));
 
   return (
-    <div className="min-h-screen bg-background pb-24">
-      {/* ------------------------------------------------------------------ */}
-      {/* HEADER                                                             */}
-      {/* ------------------------------------------------------------------ */}
-      <header className="border-b border-border/60 bg-gradient-to-b from-primary/5 to-background pt-10 pb-8 px-6 md:px-8">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 animate-in fade-in duration-500 max-w-[1600px] mx-auto">
+    <div className="min-h-screen bg-background w-full pb-12">
+      
+     <header className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border/40 px-6 md:px-8 py-6">
+        <div className=" mx-auto w-full flex flex-col md:flex-row md:items-center justify-between gap-6">
           
+          {/* Título e Ícone */}
           <div className="flex items-center gap-4">
-            {/* Ícone */}
-            <div className="h-12 w-12 rounded-2xl flex items-center justify-center bg-primary/10 text-primary shadow-sm">
+            <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
               <Star className="h-6 w-6 fill-current" />
             </div>
-
-            {/* Título */}
-            <div className="space-y-1">
-              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-foreground">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-3">
                 Entretenimento
               </h1>
-              <p className="text-sm md:text-base font-medium text-muted-foreground max-w-xl">
-                Seu catálogo pessoal. Acompanhe filmes, séries, jogos e álbuns que você consome.
+              <p className="text-sm text-muted-foreground mt-1">
+                Seu catálogo pessoal de filmes, séries, jogos, álbuns e livros.
               </p>
             </div>
           </div>
 
           {/* Ação principal (O Modal de Busca via API) */}
-          <div className="shrink-0">
+          <div className="shrink-0 w-full md:w-auto flex">
             <AddMediaDialog />
           </div>
         </div>
       </header>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* BOARD (Client Component)                                           */}
-      {/* ------------------------------------------------------------------ */}
-      <main className="px-6 md:px-8 py-8 space-y-10 max-w-[1600px] mx-auto">
+      <main className=" mx-auto w-full px-6 md:px-8 py-8 animate-in fade-in duration-500">
         <EntertainmentBoard initialItems={items} />
       </main>
+      
     </div>
   );
 }

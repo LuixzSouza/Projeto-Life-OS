@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { Users, Star, Cake, Heart, TrendingUp, Sparkles, CalendarHeart } from "lucide-react";
-import { Badge } from "@/components/ui/badge"; // 🟢 IMPORTAÇÃO CORRIGIDA AQUI
+import { Users, Heart, TrendingUp, CalendarHeart } from "lucide-react";
 import { FriendList } from "@/components/social/friend-list";
 import { FriendFormDialog } from "@/components/social/add-friend-dialog";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,7 +14,7 @@ interface StatCardProps {
   colorClass?: string;
 }
 
-// --- Componente Local: Card de Estatística (Enterprise Design) ---
+// --- Componente Local: Card de Estatística (Design Limpo e Minimalista) ---
 function StatCard({ 
   title, 
   value, 
@@ -24,25 +23,27 @@ function StatCard({
   colorClass = "text-primary bg-primary/10 ring-primary/20" 
 }: StatCardProps) {
   return (
-    <Card className="group relative overflow-hidden bg-card border-border/60 hover:border-primary/30 transition-all duration-300 hover:shadow-lg">
-      <div className="absolute -right-10 -top-10 h-32 w-32 bg-primary/5 rounded-full blur-3xl group-hover:bg-primary/10 transition-colors duration-500" />
-      
-      <CardContent className="p-6 relative z-10 flex items-start justify-between">
-        <div className="space-y-1">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-            {title}
-          </p>
-          <h3 className="text-3xl font-bold tracking-tight text-foreground">
-            {value}
-          </h3>
-          {description && (
-            <p className="text-xs text-muted-foreground pt-1 font-medium">{description}</p>
-          )}
+    <Card className="bg-card border-border/40 shadow-sm hover:shadow-md hover:border-border/80 transition-all duration-300 h-full flex flex-col">
+      <CardContent className="p-5 flex flex-col h-full justify-between gap-4">
+        <div className="flex items-start justify-between">
+          <div className="space-y-1">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+              {title}
+            </p>
+            <h3 className="text-2xl font-bold tracking-tight text-foreground">
+              {value}
+            </h3>
+          </div>
+          <div className={cn("p-2.5 rounded-xl shrink-0", colorClass)}>
+            <Icon className="h-4 w-4" />
+          </div>
         </div>
         
-        <div className={cn("p-3 rounded-xl ring-1 shadow-sm group-hover:scale-110 transition-transform duration-300", colorClass)}>
-          <Icon className="h-6 w-6" />
-        </div>
+        {description && (
+          <div className="flex items-center justify-between mt-auto pt-4 border-t border-border/40">
+            <p className="text-xs font-medium text-muted-foreground truncate pr-2">{description}</p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -89,78 +90,72 @@ export default async function SocialPage() {
   }));
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background w-full pb-12">
       
-      {/* --- HEADER COM GRADIENTE PRIMARY --- */}
-      <header className="border-b border-border/60 bg-gradient-to-b from-primary/5 to-background pt-10 pb-8 px-6 md:px-10">
-        <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground flex items-center gap-3">
-              <div className="p-2.5 bg-primary rounded-lg shadow-lg shadow-primary/25">
-                <Users className="h-6 w-6 text-primary-foreground" />
-              </div>
-              Gestão de Conexões
-            </h1>
-            <p className="text-muted-foreground text-lg max-w-2xl">
-              Centralize seus relacionamentos estratégicos e pessoais em um único CRM inteligente.
-            </p>
+      {/* --- HEADER SÓBRIO E FIXO --- */}
+      <header className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border/40 px-6 md:px-8 py-6">
+        <div className="max-w-7xl mx-auto w-full flex flex-col md:flex-row md:items-center justify-between gap-6">
+          
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+              <Users className="h-6 w-6" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-3">
+                Conexões & Networking
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1 max-w-md">
+                Centralize seus relacionamentos estratégicos e pessoais em um único local.
+              </p>
+            </div>
           </div>
           
-          <div className="flex items-center gap-3">
+          {/* Botão de Adição Rápida */}
+          <div className="shrink-0 w-full md:w-auto flex">
             <FriendFormDialog mode="create" />
           </div>
         </div>
       </header>
 
-      <main className="px-6 md:px-10 py-8 space-y-10 max-w-[1600px] mx-auto">
+      <main className="mx-auto w-full px-6 md:px-8 py-8 space-y-8 animate-in fade-in duration-500">
         
         {/* --- KPI SECTION --- */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           <StatCard 
-            title="Total de Conexões"
+            title="Rede Total"
             value={totalFriends}
             icon={TrendingUp}
             description="Contatos registrados na base"
-            colorClass="text-blue-600 bg-blue-50 ring-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:ring-blue-900/50"
+            colorClass="text-blue-600 bg-blue-500/10"
           />
           <StatCard 
             title="Círculo Íntimo"
             value={closeFriends}
             icon={Heart}
             description="Familiares e amigos próximos"
-            colorClass="text-amber-600 bg-amber-50 ring-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-900/50"
+            colorClass="text-amber-600 bg-amber-500/10"
           />
           <StatCard 
             title="Aniversários (Mês)"
             value={birthdaysThisMonth}
             icon={CalendarHeart}
             description="Celebrações pendentes este mês"
-            colorClass="text-pink-600 bg-pink-50 ring-pink-200 dark:bg-pink-900/20 dark:text-pink-400 dark:ring-pink-900/50"
+            colorClass="text-pink-600 bg-pink-500/10"
           />
         </section>
 
         {/* --- LISTAGEM PRINCIPAL --- */}
-        <section className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/50 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
-                <Sparkles className="h-4 w-4 text-primary" />
-              </div>
-              <h2 className="text-xl font-semibold text-foreground flex items-center gap-3">
-                Sua Rede
-                <Badge variant="secondary" className="px-2.5 py-0.5 rounded-full font-bold">
-                  {totalFriends}
-                </Badge>
-              </h2>
-            </div>
-            
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground bg-muted/30 px-3 py-1.5 rounded-full cursor-default">
-               <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
-               <span>Aniversariantes no topo</span>
-            </div>
+        <section className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/40 pb-4">
+            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+              Sua Rede
+            </h2>
+            <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5 bg-muted/30 px-2.5 py-1 rounded-md">
+               Aniversariantes do mês aparecem no topo
+            </p>
           </div>
           
-          <div className="rounded-2xl bg-card/30 backdrop-blur-sm">
+          <div className="bg-card/50 rounded-xl border border-border/60 shadow-sm backdrop-blur-[2px]">
              <FriendList initialData={serializedFriends} />
           </div>
         </section>

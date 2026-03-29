@@ -1,80 +1,67 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { ManagedSite, SitePage } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { 
-    AlertDialog, 
-    AlertDialogAction, 
-    AlertDialogCancel, 
-    AlertDialogContent, 
-    AlertDialogDescription, 
-    AlertDialogFooter, 
-    AlertDialogHeader, 
-    AlertDialogTitle, 
-    AlertDialogTrigger 
+    AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
+    AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, 
+    AlertDialogTitle, AlertDialogTrigger 
 } from "@/components/ui/alert-dialog";
-import { 
-    Dialog, 
-    DialogContent, 
-    DialogDescription, 
-    DialogHeader, 
-    DialogTitle, 
-    DialogTrigger 
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { 
     Plus, Trash2, Save, Copy, Check, FileJson, 
     Settings, Code2, Database, AlertCircle, TerminalSquare, 
-    ShieldAlert, X, ExternalLink
+    ShieldAlert, Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 import { savePageContent, createPage, deletePage, deleteSite } from "@/app/(dashboard)/cms/actions";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 
+// 🟢 IMPORTS DO CODEMIRROR
+import CodeMirror from '@uiw/react-codemirror';
+import { json as jsonLang } from '@codemirror/lang-json';
+import { javascript } from '@codemirror/lang-javascript';
+import { vscodeDark } from '@uiw/codemirror-theme-vscode';
+
 interface SiteWithPages extends ManagedSite {
   pages: SitePage[];
 }
 
 /* ======================================================
-   SUB-COMPONENTE: EDITOR JSON (Terminal UI)
+   SUB-COMPONENTE: CODE EDITOR
 ====================================================== */
-function JsonEditor({ page }: { page: SitePage }) {
-    const [json, setJson] = useState(page.content);
-    const [isValid, setIsValid] = useState(true);
+function CodeEditor({ page }: { page: SitePage }) {
+    const [code, setCode] = useState(page.content);
     const [isDirty, setIsDirty] = useState(false);
-
-    const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        const val = e.target.value;
-        setJson(val);
+    const [isSaving, setIsSaving] = useState(false);
+    
+    const onChange = useCallback((val: string) => {
+        setCode(val);
         setIsDirty(true);
-        try {
-            JSON.parse(val);
-            setIsValid(true);
-        } catch {
-            setIsValid(false);
-        }
-    };
+    }, []);
 
     const handleSave = async () => {
-        if (!isValid) return toast.error("JSON Inválido. Corrija a sintaxe antes de salvar.");
+        setIsSaving(true);
         const formData = new FormData();
         formData.append("pageId", page.id);
-        formData.append("content", json);
+        formData.append("content", code);
         try {
             await savePageContent(formData);
             setIsDirty(false);
             toast.success("Deploy realizado!");
         } catch {
             toast.error("Erro na sincronização.");
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -87,9 +74,13 @@ function JsonEditor({ page }: { page: SitePage }) {
         }
     };
 
+    let isJsonValid = true;
+    try { JSON.parse(code); } catch { isJsonValid = false; }
+
     return (
         <div className="h-full flex flex-col bg-card border border-border/40 rounded-[2rem] shadow-sm overflow-hidden animate-in fade-in duration-500">
-            <div className="flex items-center justify-between bg-muted/10 border-b border-border/40 p-4 md:px-6">
+            {/* BARRA DE FERRAMENTAS DO EDITOR */}
+            <div className="flex items-center justify-between bg-muted/10 border-b border-border/40 p-4 md:px-6 shrink-0">
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
                         <TerminalSquare className="h-4 w-4 text-primary" />
@@ -98,11 +89,7 @@ function JsonEditor({ page }: { page: SitePage }) {
                         </Badge>
                     </div>
                     
-                    {!isValid ? (
-                        <Badge variant="destructive" className="text-[10px] font-black uppercase tracking-widest gap-1">
-                            <AlertCircle className="h-3 w-3" /> Syntax Error
-                        </Badge>
-                    ) : isDirty ? (
+                    {isDirty ? (
                         <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest gap-1 bg-amber-500/10 text-amber-600 border-amber-500/20">
                             Pendente
                         </Badge>
@@ -110,6 +97,12 @@ function JsonEditor({ page }: { page: SitePage }) {
                         <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest gap-1 bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
                             <Check className="h-3 w-3" /> Live
                         </Badge>
+                    )}
+
+                    {!isJsonValid && code.length > 0 && (
+                        <span className="hidden md:inline text-[10px] font-mono text-muted-foreground/60 uppercase">
+                            (Raw Text Mode)
+                        </span>
                     )}
                 </div>
 
@@ -120,8 +113,8 @@ function JsonEditor({ page }: { page: SitePage }) {
                                 <Trash2 className="h-4 w-4" />
                             </Button>
                         </AlertDialogTrigger>
-                        {/* FIX: Centralização forçada do modal */}
-                        <AlertDialogContent className="fixed left-1/2 top-1/2 z-50 w-[95%] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-[2rem] border border-border/40 bg-background p-8 shadow-2xl">
+                        {/* 🟢 z-[100] adicionado para furar o blur */}
+                        <AlertDialogContent className="fixed left-1/2 top-1/2 z-[100] w-[95%] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-[2rem] border border-border/40 bg-background p-8 shadow-2xl">
                             <AlertDialogHeader className="flex flex-col items-center text-center">
                                 <div className="h-12 w-12 rounded-2xl bg-destructive/10 flex items-center justify-center text-destructive mb-2">
                                     <ShieldAlert className="h-6 w-6" />
@@ -140,25 +133,36 @@ function JsonEditor({ page }: { page: SitePage }) {
                         </AlertDialogContent>
                     </AlertDialog>
 
-                    <Button size="sm" onClick={handleSave} disabled={!isValid || !isDirty} className="gap-2 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg">
-                        <Save className="h-4 w-4" /> Deploy
+                    <Button size="sm" onClick={handleSave} disabled={!isDirty || isSaving} className="gap-2 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg">
+                        {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} 
+                        Deploy
                     </Button>
                 </div>
             </div>
 
-            <div className="flex-1 relative bg-[#0E0E11] p-6">
-                <Textarea 
-                    value={json}
-                    onChange={handleChange}
-                    className={cn(
-                        "w-full h-full font-mono text-[13px] md:text-sm bg-transparent text-emerald-400 border-none resize-none leading-relaxed focus-visible:ring-0 focus-visible:ring-offset-0 p-0 custom-scrollbar",
-                        !isValid && "text-red-400"
-                    )}
-                    spellCheck={false}
-                    placeholder="Cole seu JSON aqui..."
-                />
+            {/* ÁREA DO CODEMIRROR */}
+            <div className="flex-1 overflow-hidden relative bg-[#1e1e1e]">
+                <ScrollArea className="h-full w-full">
+                    <CodeMirror
+                        value={code}
+                        height="100%"
+                        theme={vscodeDark}
+                        extensions={[jsonLang(), javascript({ jsx: true })]}
+                        onChange={onChange}
+                        className="text-[13px] md:text-[14px] leading-relaxed custom-codemirror"
+                        basicSetup={{
+                            lineNumbers: true,
+                            foldGutter: true,
+                            highlightActiveLine: true,
+                            bracketMatching: true,
+                            autocompletion: true,
+                        }}
+                    />
+                </ScrollArea>
             </div>
-            <div className="bg-muted/10 border-t border-border/40 p-3 px-6 flex justify-between items-center text-[10px] font-mono font-bold text-muted-foreground/50 uppercase tracking-widest">
+
+            {/* RODAPÉ DO EDITOR */}
+            <div className="bg-muted/10 border-t border-border/40 p-3 px-6 flex justify-between items-center text-[10px] font-mono font-bold text-muted-foreground/50 uppercase tracking-widest shrink-0">
                 <span>Instance: {page.id.split('-')[0]}</span>
                 <span>Sincronizado: {new Date(page.updatedAt).toLocaleTimeString("pt-BR")}</span>
             </div>
@@ -181,7 +185,7 @@ function ApiGuide({ site }: { site: ManagedSite }) {
     }
 
     return (
-        <div className="space-y-6 max-w-3xl animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="space-y-6 max-w-3xl animate-in fade-in slide-in-from-bottom-4 duration-500 w-full">
             <Card className="border-border/40 shadow-xl rounded-[2rem] bg-card overflow-hidden">
                 <CardHeader className="bg-muted/10 border-b border-border/40 p-8">
                     <CardTitle className="flex items-center gap-2 text-lg font-black uppercase tracking-tighter">
@@ -201,8 +205,8 @@ function ApiGuide({ site }: { site: ManagedSite }) {
                     
                     <div className="space-y-3">
                         <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Fetch Snippet</Label>
-                        <div className="bg-[#0E0E11] border border-border/20 p-5 rounded-2xl relative group shadow-inner">
-                            <pre className="font-mono text-[13px] text-zinc-300 overflow-x-auto">
+                        <div className="bg-[#1e1e1e] border border-border/20 p-5 rounded-2xl relative group shadow-inner">
+                            <pre className="font-mono text-[13px] text-[#9cdcfe] overflow-x-auto">
 {`const res = await fetch('${baseUrl}/api/cms/${site.apiKey}/home');
 const data = await res.json();`}
                             </pre>
@@ -220,16 +224,26 @@ const data = await res.json();`}
 export function SiteEditor({ site }: { site: SiteWithPages }) {
     const router = useRouter();
     const [activeTab, setActiveTab] = useState(site.pages.length > 0 ? site.pages[0].id : "new-page");
+    
+    // Estados da Danger Zone
     const [deleteConfirmName, setDeleteConfirmName] = useState("");
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const handleFinalDeleteSite = async () => {
-        await deleteSite(site.id);
-        toast.success("Container destruído.");
-        router.push("/cms");
+        setIsDeleting(true);
+        try {
+            await deleteSite(site.id);
+            toast.success("Container destruído com sucesso.");
+            router.push("/cms");
+        } catch {
+            toast.error("Erro ao destruir container.");
+            setIsDeleting(false);
+        }
     };
 
     return (
         <div className="flex-1 flex flex-col md:flex-row h-full overflow-hidden">
+            {/* SIDEBAR DO EDITOR */}
             <aside className="w-full md:w-64 lg:w-72 border-b md:border-b-0 md:border-r border-border/40 bg-muted/5 flex flex-col shrink-0">
                 <Tabs value={activeTab} onValueChange={setActiveTab} orientation="vertical" className="flex flex-col h-full">
                     <div className="p-5 border-b border-border/40 bg-background/50">
@@ -240,6 +254,8 @@ export function SiteEditor({ site }: { site: SiteWithPages }) {
 
                     <ScrollArea className="flex-1">
                         <div className="p-4 space-y-6">
+                            
+                            {/* ROTAS */}
                             <div className="space-y-2">
                                 <div className="text-[9px] font-black text-muted-foreground/50 uppercase tracking-[0.2em] px-2 flex items-center gap-2">
                                     <Database className="h-3 w-3" /> Rotas Ativas
@@ -259,6 +275,7 @@ export function SiteEditor({ site }: { site: SiteWithPages }) {
 
                             <Separator className="bg-border/40" />
 
+                            {/* SISTEMA */}
                             <div className="space-y-2">
                                 <div className="text-[9px] font-black text-muted-foreground/50 uppercase tracking-[0.2em] px-2 flex items-center gap-2">
                                     <Settings className="h-3 w-3" /> Sistema
@@ -272,21 +289,25 @@ export function SiteEditor({ site }: { site: SiteWithPages }) {
                                     </TabsTrigger>
                                 </TabsList>
                             </div>
+
                         </div>
                     </ScrollArea>
                 </Tabs>
             </aside>
 
-            <main className="flex-1 bg-background/50 p-4 md:p-6 overflow-hidden flex flex-col relative">
+            {/* PAINEL PRINCIPAL DO EDITOR */}
+            <main className="flex-1 bg-background/50 p-4 md:p-6 overflow-hidden flex flex-col relative min-h-[500px]">
                 <Tabs value={activeTab} className="h-full flex flex-col relative w-full">
                     
+                    {/* Renderiza o CodeEditor para cada página */}
                     {site.pages.map(page => (
                         <TabsContent key={page.id} value={page.id} className="h-full mt-0 focus-visible:ring-0">
-                            <JsonEditor page={page} />
+                            <CodeEditor page={page} />
                         </TabsContent>
                     ))}
 
-                    <TabsContent value="new-page" className="h-full mt-0 overflow-y-auto">
+                    {/* ABA: CRIAR NOVA ROTA */}
+                     <TabsContent value="new-page" className="h-full mt-0 overflow-y-auto">
                         <div className="max-w-xl mx-auto py-10">
                             <Card className="border-border/40 shadow-xl rounded-[2rem] bg-card overflow-hidden">
                                 <CardHeader className="bg-primary/5 border-b border-border/40 p-8 text-center">
@@ -299,6 +320,7 @@ export function SiteEditor({ site }: { site: SiteWithPages }) {
                                     <form action={async (fd) => {
                                         await createPage(fd);
                                         toast.success("Build completo!");
+                                        // Idealmente poderíamos trocar para a tab da página recém criada aqui se tivéssemos o retorno do ID
                                     }} className="space-y-6">
                                         <input type="hidden" name="siteId" value={site.id} />
                                         <div className="space-y-3">
@@ -317,12 +339,14 @@ export function SiteEditor({ site }: { site: SiteWithPages }) {
                         </div>
                     </TabsContent>
 
+                    {/* ABA: API */}
                     <TabsContent value="api" className="h-full mt-0 overflow-y-auto focus-visible:ring-0">
                         <div className="py-10 flex justify-center">
                             <ApiGuide site={site} />
                         </div>
                     </TabsContent>
 
+                    {/* 🟢 ABA: SETTINGS / DANGER ZONE */}
                     <TabsContent value="settings" className="h-full mt-0 overflow-y-auto focus-visible:ring-0">
                         <div className="max-w-2xl py-10 mx-auto">
                             <Card className="border-red-500/30 bg-red-500/5 shadow-2xl rounded-[2rem]">
@@ -332,18 +356,19 @@ export function SiteEditor({ site }: { site: SiteWithPages }) {
                                     </div>
                                     <CardTitle className="text-red-600 text-xl font-black uppercase tracking-tighter">Destruir Container</CardTitle>
                                     <CardDescription className="text-red-600/70 font-medium text-xs mt-2 leading-relaxed">
-                                        Isso apagará todos os dados JSON e desativará a API Key <code className="font-bold">{site.apiKey.slice(0,8)}...</code> imediatamente.
+                                        Isso apagará todos os dados atrelados a este projeto e desativará a API Key <code className="font-bold">{site.apiKey.slice(0,8)}...</code> imediatamente.
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="p-8 pt-4">
-                                    <Dialog onOpenChange={() => setDeleteConfirmName("")}>
+                                    <Dialog onOpenChange={(open) => { if (!open) setDeleteConfirmName(""); }}>
                                         <DialogTrigger asChild>
                                             <Button variant="destructive" className="w-full h-12 rounded-xl font-black uppercase tracking-widest text-[11px] shadow-xl shadow-red-500/20 transition-all hover:scale-[1.02]">
                                                 <Trash2 className="mr-2 h-4 w-4" /> Iniciar Destruição
                                             </Button>
                                         </DialogTrigger>
-                                        {/* FIX: Centralização forçada do modal de exclusão */}
-                                        <DialogContent className="fixed left-1/2 top-1/2 z-50 w-[95%] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-[2.5rem] border border-border/40 bg-card p-8 shadow-2xl">
+                                        
+                                        {/* 🟢 z-[100] adicionado para furar o blur */}
+                                        <DialogContent className="fixed left-1/2 top-1/2 z-[100] w-[95%] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-[2.5rem] border border-border/40 bg-card p-8 shadow-2xl">
                                             <DialogHeader className="flex flex-col items-center text-center">
                                                 <div className="h-14 w-14 rounded-2xl bg-red-500/10 flex items-center justify-center text-red-500 mb-4">
                                                     <ShieldAlert className="h-7 w-7" />
@@ -361,11 +386,11 @@ export function SiteEditor({ site }: { site: SiteWithPages }) {
                                                     className="h-14 rounded-2xl bg-muted/40 border-border/60 shadow-inner font-bold text-center text-lg focus-visible:ring-red-500/20"
                                                 />
                                                 <Button 
-                                                    disabled={deleteConfirmName !== site.name} 
+                                                    disabled={deleteConfirmName !== site.name || isDeleting} 
                                                     onClick={handleFinalDeleteSite}
                                                     className="w-full h-14 rounded-2xl bg-destructive text-white hover:bg-destructive/90 font-black uppercase tracking-widest text-[11px] shadow-lg disabled:opacity-30 transition-all"
                                                 >
-                                                    DELETAR PROJETO PERMANENTEMENTE
+                                                    {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "DELETAR PROJETO PERMANENTEMENTE"}
                                                 </Button>
                                             </div>
                                         </DialogContent>
@@ -374,6 +399,7 @@ export function SiteEditor({ site }: { site: SiteWithPages }) {
                             </Card>
                         </div>
                     </TabsContent>
+
                 </Tabs>
             </main>
         </div>

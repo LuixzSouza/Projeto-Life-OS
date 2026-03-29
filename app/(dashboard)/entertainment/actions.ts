@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 
 // --- TIPAGEM FORTE ---
 
-export type MediaType = 'MOVIE' | 'TV_SHOW' | 'ALBUM' | 'GAME';
+// 🟢 ADICIONADO: 'BOOK'
+export type MediaType = 'MOVIE' | 'TV_SHOW' | 'ALBUM' | 'GAME' | 'BOOK';
 
 export type SearchResult = {
   id: string;
@@ -44,15 +45,30 @@ interface RawgItem {
   background_image?: string;
 }
 
+// 🟢 ADICIONADO: Interface do Google Books
+interface GoogleBooksItem {
+  id: string;
+  volumeInfo: {
+    title?: string;
+    authors?: string[];
+    description?: string;
+    publishedDate?: string;
+    imageLinks?: {
+      thumbnail?: string;
+    };
+  };
+}
+
 // Helper para pegar usuário 
 async function getAuthenticatedUserId() {
   const user = await prisma.user.findFirst();
   return user?.id;
 }
 
-// --- BUSCA NA API ---
+// --- BUSCA NAS APIs ---
 
-export async function searchMedia(query: string, type: 'VIDEO' | 'MUSIC' | 'GAME'): Promise<SearchResult[]> {
+// 🟢 ADICIONADO: 'BOOK' na assinatura da função
+export async function searchMedia(query: string, type: 'VIDEO' | 'MUSIC' | 'GAME' | 'BOOK'): Promise<SearchResult[]> {
   if (!query) return [];
 
   const results: SearchResult[] = [];
@@ -60,7 +76,7 @@ export async function searchMedia(query: string, type: 'VIDEO' | 'MUSIC' | 'GAME
   try {
     // 1. MÚSICA (iTunes)
     if (type === 'MUSIC') {
-      const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=album&limit=5`);
+      const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&entity=album&limit=6`);
       const data = await res.json();
       
       const items: SearchResult[] = (data.results as ItunesItem[]).map((item) => ({
@@ -69,7 +85,7 @@ export async function searchMedia(query: string, type: 'VIDEO' | 'MUSIC' | 'GAME
         creator: item.artistName, 
         overview: null,
         releaseYear: item.releaseDate ? item.releaseDate.split('-')[0] : null,
-        coverUrl: item.artworkUrl100?.replace('100x100bb', '500x500bb'),
+        coverUrl: item.artworkUrl100?.replace('100x100bb', '500x500bb'), // Pega imagem em alta resolução
         type: 'ALBUM'
       }));
       results.push(...items);
@@ -86,7 +102,7 @@ export async function searchMedia(query: string, type: 'VIDEO' | 'MUSIC' | 'GAME
 
         const items: SearchResult[] = (data.results as TmdbItem[])
           .filter((item) => item.media_type === 'movie' || item.media_type === 'tv')
-          .slice(0, 6)
+          .slice(0, 8)
           .map((item) => ({
             id: String(item.id),
             title: item.title || item.name || 'Sem Título',
@@ -106,7 +122,7 @@ export async function searchMedia(query: string, type: 'VIDEO' | 'MUSIC' | 'GAME
       const apiKey = settings?.rawgApiKey || process.env.RAWG_API_KEY;
 
       if (apiKey) {
-        const res = await fetch(`https://api.rawg.io/api/games?key=${apiKey}&search=${encodeURIComponent(query)}&page_size=5`);
+        const res = await fetch(`https://api.rawg.io/api/games?key=${apiKey}&search=${encodeURIComponent(query)}&page_size=6`);
         const data = await res.json();
 
         const items: SearchResult[] = (data.results as RawgItem[]).map((item) => ({
@@ -118,6 +134,30 @@ export async function searchMedia(query: string, type: 'VIDEO' | 'MUSIC' | 'GAME
           coverUrl: item.background_image || null,
           type: 'GAME'
         }));
+        results.push(...items);
+      }
+    }
+
+    // 🟢 4. LIVROS (Google Books)
+    if (type === 'BOOK') {
+      const res = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(query)}&maxResults=8&langRestrict=pt`);
+      const data = await res.json();
+
+      if (data.items) {
+        const items: SearchResult[] = (data.items as GoogleBooksItem[]).map((book) => {
+          const info = book.volumeInfo;
+          return {
+            id: book.id,
+            title: info.title || 'Sem Título',
+            // Junta os autores se houver mais de um
+            creator: info.authors ? info.authors.join(', ') : 'Autor Desconhecido',
+            overview: info.description || null,
+            releaseYear: info.publishedDate ? info.publishedDate.split('-')[0] : null,
+            // Força HTTPS para evitar erro de Mixed Content no Next.js
+            coverUrl: info.imageLinks?.thumbnail ? info.imageLinks.thumbnail.replace('http:', 'https:') : null,
+            type: 'BOOK'
+          };
+        });
         results.push(...items);
       }
     }
@@ -158,7 +198,6 @@ export async function addMediaItem(item: SearchResult) {
   }
 }
 
-// 🟢 CORRIGIDO: Busca apenas pelo ID da obra, evitando erro do Prisma
 export async function updateMediaStatus(id: string, newStatus: string) {
     try {
         await prisma.mediaItem.update({
@@ -174,7 +213,6 @@ export async function updateMediaStatus(id: string, newStatus: string) {
     }
 }
 
-// 🟢 CORRIGIDO: Busca apenas pelo ID da obra
 export async function updateMediaDetails(id: string, rating: number, notes: string) {
   try {
       await prisma.mediaItem.update({
@@ -193,7 +231,6 @@ export async function updateMediaDetails(id: string, rating: number, notes: stri
   }
 }
 
-// 🟢 CORRIGIDO: Busca apenas pelo ID da obra
 export async function deleteMediaItem(id: string) {
   try {
       await prisma.mediaItem.delete({ 

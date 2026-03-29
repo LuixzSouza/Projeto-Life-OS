@@ -96,12 +96,8 @@ export async function savePageContent(formData: FormData) {
   const pageId = formData.get("pageId") as string;
   const content = formData.get("content") as string;
 
-  // Validação dura para impedir que o banco quebre a aplicação cliente depois
-  try {
-    JSON.parse(content);
-  } catch {
-    throw new Error("SyntaxError: O payload fornecido não é um JSON válido.");
-  }
+  // Remova o bloco try/catch com JSON.parse() que tinha aqui!
+  // Agora vamos apenas salvar o conteúdo cru (seja JSON, HTML, Texto...)
 
   await prisma.sitePage.update({
     where: { id: pageId },
@@ -110,3 +106,21 @@ export async function savePageContent(formData: FormData) {
 
   revalidatePath("/cms");
 }
+
+export async function updateSite(formData: FormData) {
+  const id = formData.get("id") as string;
+  const name = formData.get("name") as string;
+  const url = formData.get("url") as string;
+
+  if (!id || !name) throw new Error("ID e Nome são obrigatórios.");
+
+  await prisma.managedSite.update({
+    where: { id },
+    data: { name, url }
+  });
+
+  revalidatePath("/cms");
+  revalidatePath(`/cms/${id}`);
+}
+
+

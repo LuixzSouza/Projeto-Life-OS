@@ -1,11 +1,11 @@
 import { prisma } from "@/lib/prisma";
-import { Shirt, DollarSign, Layers, Sparkles, Tag, TrendingUp, AlertCircle, RefreshCw } from "lucide-react";
+import { Shirt, DollarSign, Tag, TrendingUp, AlertCircle, RefreshCw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { WardrobeList } from "@/components/wardrobe/wardrobe-list";
 import { WardrobeFormDialog } from "@/components/wardrobe/wardrobe-form-dialog";
 import { cn } from "@/lib/utils";
 
-// --- 1. Definimos o Tipo Exato ---
+// --- TIPAGENS ---
 type WardrobeStatus = "IN_CLOSET" | "LAUNDRY" | "LENT" | "REPAIR" | "DONATED";
 
 interface SerializedWardrobeItem {
@@ -27,41 +27,43 @@ interface SerializedWardrobeItem {
   userId: string;
 }
 
-// --- Componentes de UI Auxiliares ---
+// --- COMPONENTES DE UI AUXILIARES (Design Limpo) ---
 interface MetricCardProps {
   label: string;
   value: string | number;
   icon: React.ElementType;
   description?: string;
-  trend?: { value: string, positive: boolean }; // 🟢 NOVO: Para mostrar métricas como "Boa Rotação"
+  trend?: { value: string, positive: boolean }; 
 }
 
 function MetricCard({ label, value, icon: Icon, description, trend }: MetricCardProps) {
   return (
-    <Card className="bg-card border-border/60 hover:border-primary/30 transition-all duration-300 shadow-sm hover:shadow-md group h-full">
-      <CardContent className="p-6 flex flex-col h-full justify-between gap-4">
+    <Card className="bg-card border-border/40 shadow-sm hover:shadow-md hover:border-border/80 transition-all duration-300 h-full flex flex-col">
+      <CardContent className="p-5 flex flex-col h-full justify-between gap-4">
         <div className="flex items-start justify-between">
-          <div>
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+          <div className="space-y-1">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
               {label}
             </p>
             <h3 className="text-2xl font-bold tracking-tight text-foreground">
               {value}
             </h3>
           </div>
-          <div className="p-3 rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/20 group-hover:scale-110 transition-transform duration-300">
-            <Icon className="h-5 w-5" />
+          <div className="p-2.5 rounded-xl bg-muted text-muted-foreground shrink-0">
+            <Icon className="h-4 w-4" />
           </div>
         </div>
         
-        <div className="flex items-center justify-between mt-auto pt-2 border-t border-border/30">
+        <div className="flex items-center justify-between mt-auto pt-4 border-t border-border/40">
           {description && (
-            <p className="text-xs text-muted-foreground line-clamp-1">{description}</p>
+            <p className="text-xs font-medium text-muted-foreground truncate pr-2">{description}</p>
           )}
           {trend && (
             <span className={cn(
-              "text-[10px] font-bold px-2 py-0.5 rounded-full flex shrink-0 ml-2",
-              trend.positive ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400"
+              "text-[10px] font-bold px-2 py-0.5 rounded-md flex shrink-0",
+              trend.positive 
+                ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20" 
+                : "bg-rose-500/10 text-rose-600 border border-rose-500/20"
             )}>
               {trend.value}
             </span>
@@ -75,24 +77,27 @@ function MetricCard({ label, value, icon: Icon, description, trend }: MetricCard
 function HighlightCard({ label, value, subValue, icon: Icon, variant = "default" }: { label: string, value: string, subValue: string, icon: React.ElementType, variant?: "default" | "alert" }) {
   return (
     <Card className={cn(
-      "relative overflow-hidden border-0 shadow-lg group h-full",
-      variant === "default" ? "bg-primary text-primary-foreground" : "bg-destructive text-destructive-foreground"
+      "relative overflow-hidden border border-border/40 shadow-sm group h-full",
+      variant === "default" ? "bg-primary/5 border-primary/20" : "bg-rose-500/5 border-rose-500/20"
     )}>
-      <div className="absolute -right-6 -top-6 opacity-10 group-hover:scale-110 transition-transform duration-500">
-        <Icon className="h-32 w-32" />
+      <div className={cn(
+          "absolute -right-4 -top-4 opacity-10 group-hover:scale-110 transition-transform duration-500",
+          variant === "default" ? "text-primary" : "text-rose-500"
+      )}>
+        <Icon className="h-24 w-24" />
       </div>
       
-      <CardContent className="p-6 relative z-10 flex flex-col h-full justify-between">
+      <CardContent className="p-5 relative z-10 flex flex-col h-full justify-between">
         <div>
-          <div className="flex items-center gap-2 mb-2 opacity-90">
-            {variant === "default" ? <Sparkles className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
-            <p className="text-xs font-bold uppercase tracking-wider">{label}</p>
+          <div className={cn("flex items-center gap-1.5 mb-3", variant === "default" ? "text-primary" : "text-rose-500")}>
+            <Icon className="h-3.5 w-3.5" />
+            <p className="text-[10px] font-bold uppercase tracking-wider">{label}</p>
           </div>
-          <h3 className="text-xl font-black leading-tight truncate pr-2">
+          <h3 className="text-lg font-bold leading-tight line-clamp-2 text-foreground pr-4">
             {value}
           </h3>
         </div>
-        <p className="text-sm opacity-90 mt-4 font-medium bg-black/10 inline-block px-3 py-1 rounded-md backdrop-blur-sm w-fit">
+        <p className="text-xs font-medium text-muted-foreground mt-4 pt-4 border-t border-border/40 line-clamp-1">
           {subValue}
         </p>
       </CardContent>
@@ -100,16 +105,15 @@ function HighlightCard({ label, value, subValue, icon: Icon, variant = "default"
   );
 }
 
-// --- Página Principal ---
+// --- PÁGINA PRINCIPAL ---
 export default async function WardrobePage() {
   const items = await prisma.wardrobeItem.findMany({
     orderBy: { createdAt: 'desc' }
   });
 
-  // --- 🧠 INTELIGÊNCIA DO CLOSET (CÁLCULOS REAIS) ---
+  // --- 🧠 INTELIGÊNCIA DO CLOSET ---
   const totalItems = items.length;
   
-  // 1. Custo Total & Custo por Uso (Cost Per Wear)
   let totalValue = 0;
   let totalWearCount = 0;
   let itemsWithPrice = 0;
@@ -123,19 +127,15 @@ export default async function WardrobePage() {
   });
 
   const averagePrice = itemsWithPrice > 0 ? totalValue / itemsWithPrice : 0;
-  // Custo por uso médio: Quanto custa cada vez que ele veste uma roupa do armário?
   const averageCostPerWear = totalWearCount > 0 ? (totalValue / totalWearCount).toFixed(2) : "0.00";
 
-  // 2. Taxa de Rotação (Peças usadas vs Peças paradas)
   const itemsWorn = items.filter(i => i.wearCount > 0).length;
   const rotationRate = totalItems > 0 ? Math.round((itemsWorn / totalItems) * 100) : 0;
 
-  // 3. O Mais Usado vs O Encalhado
   const mostWornItem = items.length > 0 
     ? items.reduce((prev, current) => (prev.wearCount > current.wearCount) ? prev : current)
     : null;
 
-  // Pega uma peça que custou caro (acima da média), nunca ou pouco usada (wearCount <= 1), e que não é recente (para não pegar compras de ontem)
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -148,7 +148,7 @@ export default async function WardrobePage() {
   
   const forgottenItem = neglectedItems.length > 0 ? neglectedItems[0] : null;
 
-  // Serialização
+  // Serialização para o Client Component
   const serializedItems: SerializedWardrobeItem[] = items.map(item => ({
     ...item,
     price: item.price ? Number(item.price) : null,
@@ -164,84 +164,76 @@ export default async function WardrobePage() {
   }));
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className="min-h-screen bg-background w-full pb-12">
       
-      {/* HEADER */}
-      <header className="border-b border-border/60 bg-gradient-to-b from-primary/5 to-background pt-10 pb-8 px-6 md:px-8">
-        <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground flex items-center gap-3">
-              <div className="p-2.5 bg-primary rounded-lg shadow-lg shadow-primary/25 text-primary-foreground">
-                <Shirt className="h-6 w-6" />
-              </div>
-              Estilo & Acervo
-            </h1>
-            <p className="text-muted-foreground text-lg max-w-2xl">
-              Descubra o valor real das suas roupas. Vista o que você ama, desapegue do que pesa.
-            </p>
+      {/* HEADER LIMPO E SÓBRIO */}
+      <header className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border/40 px-6 md:px-8 py-6">
+        <div className=" mx-auto w-full flex flex-col md:flex-row md:items-center justify-between gap-6">
+          
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+              <Shirt className="h-6 w-6" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-3">
+                Closet & Acervo
+              </h1>
+              <p className="text-sm text-muted-foreground mt-1 max-w-md">
+                Gerencie suas peças, otimize seus looks e acompanhe o real custo por uso.
+              </p>
+            </div>
           </div>
           
-          <div className="flex items-center gap-3">
+          {/* Botão de Adição Rápida */}
+          <div className="shrink-0 w-full md:w-auto flex">
             <WardrobeFormDialog mode="create" />
           </div>
         </div>
       </header>
 
-      <main className="px-6 md:px-8 py-8 space-y-10 max-w-[1600px] mx-auto">
+      <main className="mx-auto w-full px-6 md:px-8 py-8 space-y-8 animate-in fade-in duration-500">
 
-        {/* 🟢 DASHBOARD DE INTELIGÊNCIA (O argumento para o amigo) */}
-        <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-          
+        {/* 🟢 DASHBOARD DE INTELIGÊNCIA */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
           <MetricCard 
-            label="Patrimônio em Roupas" 
+            label="Patrimônio Estimado" 
             value={totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })} 
             icon={DollarSign} 
             description={`${totalItems} peças no acervo`}
-            trend={{ value: `Média R$ ${averagePrice.toFixed(0)}/peça`, positive: true }}
+            trend={{ value: `Média R$ ${averagePrice.toFixed(0)}`, positive: true }}
           />
 
           <MetricCard 
-            label="Eficiência do Armário" 
+            label="Eficiência de Uso (CPW)" 
             value={`R$ ${averageCostPerWear}`} 
             icon={RefreshCw} 
-            description="Custo médio de cada 'look' (CPW)"
+            description="Custo médio por cada uso"
             trend={{ 
-                value: rotationRate > 60 ? "Ótima rotação" : "Peças paradas", 
+                value: rotationRate > 60 ? `${rotationRate}% em rotação` : `${rotationRate}% estagnado`, 
                 positive: rotationRate > 60 
             }}
           />
 
           <HighlightCard 
-            label="Sua Marca Registrada"
-            value={mostWornItem?.name || "Nenhuma peça destacada"}
+            label="Peça Favorita"
+            value={mostWornItem?.name || "Nenhuma peça"}
             subValue={mostWornItem ? `Usada ${mostWornItem.wearCount} vezes` : "Comece a registrar seus looks!"}
             icon={TrendingUp}
             variant="default"
           />
 
-          {/* O Card do "Choque de Realidade" */}
           <HighlightCard 
-            label="Sugestão de Desapego"
-            value={forgottenItem ? forgottenItem.name : "Armário Limpo!"}
-            subValue={forgottenItem ? `Cara e nunca usada. Venda?` : "Você usa tudo o que tem."}
+            label="Dinheiro Parado"
+            value={forgottenItem ? forgottenItem.name : "Acervo Limpo!"}
+            subValue={forgottenItem ? `Cara e não usada. Vender?` : "Você usa tudo o que tem."}
             icon={Tag}
             variant={forgottenItem ? "alert" : "default"}
           />
-
         </section>
 
         {/* LISTA DE ITENS */}
-        <section className="space-y-6">
-          <div className="flex items-center justify-between border-b border-border/50 pb-4">
-            <div className="flex items-center gap-2">
-              <div className="h-6 w-1 bg-primary rounded-full" />
-              <h2 className="text-xl font-semibold text-foreground">Seu Inventário</h2>
-            </div>
-          </div>
-
-          <div className="bg-card/50 rounded-xl border border-border/60 shadow-sm backdrop-blur-[2px]">
-             <WardrobeList initialData={serializedItems} />
-          </div>
+        <section className="space-y-4">
+          <WardrobeList initialData={serializedItems} />
         </section>
 
       </main>

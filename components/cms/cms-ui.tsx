@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { ManagedSite, SitePage } from "@prisma/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -38,11 +38,9 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 
 import {
   Plus,
@@ -52,14 +50,19 @@ import {
   Check,
   Code2,
   ExternalLink,
-  Sparkles,
-  RotateCcw,
   Terminal,
   Database,
   AlertCircle,
   ShieldCheck,
-  Globe
+  Globe,
+  Loader2
 } from "lucide-react";
+
+// 🟢 NOVOS IMPORTS DO CODEMIRROR
+import CodeMirror from '@uiw/react-codemirror';
+import { json as jsonLang } from '@codemirror/lang-json';
+import { javascript } from '@codemirror/lang-javascript';
+import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 
 /* ======================================================
    TYPES
@@ -98,109 +101,100 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
 }
 
 /* ======================================================
-   JSON EDITOR (Terminal UI)
+   CODE EDITOR (Terminal UI - Atualizado)
 ====================================================== */
-function JsonEditor({ page }: { page: SitePage }) {
-  const [json, setJson] = useState<string>(page.content);
-  const [dirty, setDirty] = useState(false);
-  const [isValid, setIsValid] = useState(true);
+function CodeEditor({ page }: { page: SitePage }) {
+  const [code, setCode] = useState<string>(page.content);
+  const [isDirty, setIsDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const handleChange = (value: string) => {
-    setJson(value);
-    setDirty(true);
-    try {
-      JSON.parse(value);
-      setIsValid(true);
-    } catch {
-      setIsValid(false);
-    }
-  };
+  const onChange = useCallback((val: string) => {
+      setCode(val);
+      setIsDirty(true);
+  }, []);
 
   const handleSave = async () => {
-    if (!isValid) {
-      toast.error("Erro de sintaxe no JSON");
-      return;
-    }
-
+    setIsSaving(true);
     const fd = new FormData();
     fd.append("pageId", page.id);
-    fd.append("content", json);
+    fd.append("content", code);
 
     try {
       await savePageContent(fd);
       toast.success("Build completo: Conteúdo sincronizado");
-      setDirty(false);
+      setIsDirty(false);
     } catch {
       toast.error("Falha na sincronização");
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleReset = () => {
-    setJson(page.content);
-    setDirty(false);
-    setIsValid(true);
-  };
+  let isJsonValid = true;
+  try { JSON.parse(code); } catch { isJsonValid = false; }
 
   return (
-    <div className="flex flex-col gap-4 h-full animate-in fade-in duration-300">
+    <div className="flex flex-col h-full bg-card border border-border/40 rounded-[2rem] shadow-sm overflow-hidden animate-in fade-in duration-300">
       {/* TOOLBAR DO EDITOR */}
-      <div className="flex items-center justify-between bg-muted/20 p-2 rounded-xl border border-border/40">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between bg-muted/10 border-b border-border/40 p-4 md:px-6 shrink-0">
+        <div className="flex items-center gap-4">
           <Badge variant="outline" className="font-mono text-[10px] font-bold bg-background shadow-inner">
             /{page.slug}
           </Badge>
 
-          {!isValid && (
-            <Badge variant="destructive" className="text-[9px] font-black uppercase tracking-widest gap-1">
-              <AlertCircle className="h-3 w-3" /> Syntax Error
-            </Badge>
+          {isDirty ? (
+             <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest gap-1 bg-amber-500/10 text-amber-600 border-amber-500/20">
+                Pendente
+             </Badge>
+          ) : (
+              <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest gap-1 bg-emerald-500/10 text-emerald-600 border-emerald-500/20">
+                 <Check className="h-3 w-3" /> Live
+              </Badge>
           )}
-
-          {dirty && isValid && (
-            <Badge className="bg-primary/10 text-primary border-primary/20 text-[9px] font-black uppercase tracking-widest">
-              Unsaved Changes
-            </Badge>
+          
+          {!isJsonValid && code.length > 0 && (
+             <span className="hidden md:inline text-[10px] font-mono text-muted-foreground/60 uppercase">
+                 (Raw Text Mode)
+             </span>
           )}
         </div>
 
         <div className="flex gap-2">
-          {dirty && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleReset}
-              className="h-8 gap-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg"
-            >
-              <RotateCcw className="h-3 w-3" /> Reverter
-            </Button>
-          )}
-
           <Button
             size="sm"
             onClick={handleSave}
-            disabled={!dirty || !isValid}
-            className="h-8 gap-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg shadow-lg"
+            disabled={!isDirty || isSaving}
+            className="h-8 gap-2 font-black uppercase tracking-widest text-[10px] rounded-lg shadow-lg"
           >
-            <Save className="h-3 w-3" /> Deploy
+            {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+            Deploy
           </Button>
         </div>
       </div>
 
-      {/* ÁREA DO CÓDIGO */}
-      <div className="flex-1 relative rounded-2xl overflow-hidden border border-border/40 shadow-2xl">
-        <Textarea
-          value={json}
-          onChange={(e) => handleChange(e.target.value)}
-          spellCheck={false}
-          className={cn(
-            "h-full w-full resize-none font-mono text-sm bg-[#0C0C0E] text-emerald-400 p-6 leading-relaxed focus-visible:ring-0 border-none custom-scrollbar",
-            !isValid && "text-red-400"
-          )}
-        />
+      {/* 🟢 ÁREA DO CODEMIRROR */}
+      <div className="flex-1 overflow-hidden relative bg-[#1e1e1e]">
+         <ScrollArea className="h-full w-full">
+            <CodeMirror
+                value={code}
+                height="100%"
+                theme={vscodeDark}
+                extensions={[jsonLang(), javascript({ jsx: true })]}
+                onChange={onChange}
+                className="text-[13px] md:text-[14px] leading-relaxed custom-codemirror"
+                basicSetup={{
+                    lineNumbers: true,
+                    foldGutter: true,
+                    highlightActiveLine: true,
+                    bracketMatching: true,
+                    autocompletion: true,
+                }}
+            />
+         </ScrollArea>
       </div>
 
       {/* FOOTER METADATA */}
-      <div className="flex justify-between items-center px-2 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">
+      <div className="bg-muted/10 border-t border-border/40 p-3 px-6 flex justify-between items-center text-[10px] font-mono font-bold text-muted-foreground/50 uppercase tracking-widest shrink-0">
         <span className="flex items-center gap-1"><Terminal className="h-3 w-3" /> Instance: {page.id.split('-')[0]}</span>
         <span>Build: {new Date(page.updatedAt).toLocaleDateString("pt-BR")}</span>
       </div>
@@ -215,11 +209,18 @@ export function SiteManager({ site }: { site: SiteWithPages }) {
   const [activeTab, setActiveTab] = useState<string>(
     site.pages[0]?.id ?? "new"
   );
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDeleteSite = async () => {
     if (!confirm(`ZONA CRÍTICA:\nDeseja remover o projeto "${site.name}" permanentemente?`)) return;
-    await deleteSite(site.id);
-    toast.success("Container removido");
+    setIsDeleting(true);
+    try {
+        await deleteSite(site.id);
+        toast.success("Container removido");
+    } catch {
+        toast.error("Erro ao deletar container.");
+        setIsDeleting(false);
+    }
   };
 
   return (
@@ -231,10 +232,10 @@ export function SiteManager({ site }: { site: SiteWithPages }) {
         </Button>
       </SheetTrigger>
 
-      <SheetContent className="w-[95%] sm:w-[800px] flex flex-col h-full bg-card border-l border-border/40 p-0 overflow-hidden">
+      <SheetContent className="w-[95%] sm:w-[800px] flex flex-col h-full bg-background border-l border-border/40 p-0 overflow-hidden">
         {/* HEADER TÁTICO */}
         <div className="p-8 border-b border-border/40 bg-muted/10 shrink-0">
-          <SheetHeader className="space-y-4">
+          <SheetHeader className="space-y-4 text-left">
             <div className="flex items-start justify-between">
               <div className="space-y-1">
                 <SheetTitle className="text-2xl font-black uppercase tracking-tighter flex items-center gap-3">
@@ -252,9 +253,10 @@ export function SiteManager({ site }: { site: SiteWithPages }) {
                 variant="ghost"
                 size="icon"
                 onClick={handleDeleteSite}
+                disabled={isDeleting}
                 className="h-10 w-10 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
               >
-                <Trash2 className="h-5 w-5" />
+                {isDeleting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Trash2 className="h-5 w-5" />}
               </Button>
             </div>
 
@@ -275,13 +277,13 @@ export function SiteManager({ site }: { site: SiteWithPages }) {
         </div>
 
         {/* EDITOR AREA */}
-        <div className="flex-1 flex flex-col overflow-hidden bg-background">
+        <div className="flex-1 flex flex-col overflow-hidden bg-background/50 relative">
           <Tabs
             value={activeTab}
             onValueChange={setActiveTab}
-            className="flex flex-col flex-1"
+            className="flex flex-col flex-1 h-full relative"
           >
-            <div className="px-8 pt-4 border-b border-border/20 bg-muted/5">
+            <div className="px-8 pt-4 border-b border-border/20 bg-muted/5 shrink-0">
                 <ScrollArea className="w-full">
                 <TabsList className="bg-transparent h-12 gap-2 p-0 justify-start">
                     {site.pages.map((page) => (
@@ -304,16 +306,15 @@ export function SiteManager({ site }: { site: SiteWithPages }) {
                 </ScrollArea>
             </div>
 
-            <div className="flex-1 p-8 overflow-hidden">
-                {/* LISTA DE PÁGINAS */}
+            <div className="flex-1 p-6 md:p-8 overflow-hidden relative">
+                {/* LISTA DE PÁGINAS COM O NOVO CODE EDITOR */}
                 {site.pages.map((page) => (
                 <TabsContent
                     key={page.id}
                     value={page.id}
                     className="h-full m-0 focus-visible:ring-0"
                 >
-                    {/* key força remount para carregar o novo conteúdo corretamente */}
-                    <JsonEditor key={page.id} page={page} />
+                    <CodeEditor page={page} />
 
                     <div className="mt-4 flex justify-between items-center">
                         <p className="text-[10px] font-bold text-muted-foreground/40 uppercase tracking-widest italic">
@@ -324,6 +325,8 @@ export function SiteManager({ site }: { site: SiteWithPages }) {
                                 if (confirm(`Remover permanentemente a rota /${page.slug}?`)) {
                                     await deletePage(page.id);
                                     toast.success("Rota removida da rede");
+                                    // Se a aba excluída era a ativa, joga o usuário para "new" para evitar tela quebrada
+                                    if(activeTab === page.id) setActiveTab("new");
                                 }
                             }}
                         >
@@ -340,46 +343,46 @@ export function SiteManager({ site }: { site: SiteWithPages }) {
                 ))}
 
                 {/* FORMULÁRIO DE NOVA PÁGINA */}
-                <TabsContent value="new" className="h-full m-0 focus-visible:ring-0 animate-in slide-in-from-bottom-2 duration-300">
-                <Card className="border-border/40 bg-muted/5 shadow-xl rounded-[2rem] border-dashed">
-                    <CardHeader className="p-8 pb-4">
-                    <CardTitle className="text-xl font-black uppercase tracking-tighter">Inicializar Nova Rota</CardTitle>
-                    <CardDescription className="text-xs font-medium uppercase tracking-wider text-muted-foreground/60">
-                        Defina o caminho do seu novo endpoint JSON.
-                    </CardDescription>
-                    </CardHeader>
+                <TabsContent value="new" className="h-full m-0 focus-visible:ring-0 animate-in slide-in-from-bottom-2 duration-300 overflow-y-auto">
+                    <Card className="border-border/40 bg-muted/5 shadow-xl rounded-[2rem] border-dashed">
+                        <CardHeader className="p-8 pb-4">
+                        <CardTitle className="text-xl font-black uppercase tracking-tighter">Inicializar Nova Rota</CardTitle>
+                        <CardDescription className="text-xs font-medium uppercase tracking-wider text-muted-foreground/60">
+                            Defina o caminho do seu novo endpoint JSON.
+                        </CardDescription>
+                        </CardHeader>
 
-                    <CardContent className="p-8 pt-0">
-                    <form
-                        action={async (fd) => {
-                        await createPage(fd);
-                        toast.success("Build: Nova rota provisionada");
-                        }}
-                        className="space-y-6"
-                    >
-                        <input type="hidden" name="siteId" value={site.id} />
+                        <CardContent className="p-8 pt-0">
+                        <form
+                            action={async (fd) => {
+                            await createPage(fd);
+                            toast.success("Build: Nova rota provisionada");
+                            }}
+                            className="space-y-6"
+                        >
+                            <input type="hidden" name="siteId" value={site.id} />
 
-                        <div className="space-y-3">
-                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Slug do Endpoint</Label>
-                        <div className="flex h-12 bg-muted/20 border border-border/50 rounded-xl shadow-inner focus-within:ring-2 focus-within:ring-primary/20 transition-all p-1">
-                            <span className="flex items-center justify-center px-4 font-mono font-bold text-muted-foreground bg-muted/40 rounded-lg border border-border/40 mr-1">
-                            /
-                            </span>
-                            <Input
-                            name="slug"
-                            required
-                            placeholder="ex: servicos-v1"
-                            className="border-none bg-transparent shadow-none font-mono font-bold text-sm h-full focus-visible:ring-0"
-                            />
-                        </div>
-                        </div>
+                            <div className="space-y-3">
+                            <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Slug do Endpoint</Label>
+                            <div className="flex h-12 bg-muted/20 border border-border/50 rounded-xl shadow-inner focus-within:ring-2 focus-within:ring-primary/20 transition-all p-1">
+                                <span className="flex items-center justify-center px-4 font-mono font-bold text-muted-foreground bg-muted/40 rounded-lg border border-border/40 mr-1">
+                                /
+                                </span>
+                                <Input
+                                name="slug"
+                                required
+                                placeholder="ex: servicos-v1"
+                                className="border-none bg-transparent shadow-none font-mono font-bold text-sm h-full focus-visible:ring-0"
+                                />
+                            </div>
+                            </div>
 
-                        <Button type="submit" className="w-full h-12 rounded-xl bg-foreground text-background hover:bg-foreground/90 font-black uppercase tracking-widest text-[11px] shadow-xl">
-                            Provisionar Rota
-                        </Button>
-                    </form>
-                    </CardContent>
-                </Card>
+                            <Button type="submit" className="w-full h-12 rounded-xl bg-foreground text-background hover:bg-foreground/90 font-black uppercase tracking-widest text-[11px] shadow-xl">
+                                Provisionar Rota
+                            </Button>
+                        </form>
+                        </CardContent>
+                    </Card>
                 </TabsContent>
             </div>
           </Tabs>
