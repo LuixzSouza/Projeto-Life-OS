@@ -1,17 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { updateAISettings } from "@/app/(dashboard)/settings/actions";
+import { updateAISettings, testApiConnection } from "@/app/(dashboard)/settings/actions";
 import { toast } from "sonner";
-import { 
-    Cpu, Bot, Cloud, HardDrive, KeyRound, Save, 
-    Zap, Sparkles, Loader2, CheckCircle2, Brain, 
-    Wind, ExternalLink, Eye, EyeOff, RotateCcw
+import {
+    Cpu, Bot, Cloud, HardDrive, KeyRound, Save,
+    Zap, Sparkles, Loader2, CheckCircle2, Brain,
+    Wind, ExternalLink, Eye, EyeOff, RotateCcw, TestTube2
 } from "lucide-react";
 import { Settings } from "@prisma/client"; 
 import { cn } from "@/lib/utils";
@@ -26,8 +26,10 @@ const DEFAULT_PERSONA = "Você é o núcleo de inteligência (Cérebro Digital) 
 export function AIConfigForm({ settings }: AIConfigFormProps) {
     const [provider, setProvider] = useState(settings?.aiProvider || "ollama");
     const [isLoading, setIsLoading] = useState(false);
+    const [isTesting, setIsTesting] = useState(false);
     const [showKey, setShowKey] = useState(false);
     const [personaText, setPersonaText] = useState(settings?.aiPersona || "");
+    const keyRef = useRef<HTMLInputElement>(null);
 
     const getProviderLink = () => {
         switch (provider) {
@@ -64,7 +66,25 @@ export function AIConfigForm({ settings }: AIConfigFormProps) {
     };
 
     const restoreDefaultPersona = () => {
-        setPersonaText(""); 
+        setPersonaText("");
+    };
+
+    const handleTestConnection = async () => {
+        const currentKey = keyRef.current?.value?.trim() || "";
+        if (!isLocal && !currentKey) {
+            toast.error("Insira a chave antes de testar.");
+            return;
+        }
+        setIsTesting(true);
+        try {
+            const res = await testApiConnection({ type: provider, key: currentKey });
+            if (res.success) toast.success(res.message);
+            else toast.error(res.message);
+        } catch {
+            toast.error("Falha ao testar a conexão.");
+        } finally {
+            setIsTesting(false);
+        }
     };
 
     return (
@@ -135,11 +155,12 @@ export function AIConfigForm({ settings }: AIConfigFormProps) {
                     </div>
                     
                     <div className="relative group/input">
-                        <Input 
-                            key={provider} 
-                            name={`${provider}Key`} 
-                            type={showKey ? "text" : "password"} 
-                            defaultValue={getCurrentApiKey()} 
+                        <Input
+                            key={provider}
+                            ref={keyRef}
+                            name={`${provider}Key`}
+                            type={showKey ? "text" : "password"}
+                            defaultValue={getCurrentApiKey()}
                             placeholder={isLocal ? "Modo Offline: Chave não necessária" : "sk-..."} 
                             disabled={isLocal} 
                             className={cn("bg-background font-mono text-sm rounded-xl h-12 pr-12", isLocal ? "border-transparent" : "border-primary/30 focus-visible:ring-primary")} 
@@ -207,11 +228,24 @@ export function AIConfigForm({ settings }: AIConfigFormProps) {
                 </p>
             </div>
 
-            {/* --- BOTÃO SALVAR --- */}
-            <div className="flex justify-end pt-2">
-                <Button 
-                    type="submit" 
-                    disabled={isLoading} 
+            {/* --- BOTÕES: TESTAR + SALVAR --- */}
+            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-2">
+                <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleTestConnection}
+                    disabled={isTesting}
+                    className="font-black uppercase tracking-widest text-[10px] rounded-full h-12 px-6 border-border/60"
+                >
+                    {isTesting ? (
+                        <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin"/> Testando...</span>
+                    ) : (
+                        <span className="flex items-center gap-2"><TestTube2 className="h-4 w-4" /> Testar Conexão</span>
+                    )}
+                </Button>
+                <Button
+                    type="submit"
+                    disabled={isLoading}
                     className="bg-foreground text-background hover:bg-foreground/90 font-black uppercase tracking-widest text-[10px] rounded-full h-12 px-8 shadow-xl transition-transform hover:scale-105"
                 >
                     {isLoading ? (
