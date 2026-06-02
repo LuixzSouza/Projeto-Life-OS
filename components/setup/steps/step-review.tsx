@@ -21,7 +21,11 @@ export function StepReview({ formData }: StepReviewProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           <div className="bg-background p-3 rounded border border-border">
             <span className="text-xs text-muted-foreground block mb-1">Banco de Dados</span>
-            <code className="text-primary font-mono">{formData.storagePath}\life_os.db</code>
+            {formData.storageMode === "cloud" ? (
+              <code className="text-primary font-mono break-all">{formData.tursoUrl || "Turso (nuvem)"}</code>
+            ) : (
+              <code className="text-primary font-mono">{formData.storagePath}\life_os.db</code>
+            )}
           </div>
           <div className="bg-background p-3 rounded border border-border">
             <span className="text-xs text-muted-foreground block mb-1">IA Provider</span>

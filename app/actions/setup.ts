@@ -1,12 +1,11 @@
 "use server";
 
-// NÃO importamos a instância global 'prisma' aqui para evitar cache antigo
-import { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { login, hashPassword } from "@/lib/auth";
-import { setDbProfile } from "@/lib/db-config";
-import { reconnectPrisma } from "@/lib/prisma";
+import { setDbProfile, getEnvProfile, type DbProfile } from "@/lib/db-config";
+import { reconnectPrisma, buildClient } from "@/lib/prisma";
 import { ensureSchema } from "@/lib/db-bootstrap";
 import { validatePasswordStrength } from "@/lib/password-policy";
 import fs from "fs";
@@ -25,7 +24,6 @@ function ensureWritableFolder(storagePath: string) {
     }
   }
 
-  // Teste de escrita real (cria e remove um arquivo temporário).
   const probe = path.join(storagePath, ".lifeos_write_test");
   try {
     fs.writeFileSync(probe, "ok");
@@ -35,38 +33,65 @@ function ensureWritableFolder(storagePath: string) {
   }
 }
 
+/**
+ * Resolve o perfil de banco a partir do formulário do wizard.
+ * - local: valida/cria a pasta e aponta para `<pasta>/life_os.db`.
+ * - cloud: valida a URL do Turso (libSQL) e o token.
+ * Retorna também o `storagePath` para gravar em Settings (vazio na nuvem).
+ */
+function resolveProfileFromForm(formData: FormData): {
+  profile: DbProfile;
+  storagePath: string;
+} {
+  const mode = (formData.get("storageMode") as string) || "local";
+
+  if (mode === "cloud") {
+    const url = ((formData.get("tursoUrl") as string) || "").trim();
+    const authToken = ((formData.get("tursoToken") as string) || "").trim() || undefined;
+    if (!url) throw new Error("A URL do banco na nuvem (Turso) é obrigatória.");
+    if (!/^(libsql|https?):\/\//.test(url)) {
+      throw new Error("URL inválida. Use o formato libsql://... ou https://...");
+    }
+    return { profile: { mode: "cloud", provider: "turso", url, authToken }, storagePath: "" };
+  }
+
+  const storagePath = formData.get("storagePath") as string;
+  if (!storagePath) throw new Error("O caminho do banco de dados é obrigatório.");
+  ensureWritableFolder(storagePath);
+  const dbFilePath = path.join(storagePath, "life_os.db");
+  return { profile: { mode: "local", databasePath: dbFilePath }, storagePath };
+}
+
 export async function setupSystem(formData: FormData) {
   let tempPrisma: PrismaClient | null = null;
 
   try {
     console.log("🚀 Iniciando Setup Completo...");
 
-    // --- PARTE 1: CONFIGURAÇÃO DO ARQUIVO ---
-    const storagePath = formData.get("storagePath") as string;
-    if (!storagePath) throw new Error("O caminho do banco de dados é obrigatório.");
-
-    ensureWritableFolder(storagePath);
-
-    const dbFilePath = path.join(storagePath, "life_os.db");
-    const dbUrl = `file:${dbFilePath}`;
+    // --- PARTE 1: PERFIL DE BANCO (local OU nuvem) ---
+    // Em deploy serverless (Vercel) o banco vem de env vars (TURSO_*) — nesse
+    // caso ignoramos os campos do formulário e usamos o perfil já configurado.
+    const envProfile = getEnvProfile();
+    const { profile, storagePath } = envProfile
+      ? { profile: envProfile, storagePath: "" }
+      : resolveProfileFromForm(formData);
 
     // --- PARTE 2: CONEXÃO DIRETA + CRIAÇÃO DE SCHEMA ---
-    // Cliente NOVO apontando explicitamente para o banco escolhido (ignora
-    // qualquer cache antigo). As tabelas são criadas via SQL baseline em
-    // runtime — SEM depender de `npx prisma db push` (compatível com desktop).
-    tempPrisma = new PrismaClient({ datasources: { db: { url: dbUrl } } });
+    // Cliente NOVO para o destino escolhido (ignora cache antigo). As tabelas
+    // são criadas via SQL baseline em runtime — SEM `npx prisma db push`.
+    tempPrisma = buildClient(profile);
 
-    console.log("📦 Garantindo schema no arquivo:", dbFilePath);
+    console.log(`📦 Garantindo schema (${profile.mode})...`);
     await ensureSchema(tempPrisma);
 
-    // Proteção de dados: se já existe um usuário, o banco é de uma instalação
+    // Proteção de dados: se já existe usuário, o banco é de uma instalação
     // anterior. Não sobrescrevemos — conectamos e orientamos a fazer login.
     const existingUsers = await tempPrisma.user.count();
     if (existingUsers > 0) {
-      setDbProfile({ mode: "local", databasePath: dbFilePath });
+      setDbProfile(profile);
       await reconnectPrisma();
       throw new Error(
-        "Já existe um banco do Life OS nesta pasta. Conexão restaurada — faça login com sua conta existente."
+        "Já existe um banco do Life OS neste destino. Conexão restaurada — faça login com sua conta existente."
       );
     }
 
@@ -128,9 +153,9 @@ export async function setupSystem(formData: FormData) {
     console.log("✅ Dados inseridos com sucesso!");
 
     // --- PARTE 4: ATIVA O PERFIL E RECONECTA O CLIENTE GLOBAL ---
-    // Salva o perfil ANTES de reconectar para que o prisma global passe a
-    // apontar para o banco novo — assim o login imediato funciona SEM reiniciar.
-    setDbProfile({ mode: "local", databasePath: dbFilePath });
+    // Salva o perfil ANTES de reconectar para que o prisma global aponte para o
+    // destino novo — assim o login imediato funciona SEM reiniciar o servidor.
+    setDbProfile(profile);
     await reconnectPrisma();
 
     await login(adminUser.id);

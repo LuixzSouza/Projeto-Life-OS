@@ -32,6 +32,8 @@ export function SetupWizard() {
     theme: "system",
     storageMode: "local",
     storagePath: "C:\\LifeOS_Data", // Padrão Windows (escapado para JS)
+    tursoUrl: "",
+    tursoToken: "",
   });
 
   const nextStep = () => {
@@ -49,7 +51,16 @@ export function SetupWizard() {
     }
     // Validação do Passo 2
     if (step === 2) {
-      if (!formData.storagePath) {
+      if (formData.storageMode === "cloud") {
+        if (!formData.tursoUrl.trim()) {
+          toast.error("Informe a URL do banco na nuvem (Turso).");
+          return;
+        }
+        if (!/^(libsql|https?):\/\//.test(formData.tursoUrl.trim())) {
+          toast.error("URL inválida. Use libsql://... ou https://...");
+          return;
+        }
+      } else if (!formData.storagePath) {
         toast.error("O caminho do banco de dados é obrigatório.");
         return;
       }
@@ -87,6 +98,8 @@ export function SetupWizard() {
           <input type="hidden" name="theme" value={formData.theme} />
           <input type="hidden" name="storageMode" value={formData.storageMode} />
           <input type="hidden" name="storagePath" value={formData.storagePath} />
+          <input type="hidden" name="tursoUrl" value={formData.tursoUrl} />
+          <input type="hidden" name="tursoToken" value={formData.tursoToken} />
 
           <div className="space-y-8">
             <div className="space-y-1">

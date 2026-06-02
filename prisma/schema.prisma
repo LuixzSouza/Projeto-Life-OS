@@ -1,5 +1,8 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  // driverAdapters: permite conectar via @prisma/adapter-libsql (Turso/cloud)
+  // mantendo o provider "sqlite" — local (arquivo) e nuvem usam o MESMO schema.
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {

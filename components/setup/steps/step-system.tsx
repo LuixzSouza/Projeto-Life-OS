@@ -34,52 +34,94 @@ export function StepSystem({ formData, setFormData }: StepSystemProps) {
 
         <button
           type="button"
-          disabled
-          title="Disponível em breve"
-          className="flex flex-col items-start gap-1.5 p-4 rounded-xl border border-dashed border-border bg-muted/10 text-left opacity-60 cursor-not-allowed relative"
+          onClick={() => setFormData({ ...formData, storageMode: "cloud" })}
+          className={cn(
+            "flex flex-col items-start gap-1.5 p-4 rounded-xl border text-left transition-all",
+            formData.storageMode === "cloud"
+              ? "border-primary bg-primary/10 shadow-sm"
+              : "border-border bg-muted/20 hover:border-primary/30"
+          )}
         >
-          <span className="absolute top-2 right-2 text-[9px] font-bold uppercase tracking-wide bg-muted text-muted-foreground px-1.5 py-0.5 rounded">
-            Em breve
-          </span>
-          <Cloud className="h-5 w-5 text-muted-foreground" />
-          <span className="text-sm font-semibold text-foreground">Banco na nuvem</span>
+          <Cloud className={cn("h-5 w-5", formData.storageMode === "cloud" ? "text-primary" : "text-muted-foreground")} />
+          <span className="text-sm font-semibold text-foreground">Banco na nuvem (Turso)</span>
           <span className="text-[11px] text-muted-foreground leading-tight">
-            Sincronize entre dispositivos (Turso/Supabase). Em desenvolvimento.
+            Sincronize entre dispositivos. Ideal para deploy (Vercel) e acesso web.
           </span>
         </button>
       </div>
 
-      <div className="space-y-3 p-4 rounded-xl border border-border bg-muted/20">
-        <Label className="text-foreground flex items-center gap-2 text-base font-semibold">
-          <HardDrive className="h-5 w-5" /> Localização do Banco de Dados
-        </Label>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          O arquivo <code>life_os.db</code> será criado nesta pasta.
-        </p>
-        <div className="grid gap-2 pt-2">
-          <Label htmlFor="storagePath" className="text-xs font-semibold uppercase text-muted-foreground">Caminho da Pasta</Label>
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <FolderInput className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="storagePath"
-                value={formData.storagePath}
-                onChange={(e) => setFormData({ ...formData, storagePath: e.target.value })}
-                placeholder="Ex: C:\LifeOS_Data"
-                className="pl-9 bg-background font-mono text-xs border-border h-10"
-              />
-            </div>
+      {formData.storageMode === "local" ? (
+        <div className="space-y-3 p-4 rounded-xl border border-border bg-muted/20">
+          <Label className="text-foreground flex items-center gap-2 text-base font-semibold">
+            <HardDrive className="h-5 w-5" /> Localização do Banco de Dados
+          </Label>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            O arquivo <code>life_os.db</code> será criado nesta pasta.
+          </p>
+          <div className="grid gap-2 pt-2">
+            <Label htmlFor="storagePath" className="text-xs font-semibold uppercase text-muted-foreground">Caminho da Pasta</Label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <FolderInput className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="storagePath"
+                  value={formData.storagePath}
+                  onChange={(e) => setFormData({ ...formData, storagePath: e.target.value })}
+                  placeholder="Ex: C:\LifeOS_Data"
+                  className="pl-9 bg-background font-mono text-xs border-border h-10"
+                />
+              </div>
 
-            <div className="shrink-0">
-              <FolderPicker
-                currentPath={formData.storagePath}
-                onSelect={(newPath) => setFormData({ ...formData, storagePath: newPath })}
+              <div className="shrink-0">
+                <FolderPicker
+                  currentPath={formData.storagePath}
+                  onSelect={(newPath) => setFormData({ ...formData, storagePath: newPath })}
+                />
+              </div>
+            </div>
+            <p className="text-[10px] text-zinc-500">Dica: Use um caminho curto e sem espaços se possível (ex: C:\LifeOS).</p>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3 p-4 rounded-xl border border-border bg-muted/20">
+          <Label className="text-foreground flex items-center gap-2 text-base font-semibold">
+            <Cloud className="h-5 w-5" /> Conexão com o Turso
+          </Label>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Crie um banco grátis em{" "}
+            <a href="https://turso.tech" target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-2">
+              turso.tech
+            </a>{" "}
+            e cole a URL e o token de autenticação do banco.
+          </p>
+          <div className="grid gap-3 pt-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="tursoUrl" className="text-xs font-semibold uppercase text-muted-foreground">URL do Banco</Label>
+              <Input
+                id="tursoUrl"
+                value={formData.tursoUrl}
+                onChange={(e) => setFormData({ ...formData, tursoUrl: e.target.value })}
+                placeholder="libsql://seu-banco.turso.io"
+                className="bg-background font-mono text-xs border-border h-10"
               />
             </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="tursoToken" className="text-xs font-semibold uppercase text-muted-foreground">Token de Autenticação</Label>
+              <Input
+                id="tursoToken"
+                type="password"
+                value={formData.tursoToken}
+                onChange={(e) => setFormData({ ...formData, tursoToken: e.target.value })}
+                placeholder="eyJhbGciOi..."
+                className="bg-background font-mono text-xs border-border h-10"
+              />
+            </div>
+            <p className="text-[10px] text-zinc-500">
+              Gere o token com <code>turso db tokens create &lt;nome&gt;</code> ou no painel do Turso.
+            </p>
           </div>
-          <p className="text-[10px] text-zinc-500">Dica: Use um caminho curto e sem espaços se possível (ex: C:\LifeOS).</p>
         </div>
-      </div>
+      )}
 
       <div className="grid grid-cols-2 gap-6">
         <div className="space-y-3">

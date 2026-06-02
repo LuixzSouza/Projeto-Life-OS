@@ -15,6 +15,8 @@ export interface SetupFormData {
   theme: string;
   storageMode: StorageMode;
   storagePath: string;
+  tursoUrl: string;
+  tursoToken: string;
 }
 
 export interface WizardStep {

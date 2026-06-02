@@ -1,13 +1,15 @@
 import { PrismaClient } from "@prisma/client";
-import { resolveDatabaseUrl } from "./db-config";
+import { PrismaLibSQL } from "@prisma/adapter-libsql";
+import { createClient } from "@libsql/client/web";
+import { getDbProfile, type DbProfile } from "./db-config";
 
-// URL de fallback usada quando o sistema ainda não foi instalado (/setup).
+// Perfil de fallback quando o sistema ainda não foi instalado (/setup).
 // Mantém o build/start do Next.js de pé sem um banco real configurado.
-const FALLBACK_URL = "file:./setup_needed.db";
+const FALLBACK_PROFILE: DbProfile = { mode: "local", databasePath: "./setup_needed.db" };
 
 interface PrismaState {
   client: PrismaClient | null;
-  url: string | null;
+  signature: string | null;
 }
 
 // Estado guardado no globalThis para sobreviver ao HMR do Next.js em dev
@@ -16,56 +18,76 @@ declare global {
   var __prismaState: PrismaState | undefined;
 }
 
-const state: PrismaState = globalThis.__prismaState ?? { client: null, url: null };
+const state: PrismaState = globalThis.__prismaState ?? { client: null, signature: null };
 if (process.env.NODE_ENV !== "production") globalThis.__prismaState = state;
 
-function buildClient(url: string): PrismaClient {
+const logLevels: ("error" | "warn")[] =
+  process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"];
+
+/** Assinatura usada para detectar mudança de perfil e reconectar. */
+function signatureOf(profile: DbProfile): string {
+  return profile.mode === "local"
+    ? `local:${profile.databasePath}`
+    : `cloud:${profile.provider}:${profile.url}`;
+}
+
+/**
+ * Constrói um PrismaClient para o perfil informado.
+ * - local: SQLite em arquivo (datasource URL direta).
+ * - cloud: Turso/libSQL via driver adapter (HTTP, serverless-safe).
+ * Exportada para o /setup criar um client temporário consistente.
+ */
+export function buildClient(profile: DbProfile): PrismaClient {
+  if (profile.mode === "cloud") {
+    const libsql = createClient({ url: profile.url, authToken: profile.authToken });
+    const adapter = new PrismaLibSQL(libsql);
+    return new PrismaClient({ adapter, log: logLevels });
+  }
   return new PrismaClient({
-    datasources: { db: { url } },
-    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+    datasources: { db: { url: `file:${profile.databasePath}` } },
+    log: logLevels,
   });
 }
 
 /**
- * Retorna o PrismaClient apontando para o banco ATUAL. Se o perfil de banco
- * mudou desde a última chamada (ex.: logo após o /setup ou ao mover a pasta),
+ * Retorna o PrismaClient apontando para o banco ATUAL. Se o perfil mudou desde
+ * a última chamada (ex.: logo após o /setup ou ao mover a pasta / migrar p/ nuvem),
  * descarta o cliente antigo e cria um novo — sem precisar reiniciar o servidor.
  */
 function getClient(): PrismaClient {
-  const url = resolveDatabaseUrl() ?? FALLBACK_URL;
+  const profile = getDbProfile() ?? FALLBACK_PROFILE;
+  const signature = signatureOf(profile);
 
-  if (state.client && state.url === url) {
+  if (state.client && state.signature === signature) {
     return state.client;
   }
 
-  // URL mudou (ou primeira inicialização): reconstrói a conexão.
   if (state.client) {
     const old = state.client;
-    // Fecha em background; não bloqueia a request atual.
     void old.$disconnect().catch(() => {});
   }
 
-  if (url === FALLBACK_URL) {
+  if (profile === FALLBACK_PROFILE) {
     console.warn("⚠️ [PRISMA] Sistema não instalado. Aguardando configuração em /setup...");
   } else {
-    console.log(`✅ [PRISMA] Conectado ao banco em: ${url}`);
+    console.log(`✅ [PRISMA] Conectado (${signature})`);
   }
 
-  state.client = buildClient(url);
-  state.url = url;
+  state.client = buildClient(profile);
+  state.signature = signature;
   return state.client;
 }
 
 /**
  * Força o descarte do cliente atual. A próxima query reconecta usando o perfil
- * de banco mais recente. Chamar após gravar um novo perfil (setup / mover pasta).
+ * mais recente. Chamar após gravar um novo perfil (setup / mover pasta / nuvem).
  */
 export async function reconnectPrisma(): Promise<void> {
   if (state.client) {
     await state.client.$disconnect().catch(() => {});
   }
   state.client = null;
-  state.url = null;
+  state.signature = null;
 }
 
 // Proxy que delega cada acesso ao cliente vivo resolvido por getClient().

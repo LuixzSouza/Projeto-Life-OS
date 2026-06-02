@@ -41,11 +41,35 @@ function readConfig(): ConfigShape {
 }
 
 function writeConfig(config: ConfigShape) {
-  const dir = path.dirname(CONFIG_PATH);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  try {
+    const dir = path.dirname(CONFIG_PATH);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+  } catch (e) {
+    // Em ambientes serverless (Vercel) o FS é somente-leitura. Nesses casos a
+    // configuração vem de variáveis de ambiente, então a falha aqui é esperada.
+    console.warn("⚠️ Não foi possível gravar config local (FS read-only?):", e);
   }
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2));
+}
+
+/**
+ * Perfil de banco vindo de variáveis de ambiente (prioridade máxima).
+ * Essencial em deploy serverless (Vercel), onde o config em arquivo não persiste.
+ *   - TURSO_DATABASE_URL (+ TURSO_AUTH_TOKEN): banco na nuvem (Turso/libSQL).
+ */
+export function getEnvProfile(): DbProfile | null {
+  const tursoUrl = process.env.TURSO_DATABASE_URL;
+  if (tursoUrl) {
+    return {
+      mode: "cloud",
+      provider: "turso",
+      url: tursoUrl,
+      authToken: process.env.TURSO_AUTH_TOKEN,
+    };
+  }
+  return null;
 }
 
 // =========================================================
@@ -53,6 +77,11 @@ function writeConfig(config: ConfigShape) {
 // =========================================================
 
 export function getDbProfile(): DbProfile | null {
+  // 1. Env vars têm prioridade (Vercel/serverless — config em arquivo não persiste).
+  const envProfile = getEnvProfile();
+  if (envProfile) return envProfile;
+
+  // 2. Config local em arquivo (desktop/local-first).
   const config = readConfig();
   if (config.profile) return config.profile;
   // Migração suave: config antigo só tinha databasePath.
