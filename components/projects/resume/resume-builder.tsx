@@ -5,11 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { 
-    LayoutTemplate, Printer, Save, User, Briefcase, Layers, Code, 
-    GraduationCap, MessageSquare, ShieldCheck, Loader2, CheckCircle2
+import {
+    LayoutTemplate, Printer, Save, User, Briefcase, Layers, Code,
+    GraduationCap, MessageSquare, ShieldCheck, Loader2, CheckCircle2,
+    Award, Languages, FileDown
 } from "lucide-react";
 import { PortfolioData, INITIAL_PORTFOLIO } from "@/types/portfolio";
+import { savePortfolio } from "@/app/(dashboard)/projects/actions";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -19,7 +21,10 @@ import { ProjectsForm } from "./projects-form";
 import { SkillsForm } from "./skills-form";
 import { EducationForm } from "./education-form";
 import { TestimonialsForm } from "./testimonials-form";
+import { CertificationsForm } from "./certifications-form";
+import { LanguagesForm } from "./languages-form";
 import { ResumePreview } from "./resume-preview";
+import { LUIZ_PORTFOLIO } from "./seed-data";
 
 // Helper tático para os ícones do Accordion
 const StatusIcon = ({ active, icon: Icon }: { active: boolean, icon: React.ElementType }) => (
@@ -33,34 +38,40 @@ const StatusIcon = ({ active, icon: Icon }: { active: boolean, icon: React.Eleme
     </div>
 );
 
-export function ResumeBuilder() {
-    // 1. INICIALIZAÇÃO PURA
-    const [data, setData] = useState<PortfolioData>(INITIAL_PORTFOLIO);
-    const [isLoaded, setIsLoaded] = useState(false);
+export function ResumeBuilder({ initialData }: { initialData: PortfolioData }) {
+    // 1. INICIALIZAÇÃO A PARTIR DO BANCO (SQLite via Server Action)
+    const [data, setData] = useState<PortfolioData>(initialData);
+    const [isSaving, setIsSaving] = useState(false);
     const printRef = useRef<HTMLDivElement>(null);
 
-    // 2. SINCRONIZAÇÃO COM SISTEMA EXTERNO (LocalStorage)
+    // 2. MIGRAÇÃO SUAVE: se houver currículo legado no localStorage e o banco
+    //    estiver vazio, importa uma única vez e limpa a chave antiga.
     useEffect(() => {
-        const loadTimer = setTimeout(() => {
-            try {
-                const savedResume = localStorage.getItem("life-os-resume");
-                if (savedResume) {
-                    setData(JSON.parse(savedResume));
-                }
-            } catch (e) {
-                console.error("Erro ao carregar dados salvos", e);
-            } finally {
-                setIsLoaded(true);
+        const isEmpty = !initialData.hero.name && initialData.experience.length === 0;
+        if (!isEmpty) return;
+        try {
+            const legacy = localStorage.getItem("life-os-resume");
+            if (legacy) {
+                setData({ ...INITIAL_PORTFOLIO, ...JSON.parse(legacy) });
+                localStorage.removeItem("life-os-resume");
+                toast.info("Currículo antigo importado do navegador. Clique em Gravar para salvar no banco.");
             }
-        }, 10);
+        } catch (e) {
+            console.error("Erro ao migrar currículo legado", e);
+        }
+    }, [initialData]);
 
-        return () => clearTimeout(loadTimer);
-    }, []);
-
-    // 3. SALVAMENTO (Local Storage)
-    const handleSave = () => {
-        localStorage.setItem("life-os-resume", JSON.stringify(data));
-        toast.success("Dados sincronizados com sucesso!");
+    // 3. SALVAMENTO (Banco de Dados / SQLite)
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            await savePortfolio(data);
+            toast.success("Currículo salvo no banco de dados!");
+        } catch {
+            toast.error("Falha ao salvar. Tente novamente.");
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     // 4. EXPORTAÇÃO PROFISSIONAL DE PDF
@@ -126,18 +137,12 @@ export function ResumeBuilder() {
         projects: data.projects.length > 0,
         skills: data.skills.languages.length > 0 || data.skills.frameworks.length > 0,
         education: data.education.length > 0,
+        certifications: data.certifications.length > 0,
+        languages: data.languages.length > 0,
         testimonials: data.testimonials.length > 0,
     }), [data]);
 
-    const completion = Math.round((Object.values(checklist).filter(Boolean).length / 7) * 100);
-
-    if (!isLoaded) {
-        return (
-            <div className="flex h-[50vh] w-full items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-primary opacity-50" />
-            </div>
-        );
-    }
+    const completion = Math.round((Object.values(checklist).filter(Boolean).length / 9) * 100);
 
     return (
         <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-140px)] w-full">
@@ -162,9 +167,15 @@ export function ResumeBuilder() {
                                     </p>
                                 </div>
                             </div>
-                            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/50 px-2.5 py-1.5 bg-muted/50 rounded-lg border border-border/40">
-                                V {new Date().getFullYear()}
-                            </span>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => { setData(LUIZ_PORTFOLIO); toast.success("Dados do PDF importados! Revise e clique em Gravar."); }}
+                                className="h-9 rounded-xl font-black uppercase tracking-widest text-[9px] gap-1.5 border-border/60 hover:bg-primary/5 hover:text-primary"
+                                title="Preencher com os dados do seu PDF"
+                            >
+                                <FileDown className="h-3.5 w-3.5" /> Importar PDF
+                            </Button>
                         </div>
 
                         {/* Barra de Integridade Otimizada */}
@@ -301,6 +312,44 @@ export function ResumeBuilder() {
                                     </AccordionContent>
                                 </AccordionItem>
 
+                                {/* Item 7: Certificações */}
+                                <AccordionItem
+                                    value="certifications"
+                                    className="border border-border/40 rounded-[1.5rem] bg-card shadow-sm data-[state=open]:shadow-lg data-[state=open]:border-primary/30 data-[state=open]:bg-primary/[0.02] transition-all duration-300 overflow-hidden"
+                                >
+                                    <AccordionTrigger className="hover:no-underline py-5 px-5 hover:bg-muted/30 transition-colors">
+                                        <div className="flex items-center gap-4">
+                                            <StatusIcon active={checklist.certifications} icon={Award} />
+                                            <div className="text-left">
+                                                <span className="font-black uppercase tracking-widest text-[11px] text-foreground block mb-0.5">7. Certificações</span>
+                                                <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Cursos e credenciais</span>
+                                            </div>
+                                        </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent className="px-5 pb-6 pt-2 border-t border-border/20">
+                                        <CertificationsForm data={data} onChange={setData} />
+                                    </AccordionContent>
+                                </AccordionItem>
+
+                                {/* Item 8: Idiomas */}
+                                <AccordionItem
+                                    value="languages"
+                                    className="border border-border/40 rounded-[1.5rem] bg-card shadow-sm data-[state=open]:shadow-lg data-[state=open]:border-primary/30 data-[state=open]:bg-primary/[0.02] transition-all duration-300 overflow-hidden"
+                                >
+                                    <AccordionTrigger className="hover:no-underline py-5 px-5 hover:bg-muted/30 transition-colors">
+                                        <div className="flex items-center gap-4">
+                                            <StatusIcon active={checklist.languages} icon={Languages} />
+                                            <div className="text-left">
+                                                <span className="font-black uppercase tracking-widest text-[11px] text-foreground block mb-0.5">8. Idiomas</span>
+                                                <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Fluência e níveis</span>
+                                            </div>
+                                        </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent className="px-5 pb-6 pt-2 border-t border-border/20">
+                                        <LanguagesForm data={data} onChange={setData} />
+                                    </AccordionContent>
+                                </AccordionItem>
+
                             </Accordion>
                         </div>
                         
@@ -310,12 +359,13 @@ export function ResumeBuilder() {
 
                     {/* Footer Actions (Rodapé Fixo) */}
                     <div className="px-6 py-5 border-t border-border/40 bg-background/95 backdrop-blur-xl flex gap-4 shrink-0 z-10 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
-                        <Button 
-                            variant="outline" 
-                            className="flex-1 gap-2 rounded-xl h-14 font-black uppercase tracking-widest text-[11px] shadow-sm hover:bg-muted hover:text-foreground transition-all border-border/60" 
+                        <Button
+                            variant="outline"
+                            disabled={isSaving}
+                            className="flex-1 gap-2 rounded-xl h-14 font-black uppercase tracking-widest text-[11px] shadow-sm hover:bg-muted hover:text-foreground transition-all border-border/60"
                             onClick={handleSave}
                         >
-                            <Save className="h-4 w-4" /> Gravar Dados
+                            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Gravar Dados
                         </Button>
                         <Button 
                             className="flex-1 gap-2 rounded-xl h-14 bg-foreground text-background hover:bg-foreground/90 font-black uppercase tracking-widest text-[11px] shadow-xl transition-all" 

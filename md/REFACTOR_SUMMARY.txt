@@ -1,0 +1,245 @@
+═══════════════════════════════════════════════════════════════════════════════
+    LIFE OS - REFACTOR & ORGANIZAÇÃO (Jun 2026)
+═══════════════════════════════════════════════════════════════════════════════
+
+📊 ESTADO ATUAL
+─────────────────────────────────────────────────────────────────────────────
+  • 237 arquivos TSX + 22 TS
+  • 2.4M em components/ | 572K em app/
+  • ~5 componentes compartilhados (faltam 30+)
+  • 17 módulos sem padrão
+  • ALTA duplicação de código (forms, dialogs, cards, lists)
+  • Type safety: 95% (alguns `any` ainda)
+
+🎯 ALVO REFACTOR
+─────────────────────────────────────────────────────────────────────────────
+  • 30-40 componentes compartilhados reutilizáveis
+  • Zero duplicação (-70%)
+  • Padrões consistentes (dialogs, forms, cards, tables)
+  • Type safety 100%
+  • -15-20% bundle size
+  • Documentação completa (README por módulo)
+
+═══════════════════════════════════════════════════════════════════════════════
+📋 DOCUMENTOS CRIADOS
+═══════════════════════════════════════════════════════════════════════════════
+
+1. REFACTOR_CHECKLIST.md
+   └─ Checklist completo com 40+ itens específicos
+   └─ 6 fases de refatoração
+   └─ Quick wins priorizados
+   └─ Métricas de sucesso
+
+2. ANALYSIS.md
+   └─ Problemas específicos encontrados no código
+   └─ Exemplos de duplicação (com código)
+   └─ Padrões faltando
+   └─ Quick wins detalhados
+
+3. ROADMAP_EXECUCAO.md
+   └─ Plano dia-a-dia (5 semanas)
+   └─ Checklist por dia
+   └─ Como começar hoje
+
+═══════════════════════════════════════════════════════════════════════════════
+🚀 QUICK WINS (Máximo Impacto, Mínimo Esforço)
+═══════════════════════════════════════════════════════════════════════════════
+
+Semana 1: 5 tarefas (ganho -100+ linhas + padrões)
+
+  1️⃣  Remover Dialogs Inline em Maps (1-2 dias)
+      └─ Encontrados em: finance, projects, studies
+      └─ Ganho: -50 linhas, padrão consistente
+      └─ Ação: Mover modais para componentes globais
+
+  2️⃣  SubmitButton com Loading (1 dia)
+      └─ Criar: components/ui/submit-button.tsx
+      └─ Ganho: padrão visual, melhor UX
+      └─ Aplicar: 20+ páginas
+
+  3️⃣  Consolidar Zod Schemas (1 dia)
+      └─ Criar: lib/validation/schemas.ts
+      └─ Ganho: single source of truth
+      └─ Reuse: forms, API, actions
+
+  4️⃣  Hook useMutation (1 dia)
+      └─ Criar: lib/hooks/useMutation.ts
+      └─ Ganho: -50+ linhas duplicadas
+      └─ Padrão: TODA app usa igual
+
+  5️⃣  Cleanup .gitignore (1 hora)
+      └─ ✅ JÁ FEITO (commit ainda pendente)
+      └─ Remover: .db, -shm, -wal
+
+═══════════════════════════════════════════════════════════════════════════════
+📅 CRONOGRAMA (5 Semanas)
+═══════════════════════════════════════════════════════════════════════════════
+
+SEMANA 1 (Jun 1-7): Quick Wins                      [████████░░] 80%
+  ├─ Remover dialogs inline
+  ├─ SubmitButton component
+  ├─ Zod schemas consolidado
+  ├─ useMutation hook
+  └─ Git cleanup commit
+
+SEMANA 2 (Jun 8-14): Padrões Compartilhados        [░░░░░░░░░░] 0%
+  ├─ FormField genérico
+  ├─ Dialog/Modal patterns
+  ├─ Card components
+  └─ DataTable component
+
+SEMANA 3 (Jun 15-21): Reorganização Modular        [░░░░░░░░░░] 0%
+  ├─ Finance refactor (-300 linhas)
+  ├─ Health refactor (-200 linhas)
+  ├─ Projects/Studies/Social refactor
+  └─ Demais módulos
+
+SEMANA 3.5-4 (Jun 22-28): Type System + Hooks      [░░░░░░░░░░] 0%
+  ├─ lib/types/ consolidado
+  ├─ lib/hooks/ consolidado
+  └─ lib/validation/ consolidado
+
+SEMANA 5 (Jun 29-Jul 5): Performance & Docs        [░░░░░░░░░░] 0%
+  ├─ Bundle analysis
+  ├─ Lazy imports
+  └─ README por módulo
+
+═══════════════════════════════════════════════════════════════════════════════
+💡 PROBLEMAS PRINCIPAIS IDENTIFICADOS
+═══════════════════════════════════════════════════════════════════════════════
+
+1. DUPLICAÇÃO DE DIALOGS & MODAIS
+   │
+   ├─ 15+ implementações de "create/edit" dialog
+   ├─ Cada uma reimplementa: form validation, loading, error handling
+   ├─ Dialogs inline em .map() loops (15 casos)
+   │
+   └─ ✅ SOLUÇÃO: <FormDialog>, <ConfirmDialog>, <InfoDialog> genéricos
+
+2. FORM FIELDS REPETIDOS
+   │
+   ├─ Input, Select, Date, Textarea implementados inline
+   ├─ Validação errors inconsistente
+   │
+   └─ ✅ SOLUÇÃO: <FormField> genérico reutilizável
+
+3. CARDS SEM PADRÃO
+   │
+   ├─ 10+ estilos CSS diferentes
+   ├─ Inconsistência visual
+   │
+   └─ ✅ SOLUÇÃO: <BaseCard variant="default|stat|highlight|action">
+
+4. LISTAS/TABELAS REPETIDAS
+   │
+   ├─ 10+ páginas reimplementam sort, filter, pagination
+   ├─ Código duplicado em cada listagem
+   │
+   └─ ✅ SOLUÇÃO: <DataTable> genérico com hooks reutilizáveis
+
+5. TIPOS ESPALHADOS
+   │
+   ├─ Types em app/, components/, Prisma schema
+   ├─ Duplicação de interfaces
+   │
+   └─ ✅ SOLUÇÃO: lib/types/ centralizado
+
+6. HOOKS DUPLICADOS
+   │
+   ├─ useForm em vários módulos
+   ├─ Falta padrão de server action wrapper
+   │
+   └─ ✅ SOLUÇÃO: lib/hooks/ consolidado
+
+═══════════════════════════════════════════════════════════════════════════════
+✨ BENEFÍCIOS ESPERADOS
+═══════════════════════════════════════════════════════════════════════════════
+
+Após refactor completo:
+
+  📉 DUPLICAÇÃO
+     Antes: ~500-600 linhas código duplicado
+     Depois: <100 linhas (reutilizáveis)
+     Ganho: -70% duplicação
+
+  ⚡ NOVO COMPONENTE
+     Antes: 100-150 linhas (precisa copiar template)
+     Depois: 20-30 linhas (usa components compartilhados)
+     Ganho: 5-7x mais rápido
+
+  🛡️ TYPE SAFETY
+     Antes: 95% (alguns `any`)
+     Depois: 100% (zero `any`)
+     Ganho: -30% runtime bugs
+
+  📦 BUNDLE SIZE
+     Antes: ~2.4M components/
+     Depois: ~2.0M (lazy imports + consolidation)
+     Ganho: -15-20% tamanho
+
+  🚀 MAINTAINABILITY
+     Antes: Difícil seguir padrões (não há padrões)
+     Depois: Óbvio como fazer (padrões documentados)
+     Ganho: +50% velocidade desenvolvimento
+
+  📝 ONBOARDING NOVO DEV
+     Antes: Confuso com 5+ formas de fazer a mesma coisa
+     Depois: "Leia o README, use components compartilhados"
+     Ganho: -50% tempo aprendizado
+
+═══════════════════════════════════════════════════════════════════════════════
+🎬 COMO COMEÇAR HOJE
+═══════════════════════════════════════════════════════════════════════════════
+
+1. LEIA (10 min):
+   cat REFACTOR_CHECKLIST.md (visão geral)
+   cat ANALYSIS.md (problemas específicos)
+
+2. ESCOLHA UM QUICK WIN (30 min setup):
+   Start com "Remover Dialogs Inline" ou "SubmitButton"
+
+3. CRIE BRANCH:
+   git checkout -b refactor/quick-wins
+
+4. PRIMEIRO COMPONENTE:
+   touch components/ui/submit-button.tsx
+   # copiar código de ROADMAP_EXECUCAO.md > Dia 2-3
+
+5. TESTE:
+   npm run dev
+   npm run lint
+   tsc --noEmit
+
+6. COMMIT:
+   git add components/ui/submit-button.tsx
+   git commit -m "feat: add submit button component with loading state"
+
+7. PRÓXIMO:
+   Continue checklist ou passe para Zod schemas
+
+═══════════════════════════════════════════════════════════════════════════════
+📌 PRÓXIMAS AÇÕES
+═══════════════════════════════════════════════════════════════════════════════
+
+IMEDIATO (Hoje):
+  [ ] Ler REFACTOR_CHECKLIST.md (20 min)
+  [ ] Ler ANALYSIS.md (20 min)
+  [ ] Rodar grep para dialogs inline (5 min)
+  [ ] Criar components/ui/submit-button.tsx (30 min)
+
+HJ/AMANHÃ:
+  [ ] Criar lib/validation/schemas.ts
+  [ ] Criar lib/hooks/useMutation.ts
+  [ ] Commit quick wins
+
+SEMANA 1:
+  [ ] Aplicar padrões nos 3 módulos (finance, projects, studies)
+  [ ] Rodar tsc --noEmit (deve passar 100%)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Documentação: REFACTOR_CHECKLIST.md | ANALYSIS.md | ROADMAP_EXECUCAO.md
+Estimado Total: 20-30 dias | ROI: +50% maintainability, -30% bugs
+Status: 🔴 Not Started | Prioridade: Alta
+
+═══════════════════════════════════════════════════════════════════════════════

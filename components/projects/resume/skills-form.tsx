@@ -1,10 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, X, Code2 } from "lucide-react";
+import { Plus, X, Code2, Heart } from "lucide-react";
 import { PortfolioData, Proficiency } from "@/types/portfolio";
 
 interface SkillsFormProps {
@@ -77,8 +78,61 @@ const SkillCategory = ({ title, category, data, onAdd, onRemove, onUpdate }: Ski
   </div>
 );
 
+// --- Soft Skills (tags livres) ---
+const SoftSkills = ({ data, onChange }: SkillsFormProps) => {
+  const [input, setInput] = useState("");
+
+  const addTag = () => {
+    const val = input.trim();
+    if (!val || data.skills.softSkills.includes(val)) { setInput(""); return; }
+    onChange({ ...data, skills: { ...data.skills, softSkills: [...data.skills.softSkills, val] } });
+    setInput("");
+  };
+
+  const removeTag = (tag: string) => onChange({ ...data, skills: { ...data.skills, softSkills: data.skills.softSkills.filter(t => t !== tag) } });
+
+  return (
+    <div className="space-y-4 bg-muted/10 border border-border/40 p-5 rounded-[1.5rem]">
+      <div className="flex items-center gap-2 border-b border-border/40 pb-3">
+        <div className="h-6 w-6 rounded-md bg-primary/10 flex items-center justify-center text-primary">
+          <Heart className="h-3 w-3" />
+        </div>
+        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Soft Skills</Label>
+      </div>
+      <div className="flex gap-2">
+        <Input
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
+          placeholder="Ex: Trabalho em equipe (Enter para adicionar)"
+          className="h-10 text-sm bg-background border-border/50 rounded-xl shadow-inner font-medium"
+        />
+        <Button size="icon" variant="ghost" className="h-10 w-10 shrink-0 rounded-xl bg-background shadow-sm hover:bg-primary/10 hover:text-primary" onClick={addTag}>
+          <Plus className="h-4 w-4" />
+        </Button>
+      </div>
+      {data.skills.softSkills.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {data.skills.softSkills.map(tag => (
+            <span key={tag} className="group flex items-center gap-1.5 text-[11px] font-bold text-foreground bg-background border border-border/50 px-3 py-1.5 rounded-lg shadow-sm">
+              {tag}
+              <button onClick={() => removeTag(tag)} className="text-muted-foreground/50 hover:text-destructive transition-colors">
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : (
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/30 text-center py-4 border-2 border-dashed border-border/40 rounded-xl">
+          Nenhuma soft skill listada.
+        </p>
+      )}
+    </div>
+  );
+};
+
 export function SkillsForm({ data, onChange }: SkillsFormProps) {
-  
+
   const addSkill = (category: 'languages' | 'frameworks' | 'tools') => {
     const newSkill = { name: "", proficiency: "Advanced" as Proficiency };
     onChange({
@@ -104,6 +158,7 @@ export function SkillsForm({ data, onChange }: SkillsFormProps) {
       <SkillCategory title="Linguagens de Programação" category="languages" data={data} onAdd={addSkill} onRemove={removeSkill} onUpdate={updateSkill} />
       <SkillCategory title="Frameworks & Bibliotecas" category="frameworks" data={data} onAdd={addSkill} onRemove={removeSkill} onUpdate={updateSkill} />
       <SkillCategory title="Ferramentas & DevOps" category="tools" data={data} onAdd={addSkill} onRemove={removeSkill} onUpdate={updateSkill} />
+      <SoftSkills data={data} onChange={onChange} />
     </div>
   );
 }

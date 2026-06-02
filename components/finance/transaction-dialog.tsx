@@ -1,25 +1,14 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle,
+  DialogBody,
   DialogTrigger,
   DialogFooter,
-  DialogDescription,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,7 +22,6 @@ import {
   ArrowDownRight,
   Trash2,
   CalendarIcon,
-  AlertCircle,
 } from "lucide-react";
 import {
   createTransaction,
@@ -50,24 +38,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-interface AccountOption {
-  id: string;
-  name: string;
-}
-interface TransactionData {
-  id: string;
-  description: string;
-  amount: number;
-  type: string;
-  category: string;
-  accountId: string;
-  date: Date;
-}
-interface TransactionDialogProps {
-  accounts?: AccountOption[];
-  transaction?: TransactionData | null;
-  trigger?: React.ReactNode;
-}
+import type { TransactionDialogProps } from "./transaction-dialog-types";
+import { useAmountInput } from "./use-amount-input";
+import { DeleteTransactionAlert } from "./delete-transaction-alert";
 
 export function TransactionDialog({
   accounts = [],
@@ -79,79 +52,14 @@ export function TransactionDialog({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState<boolean>(false);
   const [type, setType] = useState<string>(transaction?.type || "EXPENSE");
 
-  // --- AMOUNT: armazenamos os centavos como string ("131031" => R$ 1.310,31)
-  const [amountDigits, setAmountDigits] = useState<string>(() => {
-    if (transaction?.amount === undefined || transaction?.amount === null)
-      return "";
-    const cents = Math.round(Number(transaction.amount) * 100);
-    return String(cents);
-  });
-
-  // derived values
-  const rawAmount: string = amountDigits
-    ? (Number(amountDigits) / 100).toFixed(2)
-    : "";
-  const formattedAmount: string = amountDigits
-    ? new Intl.NumberFormat("pt-BR", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(Number(rawAmount))
-    : "";
-
-  const amountInputRef = useRef<HTMLInputElement | null>(null);
-
-  // Mantém o cursor no final (melhora UX em inputs formatados)
-  useEffect(() => {
-    const el = amountInputRef.current;
-    if (!el) return;
-    // pequeno timeout para garantir que o valor já foi aplicado ao DOM
-    const t = window.setTimeout(() => {
-      const len = el.value.length;
-      el.setSelectionRange(len, len);
-    }, 0);
-    return () => window.clearTimeout(t);
-  }, [formattedAmount]);
-
-  // alterações no input visível: pegamos apenas dígitos (centavos)
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const onlyDigits = e.target.value.replace(/\D/g, "");
-    // limite opcional pra evitar overflow no campo (12 dígitos = até bilhões)
-    setAmountDigits(onlyDigits.slice(0, 12));
-  };
-
-  // cola: limpa tudo que não é dígito
-  const handleAmountPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    const text = e.clipboardData.getData("text");
-    const onlyDigits = text.replace(/\D/g, "");
-    if (!onlyDigits) {
-      e.preventDefault();
-      return;
-    }
-    e.preventDefault();
-    setAmountDigits(onlyDigits.slice(0, 12));
-  };
-
-  // tecla: permite dígitos e teclas de navegação/remoção
-  const handleAmountKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    const allowed = [
-      "Backspace",
-      "Delete",
-      "ArrowLeft",
-      "ArrowRight",
-      "Tab",
-      "Home",
-      "End",
-    ];
-    if (allowed.includes(e.key)) return;
-    if (/^\d$/.test(e.key)) return;
-    // permitir também '.' e ',' para quem digitar separador — vamos ignorar e formatar
-    if (e.key === "." || e.key === ",") {
-      // previne inserir o caractere direto no campo (pois trabalhamos com dígitos)
-      e.preventDefault();
-      return;
-    }
-    e.preventDefault();
-  };
+  const {
+    amountInputRef,
+    rawAmount,
+    formattedAmount,
+    handleAmountChange,
+    handleAmountPaste,
+    handleAmountKeyDown,
+  } = useAmountInput(transaction?.amount);
 
   const handleSubmit = async (formData: FormData) => {
     setIsLoading(true);
@@ -211,41 +119,32 @@ export function TransactionDialog({
           )}
         </DialogTrigger>
 
-        <DialogContent className="sm:max-w-[425px] rounded-[2rem] shadow-2xl p-0 overflow-hidden border-border/40">
-          <div className="bg-muted/10 p-6 border-b border-border/40">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-xl font-extrabold">
-                <div
-                  className={cn(
-                    "p-2 rounded-xl",
-                    type === "INCOME"
-                      ? "bg-emerald-500/10 text-emerald-600"
-                      : "bg-rose-500/10 text-rose-600"
-                  )}
-                >
-                  <DollarSign className="h-5 w-5" />
-                </div>
-                {transaction ? "Editar Movimentação" : "Nova Movimentação"}
-              </DialogTitle>
-              <DialogDescription>
-                Preencha os detalhes financeiros abaixo.
-              </DialogDescription>
-            </DialogHeader>
-          </div>
+        <DialogContent size="md">
+          <DialogHeader
+            icon={<DollarSign />}
+            iconClassName={cn(
+              type === "INCOME"
+                ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                : "bg-rose-500/10 text-rose-600 border-rose-500/20"
+            )}
+            title={transaction ? "Editar Movimentação" : "Nova Movimentação"}
+            description="Preencha os detalhes financeiros abaixo."
+          />
 
           {!hasAccounts && !transaction ? (
-            <div className="p-10 text-center flex flex-col items-center">
+            <DialogBody className="text-center flex flex-col items-center py-10">
               <Wallet className="h-10 w-10 text-muted-foreground/30 mb-3" />
               <p className="text-sm font-medium text-muted-foreground">
                 Você precisa criar uma carteira antes de adicionar transações.
               </p>
-            </div>
+            </DialogBody>
           ) : (
             <form
               action={handleSubmit}
-              className="space-y-5 p-6 bg-background"
+              className="flex flex-col flex-1 min-h-0"
               noValidate
             >
+              <DialogBody className="space-y-5">
               {/* Segmented Control Moderno */}
               <div className="flex p-1.5 bg-muted/30 rounded-2xl border border-border/50">
                 <button
@@ -372,7 +271,9 @@ export function TransactionDialog({
                 </div>
               </div>
 
-              <DialogFooter className="pt-4 border-t border-border/40 flex justify-between w-full items-center">
+              </DialogBody>
+
+              <DialogFooter className="!flex-row justify-between items-center">
                 {transaction ? (
                   <Button
                     type="button"
@@ -422,35 +323,12 @@ export function TransactionDialog({
       </Dialog>
 
       {/* Modal Seguro de Exclusão */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent className="rounded-[2rem] border-destructive/20 shadow-2xl">
-          <AlertDialogHeader>
-            <div className="flex items-center gap-3 text-destructive mb-2">
-              <div className="p-3 rounded-2xl bg-destructive/10">
-                <AlertCircle className="h-6 w-6" />
-              </div>
-              <AlertDialogTitle className="text-xl font-bold">
-                Excluir Transação?
-              </AlertDialogTitle>
-            </div>
-            <AlertDialogDescription className="text-base text-muted-foreground">
-              Você está prestes a remover esta transação. O saldo da sua
-              carteira será automaticamente recalculado.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="mt-6">
-            <AlertDialogCancel className="rounded-xl h-12 font-bold">
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-white hover:bg-destructive/90 rounded-xl h-12 font-bold px-8 shadow-lg shadow-destructive/20"
-            >
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sim, Excluir"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteTransactionAlert
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        isLoading={isLoading}
+        onConfirm={handleDelete}
+      />
     </>
   );
 }

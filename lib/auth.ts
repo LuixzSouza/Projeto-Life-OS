@@ -1,8 +1,16 @@
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { cookies } from "next/headers";
+import bcrypt from "bcryptjs";
+import { getOrCreateSecret } from "./db-config";
 
-const SECRET_KEY = "LIFE_OS_SECRET_KEY_CHANGE_ME"; // Em produção, use process.env
-const key = new TextEncoder().encode(SECRET_KEY);
+/**
+ * Chave de assinatura do JWT. Prioriza `process.env.JWT_SECRET`; em builds
+ * desktop sem .env, usa um segredo forte auto-gerado e persistido no config
+ * local (estável entre reinícios). Avaliada de forma preguiçosa (não no import).
+ */
+function getKey(): Uint8Array {
+  return new TextEncoder().encode(getOrCreateSecret("JWT_SECRET"));
+}
 
 // 1. Definimos a interface do Payload da Sessão
 interface SessionPayload extends JWTPayload {
@@ -15,15 +23,38 @@ export async function encrypt(payload: SessionPayload) {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("7d") // Sessão dura 7 dias
-    .sign(key);
+    .sign(getKey());
 }
 
 export async function decrypt(input: string): Promise<SessionPayload> {
-  const { payload } = await jwtVerify(input, key, {
+  const { payload } = await jwtVerify(input, getKey(), {
     algorithms: ["HS256"],
   });
   // Forçamos a tipagem do retorno para nossa interface
   return payload as SessionPayload;
+}
+
+// =========================================================
+// HASH DE SENHAS (bcryptjs)
+// =========================================================
+
+const SALT_ROUNDS = 12;
+
+/** Gera o hash bcrypt de uma senha em texto plano. */
+export async function hashPassword(plain: string): Promise<string> {
+  return bcrypt.hash(plain, SALT_ROUNDS);
+}
+
+/**
+ * Compara uma senha em texto plano com um hash bcrypt.
+ * Retorna false (em vez de lançar) se o hash for inválido/legado.
+ */
+export async function verifyPassword(plain: string, hash: string): Promise<boolean> {
+  try {
+    return await bcrypt.compare(plain, hash);
+  } catch {
+    return false;
+  }
 }
 
 export async function login(userId: string) {
@@ -43,5 +74,32 @@ export async function logout() {
 export async function getSession(): Promise<SessionPayload | null> {
   const session = (await cookies()).get("session")?.value;
   if (!session) return null;
-  return await decrypt(session);
+  try {
+    return await decrypt(session);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Retorna o ID do usuário autenticado, ou null se não houver sessão válida.
+ * Use em leituras onde a ausência de usuário deve ser tratada de forma suave.
+ */
+export async function getCurrentUserId(): Promise<string | null> {
+  const session = await getSession();
+  return session?.userId ?? null;
+}
+
+/**
+ * Retorna o ID do usuário autenticado ou lança um erro.
+ * Use em Server Actions (mutações) que SEMPRE exigem um usuário logado.
+ * O `proxy.ts` já redireciona rotas não autenticadas, mas isto garante
+ * a segurança no nível da camada de dados (defense-in-depth).
+ */
+export async function requireUserId(): Promise<string> {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    throw new Error("Não autorizado: sessão de usuário não encontrada.");
+  }
+  return userId;
 }

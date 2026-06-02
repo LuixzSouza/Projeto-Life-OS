@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogBody, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -118,21 +118,16 @@ export function RecurringDialog({ trigger, item }: RecurringDialogProps) {
                     )}
                 </DialogTrigger>
 
-                {/* REMOVIDO overflow-hidden para evitar cortar dropdowns */}
-                <DialogContent className="sm:max-w-[425px] rounded-[2rem] p-0 shadow-2xl border-border/40">
-                    <div className="bg-muted/10 p-6 border-b border-border/40">
-                        <DialogHeader>
-                            <DialogTitle className="flex items-center gap-3 text-xl font-extrabold">
-                                <div className="p-2.5 bg-amber-500/10 rounded-xl text-amber-500 shadow-sm">
-                                    <CalendarClock className="h-5 w-5" />
-                                </div>
-                                {item ? "Editar Custo Fixo" : "Novo Custo Recorrente"}
-                            </DialogTitle>
-                            <DialogDescription>Assinaturas mensais e contas obrigatórias.</DialogDescription>
-                        </DialogHeader>
-                    </div>
+                <DialogContent size="md">
+                    <DialogHeader
+                        icon={<CalendarClock />}
+                        iconClassName="bg-amber-500/10 text-amber-600 border-amber-500/20"
+                        title={item ? "Editar Custo Fixo" : "Novo Custo Recorrente"}
+                        description="Assinaturas mensais e contas obrigatórias."
+                    />
 
-                    <form action={handleSubmit} className="space-y-5 p-6 bg-background" noValidate>
+                    <form action={handleSubmit} className="flex flex-col flex-1 min-h-0" noValidate>
+                        <DialogBody className="space-y-5">
                         <div className="space-y-2">
                             <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Nome da Despesa</Label>
                             <Input name="title" placeholder="Ex: Netflix, Internet, Aluguel..." defaultValue={item?.title} required className="h-12 rounded-xl bg-muted/20 font-medium" />
@@ -181,7 +176,9 @@ export function RecurringDialog({ trigger, item }: RecurringDialogProps) {
                             </Select>
                         </div>
 
-                        <DialogFooter className="pt-4 border-t border-border/40 flex justify-between w-full items-center">
+                        </DialogBody>
+
+                        <DialogFooter className="!flex-row justify-between items-center">
                             {item ? (
                                 <Button type="button" variant="ghost" className="text-rose-600 hover:bg-rose-500/10 rounded-xl font-bold px-4" onClick={() => setIsDeleteDialogOpen(true)} disabled={isLoading}>
                                     <Trash2 className="h-4 w-4 mr-2" /> Excluir

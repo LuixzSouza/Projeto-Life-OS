@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TransactionDialog } from "@/components/finance/transaction-dialog";
 import { cn } from "@/lib/utils";
+import { useFormatCurrency } from "@/components/providers/currency-provider";
 
 // --- TIPAGENS ---
 interface AccountOption { id: string; name: string; }
@@ -35,10 +36,9 @@ interface TransactionsViewProps {
     accounts: AccountOption[];
 }
 
-const formatMoney = (val: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
-
 // --- COMPONENTE PRINCIPAL ---
 export function TransactionsView({ transactions, accounts }: TransactionsViewProps) {
+    const formatMoney = useFormatCurrency();
     const [searchTerm, setSearchTerm] = useState("");
     const [typeFilter, setTypeFilter] = useState("ALL");
     const [accountFilter, setAccountFilter] = useState("ALL");

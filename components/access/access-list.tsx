@@ -7,9 +7,13 @@ import { cn } from "@/lib/utils";
 interface AccessListProps {
   items: AccessItem[];
   showClientBadge?: boolean;
+  strengthById?: Record<string, number>;
+  reusedIds?: string[];
+  breachCounts?: Record<string, number>;
 }
 
-export function AccessList({ items }: AccessListProps) {
+export function AccessList({ items, strengthById, reusedIds, breachCounts }: AccessListProps) {
+  const reusedSet = new Set(reusedIds ?? []);
   
   if (items.length === 0) {
     return null;
@@ -34,7 +38,7 @@ export function AccessList({ items }: AccessListProps) {
               "animate-in fade-in zoom-in-95 slide-in-from-top-4 duration-500 fill-mode-both"
             )}
           >
-            <AccessCard item={item} />
+            <AccessCard item={item} strength={strengthById?.[item.id]} reused={reusedSet.has(item.id)} breachCount={breachCounts?.[item.id]} />
           </div>
         );
       })}

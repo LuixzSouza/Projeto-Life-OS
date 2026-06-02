@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import * as cheerio from "cheerio"; // Certifique-se de ter instalado: npm install cheerio
+import { requireUserId } from "@/lib/auth";
 
 // Schema de Validação
 const LinkSchema = z.object({
@@ -57,6 +58,7 @@ export async function createLink(formData: FormData) {
   }
 
   try {
+    const userId = await requireUserId();
     await prisma.savedLink.create({
       data: {
         title: validated.data.title,
@@ -64,6 +66,7 @@ export async function createLink(formData: FormData) {
         description: validated.data.description,
         imageUrl: validated.data.imageUrl || null, // Garante null se vazio
         category: validated.data.category || "Geral",
+        userId,
       },
     });
 
@@ -92,8 +95,9 @@ export async function updateLink(id: string, formData: FormData) {
   }
 
   try {
-    await prisma.savedLink.update({
-      where: { id },
+    const userId = await requireUserId();
+    await prisma.savedLink.updateMany({
+      where: { id, userId },
       data: {
         title: validated.data.title,
         url: validated.data.url,
@@ -111,10 +115,73 @@ export async function updateLink(id: string, formData: FormData) {
   }
 }
 
+// --- VERIFICAÇÃO DE SAÚDE DOS LINKS (detecta links quebrados/offline) ---
+export type LinkHealth = {
+  statusById: Record<string, "ok" | "broken">;
+  brokenIds: string[];
+  checked: number;
+};
+
+const BROWSER_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+// Sonda um único URL: HEAD com fallback para GET, com timeout.
+async function probeLink(url: string): Promise<boolean> {
+  const target = url.startsWith("http") ? url : `https://${url}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    let res = await fetch(target, {
+      method: "HEAD",
+      redirect: "follow",
+      signal: controller.signal,
+      headers: { "User-Agent": BROWSER_UA },
+      cache: "no-store",
+    });
+    // Muitos servidores não implementam HEAD — tenta GET nesses casos.
+    if (res.status === 405 || res.status === 501 || res.status === 403) {
+      res = await fetch(target, {
+        method: "GET",
+        redirect: "follow",
+        signal: controller.signal,
+        headers: { "User-Agent": BROWSER_UA },
+        cache: "no-store",
+      });
+    }
+    return res.status < 400;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function checkLinksHealth(): Promise<LinkHealth> {
+  const userId = await requireUserId();
+  const links = await prisma.savedLink.findMany({
+    where: { userId },
+    select: { id: true, url: true },
+  });
+
+  const statusById: Record<string, "ok" | "broken"> = {};
+  const brokenIds: string[] = [];
+
+  await Promise.all(
+    links.map(async (l) => {
+      const ok = await probeLink(l.url);
+      statusById[l.id] = ok ? "ok" : "broken";
+      if (!ok) brokenIds.push(l.id);
+    })
+  );
+
+  return { statusById, brokenIds, checked: links.length };
+}
+
 // --- 4. REMOVER LINK ---
 export async function deleteLink(id: string) {
   try {
-    await prisma.savedLink.delete({ where: { id } });
+    const userId = await requireUserId();
+    await prisma.savedLink.deleteMany({ where: { id, userId } });
     revalidatePath("/links");
     return { success: true, message: "Link removido." };
   } catch (error) {

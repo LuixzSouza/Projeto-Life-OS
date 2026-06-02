@@ -2,12 +2,14 @@
 
 import dynamic from "next/dynamic";
 // Importamos os tipos que definimos no arquivo principal para manter a consistência
-import type { 
-  DashboardAccount, 
-  DashboardTransaction, 
-  DashboardWishlist, 
-  DashboardRecurring 
+import type {
+  DashboardAccount,
+  DashboardTransaction,
+  DashboardWishlist,
+  DashboardRecurring
 } from "@/components/finance/finance-dashboard";
+import type { CashFlowPoint } from "@/components/finance/cash-flow-chart";
+import { SmartViewProvider } from "@/components/finance/smart-view-context";
 
 // Replicamos a interface aqui para garantir que o Loader exija os dados corretos
 interface FinanceDashboardLoaderProps {
@@ -20,6 +22,9 @@ interface FinanceDashboardLoaderProps {
   netSalary: number;
   grossSalary: number; // ✅ Agora obrigatório e tipado
   hasSalarySet: boolean;
+  monthlyFlow: CashFlowPoint[];
+  monthIncome: number;
+  monthExpense: number;
 }
 
 // Importa o Dashboard inteiro desativando o SSR
@@ -46,5 +51,9 @@ const FinanceDashboard = dynamic<FinanceDashboardLoaderProps>(
 );
 
 export function FinanceDashboardLoader(props: FinanceDashboardLoaderProps) {
-  return <FinanceDashboard {...props} />;
+  return (
+    <SmartViewProvider>
+      <FinanceDashboard {...props} />
+    </SmartViewProvider>
+  );
 }

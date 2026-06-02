@@ -5,11 +5,11 @@ import {
   Cell,
   Pie,
   PieChart,
-  ResponsiveContainer,
   Tooltip,
   Legend,
   TooltipProps,
 } from "recharts";
+import { ChartContainer } from "@/components/ui/chart-container";
 import { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
 import { BookOpen, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -121,7 +121,7 @@ function StudyChartContent({ data }: StudyChartProps) {
   return (
     <div className="w-full">
       <div style={{ width: "100%", height: 220 }}>
-        <ResponsiveContainer width="100%" height="100%">
+        <ChartContainer minWidth={0} minHeight={0}>
           <PieChart>
             <Pie
               data={data}
@@ -157,7 +157,7 @@ function StudyChartContent({ data }: StudyChartProps) {
               )}
             />
           </PieChart>
-        </ResponsiveContainer>
+        </ChartContainer>
       </div>
     </div>
   );

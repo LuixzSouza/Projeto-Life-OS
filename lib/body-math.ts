@@ -146,6 +146,96 @@ export const calculateAdonisIndex = (shoulders: number, waist: number) => {
     return { ratio: ratio.toFixed(2), status };
 };
 
+// =========================================================
+// MÉTRICAS SEM EQUIPAMENTO (só peso, altura, idade e gênero)
+// Úteis mesmo para quem não tem fita métrica ou balança de bioimpedância.
+// =========================================================
+
+// BMI Prime: razão do IMC para o limite saudável (25). <1 = dentro do ideal.
+export const calculateBMIPrime = (bmi: number) => {
+    if (!bmi) return { value: 0, status: "N/A" };
+    const prime = bmi / 25;
+    let status = "Ideal";
+    if (prime < 0.74) status = "Abaixo";
+    else if (prime <= 1) status = "Ideal";
+    else if (prime <= 1.2) status = "Sobrepeso";
+    else status = "Acima";
+    return { value: prime, status };
+};
+
+// Faixa de peso saudável para a altura (IMC 18.5–24.9).
+export const healthyWeightRange = (heightCm: number) => {
+    if (!heightCm) return null;
+    const h = heightCm / 100;
+    return { min: 18.5 * h * h, max: 24.9 * h * h };
+};
+
+// Peso ideal (fórmula de Devine) — referência clínica clássica.
+export const calculateIdealWeight = (heightCm: number, gender: Gender) => {
+    if (!heightCm) return 0;
+    const inches = heightCm / 2.54;
+    const over60 = Math.max(0, inches - 60);
+    const base = gender === "MALE" ? 50 : 45.5;
+    return base + 2.3 * over60;
+};
+
+// Massa magra estimada (fórmula de Boer) — não exige medir gordura.
+export const calculateLeanMassBoer = (weight: number, heightCm: number, gender: Gender) => {
+    if (!weight || !heightCm) return 0;
+    return gender === "MALE"
+        ? 0.407 * weight + 0.267 * heightCm - 19.2
+        : 0.252 * weight + 0.473 * heightCm - 48.3;
+};
+
+// Área de Superfície Corporal (Du Bois) — usada em medicina/dosagens.
+export const calculateBSA = (weight: number, heightCm: number) => {
+    if (!weight || !heightCm) return 0;
+    return 0.007184 * Math.pow(weight, 0.425) * Math.pow(heightCm, 0.725);
+};
+
+// % de gordura estimada via IMC, idade e gênero (Deurenberg) — sem fita métrica.
+export const estimateBodyFatBMI = (bmi: number, age: number, gender: Gender) => {
+    if (!bmi) return 0;
+    const sex = gender === "MALE" ? 1 : 0;
+    const bf = 1.2 * bmi + 0.23 * age - 10.8 * sex - 5.4;
+    return Math.max(0, bf);
+};
+
+// Frequência cardíaca máxima (Tanaka, mais precisa que 220-idade) + zonas.
+export const calculateMaxHR = (age: number) => (age > 0 ? Math.round(208 - 0.7 * age) : 0);
+
+export interface HeartZone {
+    name: string;
+    range: string;     // ex: "120-140"
+    min: number;
+    max: number;
+    desc: string;
+    color: string;     // classes tailwind text/bg
+}
+
+export const heartRateZones = (maxHR: number): HeartZone[] => {
+    if (!maxHR) return [];
+    const z = (lo: number, hi: number) => `${Math.round(maxHR * lo)}-${Math.round(maxHR * hi)}`;
+    const mk = (lo: number, hi: number) => ({ min: Math.round(maxHR * lo), max: Math.round(maxHR * hi) });
+    return [
+        { name: "Recuperação", range: z(0.5, 0.6), ...mk(0.5, 0.6), desc: "Aquecimento e regeneração", color: "text-sky-600 bg-sky-500/10" },
+        { name: "Queima de Gordura", range: z(0.6, 0.7), ...mk(0.6, 0.7), desc: "Emagrecimento e base aeróbica", color: "text-emerald-600 bg-emerald-500/10" },
+        { name: "Aeróbico", range: z(0.7, 0.8), ...mk(0.7, 0.8), desc: "Condicionamento cardiovascular", color: "text-amber-600 bg-amber-500/10" },
+        { name: "Anaeróbico", range: z(0.8, 0.9), ...mk(0.8, 0.9), desc: "Performance e potência", color: "text-orange-600 bg-orange-500/10" },
+        { name: "Máximo (VO₂)", range: z(0.9, 1.0), ...mk(0.9, 1.0), desc: "Esforço máximo, curtos intervalos", color: "text-rose-600 bg-rose-500/10" },
+    ];
+};
+
+// Distribuição de macronutrientes a partir de uma meta calórica.
+export const calculateMacros = (targetCalories: number, weightKg: number) => {
+    if (!targetCalories || !weightKg) return { protein: 0, fat: 0, carbs: 0 };
+    const protein = Math.round(weightKg * 2);          // 2 g/kg de peso
+    const fat = Math.round((targetCalories * 0.25) / 9); // 25% das calorias
+    const carbsKcal = Math.max(0, targetCalories - protein * 4 - fat * 9);
+    const carbs = Math.round(carbsKcal / 4);
+    return { protein, fat, carbs };
+};
+
 export const calculateSymmetry = (left?: number, right?: number) => {
     if (!left || !right) return { status: 'S/ Dados', diff: 0, color: 'text-muted-foreground' };
     const diff = Math.abs(left - right);

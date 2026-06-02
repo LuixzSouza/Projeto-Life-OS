@@ -1,9 +1,12 @@
 import { prisma } from "@/lib/prisma";
-import { Shirt, DollarSign, Tag, TrendingUp, AlertCircle, RefreshCw } from "lucide-react";
+import { Shirt, DollarSign, Tag, TrendingUp, RefreshCw } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { WardrobeList } from "@/components/wardrobe/wardrobe-list";
 import { WardrobeFormDialog } from "@/components/wardrobe/wardrobe-form-dialog";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
+import { getCurrentUserId } from "@/lib/auth";
+import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
+import { StatCard } from "@/components/ui/stat-card";
 
 // --- TIPAGENS ---
 type WardrobeStatus = "IN_CLOSET" | "LAUNDRY" | "LENT" | "REPAIR" | "DONATED";
@@ -27,53 +30,7 @@ interface SerializedWardrobeItem {
   userId: string;
 }
 
-// --- COMPONENTES DE UI AUXILIARES (Design Limpo) ---
-interface MetricCardProps {
-  label: string;
-  value: string | number;
-  icon: React.ElementType;
-  description?: string;
-  trend?: { value: string, positive: boolean }; 
-}
-
-function MetricCard({ label, value, icon: Icon, description, trend }: MetricCardProps) {
-  return (
-    <Card className="bg-card border-border/40 shadow-sm hover:shadow-md hover:border-border/80 transition-all duration-300 h-full flex flex-col">
-      <CardContent className="p-5 flex flex-col h-full justify-between gap-4">
-        <div className="flex items-start justify-between">
-          <div className="space-y-1">
-            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-              {label}
-            </p>
-            <h3 className="text-2xl font-bold tracking-tight text-foreground">
-              {value}
-            </h3>
-          </div>
-          <div className="p-2.5 rounded-xl bg-muted text-muted-foreground shrink-0">
-            <Icon className="h-4 w-4" />
-          </div>
-        </div>
-        
-        <div className="flex items-center justify-between mt-auto pt-4 border-t border-border/40">
-          {description && (
-            <p className="text-xs font-medium text-muted-foreground truncate pr-2">{description}</p>
-          )}
-          {trend && (
-            <span className={cn(
-              "text-[10px] font-bold px-2 py-0.5 rounded-md flex shrink-0",
-              trend.positive 
-                ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20" 
-                : "bg-rose-500/10 text-rose-600 border border-rose-500/20"
-            )}>
-              {trend.value}
-            </span>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
+// --- COMPONENTE DE DESTAQUE (específico do Closet) ---
 function HighlightCard({ label, value, subValue, icon: Icon, variant = "default" }: { label: string, value: string, subValue: string, icon: React.ElementType, variant?: "default" | "alert" }) {
   return (
     <Card className={cn(
@@ -107,9 +64,16 @@ function HighlightCard({ label, value, subValue, icon: Icon, variant = "default"
 
 // --- PÁGINA PRINCIPAL ---
 export default async function WardrobePage() {
+  const userId = await getCurrentUserId();
   const items = await prisma.wardrobeItem.findMany({
+    where: { userId: userId ?? "" },
     orderBy: { createdAt: 'desc' }
   });
+
+  // Moeda escolhida pelo usuário (Configurações > Regional)
+  const currency = (userId
+    ? await prisma.settings.findUnique({ where: { userId }, select: { currency: true } })
+    : null)?.currency || "BRL";
 
   // --- 🧠 INTELIGÊNCIA DO CLOSET ---
   const totalItems = items.length;
@@ -164,53 +128,36 @@ export default async function WardrobePage() {
   }));
 
   return (
-    <div className="min-h-screen bg-background w-full pb-12">
-      
-      {/* HEADER LIMPO E SÓBRIO */}
-      <header className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border/40 px-6 md:px-8 py-6">
-        <div className=" mx-auto w-full flex flex-col md:flex-row md:items-center justify-between gap-6">
-          
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-              <Shirt className="h-6 w-6" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-3">
-                Closet & Acervo
-              </h1>
-              <p className="text-sm text-muted-foreground mt-1 max-w-md">
-                Gerencie suas peças, otimize seus looks e acompanhe o real custo por uso.
-              </p>
-            </div>
-          </div>
-          
-          {/* Botão de Adição Rápida */}
-          <div className="shrink-0 w-full md:w-auto flex">
-            <WardrobeFormDialog mode="create" />
-          </div>
-        </div>
-      </header>
+    <PageShell>
+      <PageHeader
+        icon={<Shirt className="h-6 w-6" />}
+        title="Closet & Acervo"
+        description="Gerencie suas peças, otimize seus looks e acompanhe o real custo por uso."
+        actions={<WardrobeFormDialog mode="create" />}
+      />
 
-      <main className="mx-auto w-full px-6 md:px-8 py-8 space-y-8 animate-in fade-in duration-500">
+      <PageContainer className="space-y-8">
 
         {/* 🟢 DASHBOARD DE INTELIGÊNCIA */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-          <MetricCard 
-            label="Patrimônio Estimado" 
-            value={totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })} 
-            icon={DollarSign} 
-            description={`${totalItems} peças no acervo`}
+          <StatCard
+            label="Patrimônio Estimado"
+            value={formatCurrency(totalValue, { currency, maximumFractionDigits: 0 })}
+            icon={DollarSign}
+            iconClassName="bg-muted text-muted-foreground"
+            hint={`${totalItems} peças no acervo`}
             trend={{ value: `Média R$ ${averagePrice.toFixed(0)}`, positive: true }}
           />
 
-          <MetricCard 
-            label="Eficiência de Uso (CPW)" 
-            value={`R$ ${averageCostPerWear}`} 
-            icon={RefreshCw} 
-            description="Custo médio por cada uso"
-            trend={{ 
-                value: rotationRate > 60 ? `${rotationRate}% em rotação` : `${rotationRate}% estagnado`, 
-                positive: rotationRate > 60 
+          <StatCard
+            label="Eficiência de Uso (CPW)"
+            value={`R$ ${averageCostPerWear}`}
+            icon={RefreshCw}
+            iconClassName="bg-muted text-muted-foreground"
+            hint="Custo médio por cada uso"
+            trend={{
+                value: rotationRate > 60 ? `${rotationRate}% em rotação` : `${rotationRate}% estagnado`,
+                positive: rotationRate > 60
             }}
           />
 
@@ -236,7 +183,7 @@ export default async function WardrobePage() {
           <WardrobeList initialData={serializedItems} />
         </section>
 
-      </main>
-    </div>
+      </PageContainer>
+    </PageShell>
   );
 }

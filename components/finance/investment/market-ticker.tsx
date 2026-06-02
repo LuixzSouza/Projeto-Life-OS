@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { MarketItem } from "@/lib/market-service";
 import { cn } from "@/lib/utils";
+import { useFormatCurrency } from "@/components/providers/currency-provider";
 import { 
     TrendingUp, 
     TrendingDown, 
@@ -26,6 +27,7 @@ export function MarketTicker({ data }: { data: MarketItem[] }) {
 }
 
 function TickerCard({ item }: { item: MarketItem }) {
+    const formatCurrency = useFormatCurrency();
     // Determine asset status (Positive, Negative, Neutral)
     const status = useMemo(() => {
         if (item.variation > 0) return "up";
@@ -46,8 +48,8 @@ function TickerCard({ item }: { item: MarketItem }) {
     // Format value (prioritize displayValue if exists, otherwise manual format)
     const formattedValue = item.displayValue ?? (
         item.type === 'INDEX' 
-            ? `${item.value}%` 
-            : item.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+            ? `${item.value}%`
+            : formatCurrency(item.value)
     );
 
     return (

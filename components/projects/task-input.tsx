@@ -1,9 +1,9 @@
 'use client';
 
-import { 
-    X, Paperclip, Code, List, Sparkles, 
+import {
+    X, Paperclip, Code, List, Sparkles,
     Check, Loader2, Bold, Italic, Link as LinkIcon,
-    CornerDownLeft, Command, LucideIcon
+    CornerDownLeft, LucideIcon
 } from "lucide-react";
 import { createTask } from "@/app/(dashboard)/projects/actions";
 import { toast } from "sonner";
@@ -89,6 +89,23 @@ export function TaskInput({ projectId }: TaskInputProps) {
         reader.readAsDataURL(file);
     }, []);
 
+    // Cola um print direto da área de transferência (Ctrl+V).
+    const handlePaste = (e: React.ClipboardEvent) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.includes("image")) {
+                const file = items[i].getAsFile();
+                if (file) {
+                    e.preventDefault();
+                    handleFile(file);
+                    toast.success("Print colado!");
+                }
+                return;
+            }
+        }
+    };
+
     const handleSubmit = async () => {
         if (!content.trim() && !image) return;
         setIsUploading(true);
@@ -105,7 +122,7 @@ export function TaskInput({ projectId }: TaskInputProps) {
             setImage(null);
             setIsFocused(false);
             setTimeout(() => setIsSuccess(false), 2000);
-            toast.success("Módulo sincronizado");
+            toast.success("Tarefa adicionada!");
         } catch {
             toast.error("Erro na transmissão de dados");
         } finally {
@@ -126,11 +143,11 @@ export function TaskInput({ projectId }: TaskInputProps) {
                     if (file) handleFile(file);
                 }}
                 className={cn(
-                    "relative w-full border-[1.5px] rounded-[1.5rem] transition-all duration-500",
-                    "bg-card shadow-lg flex flex-col",
-                    isFocused ? "border-primary shadow-2xl ring-4 ring-primary/5" : "border-border/60 hover:border-border",
-                    isDragging && "border-primary border-dashed bg-primary/5 scale-[1.005]",
-                    isSuccess && "border-emerald-500 bg-emerald-500/[0.02]"
+                    "relative w-full border rounded-2xl transition-all duration-300",
+                    "bg-card shadow-sm flex flex-col",
+                    isFocused ? "border-primary/50 shadow-md ring-1 ring-primary/10" : "border-border/60 hover:border-border",
+                    isDragging && "border-primary border-dashed bg-primary/5",
+                    isSuccess && "border-emerald-500/60 bg-emerald-500/[0.02]"
                 )}
             >
                 {/* 1. CONTAINER DE SCROLL PARA TEXTO LONGO */}
@@ -178,6 +195,7 @@ export function TaskInput({ projectId }: TaskInputProps) {
                                 ref={textareaRef}
                                 value={content}
                                 onChange={(e) => setContent(e.target.value.slice(0, MAX_CHARS))}
+                                onPaste={handlePaste}
                                 onFocus={() => setIsFocused(true)}
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -185,8 +203,8 @@ export function TaskInput({ projectId }: TaskInputProps) {
                                         handleSubmit();
                                     }
                                 }}
-                                placeholder={image ? "Descreva este anexo..." : "Qual o próximo objetivo?"}
-                                className="min-h-[44px] w-full p-0 text-lg border-0 bg-transparent shadow-none focus-visible:ring-0 resize-none font-medium placeholder:text-muted-foreground/20 leading-relaxed"
+                                placeholder={image ? "Descreva este anexo..." : "Adicionar tarefa..."}
+                                className="min-h-[44px] w-full p-0 text-base md:text-lg border-0 bg-transparent shadow-none focus-visible:ring-0 resize-none font-medium placeholder:text-muted-foreground/30 leading-relaxed"
                             />
                         </div>
                     </div>
@@ -223,11 +241,11 @@ export function TaskInput({ projectId }: TaskInputProps) {
                                         isSuccess ? "bg-emerald-500 text-white" : "bg-foreground text-background hover:bg-foreground/90"
                                     )}
                                 >
-                                    {isUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : 
-                                     isSuccess ? <Check className="h-4 w-4" /> : 
+                                    {isUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> :
+                                     isSuccess ? <Check className="h-4 w-4" /> :
                                      <div className="flex items-center gap-2">
                                         <Sparkles className="h-4 w-4" />
-                                        <span>Capturar</span>
+                                        <span>Adicionar</span>
                                      </div>
                                     }
                                 </Button>
@@ -238,9 +256,13 @@ export function TaskInput({ projectId }: TaskInputProps) {
 
                 {/* DICA DE ATALHO */}
                 {!isFocused && !hasContent && (
-                    <div className="absolute right-6 bottom-5 flex items-center gap-2 opacity-20 pointer-events-none">
-                        <Command className="h-3 w-3" />
-                        <span className="text-[10px] font-black uppercase tracking-widest">K</span>
+                    <div className="absolute right-5 bottom-4 flex items-center gap-3 opacity-50 pointer-events-none text-muted-foreground">
+                        <span className="hidden sm:flex items-center gap-1 text-[10px] font-medium">
+                            <Paperclip className="h-3 w-3" /> Cole prints com Ctrl+V
+                        </span>
+                        <span className="flex items-center gap-1 text-[10px] font-medium">
+                            <CornerDownLeft className="h-3 w-3" /> Ctrl+Enter
+                        </span>
                     </div>
                 )}
             </motion.div>

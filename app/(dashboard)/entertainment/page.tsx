@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { Star } from "lucide-react";
 import { EntertainmentBoard } from "@/components/entertainment/entertainment-board";
 import { AddMediaDialog } from "@/components/entertainment/add-media-dialog";
+import { getCurrentUserId } from "@/lib/auth";
+import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
 
 /* -------------------------------------------------------------------------- */
 /* PAGE                                                                       */
@@ -10,7 +12,9 @@ import { AddMediaDialog } from "@/components/entertainment/add-media-dialog";
 
 export default async function EntertainmentPage() {
   // 1. Busca os itens no banco
+  const userId = await getCurrentUserId();
   const rawItems = await prisma.mediaItem.findMany({
+    where: { userId },
     orderBy: { createdAt: "desc" },
   });
 
@@ -33,37 +37,17 @@ export default async function EntertainmentPage() {
   }));
 
   return (
-    <div className="min-h-screen bg-background w-full pb-12">
-      
-     <header className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border/40 px-6 md:px-8 py-6">
-        <div className=" mx-auto w-full flex flex-col md:flex-row md:items-center justify-between gap-6">
-          
-          {/* Título e Ícone */}
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-              <Star className="h-6 w-6 fill-current" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-3">
-                Entretenimento
-              </h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Seu catálogo pessoal de filmes, séries, jogos, álbuns e livros.
-              </p>
-            </div>
-          </div>
+    <PageShell>
+      <PageHeader
+        icon={<Star className="h-6 w-6 fill-current" />}
+        title="Entretenimento"
+        description="Seu catálogo pessoal de filmes, séries, jogos, álbuns e livros."
+        actions={<AddMediaDialog />}
+      />
 
-          {/* Ação principal (O Modal de Busca via API) */}
-          <div className="shrink-0 w-full md:w-auto flex">
-            <AddMediaDialog />
-          </div>
-        </div>
-      </header>
-
-      <main className=" mx-auto w-full px-6 md:px-8 py-8 animate-in fade-in duration-500">
+      <PageContainer>
         <EntertainmentBoard initialItems={items} />
-      </main>
-      
-    </div>
+      </PageContainer>
+    </PageShell>
   );
 }

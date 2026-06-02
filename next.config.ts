@@ -13,6 +13,14 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+
+  // Server Actions: o padrão de 1MB barra uploads de foto (avatar/capa) em
+  // base64. As imagens já são comprimidas no cliente; isto é só folga extra.
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "5mb",
+    },
+  },
 };
 
 export default nextConfig;

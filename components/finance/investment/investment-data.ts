@@ -14,6 +14,14 @@ export const GLOSSARY = {
     FII: "Fundos de Investimento Imobiliário. Você compra cotas na bolsa e recebe 'aluguéis' mensais isentos de IR diretamente na sua conta."
 };
 
+// Ponto da série de projeção exibida no gráfico do simulador.
+export interface ProjectionPoint {
+    year: string;
+    total: number;
+    invested: number;
+    savings: number;
+}
+
 export type ProductType = "CDB" | "LCI_LCA" | "TESOURO" | "FII";
 
 export interface InvestmentProduct {

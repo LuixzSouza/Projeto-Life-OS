@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Database, HardDrive, BarChart3, Weight } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -63,7 +63,7 @@ export function StorageAnalytics({ stats }: { stats: StorageStats }) {
                 {/* 1. Métrica Principal */}
                 <div className="flex items-baseline gap-2">
                     <span className="text-4xl font-bold tracking-tighter text-foreground">
-                        {viewMode === 'size' ? stats.totalSize : stats.totalItems.toLocaleString()}
+                        {viewMode === 'size' ? stats.totalSize : formatNumber(stats.totalItems)}
                     </span>
                     <span className="text-sm font-medium text-muted-foreground uppercase">
                         {viewMode === 'size' ? "utilizados" : "registros totais"}

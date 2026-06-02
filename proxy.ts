@@ -53,6 +53,8 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
+  // No Next 16 o proxy (antigo middleware) já roda sempre em Node.js runtime,
+  // então a verificação de sessão pode usar segredos vindos de arquivo local.
   matcher: [
     /*
      * Matcher atualizado: 

@@ -1,7 +1,11 @@
 import { prisma } from "@/lib/prisma"
-import { LockKeyhole, ShieldCheck } from "lucide-react"
+import { LockKeyhole, ShieldCheck, ShieldAlert, Repeat2, Activity } from "lucide-react"
 import { AccessView } from "@/components/access/access-view"
+import { getCurrentUserId } from "@/lib/auth"
+import { getVaultSecurityAudit } from "./actions"
+import { cn } from "@/lib/utils"
 import { Metadata } from "next"
+import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell"
 
 export const metadata: Metadata = {
   title: "Cofre de Senhas | Life OS",
@@ -11,60 +15,77 @@ export default async function AccessPage() {
   // 1. Data Fetching
   // REMOVI O 'select'. Agora ele busca tudo (incluindo notes, userId, createdAt)
   // para satisfazer a tipagem do AccessItem e permitir a busca por notas.
+  const userId = await getCurrentUserId()
   const allItems = await prisma.accessItem.findMany({
+    where: { userId },
     orderBy: { title: "asc" },
   })
 
-  return (
-    <div className="min-h-screen bg-background pb-20">
-      
-      {/* -------------------------------------------------------------------------------------------------
-       * HEADER COM VISUAL DE COFRE
-       * ------------------------------------------------------------------------------------------------- */}
-      <header className="border-b border-border/60 bg-gradient-to-b from-slate-100/50 to-background dark:from-slate-900/20 dark:to-background pt-12 pb-8 px-6 md:px-8">
-        <div className="max-w-[1600px] mx-auto flex flex-col gap-6">
-          
-          <div className="flex flex-col md:flex-row justify-between gap-6">
-            <div className="space-y-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium border border-primary/20 w-fit">
-                <ShieldCheck className="h-3 w-3" /> Ambiente Seguro & Criptografado
-              </div>
-              
-              <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground flex items-center gap-3">
-                <div className="p-3 bg-gradient-to-br from-primary to-primary/80 rounded-xl shadow-lg shadow-primary/20 text-primary-foreground">
-                  <LockKeyhole className="h-7 w-7" />
-                </div>
-                Cofre de Acessos
-              </h1>
+  // 2. Auditoria de segurança (força/reuso) — calculada no servidor.
+  const audit = await getVaultSecurityAudit()
+  const { stats } = audit
+  const healthColor =
+    stats.healthScore >= 75 ? "text-emerald-500"
+    : stats.healthScore >= 45 ? "text-amber-500"
+    : "text-rose-500"
+  const healthBar =
+    stats.healthScore >= 75 ? "bg-emerald-500"
+    : stats.healthScore >= 45 ? "bg-amber-500"
+    : "bg-rose-500"
 
-              <p className="text-muted-foreground text-lg max-w-2xl leading-relaxed">
-                Gerencie credenciais pessoais e corporativas em um único lugar. 
-                Seus dados nunca saem do seu dispositivo sem criptografia.
-              </p>
+  return (
+    <PageShell>
+      <PageHeader
+        icon={<LockKeyhole className="h-6 w-6" />}
+        title="Cofre de Acessos"
+        description="Gerencie credenciais pessoais e corporativas em um único lugar. Seus dados nunca saem do seu dispositivo sem criptografia."
+        actions={
+          <div className="grid w-full grid-cols-2 gap-3 sm:flex sm:w-auto">
+            {/* Saúde geral (score) */}
+            <div className="col-span-2 min-w-[160px] rounded-xl border border-border/60 bg-card p-4 shadow-sm sm:col-span-1">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <Activity className="h-3 w-3" /> Saúde
+                </span>
+                <span className={cn("text-lg font-black leading-none", healthColor)}>{stats.healthScore}%</span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                <div className={cn("h-full rounded-full transition-all duration-700", healthBar)} style={{ width: `${stats.healthScore}%` }} />
+              </div>
             </div>
 
-            {/* Stats Rápidos */}
-            <div className="flex gap-4 self-start md:self-end">
-                <div className="bg-card border rounded-lg p-3 px-5 text-center shadow-sm">
-                    <span className="block text-2xl font-bold text-foreground">{allItems.length}</span>
-                    <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Itens Totais</span>
-                </div>
-                <div className="bg-card border rounded-lg p-3 px-5 text-center shadow-sm hidden sm:block">
-                    {/* Filtra itens que possuem cliente (não nulo e não vazio) */}
-                    <span className="block text-2xl font-bold text-foreground">{allItems.filter(i => i.client).length}</span>
-                    <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Clientes</span>
-                </div>
+            {/* Total */}
+            <div className="rounded-xl border border-border/60 bg-card p-4 text-center shadow-sm">
+              <span className="block text-2xl font-bold leading-none text-foreground">{allItems.length}</span>
+              <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Itens</span>
+            </div>
+
+            {/* Senhas frágeis */}
+            <div className={cn("rounded-xl border p-4 text-center shadow-sm", stats.weak > 0 ? "border-rose-500/30 bg-rose-500/5" : "border-border/60 bg-card")}>
+              <span className={cn("flex items-center justify-center gap-1 text-2xl font-bold leading-none", stats.weak > 0 ? "text-rose-500" : "text-foreground")}>
+                {stats.weak > 0 && <ShieldAlert className="h-4 w-4" />}{stats.weak}
+              </span>
+              <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Frágeis</span>
+            </div>
+
+            {/* Senhas reutilizadas */}
+            <div className={cn("rounded-xl border p-4 text-center shadow-sm", stats.reused > 0 ? "border-amber-500/30 bg-amber-500/5" : "border-border/60 bg-card")}>
+              <span className={cn("flex items-center justify-center gap-1 text-2xl font-bold leading-none", stats.reused > 0 ? "text-amber-500" : "text-foreground")}>
+                {stats.reused > 0 && <Repeat2 className="h-4 w-4" />}{stats.reused}
+              </span>
+              <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Repetidas</span>
             </div>
           </div>
+        }
+      >
+        <div className="inline-flex w-fit items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+          <ShieldCheck className="h-3 w-3" /> Ambiente Seguro & Criptografado
         </div>
-      </header>
+      </PageHeader>
 
-      {/* -------------------------------------------------------------------------------------------------
-       * CONTEÚDO PRINCIPAL (CLIENT COMPONENT)
-       * ------------------------------------------------------------------------------------------------- */}
-      <main className="px-6 md:px-8 py-8 max-w-[1600px] mx-auto -mt-4">
-        <AccessView initialItems={allItems} />
-      </main>
-    </div>
+      <PageContainer>
+        <AccessView initialItems={allItems} audit={audit} />
+      </PageContainer>
+    </PageShell>
   )
 }

@@ -1,13 +1,17 @@
 import { PluggyClient } from 'pluggy-sdk';
 import { prisma } from './prisma';
+import { getCurrentUserId } from './auth';
+import { decryptKey } from './settings-crypto';
 
 // Função auxiliar para pegar o cliente ou lançar erro se não configurado
 async function getPluggyClient() {
-  // 1. Busca as configurações salvas no banco
-  const settings = await prisma.settings.findFirst();
+  // 1. Busca as configurações do usuário logado
+  const userId = await getCurrentUserId();
+  const settings = userId ? await prisma.settings.findUnique({ where: { userId } }) : null;
 
-  const clientId = settings?.pluggyClientId;
-  const clientSecret = settings?.pluggySecret;
+  // Credenciais cifradas at-rest; decifra antes de instanciar o cliente.
+  const clientId = decryptKey(settings?.pluggyClientId);
+  const clientSecret = decryptKey(settings?.pluggySecret);
 
   if (!clientId || !clientSecret) {
     console.warn("⚠️ AVISO: Credenciais da Pluggy não configuradas no sistema.");

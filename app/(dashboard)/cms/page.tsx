@@ -4,14 +4,18 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Globe, Plus, Server, LayoutTemplate, ArrowRight, FolderTree, Clock, Database, Braces } from "lucide-react";
+import { Globe, Plus, Server, LayoutTemplate, ArrowRight, FolderTree, Braces } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { SiteActionsMenu } from "@/components/cms/site-actions-menu";
+import { getCurrentUserId } from "@/lib/auth";
+import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
 
 export default async function CMSPage() {
+  const userId = await getCurrentUserId();
   const sites = await prisma.managedSite.findMany({
+    where: { userId },
     include: {
       pages: { orderBy: { slug: "asc" } },
     },
@@ -19,29 +23,17 @@ export default async function CMSPage() {
   });
 
   return (
-    <div className="min-h-screen bg-background w-full pb-12">
-      
-      {/* HEADER LIMPO E SÓBRIO */}
-      <header className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border/40 px-6 md:px-8 py-6">
-        <div className="mx-auto w-full flex flex-col md:flex-row md:items-center justify-between gap-6">
-          
-          {/* Título e Ícone */}
-          <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-              <Server className="h-6 w-6" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-3">
-                Headless CMS
-                <Badge variant="secondary" className="text-[10px] px-2 font-medium bg-primary/10 text-primary">Alpha</Badge>
-              </h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Gerencie containers, endpoints JSON e variáveis de ambiente.
-              </p>
-            </div>
-          </div>
-
-          {/* Botão de Criar Projeto */}
+    <PageShell>
+      <PageHeader
+        icon={<Server className="h-6 w-6" />}
+        title={
+          <span className="flex items-center gap-3">
+            Headless CMS
+            <Badge variant="secondary" className="px-2 text-[10px] font-medium bg-primary/10 text-primary">Alpha</Badge>
+          </span>
+        }
+        description="Gerencie containers, endpoints JSON e variáveis de ambiente."
+        actions={
           <Dialog>
             <DialogTrigger asChild>
               <Button className="h-10 px-4 gap-2 font-medium rounded-lg shadow-sm">
@@ -61,11 +53,11 @@ export default async function CMSPage() {
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label className="text-xs font-semibold text-muted-foreground">Nome do Projeto</Label>
-                    <Input 
-                        name="name" 
-                        placeholder="Ex: Website Institucional" 
-                        required 
-                        className="h-10 rounded-lg bg-muted/20 border-border/50" 
+                    <Input
+                        name="name"
+                        placeholder="Ex: Website Institucional"
+                        required
+                        className="h-10 rounded-lg bg-muted/20 border-border/50"
                     />
                   </div>
                   <div className="space-y-2">
@@ -74,10 +66,10 @@ export default async function CMSPage() {
                     </Label>
                     <div className="relative">
                         <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input 
-                            name="url" 
-                            placeholder="https://meusite.com.br" 
-                            className="h-10 pl-9 rounded-lg bg-muted/20 border-border/50 font-mono text-sm" 
+                        <Input
+                            name="url"
+                            placeholder="https://meusite.com.br"
+                            className="h-10 pl-9 rounded-lg bg-muted/20 border-border/50 font-mono text-sm"
                         />
                     </div>
                   </div>
@@ -91,11 +83,11 @@ export default async function CMSPage() {
               </form>
             </DialogContent>
           </Dialog>
-        </div>
-      </header>
+        }
+      />
 
       {/* GRID DE PROJETOS */}
-      <main className=" mx-auto w-full px-6 md:px-8 py-8 animate-in fade-in duration-500">
+      <PageContainer>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           
           {sites.length === 0 ? (
@@ -172,7 +164,7 @@ export default async function CMSPage() {
             ))
           )}
         </div>
-      </main>
-    </div>
+      </PageContainer>
+    </PageShell>
   );
 }

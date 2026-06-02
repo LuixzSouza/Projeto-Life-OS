@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { login, logout } from "@/lib/auth";
+import { login, logout, verifyPassword } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { isSystemInstalled } from "@/lib/db-config";
 
@@ -26,8 +26,8 @@ export async function authenticate(prevState: AuthState, formData: FormData) {
       where: { email },
     });
 
-    // 4. Verifica senha
-    if (!user || user.password !== password) {
+    // 4. Verifica senha (hash bcrypt)
+    if (!user || !(await verifyPassword(password, user.password))) {
       return { error: "Email ou senha incorretos." };
     }
 

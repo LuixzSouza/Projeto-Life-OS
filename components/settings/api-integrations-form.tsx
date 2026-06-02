@@ -9,13 +9,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { 
-  Globe, Film, Gamepad2, Banknote, Loader2, Shield, 
-  ExternalLink, Eye, EyeOff, Copy, Check, Info, 
-  Key, Database, Lock, TestTube2, Sparkles, Plug
+import {
+  Globe, Film, Gamepad2, Banknote, Loader2, Shield,
+  ExternalLink, Eye, EyeOff, Copy, Check, Info,
+  Key, Database, Lock, TestTube2, Sparkles, Plug, BookOpen, Salad
 } from "lucide-react";
 import { useFormStatus } from "react-dom";
-import { updateApiKeys } from "@/app/(dashboard)/settings/actions";
+import { updateApiKeys, testApiConnection } from "@/app/(dashboard)/settings/actions";
 import Link from "next/link";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -81,8 +81,9 @@ const SubmitButton: React.FC = () => {
 const APIInputField: React.FC<{
   field: APIProvider;
   defaultValue?: string | null;
-  onChangeValue: (id: string, newValue: string) => void; 
-}> = ({ field, defaultValue, onChangeValue }) => {
+  onChangeValue: (id: string, newValue: string) => void;
+  onTest: (id: string, value: string) => Promise<{ success: boolean; message: string }>;
+}> = ({ field, defaultValue, onChangeValue, onTest }) => {
   const [revealed, setRevealed] = useState(false);
   const [value, setValue] = useState(defaultValue ?? "");
   const [testing, setTesting] = useState(false);
@@ -102,11 +103,15 @@ const APIInputField: React.FC<{
   const handleTest = async () => {
     if (!value) { toast.error("Campo de chave vazio."); return; }
     setTesting(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    const isValid = value.length > 10;
-    if (isValid) toast.success(`Conexão com ${field.label} estabelecida!`);
-    else toast.error(`A chave para ${field.label} parece inválida.`);
-    setTesting(false);
+    try {
+      const res = await onTest(field.id, value);
+      if (res.success) toast.success(res.message);
+      else toast.error(res.message);
+    } catch {
+      toast.error(`Falha ao testar ${field.label}.`);
+    } finally {
+      setTesting(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -205,18 +210,38 @@ export default function APIIntegrationsForm({ settings }: APIIntegrationsFormPro
   const [formValues, setFormValues] = useState<Record<string, string>>({
     tmdbApiKey: getSettingValue(settings, "tmdbApiKey") || "",
     rawgApiKey: getSettingValue(settings, "rawgApiKey") || "",
+    googleBooksApiKey: getSettingValue(settings, "googleBooksApiKey") || "",
     pluggyClientId: getSettingValue(settings, "pluggyClientId") || "",
     pluggySecret: getSettingValue(settings, "pluggySecret") || "",
   });
 
+  // Toggle da busca online de alimentos (Open Food Facts — gratuita, sem chave).
+  const [foodApiEnabled, setFoodApiEnabled] = useState<boolean>(settings?.foodApiEnabled !== false);
+
   const handleUpdateValue = (id: string, newValue: string) => {
     setFormValues(prev => ({ ...prev, [id]: newValue }));
+  };
+
+  // Teste real de conexão. Pluggy precisa do Client ID + Secret juntos.
+  const handleTestField = async (id: string, value: string) => {
+    if (id === "tmdbApiKey") return testApiConnection({ type: "tmdb", key: value });
+    if (id === "rawgApiKey") return testApiConnection({ type: "rawg", key: value });
+    if (id === "googleBooksApiKey") return testApiConnection({ type: "googlebooks", key: value });
+    if (id === "pluggyClientId" || id === "pluggySecret") {
+      return testApiConnection({
+        type: "pluggy",
+        key: formValues.pluggyClientId,
+        secret: formValues.pluggySecret,
+      });
+    }
+    return { success: false, message: "Teste não disponível." };
   };
 
   // 🟢 REMOVIDOS OS PROVEDORES DA IA DAQUI
   const apiProviders: APIProvider[] = [
     { id: "tmdbApiKey", name: "tmdb", label: "TMDB API", icon: Film, description: "Cine OS - Filmes e Séries", category: "content", link: { url: "https://www.themoviedb.org/settings/api", label: "Dashboard" } },
     { id: "rawgApiKey", name: "rawg", label: "RAWG API", icon: Gamepad2, description: "Game OS - Catálogo de Jogos", category: "content", link: { url: "https://rawg.io/apidocs", label: "Dashboard" } },
+    { id: "googleBooksApiKey", name: "googlebooks", label: "Google Books API", icon: BookOpen, description: "Livros - Gratuita (eleva a cota de buscas)", category: "content", link: { url: "https://console.cloud.google.com/apis/library/books.googleapis.com", label: "Google Cloud" } },
     { id: "pluggyClientId", name: "pluggy-client", label: "Pluggy Client ID", icon: Banknote, description: "Open Finance - Identificador", category: "finance", link: { url: "https://dashboard.pluggy.ai/", label: "Pluggy" } },
     { id: "pluggySecret", name: "pluggy-secret", label: "Pluggy Client Secret", icon: Shield, description: "Open Finance - Chave Secreta", category: "finance", link: { url: "https://dashboard.pluggy.ai/", label: "Pluggy" }, secret: true },
   ];
@@ -254,9 +279,12 @@ export default function APIIntegrationsForm({ settings }: APIIntegrationsFormPro
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         {/* 🟢 REMOVIDA A TAB DA IA DAQUI */}
-        <TabsList className="grid w-full grid-cols-2 lg:w-fit bg-muted/50 p-1.5 rounded-full h-auto">
+        <TabsList className="grid w-full grid-cols-3 lg:w-fit bg-muted/50 p-1.5 rounded-full h-auto">
           <TabsTrigger value="content" className="gap-2 rounded-full text-xs font-black uppercase tracking-widest py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-sm">
               <Film className="h-3.5 w-3.5" /> Entretenimento
+          </TabsTrigger>
+          <TabsTrigger value="nutrition" className="gap-2 rounded-full text-xs font-black uppercase tracking-widest py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+              <Salad className="h-3.5 w-3.5" /> Nutrição
           </TabsTrigger>
           <TabsTrigger value="finance" className="gap-2 rounded-full text-xs font-black uppercase tracking-widest py-2.5 data-[state=active]:bg-background data-[state=active]:shadow-sm">
               <Banknote className="h-3.5 w-3.5" /> Open Finance
@@ -267,19 +295,66 @@ export default function APIIntegrationsForm({ settings }: APIIntegrationsFormPro
           {apiProviders.map((api) => (
             <input key={api.id} type="hidden" name={api.id} value={formValues[api.id]} />
           ))}
+          <input type="hidden" name="foodApiEnabled" value={foodApiEnabled ? "true" : "false"} />
 
           <TabsContent value="content" className="space-y-4 m-0">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {contentAPIs.map((api) => (
-                <APIInputField key={api.id} field={api} defaultValue={getSettingValue(settings, api.id)} onChangeValue={handleUpdateValue} />
+                <APIInputField key={api.id} field={api} defaultValue={getSettingValue(settings, api.id)} onChangeValue={handleUpdateValue} onTest={handleTestField} />
               ))}
             </div>
+          </TabsContent>
+
+          <TabsContent value="nutrition" className="space-y-4 m-0">
+            <Card className="overflow-hidden border-border/40 rounded-[2rem] bg-muted/5">
+              <CardHeader className="pb-3 border-b border-border/20">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 rounded-2xl bg-background shadow-sm border border-border/40 text-emerald-500">
+                      <Salad className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-3">
+                        <CardTitle className="text-xs font-black uppercase tracking-wider">Open Food Facts</CardTitle>
+                        <StatusIndicator status={foodApiEnabled ? "active" : "inactive"} />
+                      </div>
+                      <CardDescription className="text-[10px] font-medium mt-1">
+                        Banco de alimentos com imagens — gratuito, sem chave de API.
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <Link href="https://world.openfoodfacts.org" target="_blank" rel="noopener noreferrer" className="p-2 bg-background border border-border/40 rounded-xl hover:bg-muted transition-colors shrink-0 shadow-sm">
+                    <ExternalLink className="h-3 w-3 text-muted-foreground hover:text-primary" />
+                  </Link>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-start gap-2 text-[11px] text-muted-foreground">
+                    <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground/60" />
+                    <span>Quando ativo, a busca de alimentos na Nutrição consulta a base online e exibe imagens. Desative para usar apenas o banco local (100% offline).</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFoodApiEnabled(v => !v)}
+                    className={cn(
+                      "shrink-0 text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full transition-colors border",
+                      foodApiEnabled
+                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                        : "bg-background border-border/40 text-muted-foreground hover:bg-muted"
+                    )}
+                  >
+                    {foodApiEnabled ? "Habilitado" : "Desabilitado"}
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="finance" className="space-y-4 m-0">
             <div className="grid grid-cols-1 gap-6">
               {financeAPIs.map((api) => (
-                <APIInputField key={api.id} field={api} defaultValue={getSettingValue(settings, api.id)} onChangeValue={handleUpdateValue} />
+                <APIInputField key={api.id} field={api} defaultValue={getSettingValue(settings, api.id)} onChangeValue={handleUpdateValue} onTest={handleTestField} />
               ))}
             </div>
           </TabsContent>

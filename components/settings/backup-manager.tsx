@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { formatDate, formatTime, formatDateTime } from "@/lib/utils";
 import { toast } from "sonner";
 import { 
     ArchiveRestore, 
@@ -134,11 +135,11 @@ export function BackupManager({ history }: { history: BackupLog[] }) {
                                             <div className="flex items-center gap-2">
                                                 <FileClock className="h-3.5 w-3.5 text-muted-foreground/70" />
                                                 <span className="font-medium text-foreground truncate">
-                                                    {new Date(backup.createdAt).toLocaleDateString()}
+                                                    {formatDate(backup.createdAt)}
                                                 </span>
                                             </div>
                                             <span className="text-[10px] text-muted-foreground font-mono truncate pl-6">
-                                                {new Date(backup.createdAt).toLocaleTimeString()}
+                                                {formatTime(backup.createdAt)}
                                             </span>
                                         </div>
 
@@ -202,7 +203,7 @@ export function BackupManager({ history }: { history: BackupLog[] }) {
                                 {backupToRestore?.fileName}
                                 <br />
                                 <span className="text-xs text-muted-foreground">
-                                    {backupToRestore && new Date(backupToRestore.createdAt).toLocaleString()}
+                                    {backupToRestore && formatDateTime(backupToRestore.createdAt)}
                                 </span>
                             </div>
                             <p className="text-xs text-red-500 font-medium">

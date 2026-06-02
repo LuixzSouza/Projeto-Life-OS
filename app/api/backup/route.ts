@@ -1,8 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
+import { getCurrentUserId } from "@/lib/auth";
 
 export async function GET() {
   try {
+    const userId = await getCurrentUserId();
+    if (!userId) {
+      return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+    }
     // 1. Busca TUDO do banco de dados em paralelo
     const [
       user,
@@ -19,33 +24,39 @@ export async function GET() {
       sites,
       accessItems,
       savedLinks, // ✅ NOVO: Incluindo a Biblioteca de Links
-      aiMessages
+      aiMessages,
+      portfolio, // ✅ NOVO: Currículo / Portfólio (Builder Engine)
+      challenges // ✅ NOVO: Desafios de treino
     ] = await Promise.all([
-      prisma.user.findFirst(),
-      prisma.settings.findFirst(),
+      prisma.user.findUnique({ where: { id: userId } }),
+      prisma.settings.findUnique({ where: { userId } }),
       // Finanças
-      prisma.account.findMany({ include: { transactions: true } }),
+      prisma.account.findMany({ where: { userId }, include: { transactions: true } }),
       // Projetos e Tarefas
-      prisma.project.findMany({ include: { tasks: true, events: true } }),
-      prisma.task.findMany({ where: { projectId: null } }), // Inbox
+      prisma.project.findMany({ where: { userId }, include: { tasks: true, events: true } }),
+      prisma.task.findMany({ where: { projectId: null, userId } }), // Inbox
       // Carreira
-      prisma.jobApplication.findMany(),
+      prisma.jobApplication.findMany({ where: { userId } }),
       // Estudos
-      prisma.studySubject.findMany({ include: { sessions: true } }),
-      prisma.flashcardDeck.findMany({ include: { cards: true } }),
+      prisma.studySubject.findMany({ where: { userId }, include: { sessions: true } }),
+      prisma.flashcardDeck.findMany({ where: { userId }, include: { cards: true } }),
       // Saúde
-      prisma.workout.findMany(),
-      prisma.healthMetric.findMany(),
+      prisma.workout.findMany({ where: { userId } }),
+      prisma.healthMetric.findMany({ where: { userId } }),
       // Agenda (Eventos soltos)
-      prisma.event.findMany({ where: { projectId: null } }),
+      prisma.event.findMany({ where: { projectId: null, userId } }),
       // CMS
-      prisma.managedSite.findMany({ include: { pages: true } }),
+      prisma.managedSite.findMany({ where: { userId }, include: { pages: true } }),
       // Cofre
-      prisma.accessItem.findMany(),
+      prisma.accessItem.findMany({ where: { userId } }),
       // Links
-      prisma.savedLink.findMany(), 
+      prisma.savedLink.findMany({ where: { userId } }),
       // IA (Aumentado limite para preservar contexto)
-      prisma.aiMessage.findMany({ take: 500, orderBy: { createdAt: 'desc' } }) 
+      prisma.aiMessage.findMany({ where: { userId }, take: 500, orderBy: { createdAt: 'desc' } }),
+      // Currículo / Portfólio
+      prisma.portfolio.findUnique({ where: { userId } }),
+      // Desafios de treino
+      prisma.challenge.findMany({ where: { userId }, include: { checkins: true } })
     ]);
 
     // 2. Monta o objeto de Backup com estrutura compatível com a importação
@@ -69,7 +80,9 @@ export async function GET() {
       sites,
       accessItems,
       savedLinks, // ✅ Exportando os links
-      aiMessages: aiMessages.reverse() // Reordena para cronológico (Antigo -> Novo)
+      aiMessages: aiMessages.reverse(), // Reordena para cronológico (Antigo -> Novo)
+      portfolio, // ✅ Currículo / Portfólio
+      challenges // ✅ Desafios de treino
     };
 
     // 3. Gera o JSON

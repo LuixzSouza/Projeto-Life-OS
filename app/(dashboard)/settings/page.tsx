@@ -7,6 +7,8 @@ import path from "path";
 import { cn } from "@/lib/utils";
 import { getDatabasePath } from "@/lib/db-config";
 import os from "os";
+import { getCurrentUserId } from "@/lib/auth";
+import { decryptSettings } from "@/lib/settings-crypto";
 
 // --- Importação dos Componentes ---
 import AppearanceForm from "@/components/settings/appearance-form"; 
@@ -22,9 +24,13 @@ import { MaintenancePanel } from "@/components/settings/maintenance-panel"; // �
 import { SelectiveExport } from "@/components/settings/selective-export"; // ✅ Exportação Seletiva
 
 export default async function SettingsPage() {
-    // 1. Busca Dados do Usuário
-    const user = await prisma.user.findFirst();
-    const settings = await prisma.settings.findFirst();
+    // 1. Busca Dados do Usuário logado
+    const userId = await getCurrentUserId();
+    const user = userId ? await prisma.user.findUnique({ where: { id: userId } }) : null;
+    // Chaves vêm cifradas do banco; descriptografamos para exibir/editar nos forms.
+    const settings = decryptSettings(
+        userId ? await prisma.settings.findUnique({ where: { userId } }) : null
+    );
     
     // 2. Resolve Caminho do Banco
     const rawDbPath = getDatabasePath();
@@ -33,6 +39,7 @@ export default async function SettingsPage() {
     
     // 3. Histórico de Backups
     const backupHistory = await prisma.backupLog.findMany({
+        where: { userId },
         orderBy: { createdAt: 'desc' },
         take: 20
     });
@@ -69,7 +76,7 @@ export default async function SettingsPage() {
                 <p className="text-muted-foreground">Gerencie suas preferências, dados e integrações.</p>
             </div>
 
-            <Tabs defaultValue="system" className="w-full space-y-8">
+            <Tabs defaultValue="profile" className="w-full space-y-8">
                 
                 {/* BARRA DE NAVEGAÇÃO (TABS) */}
                 <div className="overflow-x-auto pb-2">
@@ -195,9 +202,12 @@ export default async function SettingsPage() {
 
                 {/* === ABA 2: PERFIL === */}
                 <TabsContent value="profile" className="space-y-6 focus-visible:outline-none">
-                    <AppearanceForm 
-                        initialColor={settings?.accentColor} 
-                        userName={user?.name} 
+                    <AppearanceForm
+                        initialColor={settings?.accentColor}
+                        initialCurrency={settings?.currency}
+                        initialPixKey={settings?.pixKey}
+                        initialBusinessName={settings?.businessName}
+                        userName={user?.name}
                         userEmail={user?.email} 
                         userAvatar={user?.avatarUrl} 
                         userBio={user?.bio} 
@@ -247,7 +257,10 @@ export default async function SettingsPage() {
                             <p className="text-sm text-muted-foreground">Altere sua senha mestre.</p>
                         </div>
                         <div className="md:col-span-8">
-                            <SecurityForm />
+                            <SecurityForm
+                                initialAutoLock={settings?.autoLockMinutes ?? 15}
+                                initialPrivacyMode={settings?.privacyMode ?? false}
+                            />
                         </div>
                     </div>
                 </TabsContent>

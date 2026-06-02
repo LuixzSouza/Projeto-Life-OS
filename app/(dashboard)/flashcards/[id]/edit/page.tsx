@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { FlashcardItem } from "@/components/flashcards/flashcard-item"; // IMPORT NOVO
+import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
 
 /* Tipagem correta para App Router */
 interface DeckEditPageProps {
@@ -77,62 +78,47 @@ export default async function DeckEditPage({ params }: DeckEditPageProps) {
   const hasCards = deck.cards.length > 0;
 
   return (
-    <div className="min-h-screen bg-background pb-24">
-      
-      {/* ================= HEADER ================= */}
-      <header className="border-b border-border/60 bg-gradient-to-b from-primary/5 to-background pt-10 pb-8 px-6 md:px-8">
-        <div className="max-w-[1600px] mx-auto flex flex-col gap-6 animate-in fade-in duration-500">
-            
-            <div className="flex items-center gap-2">
-                <Link href="/flashcards">
-                    <Button variant="ghost" size="sm" className="pl-0 text-muted-foreground hover:text-primary transition-colors">
-                        <ArrowLeft className="h-4 w-4 mr-1" />
-                        Voltar para Biblioteca
-                    </Button>
-                </Link>
-            </div>
-
-            <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
-                <div className="flex items-start gap-5">
-                    <div className="h-14 w-14 rounded-2xl flex shrink-0 items-center justify-center bg-primary/10 text-primary shadow-sm ring-1 ring-primary/10">
-                        <Library className="h-7 w-7" />
-                    </div>
-
-                    <div className="space-y-1">
-                        <div className="flex items-center gap-3 flex-wrap">
-                            <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
-                                {deck.title}
-                            </h1>
-                            {deck.studySubject && (
-                                <Badge variant="outline" className="text-primary border-primary/20 bg-primary/5 gap-1.5 py-1 px-2.5">
-                                    {deck.studySubject.icon && <span>{deck.studySubject.icon}</span>}
-                                    {deck.studySubject.title}
-                                </Badge>
-                            )}
-                        </div>
-                        <p className="text-muted-foreground flex items-center gap-2 text-sm font-medium">
-                            <Layers className="h-4 w-4 text-primary/60" />
-                            {deck.cards.length} {deck.cards.length === 1 ? 'cartão' : 'cartões'} neste baralho
-                        </p>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-3 pt-2">
-                    {hasCards && (
-                        <Link href={`/flashcards/${deck.id}/study`}>
-                            <Button size="lg" className="gap-2 shadow-lg shadow-primary/20 rounded-xl font-bold transition-transform hover:scale-[1.02]">
-                                <PlayCircle className="h-5 w-5 fill-current" />
-                                Estudar Agora
-                            </Button>
-                        </Link>
-                    )}
-                </div>
-            </div>
-        </div>
-      </header>
+    <PageShell>
+      <PageHeader
+        icon={<Library className="h-6 w-6" />}
+        title={
+          <span className="flex flex-wrap items-center gap-3">
+            {deck.title}
+            {deck.studySubject && (
+              <Badge variant="outline" className="gap-1.5 border-primary/20 bg-primary/5 px-2.5 py-1 text-primary">
+                {deck.studySubject.icon && <span>{deck.studySubject.icon}</span>}
+                {deck.studySubject.title}
+              </Badge>
+            )}
+          </span>
+        }
+        description={
+          <span className="flex items-center gap-2">
+            <Layers className="h-4 w-4 text-primary/60" />
+            {deck.cards.length} {deck.cards.length === 1 ? 'cartão' : 'cartões'} neste baralho
+          </span>
+        }
+        actions={
+          hasCards && (
+            <Link href={`/flashcards/${deck.id}/study`}>
+              <Button className="gap-2 rounded-xl font-bold shadow-lg shadow-primary/20 transition-transform hover:scale-[1.02]">
+                <PlayCircle className="h-5 w-5 fill-current" />
+                Estudar Agora
+              </Button>
+            </Link>
+          )
+        }
+      >
+        <Link href="/flashcards" className="w-fit">
+          <Button variant="ghost" size="sm" className="-ml-2 text-muted-foreground hover:text-primary">
+            <ArrowLeft className="mr-1 h-4 w-4" />
+            Voltar para Biblioteca
+          </Button>
+        </Link>
+      </PageHeader>
 
       {/* ================= CONTENT ================= */}
-      <main className="px-6 md:px-8 py-8 space-y-10 max-w-[1600px] mx-auto">
+      <PageContainer className="space-y-10">
         <div className="grid lg:grid-cols-[400px_1fr] gap-8 items-start">
             
             {/* COLUNA ESQUERDA: FORMULÁRIO (Sticky) */}
@@ -234,7 +220,7 @@ export default async function DeckEditPage({ params }: DeckEditPageProps) {
                 )}
             </section>
         </div>
-      </main>
-    </div>
+      </PageContainer>
+    </PageShell>
   );
 }

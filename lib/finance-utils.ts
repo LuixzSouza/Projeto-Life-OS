@@ -1,5 +1,9 @@
 // lib/finance-utils.ts
 
+// Fonte única de formatação de moeda vive em lib/utils. Reexportamos aqui para
+// manter compatibilidade com quem já importa `formatCurrency` deste módulo.
+export { formatCurrency } from "./utils";
+
 // Função Auxiliar de INSS (Baseada na tabela progressiva 2024)
 export const calculateNetSalary = (gross: number | null | undefined) => {
     const salary = gross || 0; // Garante que não quebra se for nulo
@@ -18,12 +22,4 @@ export const calculateNetSalary = (gross: number | null | undefined) => {
     const net = salary - inssFinal; 
     
     return { net, inss: inssFinal, fgts };
-}
-
-// Formatador de Moeda Padrão
-export const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-        style: 'currency',
-        currency: 'BRL'
-    }).format(value);
 }

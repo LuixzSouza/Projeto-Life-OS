@@ -1,12 +1,14 @@
 import { Sidebar } from "@/components/layout/sidebar"; // ou o caminho correto
 import { prisma } from "@/lib/prisma";
+import { getCurrentUserId } from "@/lib/auth";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const user = await prisma.user.findFirst();
+  const userId = await getCurrentUserId();
+  const user = userId ? await prisma.user.findUnique({ where: { id: userId } }) : null;
 
   // --- A CORREÇÃO ESTÁ AQUI ---
   // Criamos um objeto "limpo" apenas com o que o front precisa, 

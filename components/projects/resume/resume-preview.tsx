@@ -25,21 +25,31 @@ export function ResumePreview({ data, onChange }: ResumePreviewProps) {
       
       {/* 1. HEADER (Identidade e Contato) */}
       <header className="border-b-4 border-zinc-900 pb-6 mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-        <div className="w-full md:w-[65%]">
-          <EditableText 
-              tagName="h1"
-              value={data.hero.name} 
-              onChange={(val) => updateHero('name', val)} 
-              className="text-4xl md:text-5xl font-black uppercase tracking-tighter text-zinc-900 leading-[0.9] mb-3 block w-full break-words"
-              placeholder="NOME COMPLETO"
-          />
-          <EditableText 
-              tagName="p"
-              value={data.hero.headline} 
-              onChange={(val) => updateHero('headline', val)} 
-              className="text-base md:text-lg font-bold tracking-tight text-zinc-500 uppercase block w-full break-words"
-              placeholder="SEU CARGO / ESPECIALIDADE"
-          />
+        <div className="w-full md:w-[65%] flex items-center gap-5">
+          {data.hero.photoUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={data.hero.photoUrl}
+              alt={data.hero.name}
+              className="h-24 w-24 rounded-2xl object-cover border-2 border-zinc-900 shrink-0 grayscale"
+            />
+          )}
+          <div className="min-w-0">
+            <EditableText
+                tagName="h1"
+                value={data.hero.name}
+                onChange={(val) => updateHero('name', val)}
+                className="text-4xl md:text-5xl font-black uppercase tracking-tighter text-zinc-900 leading-[0.9] mb-3 block w-full break-words"
+                placeholder="NOME COMPLETO"
+            />
+            <EditableText
+                tagName="p"
+                value={data.hero.headline}
+                onChange={(val) => updateHero('headline', val)}
+                className="text-base md:text-lg font-bold tracking-tight text-zinc-500 uppercase block w-full break-words"
+                placeholder="SEU CARGO / ESPECIALIDADE"
+            />
+          </div>
         </div>
         
         {/* Informações de Contato Alinhadas à Direita - Adicionado break-all para não vazar */}
@@ -186,6 +196,24 @@ export function ResumePreview({ data, onChange }: ResumePreviewProps) {
                     </div>
                 </section>
             )}
+
+            {/* CERTIFICAÇÕES */}
+            {data.certifications.length > 0 && (
+                <section className="break-inside-avoid">
+                    <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-400 mb-5 flex items-center gap-2">
+                        <span className="w-2 h-2 bg-zinc-900 rounded-sm inline-block shrink-0" /> Cursos & Certificações
+                    </h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {data.certifications.map(cert => (
+                            <div key={cert.id} className="border border-zinc-200 p-3 rounded-lg bg-zinc-50/50 break-inside-avoid">
+                                <h3 className="font-bold text-[13px] text-zinc-900 leading-tight break-words">{cert.name}</h3>
+                                <p className="text-[11px] font-medium text-zinc-600 mt-0.5 break-words">{cert.issuer}</p>
+                                {cert.date && <p className="text-[10px] font-mono font-bold text-zinc-400 mt-1 break-words">{cert.date}</p>}
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            )}
         </div>
 
         {/* COLUNA DIREITA (Sidebar Tática) */}
@@ -236,6 +264,39 @@ export function ResumePreview({ data, onChange }: ResumePreviewProps) {
                             </div>
                         </div>
                     )}
+                </section>
+            )}
+
+            {/* SOFT SKILLS */}
+            {data.skills.softSkills.length > 0 && (
+                <section className="break-inside-avoid">
+                    <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-400 mb-4 flex items-center gap-2 border-b border-zinc-200 pb-2">
+                        Soft Skills
+                    </h2>
+                    <div className="flex flex-wrap gap-1.5">
+                        {data.skills.softSkills.map((s, i) => (
+                            <span key={i} className="text-[10px] font-medium text-zinc-700 bg-zinc-100 border border-zinc-200 px-2 py-1 rounded-sm break-words">
+                                {s}
+                            </span>
+                        ))}
+                    </div>
+                </section>
+            )}
+
+            {/* IDIOMAS */}
+            {data.languages.length > 0 && (
+                <section className="break-inside-avoid">
+                    <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-400 mb-4 flex items-center gap-2 border-b border-zinc-200 pb-2">
+                        Idiomas
+                    </h2>
+                    <div className="space-y-2">
+                        {data.languages.map(lang => (
+                            <div key={lang.id} className="flex justify-between items-baseline gap-2">
+                                <span className="font-bold text-[13px] text-zinc-900 break-words">{lang.name}</span>
+                                <span className="text-[10px] font-mono font-bold text-zinc-500 shrink-0">{lang.level}</span>
+                            </div>
+                        ))}
+                    </div>
                 </section>
             )}
 

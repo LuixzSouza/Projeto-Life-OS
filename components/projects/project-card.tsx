@@ -2,34 +2,14 @@
 
 import Link from "next/link";
 import { Progress } from "@/components/ui/progress";
-import {
-  ArrowRight,
-  Folder,
-  Layers,
-  AlignLeft,
-  ExternalLink,
-  CheckCircle2,
-  Circle,
-  Calendar,
-  MoreHorizontal
-} from "lucide-react";
+import { ArrowRight, Folder, Layers, AlignLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-  DialogDescription,
-  DialogHeader,
+  Dialog, DialogContent, DialogTitle, DialogTrigger, DialogFooter, DialogDescription, DialogHeader,
 } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-
-/* -------------------------------------------------------------------------- */
-/* TYPES                                                                      */
-/* -------------------------------------------------------------------------- */
+import React from "react";
 
 interface ProjectCardProps {
   id: string;
@@ -40,192 +20,115 @@ interface ProjectCardProps {
   totalTasks: number;
   completedTasks: number;
   isInbox?: boolean;
-  color?: string; // Hexadecimal vindo do banco
+  color?: string;
 }
 
-/* -------------------------------------------------------------------------- */
-/* COMPONENT                                                                  */
-/* -------------------------------------------------------------------------- */
-
 export function ProjectCard({
-  id,
-  slug,
-  title,
-  description,
-  status = "ACTIVE",
-  totalTasks,
-  completedTasks,
-  isInbox = false,
-  color,
+  id, slug, title, description, status = "ACTIVE", totalTasks, completedTasks, isInbox = false, color,
 }: ProjectCardProps) {
   const progress = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
   const projectUrl = isInbox ? "/projects/inbox" : `/projects/${slug}`;
-  
-  // Cor de destaque (Default para Indigo se não houver)
-  const accentColor = color || "#6366f1";
+  const accent = isInbox ? "#3b82f6" : (color || "#6366f1");
+  const remaining = totalTasks - completedTasks;
 
   return (
     <Dialog>
       <DialogTrigger asChild>
         <div
           className={cn(
-            "group relative flex flex-col justify-between rounded-[2rem] border bg-card p-7 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl cursor-pointer text-left h-full active:scale-[0.98]",
-            isInbox
-              ? "border-dashed border-primary/30 bg-primary/[0.02] hover:border-primary/50"
-              : "border-border/60 hover:border-border"
+            "group relative flex flex-col justify-between rounded-2xl border bg-card p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:border-primary/30 cursor-pointer text-left h-full",
+            isInbox ? "border-dashed border-primary/30 bg-primary/[0.02]" : "border-border/40"
           )}
         >
-          <div className="space-y-5">
-            {/* Top Bar: Icon & Badge */}
+          <div className="space-y-4">
             <div className="flex items-start justify-between">
               <div
-                className="h-12 w-12 rounded-2xl flex items-center justify-center border border-border/50 shadow-sm transition-transform group-hover:scale-110 duration-500 bg-background"
-                style={{ color: isInbox ? undefined : accentColor }}
+                className="h-11 w-11 rounded-xl flex items-center justify-center text-white shadow-sm transition-transform group-hover:scale-105"
+                style={{ backgroundColor: accent }}
               >
-                {isInbox ? (
-                  <Layers className="h-6 w-6 text-blue-500" />
-                ) : (
-                  <Folder className="h-6 w-6 fill-current opacity-20 absolute" />
-                )}
-                {!isInbox && <Folder className="h-6 w-6 relative z-10" />}
+                {isInbox ? <Layers className="h-5 w-5" /> : <Folder className="h-5 w-5" />}
               </div>
-
               {!isInbox && (
-                <Badge
-                  variant="secondary"
-                  className="text-[9px] font-black uppercase tracking-[0.15em] px-2.5 py-1 bg-muted/50 text-muted-foreground border-none"
-                >
+                <Badge variant="secondary" className="text-[10px] font-semibold bg-muted/60 text-muted-foreground border-none">
                   {status}
                 </Badge>
               )}
             </div>
 
-            {/* Content */}
-            <div className="space-y-2">
-              <h3 className="text-xl font-black text-foreground tracking-tight group-hover:text-primary transition-colors duration-300">
+            <div className="space-y-1.5">
+              <h3 className="text-base font-bold text-foreground tracking-tight group-hover:text-primary transition-colors line-clamp-1">
                 {title}
               </h3>
-              <p className="text-sm font-medium text-muted-foreground/80 line-clamp-2 leading-relaxed">
-                {description || "Sem descrição definida para este projeto."}
+              <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+                {description || "Sem descrição definida."}
               </p>
             </div>
           </div>
 
-          {/* Progress Section */}
-          <div className="mt-8 space-y-4">
-            <div className="space-y-2">
-              <div className="flex justify-between items-end">
-                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">
-                  {completedTasks} / {totalTasks} Tarefas
-                </span>
-                <span className="text-xs font-black font-mono text-foreground">
-                  {progress}%
-                </span>
-              </div>
-              <div className="h-2 w-full bg-muted rounded-full overflow-hidden shadow-inner">
-                <div 
-                  className="h-full transition-all duration-1000 ease-out rounded-full"
-                  style={{ 
-                    width: `${progress}%`,
-                    backgroundColor: isInbox ? '#3b82f6' : accentColor 
-                  }}
-                />
-              </div>
+          <div className="mt-6 space-y-2.5">
+            <div className="flex justify-between items-center">
+              <span className="text-[11px] font-medium text-muted-foreground">{completedTasks}/{totalTasks} tarefas</span>
+              <span className="text-xs font-bold text-foreground">{progress}%</span>
             </div>
-
-            <div className="pt-4 flex items-center justify-between border-t border-border/40">
-              <div className="flex -space-x-2">
-                {/* Placeholder para avatares se houver time no futuro */}
-                <div className="h-6 w-6 rounded-full border-2 border-background bg-muted flex items-center justify-center text-[8px] font-bold">L</div>
-              </div>
-              <div className="flex items-center gap-2 text-muted-foreground group-hover:text-primary transition-colors">
-                <span className="text-[10px] font-black uppercase tracking-widest">Detalhes</span>
-                <ArrowRight className="h-4 w-4 transform group-hover:translate-x-1 transition-transform" />
-              </div>
+            <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+              <div className="h-full rounded-full transition-all duration-700" style={{ width: `${progress}%`, backgroundColor: accent }} />
+            </div>
+            <div className="pt-3 flex items-center justify-end border-t border-border/40 text-muted-foreground group-hover:text-primary transition-colors">
+              <span className="text-xs font-semibold">Detalhes</span>
+              <ArrowRight className="h-4 w-4 ml-1 group-hover:translate-x-0.5 transition-transform" />
             </div>
           </div>
         </div>
       </DialogTrigger>
 
-      {/* MODAL DETALHADO */}
-      <DialogContent className="fixed left-[50%] top-[50%] z-50 flex w-[95vw] md:max-w-2xl max-h-[90vh] flex-col translate-x-[-50%] translate-y-[-50%] p-0 overflow-hidden bg-background border-border/40 shadow-2xl rounded-[2.5rem]">
-        
-        {/* Modal Header */}
-        <div className="bg-muted/20 p-8 border-b border-border/40 relative">
-            <div className="flex items-start justify-between gap-4 relative z-10">
-                <div className="flex items-center gap-5">
-                    <div 
-                        className="h-16 w-16 rounded-3xl flex items-center justify-center border border-border/50 shadow-sm bg-background"
-                        style={{ color: isInbox ? '#3b82f6' : accentColor }}
-                    >
-                        {isInbox ? <Layers className="h-8 w-8" /> : <Folder className="h-8 w-8" />}
-                    </div>
-                    <div>
-                        <DialogTitle className="text-3xl font-black tracking-tighter text-foreground uppercase">
-                            {title}
-                        </DialogTitle>
-                        <DialogDescription className="flex items-center gap-3 mt-1.5 font-bold uppercase tracking-widest text-[10px]">
-                            <Badge variant="outline" className="bg-background">{status}</Badge>
-                            <span className="text-muted-foreground/60 tracking-normal font-mono uppercase">ID: {id.slice(0, 8)}</span>
-                        </DialogDescription>
-                    </div>
-                </div>
+      {/* MODAL DE DETALHES (limpo) */}
+      <DialogContent className="sm:max-w-lg p-0 overflow-hidden rounded-[2rem] shadow-2xl gap-0">
+        <DialogHeader className="p-6 pb-5 border-b border-border/40 bg-muted/10 text-left space-y-5">
+          <div className="flex items-center gap-4">
+            <div className="h-14 w-14 rounded-2xl flex items-center justify-center text-white shadow-sm shrink-0" style={{ backgroundColor: accent }}>
+              {isInbox ? <Layers className="h-7 w-7" /> : <Folder className="h-7 w-7" />}
             </div>
+            <div className="min-w-0">
+              <DialogTitle className="text-xl font-bold tracking-tight truncate">{title}</DialogTitle>
+              <DialogDescription className="flex items-center gap-2 mt-1">
+                <Badge variant="secondary" className="bg-primary/10 text-primary border-none text-[10px] font-semibold">
+                  {isInbox ? "Inbox" : status}
+                </Badge>
+                <span className="text-[10px] text-muted-foreground font-mono">#{id.slice(0, 6)}</span>
+              </DialogDescription>
+            </div>
+          </div>
 
-            {/* Stats Overview inside Modal */}
-            <div className="grid grid-cols-3 gap-4 mt-8">
-                <div className="bg-background/60 p-4 rounded-2xl border border-border/40 shadow-sm">
-                    <p className="text-[9px] font-black text-muted-foreground uppercase mb-1">Concluído</p>
-                    <p className="text-2xl font-black font-mono">{progress}%</p>
-                </div>
-                <div className="bg-background/60 p-4 rounded-2xl border border-border/40 shadow-sm">
-                    <p className="text-[9px] font-black text-muted-foreground uppercase mb-1">Tarefas</p>
-                    <p className="text-2xl font-black font-mono">{totalTasks}</p>
-                </div>
-                <div className="bg-background/60 p-4 rounded-2xl border border-border/40 shadow-sm">
-                    <p className="text-[9px] font-black text-muted-foreground uppercase mb-1">Restantes</p>
-                    <p className="text-2xl font-black font-mono text-primary">{totalTasks - completedTasks}</p>
-                </div>
+          {/* Progresso */}
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Progresso</span>
+              <span className="text-sm font-bold text-foreground">{progress}%</span>
             </div>
+            <Progress value={progress} className="h-2 bg-muted/50" style={{ "--progress-foreground": accent } as React.CSSProperties} />
+            <div className="flex flex-wrap gap-x-6 gap-y-1 pt-1 text-sm">
+              <span><span className="font-bold text-foreground">{totalTasks}</span> <span className="text-xs text-muted-foreground">total</span></span>
+              <span><span className="font-bold text-emerald-600">{completedTasks}</span> <span className="text-xs text-muted-foreground">concluídas</span></span>
+              <span><span className="font-bold text-amber-600">{remaining}</span> <span className="text-xs text-muted-foreground">restantes</span></span>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="p-6 space-y-3">
+          <h4 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+            <AlignLeft className="h-3.5 w-3.5" /> Sobre
+          </h4>
+          <p className="text-sm text-foreground/80 leading-relaxed bg-muted/20 border border-border/40 rounded-xl p-4">
+            {description || "Sem descrição. Abra o board para organizar tarefas, notas e reuniões deste projeto."}
+          </p>
         </div>
 
-        <ScrollArea className="flex-1 p-8">
-          <div className="space-y-6">
-            <div className="space-y-3">
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                    <AlignLeft className="h-4 w-4" /> Sobre o Projeto
-                </h4>
-                <div className="text-base font-medium text-foreground/80 leading-relaxed whitespace-pre-wrap bg-muted/10 p-6 rounded-[1.5rem] border border-border/40 italic">
-                    &quot;{description || "O sucesso deste projeto depende da organização e execução clara das tarefas pendentes."}&quot;
-                </div>
-            </div>
-
-            {/* Actions Quick List (Placeholder para features futuras) */}
-            <div className="pt-4 grid grid-cols-2 gap-3">
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/5 border border-border/40 text-xs font-bold text-muted-foreground italic">
-                    <CheckCircle2 className="h-4 w-4 opacity-40" /> Foco em Conclusão
-                </div>
-                <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/5 border border-border/40 text-xs font-bold text-muted-foreground italic">
-                    <Calendar className="h-4 w-4 opacity-40" /> Sem data limite
-                </div>
-            </div>
-          </div>
-        </ScrollArea>
-
-        <DialogFooter className="p-6 border-t border-border/40 bg-muted/5 shrink-0">
-          <div className="flex flex-col sm:flex-row w-full gap-4">
-              <Button variant="ghost" className="rounded-xl font-bold text-xs uppercase tracking-widest flex-1 h-12" asChild>
-                  <Link href={projectUrl}>Ações rápidas</Link>
-              </Button>
-              <Link href={projectUrl} className="flex-[2]">
-                <Button 
-                    className="w-full gap-3 text-sm h-12 rounded-xl shadow-xl font-black uppercase tracking-widest transition-all active:scale-95"
-                    style={{ backgroundColor: isInbox ? '#3b82f6' : accentColor }}
-                >
-                  Abrir Board <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
-          </div>
+        <DialogFooter className="p-4 border-t border-border/40 bg-muted/5">
+          <Link href={projectUrl} className="w-full">
+            <Button className="w-full gap-2 h-11 rounded-xl font-bold shadow-lg text-white" style={{ backgroundColor: accent }}>
+              Abrir Board <ArrowRight className="h-4 w-4" />
+            </Button>
+          </Link>
         </DialogFooter>
       </DialogContent>
     </Dialog>

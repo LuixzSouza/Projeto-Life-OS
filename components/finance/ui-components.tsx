@@ -6,10 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { TrendingUp, TrendingDown, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-// --- HELPERS DE FORMATAÇÃO ---
-export const formatMoney = (val: number) => 
-  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
+import { useFormatCurrency } from "@/components/providers/currency-provider";
 
 // --- COMPONENTE DE TEXTO COM SMART VIEW (ANIMAÇÃO PREMIUM) ---
 interface PrivacyTextProps {
@@ -20,6 +17,7 @@ interface PrivacyTextProps {
 }
 
 export const PrivacyText: FC<PrivacyTextProps> = ({ value, isSmartView, className, prefix = "" }) => {
+  const formatMoney = useFormatCurrency();
   const formattedValue = formatMoney(Math.abs(value));
   
   return (

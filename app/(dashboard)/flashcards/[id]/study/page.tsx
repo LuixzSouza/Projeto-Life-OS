@@ -3,6 +3,7 @@ import { StudySession } from "@/components/flashcards/study-session";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ArrowLeft, Layers, Plus, SearchX, BrainCircuit } from "lucide-react";
+import { filterDue } from "@/components/flashcards/deck-grid-types";
 
 /* -------------------------------------------------------------------------- */
 /* TYPES                                                                      */
@@ -12,6 +13,7 @@ interface StudyPageProps {
   params: Promise<{
     id: string;
   }>;
+  searchParams: Promise<{ mode?: string }>;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -35,8 +37,9 @@ const StateContainer = ({ children }: { children: React.ReactNode }) => (
 /* PAGE                                                                       */
 /* -------------------------------------------------------------------------- */
 
-export default async function StudyPage({ params }: StudyPageProps) {
+export default async function StudyPage({ params, searchParams }: StudyPageProps) {
   const { id: deckId } = await params;
+  const { mode } = await searchParams;
 
   /* ----------------------------- INVALID ID ------------------------------ */
 
@@ -140,10 +143,48 @@ export default async function StudyPage({ params }: StudyPageProps) {
 
   /* ----------------------------- STUDY MODE ------------------------------- */
 
+  // Modo Inteligente (smart): só cartões vencidos (curva de esquecimento).
+  // Modo Prova (cram) ou padrão: todo o baralho.
+  const isSmart = mode === "smart";
+  const cards = isSmart ? filterDue(deck.cards) : deck.cards;
+
+  // Modo Inteligente sem cartões devidos: nada a revisar hoje.
+  if (isSmart && cards.length === 0) {
+    return (
+      <StateContainer>
+        <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-[2rem] bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 ring-1 ring-emerald-500/20 shadow-inner relative">
+          <div className="absolute inset-0 bg-emerald-500/20 rounded-[2rem] blur-xl opacity-50" />
+          <BrainCircuit className="h-12 w-12 text-emerald-600 relative z-10" />
+        </div>
+
+        <div className="space-y-3">
+          <h3 className="text-3xl font-extrabold tracking-tight text-foreground">Tudo em dia! 🎉</h3>
+          <p className="text-muted-foreground leading-relaxed text-base">
+            Nenhum cartão de <span className="font-bold text-foreground">&quot;{deck.title}&quot;</span> está
+            previsto para revisão hoje. Volte mais tarde ou revise o baralho inteiro.
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-4 pt-6">
+          <Link href="/flashcards" className="w-full sm:w-1/2">
+            <Button variant="outline" className="w-full gap-2 h-14 rounded-xl text-base font-semibold hover:bg-muted/50">
+              <ArrowLeft className="h-5 w-5" /> Voltar
+            </Button>
+          </Link>
+          <Link href={`/flashcards/${deckId}/study?mode=cram`} className="w-full sm:w-1/2">
+            <Button className="w-full gap-2 h-14 rounded-xl text-base font-bold shadow-lg shadow-primary/25 bg-primary hover:bg-primary/90 text-primary-foreground">
+              <Layers className="h-5 w-5" /> Revisar tudo
+            </Button>
+          </Link>
+        </div>
+      </StateContainer>
+    );
+  }
+
   // Se tudo estiver certo, renderiza o ambiente de foco
   return (
     <div className="min-h-screen bg-background animate-in fade-in duration-700">
-      <StudySession deck={deck} cards={deck.cards} />
+      <StudySession deck={deck} cards={cards} />
     </div>
   );
 }

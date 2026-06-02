@@ -2,7 +2,8 @@
 
 import { LayoutGrid, ArrowUpRight, Zap, Target } from "lucide-react";
 import { BaseCard } from "./base-card";
-import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
+import { Area, AreaChart, Tooltip, XAxis } from "recharts";
+import { ChartContainer } from "@/components/ui/chart-container";
 import { cn } from "@/lib/utils";
 
 // Dados simulados da semana (Produtividade)
@@ -69,7 +70,7 @@ export function OverviewCard() {
                     {/* Gradiente para o gráfico */}
                     <div className="absolute inset-0 bg-gradient-to-l from-[#09090b] via-transparent to-transparent z-10 pointer-events-none" />
                     
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ChartContainer>
                         <AreaChart data={DATA}>
                             <defs>
                                 <linearGradient id="colorProd" x1="0" y1="0" x2="0" y2="1">
@@ -99,7 +100,7 @@ export function OverviewCard() {
                                 fill="url(#colorProd)" 
                             />
                         </AreaChart>
-                    </ResponsiveContainer>
+                    </ChartContainer>
                 </div>
 
             </div>

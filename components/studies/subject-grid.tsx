@@ -1,69 +1,22 @@
 "use client";
 
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
-import { StudySubject } from "@prisma/client";
 import { deleteSubject } from "@/app/(dashboard)/studies/actions";
-
-import {
-  Plus,
-  GitFork,
-  Search,
-  SortAsc,
-  Layers,
-  FolderTree,
-  BrainCircuit,
-  AlertTriangle,
-  BookDashed,
-  ChevronRight,
-  LayoutGrid
-} from "lucide-react";
-
+import { Plus, GitFork, BrainCircuit, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 
-import { SubjectCard } from "./subject-card";
 import { SubjectFormDialog } from "./subject-form-dialog";
 import { SubjectDetailsModal } from "./subject-details-modal";
+import { SubjectGridToolbar } from "./subject-grid-toolbar";
+import { SubjectGridContent } from "./subject-grid-content";
+import { SubjectDeleteDialog } from "./subject-delete-dialog";
+import type { RichSubject, SubjectListProps, SortOption } from "./subject-grid-types";
 
-/* -------------------------------------------------------------------------- */
-/* TYPES                                                                      */
-/* -------------------------------------------------------------------------- */
-
-interface RichSubject extends StudySubject {
-  totalMinutes: number;
-}
-
-interface SubjectListProps {
-  subjects: RichSubject[];
-}
-
-type SortOption = "totalMinutes" | "title" | "createdAt";
-
-/* -------------------------------------------------------------------------- */
-/* COMPONENT                                                                  */
-/* -------------------------------------------------------------------------- */
+export type { RichSubject } from "./subject-grid-types";
 
 export function SubjectGrid({ subjects }: SubjectListProps) {
   /* ------------------------------- UI STATES ------------------------------ */
@@ -107,11 +60,11 @@ export function SubjectGrid({ subjects }: SubjectListProps) {
   const executeDelete = useCallback(async () => {
     if (!subjectToDelete) return;
     const id = subjectToDelete;
-    setSubjectToDelete(null); 
+    setSubjectToDelete(null);
 
     setOptimisticRemovedIds((prev) => new Set(prev).add(id));
     const toastId = toast.loading("Removendo matéria...");
-    
+
     try {
       const result = await deleteSubject(id);
       toast.dismiss(toastId);
@@ -126,7 +79,7 @@ export function SubjectGrid({ subjects }: SubjectListProps) {
           return next;
         });
       }
-    } catch (err) {
+    } catch {
       toast.dismiss(toastId);
       toast.error("Erro de conexão.");
       setOptimisticRemovedIds((prev) => {
@@ -190,7 +143,7 @@ export function SubjectGrid({ subjects }: SubjectListProps) {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      
+
       {/* ----------------- HEADER & FLASHCARDS ----------------- */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -232,148 +185,34 @@ export function SubjectGrid({ subjects }: SubjectListProps) {
       </Link>
 
       {/* ----------------- TOOLBAR DE FILTROS ----------------- */}
-      <div className="bg-card p-3 rounded-2xl border border-border/60 shadow-sm flex flex-col lg:flex-row gap-3 items-center justify-between">
-        
-        <div className="relative w-full lg:max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Pesquisar matérias..."
-            className="pl-9 bg-muted/30 border-0 focus-visible:ring-1 shadow-none h-11 rounded-xl w-full"
-          />
-        </div>
-
-        <div className="flex flex-wrap sm:flex-nowrap gap-3 items-center w-full lg:w-auto">
-          {!isSearching && (
-            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "flat" | "tree")} className="w-full sm:w-auto">
-              <TabsList className="h-11 w-full sm:w-auto grid grid-cols-2 rounded-xl p-1 bg-muted/50 border border-border/50">
-                <TabsTrigger value="tree" className="text-xs font-bold rounded-lg"><LayoutGrid className="h-4 w-4 mr-2"/> Grade</TabsTrigger>
-                <TabsTrigger value="flat" className="text-xs font-bold rounded-lg"><Layers className="h-4 w-4 mr-2"/> Lista</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          )}
-
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="h-11 w-full sm:w-[150px] rounded-xl bg-muted/30 border-border/50 font-medium text-sm">
-              <SelectValue placeholder="Categoria" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all" className="font-bold text-primary">Todas</SelectItem>
-              {categories.map((cat) => (
-                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
-            <SelectTrigger className="h-11 w-full sm:w-[170px] rounded-xl bg-muted/30 border-border/50 font-medium text-sm">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <SortAsc className="h-4 w-4" />
-                <SelectValue />
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="totalMinutes">Mais Focado</SelectItem>
-              <SelectItem value="title">Ordem (A-Z)</SelectItem>
-              <SelectItem value="createdAt">Mais Recente</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+      <SubjectGridToolbar
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        isSearching={isSearching}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        categoryFilter={categoryFilter}
+        onCategoryChange={setCategoryFilter}
+        categories={categories}
+        sortBy={sortBy}
+        onSortChange={setSortBy}
+      />
 
       {/* ----------------- CONTEÚDO PRINCIPAL ----------------- */}
-      {filteredSubjects.filter((s) => !optimisticRemovedIds.has(s.id)).length === 0 ? (
-        <div className="text-center py-24 px-4 rounded-3xl border border-dashed border-border/60 bg-muted/10">
-          <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-              <BookDashed className="h-8 w-8 text-muted-foreground/50" />
-          </div>
-          <h3 className="text-xl font-bold text-foreground">Nenhuma matéria encontrada</h3>
-          <p className="text-sm text-muted-foreground max-w-sm mx-auto mt-2 mb-6">
-            Não encontramos nenhum tópico com os filtros atuais. Que tal criar um novo agora?
-          </p>
-          <Button onClick={handleStartCreate} size="lg" className="shadow-lg shadow-primary/20 rounded-xl font-bold">
-            <Plus className="h-5 w-5 mr-2" /> Criar Primeiro Tópico
-          </Button>
-        </div>
-      ) : (
-        <div className="pb-10">
-          
-          {/* 🟢 MODO GRADE (Árvore Agrupada em Grid Perfeito) */}
-          {displayMode === "tree" ? (
-            <div className="space-y-12">
-              {rootSubjects.map((root) => {
-                if (optimisticRemovedIds.has(root.id)) return null;
-                const children = childSubjects.filter((c) => c.parentId === root.id && !optimisticRemovedIds.has(c.id));
-                
-                return (
-                  <div key={root.id} className="space-y-5">
-                    
-                    {/* Cabeçalho da Seção */}
-                    <div className="flex items-center gap-3 border-b border-border/40 pb-3">
-                        <div className="h-6 w-1.5 bg-primary rounded-full" />
-                        <h4 className="font-bold text-xl">{root.title}</h4>
-                        <Badge variant="secondary" className="text-xs bg-muted/50 border-none">{children.length} sub-tópicos</Badge>
-                    </div>
-
-                    {/* Pai e Filhos compartilham O MESMO GRID para não quebrar a tela */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                        
-                        {/* Matéria Raiz (Destaque Glow) */}
-                        <div className="relative">
-                            <div className="absolute -inset-1 bg-primary/20 rounded-2xl blur-md opacity-60" />
-                            <SubjectCard
-                                subject={root}
-                                onEdit={handleEdit}
-                                onDelete={confirmDelete}
-                                onDetailsClick={handleOpenDetails}
-                                parentName={undefined}
-                                viewMode="grid"
-                            />
-                        </div>
-
-                        {/* Matérias Filhas */}
-                        {children.map((child) => (
-                            <SubjectCard
-                                key={child.id}
-                                subject={child}
-                                onEdit={handleEdit}
-                                onDelete={confirmDelete}
-                                onDetailsClick={handleOpenDetails}
-                                parentName={root.title}
-                                viewMode="grid"
-                            />
-                        ))}
-                    </div>
-
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            
-            /* 🟢 MODO LISTA (Barras Horizontais) */
-            <div className="flex flex-col gap-3">
-              {filteredSubjects
-                .filter((s) => !optimisticRemovedIds.has(s.id))
-                .map((subject) => (
-                  <SubjectCard
-                    key={subject.id}
-                    subject={subject}
-                    onEdit={handleEdit}
-                    onDelete={confirmDelete}
-                    onDetailsClick={handleOpenDetails}
-                    parentName={subjects.find((p) => p.id === subject.parentId)?.title}
-                    viewMode="list" 
-                  />
-                ))}
-            </div>
-          )}
-        </div>
-      )}
+      <SubjectGridContent
+        filteredSubjects={filteredSubjects}
+        rootSubjects={rootSubjects}
+        childSubjects={childSubjects}
+        optimisticRemovedIds={optimisticRemovedIds}
+        displayMode={displayMode}
+        subjects={subjects}
+        onEdit={handleEdit}
+        onDelete={confirmDelete}
+        onDetailsClick={handleOpenDetails}
+        onCreate={handleStartCreate}
+      />
 
       {/* ----------------- MODALS ----------------- */}
-      
       <SubjectFormDialog
         key={subjectToEdit?.id ?? "create"}
         open={isFormDialogOpen}
@@ -388,27 +227,11 @@ export function SubjectGrid({ subjects }: SubjectListProps) {
         onClose={() => setIsDetailsModalOpen(false)}
       />
 
-      <AlertDialog open={!!subjectToDelete} onOpenChange={(open) => !open && setSubjectToDelete(null)}>
-        <AlertDialogContent className="border-destructive/30 rounded-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-destructive text-xl">
-              <AlertTriangle className="h-6 w-6" /> Excluir Matéria?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-base text-foreground/80 mt-2">
-              Tem certeza que deseja deletar permanentemente esta matéria? 
-              <strong className="block mt-3 p-3 bg-destructive/10 text-destructive rounded-lg border border-destructive/20 text-sm">
-                Aviso: Todo o histórico de sessões, cronômetros e anotações vinculadas a este tópico será apagado para sempre.
-              </strong>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="mt-6 gap-2">
-            <AlertDialogCancel className="h-11 rounded-xl font-bold">Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={executeDelete} className="h-11 rounded-xl font-bold bg-destructive hover:bg-destructive/90 text-white shadow-lg shadow-destructive/20">
-              Sim, excluir matéria
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <SubjectDeleteDialog
+        open={!!subjectToDelete}
+        onOpenChange={(open) => !open && setSubjectToDelete(null)}
+        onConfirm={executeDelete}
+      />
     </div>
   );
 }

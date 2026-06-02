@@ -1,11 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { DeckGrid } from "@/components/flashcards/deck-grid";
 import { Metadata } from "next";
-import { Layers, BrainCircuit, ArrowLeft, BookOpen, Target, TrendingUp, Zap } from "lucide-react";
+import { Layers, BrainCircuit, ArrowLeft, BookOpen, Target, TrendingUp, Zap, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import { getCurrentUserId } from "@/lib/auth";
+import { cn } from "@/lib/utils";
+import { countDue } from "@/components/flashcards/deck-grid-types";
+import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
 
 export const metadata: Metadata = {
   title: "Flashcards | Life OS",
@@ -13,96 +16,80 @@ export const metadata: Metadata = {
 };
 
 export default async function FlashcardsPage() {
+  const userId = await getCurrentUserId();
   /**
    * Buscamos:
    * - Baralhos (com contagem de cards e vínculo com matéria)
    * - Matérias (para o Select de criação no Grid)
    * - TODOS os flashcards (para gerar estatísticas globais de memória)
    */
-  const [decks, subjects, allCards] = await Promise.all([
+  const [decks, subjects] = await Promise.all([
     prisma.flashcardDeck.findMany({
+      where: { userId },
       orderBy: { createdAt: "desc" },
       include: {
-        cards: { select: { id: true } },
+        cards: { select: { id: true, box: true, nextReview: true } },
         studySubject: {
           select: { id: true, title: true, color: true, icon: true },
         },
       },
     }),
     prisma.studySubject.findMany({
+      where: { userId },
       orderBy: { title: "asc" },
     }),
-    prisma.flashcard.findMany({
-        select: { box: true }
-    })
   ]);
 
-  // Cálculos das Estatísticas Globais de Retenção
+  // Estatísticas globais derivadas diretamente dos cartões dos baralhos.
+  const allCards = decks.flatMap((d) => d.cards);
   const totalCards = allCards.length;
-  
+
   // Agrupando cartões pelo Box (Nível de retenção no algoritmo SM-2)
-  // Box 1: Novos ou Esquecidos recentemente
-  // Box 2 e 3: Em processo de aprendizagem
-  // Box 4+: Memória de longo prazo (Dominados)
+  // Box 1: Novos ou Esquecidos · Box 2-3: Aprendendo · Box 4+: Dominados
   const stats = {
       learning: allCards.filter(c => c.box === 1).length,
       reviewing: allCards.filter(c => c.box === 2 || c.box === 3).length,
       mastered: allCards.filter(c => c.box >= 4).length,
   };
 
+  // Cartões devidos hoje (curva de esquecimento) em todos os baralhos.
+  const dueToday = countDue(allCards);
+
   const learningPercent = totalCards > 0 ? (stats.learning / totalCards) * 100 : 0;
   const reviewingPercent = totalCards > 0 ? (stats.reviewing / totalCards) * 100 : 0;
   const masteredPercent = totalCards > 0 ? (stats.mastered / totalCards) * 100 : 0;
 
   return (
-    <div className="min-h-screen bg-background pb-24">
-      {/* ================= HEADER ================= */}
-      <header className="border-b border-border/60 bg-gradient-to-b from-primary/5 to-background pt-8 pb-8 px-6 md:px-8">
-        <div className="max-w-[1600px] mx-auto flex flex-col gap-6 animate-in fade-in duration-500">
-          
-          {/* Navegação de Retorno */}
-          <div className="flex items-center">
-            <Link href="/studies">
-                <Button variant="ghost" size="sm" className="pl-0 text-muted-foreground hover:text-primary hover:bg-transparent transition-colors">
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Voltar para o Painel de Estudos
-                </Button>
-            </Link>
-          </div>
-
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="h-14 w-14 rounded-2xl flex items-center justify-center bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20">
-                <Layers className="h-7 w-7" />
-              </div>
-
-              <div>
-                <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-foreground">
-                  Flashcards
-                </h1>
-                <p className="text-sm md:text-base text-muted-foreground flex items-center gap-2 mt-1 font-medium">
-                  <BrainCircuit className="h-4 w-4 text-primary/70" />
-                  Domine o conteúdo usando repetição espaçada.
-                </p>
-              </div>
-            </div>
-            
-            {/* Atalho rápido */}
-            <div className="hidden md:block">
-              <Link href="/studies">
-                <Button variant="outline" className="gap-2 rounded-xl bg-background/50 backdrop-blur-sm border-border/60 shadow-sm">
-                  <BookOpen className="h-4 w-4 text-primary" />
-                  Árvore de Matérias
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </div>
-      </header>
+    <PageShell>
+      <PageHeader
+        icon={<Layers className="h-6 w-6" />}
+        title="Flashcards"
+        description={
+          <span className="flex items-center gap-2">
+            <BrainCircuit className="h-4 w-4 text-primary/70" />
+            Domine o conteúdo usando repetição espaçada.
+          </span>
+        }
+        actions={
+          <Link href="/studies">
+            <Button variant="outline" className="gap-2 rounded-xl border-border/60 bg-background/50 shadow-sm backdrop-blur-sm">
+              <BookOpen className="h-4 w-4 text-primary" />
+              Árvore de Matérias
+            </Button>
+          </Link>
+        }
+      >
+        <Link href="/studies" className="w-fit">
+          <Button variant="ghost" size="sm" className="-ml-2 text-muted-foreground hover:bg-transparent hover:text-primary">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Voltar para o Painel de Estudos
+          </Button>
+        </Link>
+      </PageHeader>
 
       {/* ================= CONTENT ================= */}
-      <main className="px-6 md:px-8 py-8 max-w-[1600px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 space-y-8">
-        
+      <PageContainer className="space-y-8">
+
         {/* Painel de Saúde da Memória (Estatísticas Globais) */}
         {totalCards > 0 && (
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -121,8 +108,28 @@ export default async function FlashcardsPage() {
                             <span className="text-sm font-semibold text-muted-foreground pb-1">cartões totais</span>
                         </div>
                         <p className="text-xs text-muted-foreground mt-3 leading-relaxed">
-                            Distribuídos em {decks.length} baralhos de estudo.
+                            Distribuídos em {decks.length} {decks.length === 1 ? "baralho" : "baralhos"}.
                         </p>
+
+                        {/* Para revisar hoje */}
+                        <div className={cn(
+                            "mt-4 flex items-center gap-2.5 rounded-xl border p-3",
+                            dueToday > 0 ? "border-primary/20 bg-primary/5" : "border-emerald-500/20 bg-emerald-500/5"
+                        )}>
+                            <div className={cn("p-1.5 rounded-lg", dueToday > 0 ? "bg-primary/10 text-primary" : "bg-emerald-500/10 text-emerald-600")}>
+                                {dueToday > 0 ? <Zap className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+                            </div>
+                            <div className="min-w-0">
+                                {dueToday > 0 ? (
+                                    <>
+                                        <p className="text-sm font-bold leading-none">{dueToday} para revisar hoje</p>
+                                        <p className="text-[11px] text-muted-foreground mt-1">Escolha um baralho abaixo e mande ver.</p>
+                                    </>
+                                ) : (
+                                    <p className="text-sm font-bold text-emerald-600 leading-tight">Tudo em dia! 🎉</p>
+                                )}
+                            </div>
+                        </div>
                     </CardContent>
                 </Card>
 
@@ -199,8 +206,8 @@ export default async function FlashcardsPage() {
 
         {/* Componente que renderiza os baralhos que você já construiu */}
         <DeckGrid decks={decks} subjects={subjects} />
-        
-      </main>
-    </div>
+
+      </PageContainer>
+    </PageShell>
   );
 }

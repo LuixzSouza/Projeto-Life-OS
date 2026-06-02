@@ -2,14 +2,17 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requireUserId } from "@/lib/auth";
 
 // Criar Site (Container)
 export async function createSite(formData: FormData) {
   const name = formData.get("name") as string;
   const url = formData.get("url") as string;
 
+  const userId = await requireUserId();
+
   const site = await prisma.managedSite.create({
-    data: { name, url }
+    data: { name, url, userId }
   });
 
   // Cria página "home" padrão
@@ -17,11 +20,12 @@ export async function createSite(formData: FormData) {
     data: {
       siteId: site.id,
       slug: "home",
+      userId,
       content: JSON.stringify(
-        { 
+        {
             system: "Life OS CMS",
             status: "online",
-            message: "Edite este JSON via terminal web." 
+            message: "Edite este JSON via terminal web."
         },
         null,
         2
@@ -34,8 +38,9 @@ export async function createSite(formData: FormData) {
     data: {
       siteId: site.id,
       slug: "env-vars",
+      userId,
       content: JSON.stringify(
-        { 
+        {
             NEXT_PUBLIC_API_URL: "https://api.exemplo.com",
             DATABASE_USER: "root_admin"
         },
@@ -50,7 +55,8 @@ export async function createSite(formData: FormData) {
 
 // Deletar Site
 export async function deleteSite(siteId: string) {
-  await prisma.managedSite.delete({ where: { id: siteId } });
+  const userId = await requireUserId();
+  await prisma.managedSite.deleteMany({ where: { id: siteId, userId } });
   revalidatePath("/cms");
 }
 
@@ -67,6 +73,12 @@ export async function createPage(formData: FormData) {
 
   if (!slug) throw new Error("O nome da rota não pode estar vazio.");
 
+  const userId = await requireUserId();
+
+  // Garante que o container pertence ao usuário
+  const ownedSite = await prisma.managedSite.findFirst({ where: { id: siteId, userId }, select: { id: true } });
+  if (!ownedSite) throw new Error("Container não encontrado.");
+
   // Verifica duplicidade
   const exists = await prisma.sitePage.findFirst({
     where: { siteId, slug }
@@ -78,6 +90,7 @@ export async function createPage(formData: FormData) {
     data: {
       siteId,
       slug,
+      userId,
       content: "{\n  \"status\": \"novo_endpoint\",\n  \"data\": []\n}"
     }
   });
@@ -87,7 +100,8 @@ export async function createPage(formData: FormData) {
 
 // Deletar Página/Rota
 export async function deletePage(pageId: string) {
-  await prisma.sitePage.delete({ where: { id: pageId } });
+  const userId = await requireUserId();
+  await prisma.sitePage.deleteMany({ where: { id: pageId, userId } });
   revalidatePath("/cms");
 }
 
@@ -96,11 +110,10 @@ export async function savePageContent(formData: FormData) {
   const pageId = formData.get("pageId") as string;
   const content = formData.get("content") as string;
 
-  // Remova o bloco try/catch com JSON.parse() que tinha aqui!
-  // Agora vamos apenas salvar o conteúdo cru (seja JSON, HTML, Texto...)
+  const userId = await requireUserId();
 
-  await prisma.sitePage.update({
-    where: { id: pageId },
+  await prisma.sitePage.updateMany({
+    where: { id: pageId, userId },
     data: { content }
   });
 
@@ -114,8 +127,10 @@ export async function updateSite(formData: FormData) {
 
   if (!id || !name) throw new Error("ID e Nome são obrigatórios.");
 
-  await prisma.managedSite.update({
-    where: { id },
+  const userId = await requireUserId();
+
+  await prisma.managedSite.updateMany({
+    where: { id, userId },
     data: { name, url }
   });
 

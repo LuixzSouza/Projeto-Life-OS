@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { restoreBackup, factoryReset } from "@/app/(dashboard)/settings/actions";
+import { importJsonData, factoryReset } from "@/app/(dashboard)/settings/actions";
 import { toast } from "sonner";
 import { Upload, AlertTriangle, Loader2, Trash2, FileJson, Check } from "lucide-react";
 import {
@@ -37,7 +37,7 @@ export function RestoreBackupForm() {
 
         setIsLoading(true);
         try {
-            await restoreBackup(formData);
+            await importJsonData(formData);
             toast.success("Sistema restaurado com sucesso! A página será recarregada.");
             
             if (fileInputRef.current) fileInputRef.current.value = "";

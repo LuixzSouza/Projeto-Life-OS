@@ -2,6 +2,8 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { getCurrentUserId, requireUserId } from "@/lib/auth";
+import { getProductPreview, inlineImageAsBase64 } from "@/lib/product-preview";
 
 // --- TIPOS ---
 type WardrobeStatus = "IN_CLOSET" | "LAUNDRY" | "REPAIR" | "DONATED" | "WISH_LIST";
@@ -42,10 +44,9 @@ function parseStatus(value: FormDataEntryValue | null): WardrobeStatus {
   return "IN_CLOSET";
 }
 
-// Helper para pegar usuário (Simulação/Pronto para Auth Real)
+// Helper para pegar o ID do usuário autenticado (sessão JWT)
 async function getAuthenticatedUserId() {
-  const user = await prisma.user.findFirst();
-  return user?.id;
+  return await getCurrentUserId();
 }
 
 // --- 1. CREATE (ADICIONAR PEÇA) ---
@@ -162,8 +163,32 @@ export async function toggleFavoriteItem(id: string, currentState: boolean) {
 
     revalidatePath("/wardrobe");
     return { success: true };
-  } catch (error) {
+  } catch {
     return { success: false };
+  }
+}
+
+// --- 6. IMPORTAR FOTO DE PRODUTO (cola o link da loja) ---
+// Usa a lógica compartilhada (OG + JSON-LD + fallback Microlink) e embute a
+// imagem em base64 para persistir a foto e evitar problemas de CORS.
+export async function fetchProductPreview(rawUrl: string) {
+  await requireUserId();
+  try {
+    const preview = await getProductPreview(rawUrl);
+    if (!preview.success || !preview.image) {
+      return { success: false as const, message: preview.message || "Não encontrei uma imagem nesse link." };
+    }
+
+    const image = await inlineImageAsBase64(preview.image);
+    return {
+      success: true as const,
+      image,
+      title: preview.title,
+      brand: preview.brand,
+    };
+  } catch (error) {
+    console.error("Erro ao importar produto:", error);
+    return { success: false as const, message: "Falha ao importar a partir do link." };
   }
 }
 
@@ -189,7 +214,7 @@ export async function wearItem(id: string) {
     
         revalidatePath("/wardrobe");
         return { success: true, message: "Uso registrado! 👗" };
-      } catch (error) {
+      } catch {
         return { success: false, message: "Erro ao registrar o uso da peça." };
       }
 }

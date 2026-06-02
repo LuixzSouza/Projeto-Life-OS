@@ -3,18 +3,8 @@
 import React, { useMemo } from "react";
 import { StudySubject } from "@prisma/client";
 import {
-  MoreVertical,
-  Clock,
-  Edit,
-  Trash2,
-  BookOpen,
-  Calendar,
-  BarChart3,
-  Target,
-  Star,
-  CornerDownRight,
-  Folder,
-  CheckCircle2,
+  MoreVertical, Clock, Edit, Trash2, BookOpen, Calendar,
+  BarChart3, Folder, CheckCircle2,
 } from "lucide-react";
 
 import {
@@ -27,7 +17,6 @@ import {
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -46,10 +35,8 @@ interface SubjectCardProps {
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
   onDetailsClick: (id: string) => void;
-  onToggleFavorite?: (id: string) => void;
   parentName?: string | null;
-  isFavorite?: boolean;
-  viewMode?: "grid" | "list"; // 🟢 Nova prop para controlar o layout interno
+  viewMode?: "grid" | "list";
 }
 
 /* -------------------------------------------------------------------------- */
@@ -57,11 +44,11 @@ interface SubjectCardProps {
 /* -------------------------------------------------------------------------- */
 
 const DIFFICULTY_CONFIG = {
-  1: { label: "Iniciante", color: "text-emerald-500", bg: "bg-emerald-500/10", border: "border-emerald-500/20" },
-  2: { label: "Fácil", color: "text-teal-500", bg: "bg-teal-500/10", border: "border-teal-500/20" },
-  3: { label: "Interm.", color: "text-blue-500", bg: "bg-blue-500/10", border: "border-blue-500/20" },
-  4: { label: "Difícil", color: "text-orange-500", bg: "bg-orange-500/10", border: "border-orange-500/20" },
-  5: { label: "Expert", color: "text-rose-500", bg: "bg-rose-500/10", border: "border-rose-500/20" },
+  1: { label: "Iniciante", color: "text-emerald-600", bg: "bg-emerald-500/10" },
+  2: { label: "Fácil", color: "text-teal-600", bg: "bg-teal-500/10" },
+  3: { label: "Intermediário", color: "text-blue-600", bg: "bg-blue-500/10" },
+  4: { label: "Difícil", color: "text-amber-600", bg: "bg-amber-500/10" },
+  5: { label: "Expert", color: "text-rose-600", bg: "bg-rose-500/10" },
 } as const;
 
 /* -------------------------------------------------------------------------- */
@@ -94,10 +81,8 @@ export function SubjectCard({
   onEdit,
   onDelete,
   onDetailsClick,
-  onToggleFavorite,
   parentName,
-  isFavorite = false,
-  viewMode = "grid", // Padrão é grid se não for passado
+  viewMode = "grid",
 }: SubjectCardProps) {
 
   const {
@@ -109,17 +94,14 @@ export function SubjectCard({
     lastStudiedFormatted,
   } = useMemo(() => {
     const difficultyKey = Math.max(1, Math.min(5, subject.difficulty ?? 3)) as keyof typeof DIFFICULTY_CONFIG;
-    const difficultyInfo = DIFFICULTY_CONFIG[difficultyKey];
-    
     const goalMinutes = subject.goalMinutes && subject.goalMinutes > 0 ? subject.goalMinutes : 3600;
     const totalMinutes = subject.totalMinutes ?? 0;
     const percent = goalMinutes > 0 ? Math.min((totalMinutes / goalMinutes) * 100, 100) : 0;
-    const isCompleted = percent >= 100;
 
     return {
-      difficultyInfo,
+      difficultyInfo: DIFFICULTY_CONFIG[difficultyKey],
       progressPercent: Math.round(percent),
-      isCompleted,
+      isCompleted: percent >= 100,
       totalMinutesFormatted: formatDuration(totalMinutes),
       goalMinutesFormatted: formatDuration(goalMinutes),
       lastStudiedFormatted: formatDate(subject.lastStudied),
@@ -128,209 +110,183 @@ export function SubjectCard({
 
   const handleCardClick: React.MouseEventHandler = (e) => {
     const t = e.target as HTMLElement;
-    if (t.closest("button") || t.closest("[role='menuitem']") || t.getAttribute("role") === "menuitem") {
-      return;
-    }
+    if (t.closest("button") || t.closest("[role='menuitem']")) return;
     onDetailsClick(subject.id);
   };
 
-  const cardColor = subject.color || "hsl(var(--primary))";
+  // A cor da matéria entra apenas como acento sutil no ícone (identidade sem poluir).
+  const accent = subject.color || "hsl(var(--primary))";
+  const hasMeta = typeof subject.sessionCount === "number" || subject.lastStudied !== undefined;
 
-  // Renderização condicional baseada no viewMode
+  const Menu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MoreVertical className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-40">
+        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(subject.id); }}>
+          <Edit className="mr-2 h-4 w-4" /> Editar
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={(e) => { e.stopPropagation(); onDelete(subject.id); }}
+          className="text-destructive focus:text-destructive focus:bg-destructive/10"
+        >
+          <Trash2 className="mr-2 h-4 w-4" /> Excluir
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  const IconChip = (
+    <div
+      className="flex shrink-0 items-center justify-center rounded-xl border border-border/50"
+      style={{ backgroundColor: `${accent}14`, color: accent }}
+    >
+      {subject.icon ? <span className="leading-none">{subject.icon}</span> : <BookOpen className="h-5 w-5" />}
+    </div>
+  );
+
+  /* --------------------------------- LISTA -------------------------------- */
   if (viewMode === "list") {
     return (
       <Card
         onClick={handleCardClick}
         className={cn(
-          "group relative overflow-hidden transition-all duration-300 ease-out cursor-pointer",
-          "border border-border/60 bg-card hover:shadow-md",
-          isCompleted && "border-emerald-500/30 bg-emerald-500/5"
+          "group cursor-pointer overflow-hidden rounded-xl border border-border/40 bg-card shadow-sm transition-all",
+          "hover:border-primary/30 hover:shadow-md",
+          isCompleted && "border-emerald-500/30"
         )}
       >
-        <div className="absolute left-0 top-0 bottom-0 w-1.5 opacity-80 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: cardColor }} />
-        
-        <CardContent className="p-4 flex flex-col md:flex-row items-center gap-4 pl-6">
-          
-          {/* BLOCO 1: Ícone e Título */}
-          <div className="flex items-center gap-4 flex-1 min-w-0 w-full md:w-auto">
-            <div 
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border shadow-sm"
-              style={{ backgroundColor: `${cardColor}15`, borderColor: `${cardColor}30`, color: cardColor }}
-            >
-              {subject.icon ? <span className="text-xl">{subject.icon}</span> : <BookOpen className="h-5 w-5" />}
-            </div>
-            
+        <CardContent className="flex flex-col items-center gap-4 p-4 md:flex-row">
+          <div className="flex w-full min-w-0 flex-1 items-center gap-3 md:w-auto">
+            <div className="h-10 w-10 [&>span]:text-lg">{IconChip}</div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-base truncate text-foreground group-hover:text-primary transition-colors">
-                  {subject.title}
-                </h3>
-                {isCompleted && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
+                <h3 className="truncate font-bold text-foreground group-hover:text-primary transition-colors">{subject.title}</h3>
+                {isCompleted && <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />}
               </div>
-              <div className="flex flex-wrap items-center gap-2 mt-0.5">
+              <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
                 {parentName && (
-                  <span className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                    <Folder className="h-3 w-3" /> {parentName} <CornerDownRight className="h-3 w-3 opacity-50" />
+                  <span className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    <Folder className="h-3 w-3" /> {parentName}
                   </span>
                 )}
-                <Badge variant="secondary" className="text-[9px] px-1.5 py-0 uppercase bg-muted text-muted-foreground border-none">
+                <Badge variant="secondary" className="border-none bg-muted px-1.5 py-0 text-[9px] uppercase text-muted-foreground">
                   {subject.category ?? "Geral"}
                 </Badge>
+                <span className={cn("rounded px-1.5 py-0 text-[9px] font-semibold", difficultyInfo.bg, difficultyInfo.color)}>
+                  {difficultyInfo.label}
+                </span>
               </div>
             </div>
           </div>
 
-          {/* BLOCO 2: Estatísticas Rápidas (Escondidas em telas muito pequenas) */}
-          <div className="hidden sm:flex items-center gap-6 shrink-0 text-sm">
+          <div className="hidden shrink-0 items-center gap-6 text-sm sm:flex">
             <div className="flex flex-col items-end">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                 <Clock className="h-3 w-3" /> Foco
-              </span>
-              <span className="font-black text-foreground">{totalMinutesFormatted}</span>
+              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Foco</span>
+              <span className="font-bold text-foreground">{totalMinutesFormatted}</span>
             </div>
-            <div className="flex flex-col items-end w-20">
-               <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                 <Target className="h-3 w-3" /> Progresso
-              </span>
-              <span className={cn("font-black", isCompleted ? "text-emerald-500" : "text-foreground")}>{progressPercent}%</span>
+            <div className="flex w-16 flex-col items-end">
+              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Meta</span>
+              <span className={cn("font-bold", isCompleted ? "text-emerald-600" : "text-foreground")}>{progressPercent}%</span>
             </div>
           </div>
 
-          {/* BLOCO 3: Barra de Progresso (Compacta) */}
-          <div className="w-full md:w-32 lg:w-48 shrink-0">
-            <div className="relative h-2 w-full bg-muted rounded-full overflow-hidden">
-              <div 
-                className={cn("absolute top-0 left-0 h-full transition-all duration-1000 ease-out rounded-full", isCompleted && "bg-emerald-500")}
-                style={{ width: `${progressPercent}%`, backgroundColor: isCompleted ? undefined : cardColor }}
+          <div className="w-full shrink-0 md:w-32 lg:w-44">
+            <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className={cn("absolute left-0 top-0 h-full rounded-full transition-all duration-700", isCompleted ? "bg-emerald-500" : "bg-primary")}
+                style={{ width: `${progressPercent}%` }}
               />
             </div>
           </div>
 
-          {/* BLOCO 4: Ações */}
-          <div className="flex items-center gap-1 shrink-0 ml-auto md:ml-0">
-             {onToggleFavorite && (
-              <Button variant="ghost" size="icon" className={cn("h-8 w-8 transition-all", isFavorite ? "text-amber-400 opacity-100" : "text-muted-foreground opacity-0 group-hover:opacity-50 hover:opacity-100")} onClick={(e) => { e.stopPropagation(); onToggleFavorite(subject.id); }}>
-                <Star className={cn("h-4 w-4", isFavorite && "fill-amber-400")} />
-              </Button>
-            )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={(e) => e.stopPropagation()}>
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40">
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(subject.id); }}><Edit className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDelete(subject.id); }} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Excluir</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <div className="ml-auto shrink-0 md:ml-0">{Menu}</div>
         </CardContent>
       </Card>
     );
   }
 
-  // ---------------------------------------------------------
-  // MODO GRID (Padrão e Atualizado)
-  // ---------------------------------------------------------
+  /* --------------------------------- GRADE -------------------------------- */
   return (
     <Card
       onClick={handleCardClick}
       className={cn(
-        "group relative overflow-hidden transition-all duration-300 ease-out cursor-pointer flex flex-col justify-between h-full",
-        "border border-border/60 bg-card hover:-translate-y-1 hover:shadow-xl",
-        isCompleted && "border-emerald-500/30 shadow-emerald-500/5"
+        "group flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl border border-border/40 bg-card shadow-sm transition-all duration-300",
+        "hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md",
+        isCompleted && "border-emerald-500/30"
       )}
     >
-      <div className="absolute top-0 left-0 right-0 h-1.5 opacity-80 group-hover:opacity-100 transition-opacity" style={{ backgroundColor: cardColor }} />
-      <div className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity pointer-events-none" style={{ backgroundImage: `radial-gradient(circle at top right, ${cardColor}, transparent 70%)` }} />
+      <CardContent className="flex h-full flex-col gap-4 p-5">
 
-      <CardContent className="p-5 flex flex-col gap-5 h-full relative z-10">
-        
+        {/* Header */}
         <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            {parentName && (
-              <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">
-                <Folder className="h-3 w-3" />
-                <span className="truncate max-w-[120px]">{parentName}</span>
-                <CornerDownRight className="h-3 w-3 opacity-50" />
-              </div>
-            )}
-
-            <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border shadow-sm transition-transform group-hover:scale-105" style={{ backgroundColor: `${cardColor}15`, borderColor: `${cardColor}30`, color: cardColor }}>
-                {subject.icon ? <span className="text-2xl drop-shadow-sm">{subject.icon}</span> : <BookOpen className="h-6 w-6" />}
-              </div>
-
-              <div className="min-w-0">
-                <h3 className="font-extrabold text-base truncate text-foreground group-hover:text-primary transition-colors">
-                  {subject.title}
-                </h3>
-                <div className="flex items-center gap-2 mt-1">
-                  <Badge variant="secondary" className="text-[9px] px-2 py-0.5 uppercase tracking-wider font-semibold bg-muted text-muted-foreground border-none">
-                    {subject.category ?? "Geral"}
-                  </Badge>
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="h-11 w-11 [&>span]:text-xl">{IconChip}</div>
+            <div className="min-w-0">
+              {parentName && (
+                <div className="mb-1 flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <Folder className="h-3 w-3" />
+                  <span className="max-w-[130px] truncate">{parentName}</span>
                 </div>
+              )}
+              <h3 className="truncate text-[15px] font-bold leading-tight text-foreground transition-colors group-hover:text-primary">
+                {subject.title}
+              </h3>
+              <div className="mt-1.5 flex items-center gap-1.5">
+                <Badge variant="secondary" className="border-none bg-muted px-2 py-0 text-[10px] font-medium uppercase text-muted-foreground">
+                  {subject.category ?? "Geral"}
+                </Badge>
+                <span className={cn("rounded-md px-1.5 py-0.5 text-[10px] font-semibold", difficultyInfo.bg, difficultyInfo.color)}>
+                  {difficultyInfo.label}
+                </span>
               </div>
             </div>
           </div>
-
-          <div className="flex flex-col items-center gap-1">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground opacity-50 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40">
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(subject.id); }}><Edit className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDelete(subject.id); }} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Excluir</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {onToggleFavorite && (
-              <Button variant="ghost" size="icon" className={cn("h-8 w-8 transition-all", isFavorite ? "text-amber-400 opacity-100" : "text-muted-foreground opacity-0 group-hover:opacity-50 hover:opacity-100")} onClick={(e) => { e.stopPropagation(); onToggleFavorite(subject.id); }}>
-                <Star className={cn("h-4 w-4", isFavorite && "fill-amber-400")} />
-              </Button>
-            )}
-          </div>
+          {Menu}
         </div>
 
-        <div className="grid grid-cols-2 gap-2 mt-2">
-          <div className="flex flex-col gap-1 p-2.5 rounded-xl bg-muted/40 border border-border/50 group-hover:bg-muted/60 transition-colors">
-            <span className="flex items-center gap-1.5 text-[9px] font-bold text-muted-foreground uppercase tracking-wider"><Clock className="h-3 w-3" /> Foco Total</span>
-            <span className="text-sm font-black text-foreground">{totalMinutesFormatted}</span>
-          </div>
-
-          <div className={cn("flex flex-col gap-1 p-2.5 rounded-xl border transition-colors", difficultyInfo.bg, difficultyInfo.border)}>
-            <span className={cn("flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider", difficultyInfo.color)}><Target className="h-3 w-3" /> Nível</span>
-            <span className={cn("text-sm font-black", difficultyInfo.color)}>{difficultyInfo.label}</span>
-          </div>
-
-          {(subject.sessionCount !== undefined || subject.lastStudied) && (
-            <div className="col-span-2 flex items-center justify-between p-2.5 rounded-xl bg-muted/20 border border-border/50 mt-1">
-                {subject.sessionCount !== undefined && <span className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground"><BarChart3 className="h-3.5 w-3.5" /> {subject.sessionCount} sessões</span>}
-                {subject.lastStudied !== undefined && <span className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground"><Calendar className="h-3.5 w-3.5" /> Último: {lastStudiedFormatted}</span>}
-            </div>
+        {/* Stats */}
+        <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+          <span className="flex items-center gap-1 font-semibold text-foreground">
+            <Clock className="h-3.5 w-3.5 text-muted-foreground" /> {totalMinutesFormatted}
+          </span>
+          {typeof subject.sessionCount === "number" && (
+            <span className="flex items-center gap-1">
+              <BarChart3 className="h-3.5 w-3.5" /> {subject.sessionCount} {subject.sessionCount === 1 ? "sessão" : "sessões"}
+            </span>
+          )}
+          {hasMeta && (
+            <span className="ml-auto flex items-center gap-1">
+              <Calendar className="h-3.5 w-3.5" /> {lastStudiedFormatted}
+            </span>
           )}
         </div>
 
-        <div className="space-y-2 mt-auto pt-2">
-          <div className="flex justify-between items-end text-xs">
-            <span className={cn("font-bold flex items-center gap-1", isCompleted ? "text-emerald-500" : "text-muted-foreground")}>
+        {/* Progresso */}
+        <div className="mt-auto space-y-1.5 pt-1">
+          <div className="flex items-end justify-between text-xs">
+            <span className={cn("flex items-center gap-1 font-medium", isCompleted ? "text-emerald-600" : "text-muted-foreground")}>
               {isCompleted && <CheckCircle2 className="h-3.5 w-3.5" />}
-              {isCompleted ? "Meta Concluída!" : "Progresso da Meta"}
+              {isCompleted ? "Meta concluída" : "Progresso da meta"}
             </span>
-            <span className={cn("font-black", isCompleted ? "text-emerald-500" : "text-foreground")}>{progressPercent}%</span>
+            <span className={cn("font-bold", isCompleted ? "text-emerald-600" : "text-foreground")}>{progressPercent}%</span>
           </div>
-
-          <div className="relative h-2 w-full bg-muted rounded-full overflow-hidden">
-            <div className={cn("absolute top-0 left-0 h-full transition-all duration-1000 ease-out rounded-full", isCompleted && "bg-emerald-500")} style={{ width: `${progressPercent}%`, backgroundColor: isCompleted ? undefined : cardColor }} />
+          <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className={cn("absolute left-0 top-0 h-full rounded-full transition-all duration-700 ease-out", isCompleted ? "bg-emerald-500" : "bg-primary")}
+              style={{ width: `${progressPercent}%` }}
+            />
           </div>
-
-          <div className="text-[10px] font-semibold text-muted-foreground/70 text-right">Objetivo: {goalMinutesFormatted}</div>
+          <div className="text-right text-[10px] text-muted-foreground/70">Objetivo: {goalMinutesFormatted}</div>
         </div>
 
       </CardContent>

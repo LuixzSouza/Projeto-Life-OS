@@ -74,6 +74,11 @@ export interface PortfolioData {
     company: string;
     text: string;
   }[];
+  languages: { // Idiomas (do PDF)
+    id: string;
+    name: string;
+    level: string; // Ex: Nativo, Avançado, Intermediário, Básico
+  }[];
 }
 
 export const INITIAL_PORTFOLIO: PortfolioData = {
@@ -85,5 +90,6 @@ export const INITIAL_PORTFOLIO: PortfolioData = {
   education: [],
   certifications: [],
   skills: { languages: [], frameworks: [], tools: [], softSkills: [] },
-  testimonials: []
+  testimonials: [],
+  languages: []
 };

@@ -12,7 +12,8 @@ import {
     TrendingUp, TrendingDown, Target, Zap, 
     Calendar as CalendarIcon, ArrowRight, LayoutList, CalendarRange
 } from "lucide-react";
-import { Bar, BarChart, ResponsiveContainer, Tooltip, Cell, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, Tooltip, Cell, XAxis, YAxis } from "recharts";
+import { ChartContainer } from "@/components/ui/chart-container";
 import { cn } from "@/lib/utils";
 import { FoodLogger } from "./food-logger";
 import { WeeklyPlanner } from "./weekly-planner";
@@ -47,13 +48,16 @@ interface SerializedWeekData {
 }
 
 interface NutritionDashboardProps {
-    initialDate: string; 
+    initialDate: string;
     meals: SerializedMeal[];
     weekData: SerializedWeekData[];
     mealPlan?: SerializedMealPlan[]; // Usando a tipagem correta agora
+    suggestedGoal?: number | null;   // Meta calórica sugerida pelo perfil (TDEE)
+    tdee?: number | null;            // Gasto energético estimado
+    userName?: string;
 }
 
-export function NutritionDashboard({ initialDate, meals, weekData, mealPlan = [] }: NutritionDashboardProps) {
+export function NutritionDashboard({ initialDate, meals, weekData, mealPlan = [], suggestedGoal = null, tdee = null, userName }: NutritionDashboardProps) {
     const router = useRouter();
     const [date, setDate] = useState<Date | undefined>(new Date(initialDate));
     
@@ -163,7 +167,7 @@ export function NutritionDashboard({ initialDate, meals, weekData, mealPlan = []
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="h-[200px] w-full pt-4">
-                                    <ResponsiveContainer width="100%" height="100%">
+                                    <ChartContainer>
                                         <BarChart data={chartData} margin={{ top: 0, right: 0, bottom: 0, left: -25 }}>
                                             <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} dy={10} />
                                             <Tooltip 
@@ -187,7 +191,7 @@ export function NutritionDashboard({ initialDate, meals, weekData, mealPlan = []
                                                 ))}
                                             </Bar>
                                         </BarChart>
-                                    </ResponsiveContainer>
+                                    </ChartContainer>
                                 </CardContent>
                             </Card>
                         </div>
@@ -233,7 +237,12 @@ export function NutritionDashboard({ initialDate, meals, weekData, mealPlan = []
 
                 {/* --- CONTEÚDO: PLANEJADOR --- */}
                 <TabsContent value="planner" className="mt-0 focus-visible:outline-none focus-visible:ring-0">
-                    <WeeklyPlanner initialData={mealPlan} />
+                    <WeeklyPlanner
+                        initialData={mealPlan}
+                        suggestedGoal={suggestedGoal}
+                        tdee={tdee}
+                        userName={userName}
+                    />
                 </TabsContent>
 
             </Tabs>

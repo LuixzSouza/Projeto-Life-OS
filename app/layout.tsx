@@ -4,8 +4,9 @@ import "./globals.css";
 import { prisma } from "@/lib/prisma";
 import ClientProviders from "@/components/providers/client-providers";
 import { SecurityProvider } from "@/components/providers/security-provider";
-import { isSystemInstalled } from "@/lib/db-config"; 
+import { isSystemInstalled } from "@/lib/db-config";
 import { ConsoleWelcome } from "@/components/console-welcome";
+import { getCurrentUserId } from "@/lib/auth";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,20 +29,27 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   let themeClass = "theme-blue";
-  
+  let currency = "BRL";
+
   // Configuração padrão tipada
   let securitySettings = {
-    autoLockMinutes: 15, 
+    autoLockMinutes: 15,
     privacyMode: false,
   };
 
   if (isSystemInstalled()) {
     try {
-      const settings = await prisma.settings.findFirst();
-      
+      // Carrega as configurações do usuário logado (se houver sessão).
+      // Em rotas públicas (login/setup) cai no fallback de tema padrão.
+      const userId = await getCurrentUserId();
+      const settings = userId ? await prisma.settings.findUnique({ where: { userId } }) : null;
+
       if (settings) {
         if (settings.accentColor) {
           themeClass = settings.accentColor;
+        }
+        if (settings.currency) {
+          currency = settings.currency;
         }
 
         securitySettings = {
@@ -61,7 +69,7 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable}`} 
     >
       <body className={`antialiased bg-background text-foreground`}>
-        <ClientProviders themeClass={themeClass}>
+        <ClientProviders themeClass={themeClass} currency={currency}>
           <SecurityProvider initialSettings={securitySettings}>
             <ConsoleWelcome />
             {children}

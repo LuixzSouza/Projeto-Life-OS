@@ -9,12 +9,14 @@ import { Info, TrendingUp, Wallet, Banknote, CheckCircle2, ArrowRight, ShieldChe
 import { PRODUCTS, InvestmentProduct, GLOSSARY } from "./investment-data";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { cn } from "@/lib/utils";
+import { useFormatCurrency } from "@/components/providers/currency-provider";
 
 interface ComparatorProps {
     cdi: number;
 }
 
 export function ProductComparator({ cdi }: ComparatorProps) {
+    const formatCurrency = useFormatCurrency();
     const calculateProduct = (product: InvestmentProduct) => {
         // Exemplo fixo: 5 anos, R$ 1000 inicial (para comparação padronizada)
         const initialAmount = 1000;
@@ -39,8 +41,6 @@ export function ProductComparator({ cdi }: ComparatorProps) {
 
         return { netAmount, netProfit, equivalentCDI };
     };
-
-    const formatCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
     return (
         <div className="space-y-8 animate-in fade-in duration-700">

@@ -4,6 +4,9 @@ export interface FoodItem {
   emoji: string;
   calories: number; // por porção média
   unit: string;
+  image?: string;   // URL da imagem (ex: Open Food Facts)
+  brand?: string;   // marca/origem do produto
+  source?: "LOCAL" | "OFF"; // banco local ou Open Food Facts
 }
 
 export const FOOD_DATABASE: FoodItem[] = [

@@ -5,18 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DialogFooter } from "@/components/ui/dialog";
-import { createWishlist, updateWishlist } from "@/app/(dashboard)/finance/actions";
+import { createWishlist, updateWishlist, fetchProductMetadata } from "@/app/(dashboard)/finance/actions";
 import { toast } from "sonner";
-import { 
-    Loader2, 
-    Image as ImageIcon, 
-    DollarSign, 
-    Tag, 
+import {
+    Loader2,
+    Image as ImageIcon,
+    DollarSign,
+    Tag,
     PiggyBank,
     Flame,
     Scale,
     Snowflake,
-    ArrowUpRight
+    ArrowUpRight,
+    Sparkles,
+    Wand2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +38,43 @@ export function WishlistForm({ item, onClose }: { item?: WishlistData, onClose: 
     const [price, setPrice] = useState<number>(item?.price ?? 0);
     const [saved, setSaved] = useState<number>(item?.saved ?? 0);
     const [priority, setPriority] = useState<string>(item?.priority || "MEDIUM");
+
+    // Campos controlados (para o auto-preenchimento por link funcionar)
+    const [name, setName] = useState<string>(item?.name || "");
+    const [productUrl, setProductUrl] = useState<string>(item?.productUrl || "");
+
+    // Importação por link
+    const [importUrl, setImportUrl] = useState<string>("");
+    const [isFetching, setIsFetching] = useState<boolean>(false);
+
+    const handleImport = async () => {
+        if (!importUrl.trim()) {
+            toast.error("Cole o link do produto primeiro.");
+            return;
+        }
+        setIsFetching(true);
+        try {
+            const res = await fetchProductMetadata(importUrl.trim());
+            if (!res.success || !res.data) {
+                toast.error(res.message || "Não consegui ler esse link.");
+                return;
+            }
+            const { title, image, price: fetchedPrice } = res.data;
+            if (title) setName(title);
+            if (image) setPreviewUrl(image);
+            if (fetchedPrice != null) setPrice(fetchedPrice);
+            setProductUrl(importUrl.trim());
+
+            const gotPrice = fetchedPrice != null;
+            toast.success(
+                gotPrice ? "Produto importado! Confira os dados. ✨" : "Importei nome e imagem — adicione o valor manualmente.",
+            );
+        } catch {
+            toast.error("Erro ao importar o produto.");
+        } finally {
+            setIsFetching(false);
+        }
+    };
 
     const priceRef = useRef<HTMLInputElement | null>(null);
     const savedRef = useRef<HTMLInputElement | null>(null);
@@ -105,6 +144,47 @@ export function WishlistForm({ item, onClose }: { item?: WishlistData, onClose: 
         <form action={handleSubmit} className="space-y-6" noValidate>
             {item && <input type="hidden" name="id" value={item.id} />}
 
+            {/* IMPORTAÇÃO POR LINK (Frictionless) */}
+            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                    <p className="text-[11px] font-black uppercase tracking-widest text-primary">
+                        Viu em alguma loja? Cole o link
+                    </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="relative flex-1">
+                        <ArrowUpRight className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
+                        <Input
+                            value={importUrl}
+                            onChange={(e) => setImportUrl(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    handleImport();
+                                }
+                            }}
+                            placeholder="https://loja.com/produto..."
+                            className="h-11 pl-10 text-sm font-medium bg-background border-border/50 rounded-xl focus-visible:ring-primary/30"
+                            autoComplete="off"
+                            inputMode="url"
+                        />
+                    </div>
+                    <Button
+                        type="button"
+                        onClick={handleImport}
+                        disabled={isFetching}
+                        className="h-11 px-5 rounded-xl font-bold gap-2 shadow-sm shrink-0 active:scale-95 transition-all"
+                    >
+                        {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
+                        {isFetching ? "Buscando..." : "Importar"}
+                    </Button>
+                </div>
+                <p className="text-[11px] text-muted-foreground font-medium">
+                    Puxamos nome, foto e preço automaticamente. Você confere e ajusta abaixo.
+                </p>
+            </div>
+
             <div className="flex flex-col md:flex-row gap-6 md:gap-8">
                 {/* COLUNA 1: PREVIEW DA IMAGEM */}
                 <div className="w-full md:w-[240px] flex flex-col gap-4 shrink-0 mx-auto">
@@ -142,13 +222,14 @@ export function WishlistForm({ item, onClose }: { item?: WishlistData, onClose: 
                         <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">O que você deseja conquistar? *</Label>
                         <div className="relative">
                             <Tag className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
-                            <Input 
-                                name="name" 
-                                defaultValue={item?.name} 
-                                placeholder="Ex: MacBook Pro M3, Viagem para Paris..." 
-                                required 
+                            <Input
+                                name="name"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                placeholder="Ex: MacBook Pro M3, Viagem para Paris..."
+                                required
                                 autoFocus={!item}
-                                className="pl-11 h-12 rounded-xl bg-muted/20 font-bold text-base border-border/50 focus-visible:ring-primary/30" 
+                                className="pl-11 h-12 rounded-xl bg-muted/20 font-bold text-base border-border/50 focus-visible:ring-primary/30"
                             />
                         </div>
                     </div>
@@ -233,11 +314,12 @@ export function WishlistForm({ item, onClose }: { item?: WishlistData, onClose: 
                         <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Link da Loja (Opcional)</Label>
                         <div className="relative">
                             <ArrowUpRight className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
-                            <Input 
-                                name="productUrl" 
-                                defaultValue={item?.productUrl || ""} 
-                                placeholder="https://mercadolivre.com.br/..." 
-                                className="h-12 pl-10 text-sm font-medium bg-muted/20 border-border/50 rounded-xl focus-visible:ring-primary/30" 
+                            <Input
+                                name="productUrl"
+                                value={productUrl}
+                                onChange={(e) => setProductUrl(e.target.value)}
+                                placeholder="https://mercadolivre.com.br/..."
+                                className="h-12 pl-10 text-sm font-medium bg-muted/20 border-border/50 rounded-xl focus-visible:ring-primary/30"
                                 autoComplete="off"
                             />
                         </div>

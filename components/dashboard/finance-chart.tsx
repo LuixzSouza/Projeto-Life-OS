@@ -1,20 +1,21 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { 
-  Bar, 
-  BarChart, 
-  ResponsiveContainer, 
-  XAxis, 
-  YAxis, 
-  Tooltip, 
-  Cell, 
-  CartesianGrid, 
+import {
+  Bar,
+  BarChart,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Cell,
+  CartesianGrid,
   TooltipProps,
   ReferenceLine,
 } from "recharts";
+import { ChartContainer } from "@/components/ui/chart-container";
 import { TrendingUp, TrendingDown, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useFormatCurrency } from "@/components/providers/currency-provider";
 
 /* -------------------------------------------------------------------------------------------------
  * 1. TIPAGEM E COMPONENTES AUXILIARES
@@ -37,6 +38,7 @@ interface FinanceChartTooltipProps extends TooltipProps<number, string> {
 }
 
 const CustomTooltip = ({ active, payload, label }: FinanceChartTooltipProps) => {
+  const formatMoney = useFormatCurrency();
   if (active && payload && payload.length > 0) {
     const data = payload[0];
     const isIncome = data.payload.type === 'INCOME';
@@ -50,7 +52,7 @@ const CustomTooltip = ({ active, payload, label }: FinanceChartTooltipProps) => 
         <div className="flex items-center justify-between gap-3">
           <span className="text-xs text-muted-foreground font-bold uppercase tracking-tighter">{isIncome ? 'Entrada' : 'Saída'}</span>
           <span className={cn("font-black font-mono text-sm tracking-tight", isIncome ? "text-emerald-500" : "text-rose-500")}>
-            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(data.value)}
+            {formatMoney(data.value)}
           </span>
         </div>
       </div>
@@ -91,7 +93,7 @@ function FinanceChartContent({ data, title = "Fluxo de Caixa", className }: { da
       </div>
 
       <div style={{ width: '100%', height: 250 }}>
-        <ResponsiveContainer width="100%" height="100%">
+        <ChartContainer minWidth={0} minHeight={0}>
           <BarChart data={data} margin={{ top: 0, right: 0, left: -25, bottom: 0 }}>
             <defs>
               <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
@@ -114,7 +116,7 @@ function FinanceChartContent({ data, title = "Fluxo de Caixa", className }: { da
               ))}
             </Bar>
           </BarChart>
-        </ResponsiveContainer>
+        </ChartContainer>
       </div>
     </div>
   );

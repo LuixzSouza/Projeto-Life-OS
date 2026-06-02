@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requireUserId, getCurrentUserId } from "@/lib/auth";
 
 // --- EVENTOS (Agora com suporte a Timeblocking real) ---
 
@@ -31,6 +32,8 @@ export async function createEvent(formData: FormData) {
       endTime.setHours(endTime.getHours() + 1);
   }
 
+  const userId = await requireUserId();
+
   await prisma.event.create({
     data: {
       title,
@@ -40,6 +43,7 @@ export async function createEvent(formData: FormData) {
       location: location || null,
       color: color || "#3B82F6", // Default Blue (Google Calendar vibe)
       emailAlert: notification,
+      userId,
     },
   });
 
@@ -69,8 +73,10 @@ export async function updateEvent(formData: FormData) {
       endTime.setHours(endTime.getHours() + 1);
   }
 
-  await prisma.event.update({
-    where: { id },
+  const userId = await requireUserId();
+
+  await prisma.event.updateMany({
+    where: { id, userId },
     data: {
       title,
       description: description || null,
@@ -85,22 +91,24 @@ export async function updateEvent(formData: FormData) {
 }
 
 export async function deleteEvent(eventId: string) {
-  await prisma.event.delete({ where: { id: eventId } });
+  const userId = await requireUserId();
+  await prisma.event.deleteMany({ where: { id: eventId, userId } });
   revalidatePath("/agenda");
 }
 
 // --- TAREFAS ---
 
 export async function toggleTaskDone(taskId: string) {
-  const task = await prisma.task.findUnique({
-    where: { id: taskId },
+  const userId = await requireUserId();
+  const task = await prisma.task.findFirst({
+    where: { id: taskId, userId },
     select: { isDone: true },
   });
 
   if (!task) return;
 
-  await prisma.task.update({
-    where: { id: taskId },
+  await prisma.task.updateMany({
+    where: { id: taskId, userId },
     data: { isDone: !task.isDone },
   });
 
@@ -110,13 +118,16 @@ export async function toggleTaskDone(taskId: string) {
 // --- ROTINAS (Mantido intacto) ---
 
 export async function getRoutineItems() {
+  const userId = await getCurrentUserId();
   return await prisma.routineItem.findMany({
+    where: { userId },
     orderBy: { startTime: 'asc' }
   });
 }
 
 export async function seedRoutine() {
-  const count = await prisma.routineItem.count();
+  const userId = await requireUserId();
+  const count = await prisma.routineItem.count({ where: { userId } });
   if (count > 0) return { success: false, message: "Rotina já existe!" };
 
   const routineData = [
@@ -146,7 +157,8 @@ export async function seedRoutine() {
         endTime: item.end,
         category: item.cat,
         daysOfWeek: item.days,
-        description: item.desc
+        description: item.desc,
+        userId
     }))
   });
 
@@ -162,8 +174,10 @@ export async function createRoutineItem(formData: FormData) {
   const category = formData.get("category") as string;
   const daysOfWeek = formData.get("daysOfWeek") as string;
 
+  const userId = await requireUserId();
+
   await prisma.routineItem.create({
-    data: { title, startTime, endTime, description, category, daysOfWeek }
+    data: { title, startTime, endTime, description, category, daysOfWeek, userId }
   });
   revalidatePath("/agenda");
 }
@@ -177,19 +191,23 @@ export async function updateRoutineItem(formData: FormData) {
   const category = formData.get("category") as string;
   const daysOfWeek = formData.get("daysOfWeek") as string;
 
-  await prisma.routineItem.update({
-    where: { id },
+  const userId = await requireUserId();
+
+  await prisma.routineItem.updateMany({
+    where: { id, userId },
     data: { title, startTime, endTime, description, category, daysOfWeek }
   });
   revalidatePath("/agenda");
 }
 
 export async function deleteRoutineItem(id: string) {
-  await prisma.routineItem.delete({ where: { id } });
+  const userId = await requireUserId();
+  await prisma.routineItem.deleteMany({ where: { id, userId } });
   revalidatePath("/agenda");
 }
 
 export async function resetRoutine() {
-  await prisma.routineItem.deleteMany();
+  const userId = await requireUserId();
+  await prisma.routineItem.deleteMany({ where: { userId } });
   revalidatePath("/agenda");
 }

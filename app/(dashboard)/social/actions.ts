@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { getCurrentUserId } from "@/lib/auth";
 
 // --- HELPERS DE FORMATAÇÃO ---
 
@@ -45,11 +46,9 @@ function extractFriendData(formData: FormData) {
   };
 }
 
-// Helper para pegar usuário (Simulação de Auth)
+// Helper para pegar o ID do usuário autenticado (sessão JWT)
 async function getAuthenticatedUserId() {
-  // TODO: Substituir pela auth() real quando estiver configurado
-  const user = await prisma.user.findFirst();
-  return user?.id;
+  return await getCurrentUserId();
 }
 
 

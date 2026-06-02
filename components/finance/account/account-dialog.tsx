@@ -5,6 +5,7 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
+  DialogBody,
   DialogTitle,
   DialogFooter,
   DialogTrigger,
@@ -158,29 +159,28 @@ export function AccountDialog({
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
 
-      <DialogContent className="sm:max-w-[425px] rounded-[2rem] p-0 overflow-hidden shadow-2xl border-border/40 z-[90]">
-        <div
-          className="bg-muted/10 p-6 border-b border-border/40"
-          style={{ backgroundColor: `${selectedColor}10` }}
-        >
-          <DialogHeader>
-            <DialogTitle
-              className="flex items-center gap-3 text-xl font-extrabold"
+      <DialogContent size="md" className="z-[90]">
+        <DialogHeader style={{ backgroundColor: `${selectedColor}10` }}>
+          <div className="flex items-start gap-3.5 pr-8">
+            <div
+              className="p-2.5 rounded-xl bg-background shadow-sm border border-border/50 shrink-0"
               style={{ color: selectedColor }}
             >
-              <div className="p-2.5 rounded-xl bg-background shadow-sm border border-border/50">
-                <Wallet className="h-5 w-5" />
-              </div>
-              {account ? "Editar Carteira" : "Nova Carteira"}
-            </DialogTitle>
+              <Wallet className="h-5 w-5" />
+            </div>
+            <div className="space-y-1 min-w-0 pt-0.5">
+              <DialogTitle style={{ color: selectedColor }}>
+                {account ? "Editar Carteira" : "Nova Carteira"}
+              </DialogTitle>
+              <DialogDescription>
+                Crie uma carteira manual para organizar o saldo.
+              </DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
 
-            <DialogDescription>
-              Crie uma carteira manual para organizar o saldo.
-            </DialogDescription>
-          </DialogHeader>
-        </div>
-
-        <form action={handleSubmit} className="space-y-5 p-6 bg-background" noValidate>
+        <form action={handleSubmit} className="flex flex-col flex-1 min-h-0" noValidate>
+          <DialogBody className="space-y-5">
           <div className="space-y-2">
             <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">
               Nome da Conta
@@ -264,7 +264,9 @@ export function AccountDialog({
             </div>
           </div>
 
-          <DialogFooter className="pt-4 border-t border-border/40">
+          </DialogBody>
+
+          <DialogFooter>
             <Button type="button" variant="ghost" className="rounded-xl font-bold" onClick={() => setIsOpen(false)}>
               Cancelar
             </Button>

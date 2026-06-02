@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { changePassword, updateSecurityPreferences } from "@/app/(dashboard)/settings/actions";
+import { validatePasswordStrength } from "@/lib/password-policy";
 import { toast } from "sonner";
 import { 
     Lock, 
@@ -56,8 +57,9 @@ export function SecurityForm({ initialAutoLock = 15, initialPrivacyMode = false 
             toast.error("As senhas não coincidem.");
             return;
         }
-        if (pass.length < 6) {
-            toast.error("A senha deve ter pelo menos 6 caracteres.");
+        const check = validatePasswordStrength(pass);
+        if (!check.valid) {
+            toast.error(check.message!);
             return;
         }
 
@@ -68,7 +70,7 @@ export function SecurityForm({ initialAutoLock = 15, initialPrivacyMode = false 
             setPass("");
             setConfirm("");
         } catch (e) {
-            toast.error("Erro ao atualizar senha.");
+            toast.error(e instanceof Error ? e.message : "Erro ao atualizar senha.");
         } finally {
             setLoading(false);
         }
@@ -138,7 +140,7 @@ export function SecurityForm({ initialAutoLock = 15, initialPrivacyMode = false 
                                         autoComplete="new-password"
                                         className="pl-9 pr-10" 
                                     />
-                                    <button 
+                                    <button
                                         type="button"
                                         onClick={() => setShowPassword(!showPassword)}
                                         className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground transition-colors"
@@ -146,6 +148,7 @@ export function SecurityForm({ initialAutoLock = 15, initialPrivacyMode = false 
                                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                     </button>
                                 </div>
+                                <p className="text-[11px] text-muted-foreground">Mín. 8 caracteres, com letras e números.</p>
                             </div>
 
                             <div className="space-y-2">

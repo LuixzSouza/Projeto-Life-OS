@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Loader2, Plus, Film, Music, Gamepad2, X, Check, ImageOff, BookOpen } from "lucide-react";
-import { searchMedia, addMediaItem, type SearchResult, type MediaType } from "@/app/(dashboard)/entertainment/actions";
+import { Search, Loader2, Plus, Film, Music, Gamepad2, X, Check, ImageOff, BookOpen, Dices, Settings, AlertTriangle } from "lucide-react";
+import { searchMedia, discoverRandomMedia, getMediaProviderStatus, addMediaItem, type SearchResult, type MediaType } from "@/app/(dashboard)/entertainment/actions";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,6 +16,10 @@ import { cn } from "@/lib/utils";
 // Tipagem estrita para o parâmetro que a API espera
 type ApiSearchType = "VIDEO" | "MUSIC" | "GAME" | "BOOK";
 
+// Converte a aba (MediaType) para o tipo que as APIs esperam.
+const apiTypeFor = (t: MediaType): ApiSearchType =>
+  t === "ALBUM" ? "MUSIC" : t === "GAME" ? "GAME" : t === "BOOK" ? "BOOK" : "VIDEO";
+
 export function AddMediaDialog() {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -22,16 +27,26 @@ export function AddMediaDialog() {
   const [isLoadingSearch, setIsLoadingSearch] = useState(false);
   const [isSavingId, setIsSavingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<MediaType>("MOVIE");
+  const [providers, setProviders] = useState<{ tmdb: boolean; rawg: boolean; googleBooks: boolean } | null>(null);
+  const [discovered, setDiscovered] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Provedor que exige chave e está faltando para a aba atual (conexão com Settings).
+  const missingProvider: "TMDB" | "RAWG" | null =
+    !providers ? null
+    : (activeTab === "MOVIE" || activeTab === "TV_SHOW") && !providers.tmdb ? "TMDB"
+    : activeTab === "GAME" && !providers.rawg ? "RAWG"
+    : null;
 
   // Limpa os estados ao fechar o modal, com delay para não piscar a tela
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
     if (!open) {
-      setTimeout(() => { 
-        setResults([]); 
-        setQuery(""); 
+      setTimeout(() => {
+        setResults([]);
+        setQuery("");
+        setDiscovered(false);
       }, 300);
     }
   };
@@ -43,26 +58,46 @@ export function AddMediaDialog() {
     }
   }, [isOpen]);
 
+  // Verifica quais provedores (TMDB/RAWG) estão configurados nas Configurações
+  useEffect(() => {
+    if (isOpen && !providers) {
+      getMediaProviderStatus().then(setProviders).catch(() => {});
+    }
+  }, [isOpen, providers]);
+
+  // Descoberta aleatória ("Surpreenda-me") respeitando a aba ativa
+  async function handleDiscover() {
+    setIsLoadingSearch(true);
+    setResults([]);
+    setDiscovered(true);
+    try {
+      const { results: found, missingKey } = await discoverRandomMedia(apiTypeFor(activeTab));
+      if (missingKey) {
+        const label = missingKey === "googleBooks" ? "Google Books" : missingKey.toUpperCase();
+        toast.error(`Cota esgotada — conecte sua chave ${label} nas Configurações para continuar.`);
+        setResults([]);
+      } else {
+        setResults(found);
+        if (found.length === 0) toast.info("Nada encontrado agora. Tente de novo!");
+      }
+    } catch (error) {
+      console.error("Discover error:", error);
+      toast.error("Erro ao descobrir. Tente novamente.");
+    } finally {
+      setIsLoadingSearch(false);
+    }
+  }
+
   async function handleSearch(overrideType?: MediaType) {
     if (!query.trim()) return;
 
     setIsLoadingSearch(true);
     setResults([]);
+    setDiscovered(false);
 
-    // Mapeamento ESTRITO de Tipos: Converte a Aba atual para o Tipo de API
-    let apiType: ApiSearchType = "VIDEO";
-    const typeToSearch = overrideType || activeTab;
-
-    if (typeToSearch === "ALBUM") {
-      apiType = "MUSIC";
-    } else if (typeToSearch === "GAME") {
-      apiType = "GAME";
-    } else if (typeToSearch === "BOOK") {
-      apiType = "BOOK";
-    }
+    const apiType = apiTypeFor(overrideType || activeTab);
 
     try {
-      // 🟢 Sem uso de "any"! O TypeScript agora sabe exatamente o que entra aqui.
       const data = await searchMedia(query, apiType);
       setResults(data || []);
     } catch (error) {
@@ -77,6 +112,7 @@ export function AddMediaDialog() {
   const handleTabChange = (val: string) => {
     const newTab = val as MediaType;
     setActiveTab(newTab);
+    setDiscovered(false);
     if (query.trim()) {
       handleSearch(newTab);
     } else {
@@ -172,7 +208,27 @@ export function AddMediaDialog() {
             <Button onClick={() => handleSearch()} disabled={isLoadingSearch || !query.trim()} className="h-12 px-6 rounded-xl shadow-sm">
               {isLoadingSearch ? <Loader2 className="h-4 w-4 animate-spin" /> : "Buscar"}
             </Button>
+            <Button
+              variant="outline"
+              onClick={handleDiscover}
+              disabled={isLoadingSearch}
+              title="Descobrir algo aleatório para esta categoria"
+              className="h-12 px-4 rounded-xl shadow-sm gap-2 shrink-0 text-primary border-primary/30 hover:bg-primary/10"
+            >
+              <Dices className="h-4 w-4" /> <span className="hidden sm:inline">Surpreenda-me</span>
+            </Button>
           </div>
+
+          {/* Aviso: chave do provedor faltando (conexão com Settings) */}
+          {missingProvider && (
+            <div className="mt-3 flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              <span className="flex-1">Configure sua chave <strong>{missingProvider}</strong> para buscar nesta categoria.</span>
+              <Link href="/settings" onClick={() => setIsOpen(false)} className="font-bold underline inline-flex items-center gap-1 shrink-0">
+                <Settings className="h-3 w-3" /> Configurações
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* ÁREA DE RESULTADOS */}
@@ -240,18 +296,37 @@ export function AddMediaDialog() {
           </div>
 
           {/* ESTADOS VAZIOS */}
-          {!isLoadingSearch && results.length === 0 && query && (
+          {!isLoadingSearch && results.length === 0 && (query || discovered) && (
             <div className="h-full flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
               <Search className="h-12 w-12 mb-4 opacity-20" />
               <p className="font-semibold text-foreground">Nenhum resultado encontrado.</p>
-              <p className="text-sm mt-1 max-w-xs">Verifique a ortografia ou tente buscar pelo nome original (em inglês).</p>
+              <p className="text-sm mt-1 max-w-xs">Verifique a ortografia, tente o nome original (em inglês) ou descubra algo novo.</p>
+
+              {/* Livros: API gratuita sem chave pode estourar a cota — sugere conectar. */}
+              {activeTab === "BOOK" && providers && !providers.googleBooks && (
+                <div className="mt-4 flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-xs text-amber-700 dark:text-amber-400 max-w-sm">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  <span className="flex-1 text-left">Sem resultados pode ser limite de cota. Conecte uma chave <strong>Google Books</strong> (gratuita).</span>
+                  <Link href="/settings" onClick={() => setIsOpen(false)} className="font-bold underline inline-flex items-center gap-1 shrink-0">
+                    <Settings className="h-3 w-3" /> Conectar
+                  </Link>
+                </div>
+              )}
+
+              <Button variant="outline" onClick={handleDiscover} className="mt-5 gap-2 rounded-xl text-primary border-primary/30 hover:bg-primary/10">
+                <Dices className="h-4 w-4" /> Surpreenda-me
+              </Button>
             </div>
           )}
 
-          {!isLoadingSearch && results.length === 0 && !query && (
-            <div className="h-full flex flex-col items-center justify-center py-24 text-muted-foreground/40">
-              <Search className="h-12 w-12 mb-4 opacity-20" />
-              <p className="text-sm font-medium">Digite o nome da obra acima para começar a buscar.</p>
+          {!isLoadingSearch && results.length === 0 && !query && !discovered && (
+            <div className="h-full flex flex-col items-center justify-center py-24 text-center">
+              <Dices className="h-12 w-12 mb-4 text-muted-foreground/30" />
+              <p className="text-sm font-medium text-foreground">Busque pelo nome ou descubra algo novo.</p>
+              <p className="text-xs text-muted-foreground mt-1 max-w-xs">Sem ideias do que assistir, jogar, ouvir ou ler? Deixe o sistema sugerir.</p>
+              <Button onClick={handleDiscover} className="mt-5 gap-2 rounded-xl shadow-sm">
+                <Dices className="h-4 w-4" /> Surpreenda-me
+              </Button>
             </div>
           )}
         </ScrollArea>

@@ -12,8 +12,13 @@ import {
   ChevronRight,
   ShieldCheck,
   Zap,
-  Filter
+  Filter,
+  Radar,
+  Loader2
 } from "lucide-react";
+import { toast } from "sonner";
+import { type VaultAudit, type BreachScan, scanPasswordBreaches } from "@/app/(dashboard)/access/actions";
+import { CATEGORY_CONFIG, type CategoryKey } from "@/components/access/access-helpers";
 import { AccessList } from "@/components/access/access-list";
 import { AccessDialog } from "@/components/access/access-dialog";
 import { Input } from "@/components/ui/input";
@@ -21,24 +26,60 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+
+const CATEGORY_KEYS = Object.keys(CATEGORY_CONFIG) as CategoryKey[];
 
 const ITEMS_PER_PAGE = 12;
 
-export function AccessView({ initialItems }: { initialItems: AccessItem[] }) {
+export function AccessView({ initialItems, audit }: { initialItems: AccessItem[]; audit: VaultAudit }) {
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState("PERSONAL");
+  // Filtro de risco: mostra só credenciais frágeis, reutilizadas ou vazadas.
+  const [riskOnly, setRiskOnly] = useState(false);
+  // Filtro por categoria (FINANCE/SOCIAL/WORK/OTHERS ou "all").
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  // Resultado da verificação de vazamentos (sob demanda).
+  const [breach, setBreach] = useState<BreachScan | null>(null);
+  const [scanning, setScanning] = useState(false);
+
+  const reusedSet = new Set(audit.reusedIds);
+  const breachedSet = new Set(breach?.breachedIds ?? []);
+  const isAtRisk = (id: string) =>
+    (audit.strengthById[id] ?? 0) < 50 || reusedSet.has(id) || breachedSet.has(id);
+  const riskCount = initialItems.filter((i) => isAtRisk(i.id)).length;
+
+  const handleScanBreaches = async () => {
+    setScanning(true);
+    try {
+      const result = await scanPasswordBreaches();
+      setBreach(result);
+      if (result.breachedIds.length > 0) {
+        toast.error(`${result.breachedIds.length} senha(s) encontrada(s) em vazamentos públicos. Troque-as!`);
+        setRiskOnly(true);
+        setCurrentPage(1);
+      } else {
+        toast.success("Nenhuma senha encontrada em vazamentos conhecidos. 🎉");
+      }
+    } catch {
+      toast.error("Falha ao verificar vazamentos. Tente novamente.");
+    } finally {
+      setScanning(false);
+    }
+  };
 
   // 1. Filtragem Inteligente
   const filteredItems = initialItems.filter((item) => {
     const searchLower = search.toLowerCase();
-    return (
+    const matchesSearch =
       (item.title?.toLowerCase() ?? "").includes(searchLower) ||
       (item.username?.toLowerCase() ?? "").includes(searchLower) ||
       (item.client?.toLowerCase() ?? "").includes(searchLower) ||
-      (item.category?.toLowerCase() ?? "").includes(searchLower)
-    );
+      (item.category?.toLowerCase() ?? "").includes(searchLower);
+    const matchesCategory = categoryFilter === "all" || item.category === categoryFilter;
+    return matchesSearch && matchesCategory && (!riskOnly || isAtRisk(item.id));
   });
 
   const personalItems = filteredItems.filter((item) => !item.client);
@@ -76,7 +117,50 @@ export function AccessView({ initialItems }: { initialItems: AccessItem[] }) {
           />
         </div>
 
-        <div className="flex w-full md:w-auto items-center gap-3 justify-end">
+        <div className="flex w-full md:w-auto items-center gap-3 justify-end flex-wrap">
+          {/* Filtro por categoria */}
+          <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); setCurrentPage(1); }}>
+            <SelectTrigger className="h-10 w-[150px] rounded-xl border-border/40 bg-muted/10 font-black uppercase tracking-widest text-[9px]">
+              <Filter className="h-3 w-3 mr-1 text-muted-foreground" />
+              <SelectValue placeholder="Categoria" />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl">
+              <SelectItem value="all" className="font-bold text-xs uppercase">Todas Categorias</SelectItem>
+              {CATEGORY_KEYS.map((key) => (
+                <SelectItem key={key} value={key} className="font-bold text-xs uppercase">{CATEGORY_CONFIG[key].label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Verificar vazamentos (HaveIBeenPwned) */}
+          <Button
+            variant="outline"
+            onClick={handleScanBreaches}
+            disabled={scanning}
+            title="Verifica se suas senhas apareceram em vazamentos públicos (privado, via k-anonymity)"
+            className="h-10 px-4 rounded-xl border-border/40 bg-muted/10 hover:bg-muted font-black uppercase tracking-widest text-[9px] gap-2"
+          >
+            {scanning ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Radar className="h-3.5 w-3.5" />}
+            {scanning ? "Verificando..." : "Vazamentos"}
+          </Button>
+
+          {/* Filtro de risco — só aparece quando há credenciais frágeis/repetidas/vazadas */}
+          {riskCount > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => { setRiskOnly((v) => !v); setCurrentPage(1); }}
+              className={cn(
+                "h-10 px-4 rounded-xl font-black uppercase tracking-widest text-[9px] gap-2 transition-all",
+                riskOnly
+                  ? "bg-rose-500 text-white border-rose-500 hover:bg-rose-600"
+                  : "border-rose-500/30 text-rose-500 bg-rose-500/5 hover:bg-rose-500/10"
+              )}
+            >
+              <ShieldAlert className="h-3.5 w-3.5" />
+              {riskOnly ? "Vendo Riscos" : `Em Risco`}
+              <span className={cn("px-1.5 py-0.5 rounded-md font-mono text-[10px]", riskOnly ? "bg-white/20" : "bg-rose-500/15")}>{riskCount}</span>
+            </Button>
+          )}
           <Badge variant="outline" className="hidden lg:flex h-10 px-4 rounded-xl border-border/60 font-black uppercase tracking-widest text-[9px] gap-2 bg-muted/10">
             <ShieldCheck className="h-3 w-3 text-emerald-500" /> Criptografia Ativa
           </Badge>
@@ -123,7 +207,7 @@ export function AccessView({ initialItems }: { initialItems: AccessItem[] }) {
           <TabsContent value="PERSONAL" className="space-y-8 focus-visible:outline-none mt-0">
             {personalItems.length > 0 ? (
               <>
-                <AccessList items={paginatedItems} />
+                <AccessList items={paginatedItems} strengthById={audit.strengthById} reusedIds={audit.reusedIds} breachCounts={breach?.breachCounts} />
                 <PaginationFooter
                   currentPage={safeCurrentPage}
                   totalPages={totalPages}
@@ -140,7 +224,7 @@ export function AccessView({ initialItems }: { initialItems: AccessItem[] }) {
           <TabsContent value="CLIENTS" className="space-y-8 focus-visible:outline-none mt-0">
             {clientItems.length > 0 ? (
               <>
-                <AccessList items={paginatedItems} />
+                <AccessList items={paginatedItems} strengthById={audit.strengthById} reusedIds={audit.reusedIds} breachCounts={breach?.breachCounts} />
                 <PaginationFooter
                   currentPage={safeCurrentPage}
                   totalPages={totalPages}

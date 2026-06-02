@@ -1,8 +1,147 @@
 "use server";
 
+import crypto from "crypto";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { decrypt, encrypt } from "@/lib/crypto";
+import { requireUserId } from "@/lib/auth";
+import { calculateStrength } from "@/components/access/access-helpers";
+
+// --- AUDITORIA DE SEGURANÇA DO COFRE ---
+// Decifra as senhas APENAS no servidor para medir força e detectar reuso.
+// Retorna somente metadados (força/flags) — NUNCA a senha em texto puro.
+export type VaultAudit = {
+  strengthById: Record<string, number>;
+  reusedIds: string[];
+  stats: {
+    total: number;
+    weak: number;
+    medium: number;
+    strong: number;
+    reused: number;
+    healthScore: number; // 0-100
+  };
+};
+
+export async function getVaultSecurityAudit(): Promise<VaultAudit> {
+  const userId = await requireUserId();
+  const items = await prisma.accessItem.findMany({
+    where: { userId },
+    select: { id: true, password: true },
+  });
+
+  const strengthById: Record<string, number> = {};
+  const occurrences = new Map<string, string[]>(); // senha -> ids que a usam
+
+  for (const it of items) {
+    let plain = "";
+    try {
+      plain = decrypt(it.password);
+    } catch {
+      plain = "";
+    }
+    strengthById[it.id] = calculateStrength(plain);
+    if (plain) {
+      const list = occurrences.get(plain) ?? [];
+      list.push(it.id);
+      occurrences.set(plain, list);
+    }
+  }
+
+  // Reuso: qualquer senha compartilhada por 2+ itens.
+  const reusedIds: string[] = [];
+  for (const ids of occurrences.values()) {
+    if (ids.length > 1) reusedIds.push(...ids);
+  }
+
+  const strengths = Object.values(strengthById);
+  const total = strengths.length;
+  const weak = strengths.filter((s) => s < 50).length;
+  const strong = strengths.filter((s) => s >= 80).length;
+  const medium = total - weak - strong;
+  const reused = reusedIds.length;
+
+  // Saúde geral: média das forças com penalidade pelo reuso.
+  const avg = total ? strengths.reduce((a, b) => a + b, 0) / total : 0;
+  const reusePenalty = total ? (reused / total) * 30 : 0;
+  const healthScore = Math.max(0, Math.min(100, Math.round(avg - reusePenalty)));
+
+  return {
+    strengthById,
+    reusedIds,
+    stats: { total, weak, medium, strong, reused, healthScore },
+  };
+}
+
+// --- VERIFICAÇÃO DE VAZAMENTOS (HaveIBeenPwned) ---
+// Usa k-anonymity: enviamos apenas os 5 primeiros caracteres do hash SHA-1 da
+// senha; a senha NUNCA sai do servidor. Gratuito e sem chave de API.
+export type BreachScan = {
+  breachedIds: string[];
+  breachCounts: Record<string, number>; // id -> nº de vazamentos conhecidos
+  checked: number;
+};
+
+export async function scanPasswordBreaches(): Promise<BreachScan> {
+  const userId = await requireUserId();
+  const items = await prisma.accessItem.findMany({
+    where: { userId },
+    select: { id: true, password: true },
+  });
+
+  // Agrupa por hash para não repetir requisições de senhas iguais.
+  const byHash = new Map<string, { prefix: string; suffix: string; ids: string[] }>();
+  for (const it of items) {
+    let plain = "";
+    try {
+      plain = decrypt(it.password);
+    } catch {
+      plain = "";
+    }
+    if (!plain) continue;
+    const hash = crypto.createHash("sha1").update(plain).digest("hex").toUpperCase();
+    const key = hash;
+    const entry = byHash.get(key) ?? { prefix: hash.slice(0, 5), suffix: hash.slice(5), ids: [] };
+    entry.ids.push(it.id);
+    byHash.set(key, entry);
+  }
+
+  const breachedIds: string[] = [];
+  const breachCounts: Record<string, number> = {};
+  const rangeCache = new Map<string, string>(); // prefixo -> corpo da resposta
+
+  for (const entry of byHash.values()) {
+    try {
+      let body = rangeCache.get(entry.prefix);
+      if (body === undefined) {
+        const res = await fetch(`https://api.pwnedpasswords.com/range/${entry.prefix}`, {
+          // Add-Padding mascara o tamanho do resultado (privacidade extra).
+          headers: { "Add-Padding": "true" },
+          cache: "no-store",
+        });
+        body = res.ok ? await res.text() : "";
+        rangeCache.set(entry.prefix, body);
+      }
+
+      // Linhas no formato "SUFFIX:COUNT"; padding injeta COUNT=0 (ignoramos).
+      const line = body
+        .split("\n")
+        .find((l) => l.split(":")[0]?.trim().toUpperCase() === entry.suffix);
+      const count = line ? parseInt(line.split(":")[1]?.trim() || "0", 10) : 0;
+
+      if (count > 0) {
+        for (const id of entry.ids) {
+          breachedIds.push(id);
+          breachCounts[id] = count;
+        }
+      }
+    } catch {
+      // Falha de rede nesta faixa: ignora e segue para as demais.
+    }
+  }
+
+  return { breachedIds, breachCounts, checked: items.length };
+}
 
 // --- CRIAR ACESSO ---
 export async function createAccess(formData: FormData) {
@@ -16,6 +155,8 @@ export async function createAccess(formData: FormData) {
 
     const encryptedPassword = encrypt(password);
 
+    const userId = await requireUserId();
+
     await prisma.accessItem.create({
       data: {
         title,
@@ -24,10 +165,10 @@ export async function createAccess(formData: FormData) {
         url: (formData.get("url") as string) || null,
         category: (formData.get("category") as string) || "OTHERS",
         // ✅ AQUI: Garantindo que as notas sejam salvas
-        notes: (formData.get("notes") as string) || null, 
+        notes: (formData.get("notes") as string) || null,
         // ✅ AQUI: Garantindo que o cliente seja salvo
-        client: (formData.get("client") as string) || null, 
-        userId: null, // Se tiver auth, coloque o ID do usuário aqui
+        client: (formData.get("client") as string) || null,
+        userId,
       },
     });
 
@@ -49,8 +190,10 @@ export async function updateAccess(formData: FormData) {
 
     if (!id || !title) throw new Error("Dados inválidos.");
 
+    const userId = await requireUserId();
+
     // Busca item atual para não quebrar a senha se ela não mudou
-    const currentItem = await prisma.accessItem.findUnique({ where: { id } });
+    const currentItem = await prisma.accessItem.findFirst({ where: { id, userId } });
     if (!currentItem) throw new Error("Item não encontrado");
 
     // Verifica se precisa re-criptografar a senha
@@ -59,8 +202,8 @@ export async function updateAccess(formData: FormData) {
         finalPassword = encrypt(submittedPassword);
     }
 
-    await prisma.accessItem.update({
-      where: { id },
+    await prisma.accessItem.updateMany({
+      where: { id, userId },
       data: {
         title,
         username: (formData.get("username") as string) || null,
@@ -68,9 +211,9 @@ export async function updateAccess(formData: FormData) {
         url: (formData.get("url") as string) || null,
         category: (formData.get("category") as string) || "OTHERS",
         // ✅ AQUI: Atualizando as notas
-        notes: (formData.get("notes") as string) || null, 
+        notes: (formData.get("notes") as string) || null,
         // ✅ AQUI: Atualizando o cliente
-        client: (formData.get("client") as string) || null, 
+        client: (formData.get("client") as string) || null,
       },
     });
 
@@ -86,7 +229,8 @@ export async function updateAccess(formData: FormData) {
 // --- DELETAR ---
 export async function deleteAccess(id: string) {
   try {
-    await prisma.accessItem.delete({ where: { id } });
+    const userId = await requireUserId();
+    await prisma.accessItem.deleteMany({ where: { id, userId } });
     revalidatePath("/access");
     return { success: true };
   } catch (error) {
@@ -97,8 +241,9 @@ export async function deleteAccess(id: string) {
 
 // --- REVELAR SENHA ---
 export async function revealPassword(id: string) {
-    const item = await prisma.accessItem.findUnique({
-        where: { id },
+    const userId = await requireUserId();
+    const item = await prisma.accessItem.findFirst({
+        where: { id, userId },
         select: { password: true }
     });
 

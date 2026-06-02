@@ -3,7 +3,8 @@ import { getMarketOverview } from "@/lib/market-service";
 import { MarketDashboard } from "@/components/finance/market/market-dashboard"; // Vamos criar esse componente
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, LineChart } from "lucide-react";
+import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
 
 export const metadata: Metadata = {
   title: "Mercado Financeiro | LifeOS",
@@ -21,22 +22,22 @@ export default async function MarketPage() {
   const marketData = await getMarketOverview(extendedTickers);
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      {/* Header Simples */}
-      <header className="border-b border-border/60 bg-muted/20 px-6 py-4">
-        <div className="max-w-[1600px] mx-auto flex items-center gap-4">
-            <Link href="/finance">
-                <Button variant="ghost" size="sm" className="gap-1 pl-2 text-muted-foreground">
-                    <ChevronLeft className="h-4 w-4" /> Voltar
-                </Button>
-            </Link>
-            <h1 className="text-lg font-semibold">Terminal de Mercado</h1>
-        </div>
-      </header>
+    <PageShell>
+      <PageHeader
+        icon={<LineChart className="h-6 w-6" />}
+        title="Terminal de Mercado"
+        description="Cotações da B3, FIIs, ETFs, câmbio e cripto em tempo real."
+      >
+        <Link href="/finance" className="w-fit">
+          <Button variant="ghost" size="sm" className="-ml-2 gap-1 pl-2 text-muted-foreground hover:text-foreground">
+            <ChevronLeft className="h-4 w-4" /> Voltar para Finanças
+          </Button>
+        </Link>
+      </PageHeader>
 
-      <main className="px-6 py-8 max-w-[1600px] mx-auto animate-in fade-in duration-500">
+      <PageContainer>
         <MarketDashboard data={marketData} />
-      </main>
-    </div>
+      </PageContainer>
+    </PageShell>
   );
 }

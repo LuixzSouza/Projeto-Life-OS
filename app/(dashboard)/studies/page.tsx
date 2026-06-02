@@ -1,35 +1,29 @@
-import React from "react";
 import Link from "next/link";
 import { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
 import { cn } from "@/lib/utils";
+import { getCurrentUserId } from "@/lib/auth";
 
 import { StudyTimer } from "@/components/studies/study-timer";
 import { StudySessionList } from "@/components/studies/study-session-list";
 import { SubjectGrid } from "@/components/studies/subject-grid";
+import { GamificationHero } from "@/components/studies/gamification-hero";
+import { StudyAnalytics } from "@/components/studies/study-analytics";
+import { XP_PER_LEVEL, getLevelTheme, formatHours, safePercent } from "@/components/studies/studies-helpers";
+import { buildDailyActivity, computeStudyStats, type SessionLite, type DailyPoint, type StudyStats } from "@/lib/studies-math";
 
-import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardContent,
-} from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
 
 import { Trophy, History, Zap, AlertCircle, BookOpen } from "lucide-react";
 
 // Tipos Prisma corretos
 import { StudySubject, Prisma } from "@prisma/client";
 
-/* ================================
-   METADATA
-   (Página server-side)
-================================ */
 export const metadata: Metadata = {
   title: "Estudos | Life OS",
   description: "Gerencie seu tempo de estudo e acompanhe sua evolução.",
-  // opcional: openGraph etc se desejar
 };
 
 /* ================================
@@ -38,65 +32,14 @@ export const metadata: Metadata = {
 // Extende StudySubject com estatísticas calculadas
 export interface SubjectWithStats extends StudySubject {
   totalMinutes: number;
+  sessionCount: number;
+  lastStudied: Date | null;
 }
 
 // Payload de sessão com subject incluído
 type StudySessionWithSubject = Prisma.StudySessionGetPayload<{
   include: { subject: true };
 }>;
-
-/* ================================
-   CONSTANTES E HELPERS
-================================ */
-const XP_PER_LEVEL = 600;
-
-const getLevelTheme = (level: number) => {
-  // Retorna classes utilitárias (Tailwind) para personalizar visual
-  if (level >= 50)
-    return {
-      bg: "bg-primary",
-      border: "border-primary",
-      text: "text-primary",
-      glow: "bg-primary/25",
-    };
-  if (level >= 30)
-    return {
-      bg: "bg-primary/80",
-      border: "border-primary/80",
-      text: "text-primary",
-      glow: "bg-primary/20",
-    };
-  if (level >= 20)
-    return {
-      bg: "bg-primary/70",
-      border: "border-primary/70",
-      text: "text-primary",
-      glow: "bg-primary/15",
-    };
-  if (level >= 10)
-    return {
-      bg: "bg-primary/60",
-      border: "border-primary/60",
-      text: "text-primary",
-      glow: "bg-primary/10",
-    };
-  return {
-    bg: "bg-primary/50",
-    border: "border-primary/50",
-    text: "text-primary",
-    glow: "bg-primary/5",
-  };
-};
-
-const formatHours = (minutes: number) => {
-  if (!isFinite(minutes) || minutes <= 0) return "0.0";
-  return (minutes / 60).toFixed(1);
-};
-
-const safePercent = (value: number) => {
-  if (!isFinite(value) || isNaN(value)) return 0;
-  return Math.min(100, Math.max(0, value));
-};
 
 /* ================================
    PAGE (Server Component)
@@ -119,30 +62,54 @@ export default async function StudiesPage() {
   let hasActivity = false;
 
   let subjectsWithStats: SubjectWithStats[] = [];
+  let dailyActivity: DailyPoint[] = [];
+  let studyStats: StudyStats = {
+    todayMinutes: 0, weekMinutes: 0, streak: 0, bestDayMinutes: 0, activeDays: 0, avgFocus: 0,
+  };
   let hasError = false;
 
   try {
-    // Carrega em paralelo: matérias, sessões recentes, estatísticas e tempo agrupado
-    const [subjectsData, recentSessionsData, statsData, aggregatedTimeData] =
+    const userId = await getCurrentUserId();
+
+    // Janela de 30 dias para o gráfico de atividade e a sequência (streak).
+    const activityWindowStart = new Date();
+    activityWindowStart.setDate(activityWindowStart.getDate() - 29);
+    activityWindowStart.setHours(0, 0, 0, 0);
+
+    // Carrega em paralelo: matérias, sessões recentes, estatísticas, tempo agrupado e atividade.
+    const [subjectsData, recentSessionsData, statsData, aggregatedTimeData, activitySessions] =
       await Promise.all([
         prisma.studySubject.findMany({
+          where: { userId },
           orderBy: { title: "asc" },
         }),
 
         prisma.studySession.findMany({
+          where: { userId },
           take: 5,
           orderBy: { date: "desc" },
           include: { subject: true },
         }),
 
         prisma.studySession.aggregate({
+          where: { userId },
           _sum: { durationMinutes: true },
           _count: { id: true },
         }),
 
+        // Agrupado por matéria: total de minutos, nº de sessões e último estudo.
         prisma.studySession.groupBy({
           by: ["subjectId"],
+          where: { userId },
           _sum: { durationMinutes: true },
+          _count: { id: true },
+          _max: { date: true },
+        }),
+
+        // Sessões recentes (30 dias) para analytics.
+        prisma.studySession.findMany({
+          where: { userId, date: { gte: activityWindowStart } },
+          select: { date: true, durationMinutes: true, focusLevel: true },
         }),
       ]);
 
@@ -151,8 +118,7 @@ export default async function StudiesPage() {
     totalMinutes = statsData._sum.durationMinutes ?? 0;
     totalSessions = statsData._count.id ?? 0;
 
-    // XP e nível
-    // exemplo: 10 XP por minuto (mantive sua ideia original)
+    // XP e nível (10 XP por minuto)
     totalXP = totalMinutes * 10;
     currentLevel = Math.floor(totalXP / XP_PER_LEVEL) + 1;
     xpCurrentLevel = totalXP % XP_PER_LEVEL;
@@ -161,22 +127,38 @@ export default async function StudiesPage() {
     totalHours = formatHours(totalMinutes);
     hasActivity = totalSessions > 0;
 
-    // Mapeia tempo por matéria (groupBy retorna subjectId)
-    const timeMap = new Map<string, number>();
+    // Mapeia estatísticas por matéria (groupBy retorna subjectId)
+    const statMap = new Map<string, { minutes: number; count: number; last: Date | null }>();
     for (const g of aggregatedTimeData ?? []) {
       const subjectId = g.subjectId as string;
-      const mins = (g._sum?.durationMinutes ?? 0) as number;
-
-      timeMap.set(subjectId, mins);
+      statMap.set(subjectId, {
+        minutes: g._sum?.durationMinutes ?? 0,
+        count: g._count?.id ?? 0,
+        last: g._max?.date ?? null,
+      });
     }
 
-    subjectsWithStats = (subjects ?? []).map((s) => ({
-      ...s,
-      totalMinutes: timeMap.get(s.id) ?? 0,
-    }));
+    subjectsWithStats = (subjects ?? []).map((s) => {
+      const st = statMap.get(s.id);
+      return {
+        ...s,
+        totalMinutes: st?.minutes ?? 0,
+        sessionCount: st?.count ?? 0,
+        lastStudied: st?.last ?? null,
+      };
+    });
 
     // Ordena por tempo (decrescente) para dar prioridade visual às mais estudadas
     subjectsWithStats.sort((a, b) => b.totalMinutes - a.totalMinutes);
+
+    // Analytics (gráfico + KPIs) a partir das sessões recentes
+    const lite: SessionLite[] = (activitySessions ?? []).map((s) => ({
+      date: s.date,
+      durationMinutes: s.durationMinutes,
+      focusLevel: s.focusLevel,
+    }));
+    dailyActivity = buildDailyActivity(lite, 14);
+    studyStats = computeStudyStats(lite);
   } catch (err) {
     console.error("[StudiesPage] erro ao carregar dados:", err);
     hasError = true;
@@ -205,121 +187,30 @@ export default async function StudiesPage() {
   const theme = getLevelTheme(currentLevel);
 
   return (
-    <div className="min-h-screen bg-background pb-24">
-      {/* HEADER */}
-      <header className="border-b border-border/60 bg-gradient-to-b from-primary/5 to-background pt-10 pb-8 px-6 md:px-8">
-        <div className="flex flex-col gap-4 animate-in fade-in duration-500 max-w-[1600px] mx-auto">
-          <div className="flex items-center gap-4">
-            <div
-              className={cn(
-                "h-12 w-12 rounded-2xl flex items-center justify-center bg-primary/10 text-primary shadow-sm"
-              )}
-              aria-hidden
-            >
-              <Trophy className="h-6 w-6" />
-            </div>
-            <div>
-              <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">
-                Estudos
-              </h1>
-              <p className="text-sm md:text-base text-muted-foreground">
-                Controle seu foco, evolução e desempenho.
-              </p>
-            </div>
-          </div>
-        </div>
-      </header>
+    <PageShell>
+      <PageHeader
+        icon={<Trophy className="h-6 w-6" />}
+        title="Estudos"
+        description="Controle seu foco, evolução e desempenho."
+      />
 
-      {/* MAIN */}
-      <main className="px-6 md:px-8 py-8 space-y-10 max-w-[1600px] mx-auto">
+      <PageContainer className="space-y-10">
         {/* HERO / GAMIFICATION */}
-        <section
-          aria-labelledby="studies-hero-title"
-          className={cn(
-            "relative overflow-hidden rounded-3xl p-8 border shadow-sm",
-            "bg-gradient-to-br from-primary/20 via-primary/10 to-transparent",
-            "border-border"
-          )}
-        >
-          <div
-            className={cn(
-              "absolute -top-24 -right-24 w-96 h-96 rounded-full blur-3xl opacity-20",
-              theme.glow
-            )}
-            aria-hidden
-          />
-          <div
-            className={cn(
-              "absolute -bottom-24 -left-24 w-72 h-72 rounded-full blur-3xl opacity-10",
-              theme.glow
-            )}
-            aria-hidden
-          />
+        <GamificationHero
+          currentLevel={currentLevel}
+          totalXP={totalXP}
+          xpCurrentLevel={xpCurrentLevel}
+          xpNextLevel={xpNextLevel}
+          progressPercentage={progressPercentage}
+          totalHours={totalHours}
+          totalSessions={totalSessions}
+          streak={studyStats.streak}
+          weekHours={formatHours(studyStats.weekMinutes)}
+          theme={theme}
+        />
 
-          <div className="relative z-10 grid md:grid-cols-2 gap-8 items-center">
-            <div className="space-y-4">
-              <div
-                className={cn(
-                  "inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase border",
-                  "bg-secondary",
-                  theme.border,
-                  theme.text
-                )}
-              >
-                <Trophy className="h-3 w-3" />
-                Nível {currentLevel}
-              </div>
-
-              <h2
-                id="studies-hero-title"
-                className="text-4xl font-black leading-tight"
-              >
-                Mestre do Foco
-              </h2>
-
-              <p className="text-muted-foreground max-w-md text-sm">
-                Você acumulou{" "}
-                <span className="font-bold text-foreground">{totalXP} XP</span>.{" "}
-                Continue evoluindo seus hábitos.
-              </p>
-            </div>
-
-            <aside className="rounded-2xl p-6 border bg-secondary/50" aria-label="Progresso">
-              <div className="flex justify-between mb-2">
-                <span className="text-xs font-bold uppercase text-muted-foreground">
-                  Próximo nível
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {xpCurrentLevel} / {xpNextLevel} XP
-                </span>
-              </div>
-
-              <Progress
-                value={progressPercentage}
-                className="h-2.5 bg-muted"
-                indicatorClassName={cn(theme.bg)}
-                aria-valuenow={Math.round(progressPercentage)}
-                aria-valuemin={0}
-                aria-valuemax={100}
-              />
-
-              <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t">
-                <div>
-                  <div className="text-2xl font-bold">{totalHours}h</div>
-                  <div className="text-xs uppercase font-bold text-muted-foreground">
-                    Tempo Total
-                  </div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold">{totalSessions}</div>
-                  <div className="text-xs uppercase font-bold text-muted-foreground">
-                    Sessões
-                  </div>
-                </div>
-              </div>
-            </aside>
-          </div>
-        </section>
+        {/* ANALYTICS: KPIs + GRÁFICO DE ATIVIDADE */}
+        {hasActivity && <StudyAnalytics daily={dailyActivity} stats={studyStats} />}
 
         {/* GRID PRINCIPAL */}
         <section className="grid lg:grid-cols-3 gap-8">
@@ -339,7 +230,6 @@ export default async function StudiesPage() {
                 </div>
               </div>
             ) : (
-              // Passa subjectsWithStats, que estende StudySubject
               <StudyTimer subjects={subjectsWithStats} />
             )}
 
@@ -373,7 +263,7 @@ export default async function StudiesPage() {
             </CardContent>
           </Card>
         </section>
-      </main>
-    </div>
+      </PageContainer>
+    </PageShell>
   );
 }

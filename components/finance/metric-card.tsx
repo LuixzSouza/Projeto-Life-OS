@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, HelpCircle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { useFormatCurrency } from "@/components/providers/currency-provider";
 
 interface MetricCardProps {
   title: string;
@@ -36,8 +37,7 @@ export const MetricCard: FC<MetricCardProps> = ({
     danger: "border-destructive/20 bg-destructive/5 hover:bg-destructive/10",
   };
 
-  const formatMoney = (val: number) => 
-    new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
+  const formatMoney = useFormatCurrency();
 
   return (
     <Card className={cn("relative overflow-hidden transition-all duration-300 hover:shadow-lg group", variants[variant])}>

@@ -1,10 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { SiteEditor } from "@/components/cms/site-editor"; // Esse componente vamos melhorar no próximo passo!
-import { Button } from "@/components/ui/button";
 import { ArrowLeft, Globe, ExternalLink, HardDrive } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { getCurrentUserId } from "@/lib/auth";
 
 interface SitePageProps {
   params: Promise<{ id: string }>;
@@ -14,8 +14,10 @@ export default async function SiteDetailsPage(props: SitePageProps) {
   const params = await props.params;
   const { id } = params;
 
-  const site = await prisma.managedSite.findUnique({
-    where: { id },
+  const userId = await getCurrentUserId();
+
+  const site = await prisma.managedSite.findFirst({
+    where: { id, userId },
     include: {
       pages: { orderBy: { slug: "asc" } },
     },
@@ -24,12 +26,12 @@ export default async function SiteDetailsPage(props: SitePageProps) {
   if (!site) return notFound();
 
   return (
-    <div className="min-h-screen bg-[#F4F4F5] dark:bg-[#080808] flex flex-col w-full overflow-x-hidden">
-      
+    <div className="min-h-screen bg-muted/30 flex flex-col w-full overflow-x-hidden">
+
       {/* ------------------------------------------------------------------ */}
       {/* HEADER TÁTICO FULL WIDTH */}
       {/* ------------------------------------------------------------------ */}
-      <header className="sticky top-0 z-30 bg-[#F4F4F5]/80 dark:bg-[#080808]/80 backdrop-blur-xl border-b border-border/40 px-4 md:px-10 lg:px-14 py-4 flex flex-col gap-5 animate-in fade-in duration-500">
+      <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl border-b border-border/40 px-4 md:px-10 lg:px-14 py-4 flex flex-col gap-5 animate-in fade-in duration-500">
         
         {/* NAV & VOLTAR */}
         <div className="flex items-center gap-4 border-b border-border/40 pb-4">

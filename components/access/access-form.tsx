@@ -7,11 +7,15 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import { createAccess, updateAccess } from "@/app/(dashboard)/access/actions";
+import { calculateStrength } from "./access-helpers";
 import { toast } from "sonner";
-import { 
-  Loader2, Globe, User, Key, Eye, EyeOff, ShieldCheck, 
-  Wand2, Briefcase, Building2, UserCircle, CheckCircle
+import {
+  Loader2, Globe, User, Key, Eye, EyeOff, ShieldCheck,
+  Wand2, Briefcase, Building2, UserCircle, CheckCircle, SlidersHorizontal
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -33,30 +37,63 @@ interface AccessFormProps {
   onClose: () => void;
 }
 
-function generatePassword(length = 20): string {
+interface GenOptions {
+  length: number;
+  numbers: boolean;
+  symbols: boolean;
+}
+
+// Gerador criptograficamente seguro (CSPRNG via Web Crypto), com classes opcionais.
+function generatePassword({ length, numbers: useNumbers, symbols: useSymbols }: GenOptions): string {
   const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   const lower = "abcdefghijklmnopqrstuvwxyz";
   const numbers = "0123456789";
   const symbols = "!@#$%&*-_=+?";
-  const allChars = upper + lower + numbers + symbols;
-  
-  let password = "";
-  password += upper[Math.floor(Math.random() * upper.length)];
-  password += lower[Math.floor(Math.random() * lower.length)];
-  password += numbers[Math.floor(Math.random() * numbers.length)];
-  password += symbols[Math.floor(Math.random() * symbols.length)];
 
-  for (let i = 4; i < length; i++) {
-    password += allChars[Math.floor(Math.random() * allChars.length)];
+  let pool = upper + lower;
+  if (useNumbers) pool += numbers;
+  if (useSymbols) pool += symbols;
+
+  // Índice aleatório uniforme usando getRandomValues (evita Math.random previsível).
+  const rnd = (max: number) => {
+    const arr = new Uint32Array(1);
+    crypto.getRandomValues(arr);
+    return arr[0] % max;
+  };
+
+  const len = Math.max(6, length);
+  // Garante ao menos 1 caractere de cada classe ativa.
+  const required: string[] = [upper[rnd(upper.length)], lower[rnd(lower.length)]];
+  if (useNumbers) required.push(numbers[rnd(numbers.length)]);
+  if (useSymbols) required.push(symbols[rnd(symbols.length)]);
+
+  const chars = [...required];
+  for (let i = chars.length; i < len; i++) chars.push(pool[rnd(pool.length)]);
+
+  // Fisher–Yates com CSPRNG.
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = rnd(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
   }
-  return password.split('').sort(() => 0.5 - Math.random()).join('');
+  return chars.join("");
 }
 
 export function AccessForm({ item, onClose }: AccessFormProps) {
+  const isEditing = Boolean(item?.id);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [password, setPassword] = useState(item?.password ?? "");
+  // Em edição NÃO pré-preenchemos a senha (o valor salvo é cifrado/ilegível).
+  // Campo vazio = manter a senha atual.
+  const [password, setPassword] = useState("");
   const [accessType, setAccessType] = useState<AccessType>(item?.client ? "CLIENT" : "PERSONAL");
+
+  // Opções do gerador de senhas.
+  const [genOptions, setGenOptions] = useState<GenOptions>({ length: 20, numbers: true, symbols: true });
+
+  // Força calculada ao vivo (mesma métrica da auditoria do cofre).
+  const strength = calculateStrength(password);
+  const strengthColor = strength >= 80 ? "bg-emerald-500" : strength >= 50 ? "bg-amber-500" : "bg-rose-500";
+  const strengthLabel = strength >= 80 ? "Forte" : strength >= 50 ? "Média" : strength > 0 ? "Fraca" : "";
 
   const handleSubmit = async (formData: FormData) => {
     const title = formData.get("title")?.toString().trim();
@@ -93,8 +130,9 @@ export function AccessForm({ item, onClose }: AccessFormProps) {
   };
 
   const handleGeneratePassword = () => {
-    const pwd = generatePassword();
+    const pwd = generatePassword(genOptions);
     setPassword(pwd);
+    setShowPassword(true);
     toast.success("Senha de alta entropia gerada.", {
         icon: <ShieldCheck className="h-4 w-4 text-emerald-500" />
     });
@@ -201,31 +239,77 @@ export function AccessForm({ item, onClose }: AccessFormProps) {
                           type={showPassword ? "text" : "password"}
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          placeholder="••••••••"
+                          placeholder={isEditing ? "Deixe em branco para manter a atual" : "••••••••"}
                           className="pl-10 pr-10 h-11 bg-background border-border/40 focus-visible:ring-primary/20 rounded-xl font-mono tracking-widest text-sm"
-                          required={!item?.id}
+                          required={!isEditing}
                           autoComplete="new-password"
                       />
-                      <Button 
-                          type="button" 
-                          size="icon" 
-                          variant="ghost" 
-                          onClick={() => setShowPassword((v) => !v)} 
+                      <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => setShowPassword((v) => !v)}
                           className="absolute right-1 top-1/2 -translate-y-1/2 h-9 w-9 text-muted-foreground hover:text-primary"
                       >
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </Button>
                   </div>
 
-                  <Button 
-                      type="button" 
-                      variant="outline" 
+                  {/* Opções do gerador (comprimento, números, símbolos) */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button type="button" variant="outline" size="icon" title="Opções do gerador" className="h-11 w-11 shrink-0 rounded-xl border-border/40 hover:bg-muted">
+                        <SlidersHorizontal className="h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-72 rounded-2xl p-5 space-y-5">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Comprimento</Label>
+                          <span className="text-sm font-black text-primary font-mono">{genOptions.length}</span>
+                        </div>
+                        <Slider
+                          min={8} max={48} step={1}
+                          value={[genOptions.length]}
+                          onValueChange={([v]) => setGenOptions((o) => ({ ...o, length: v }))}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Incluir números</Label>
+                        <Switch checked={genOptions.numbers} onCheckedChange={(c) => setGenOptions((o) => ({ ...o, numbers: c }))} />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Incluir símbolos</Label>
+                        <Switch checked={genOptions.symbols} onCheckedChange={(c) => setGenOptions((o) => ({ ...o, symbols: c }))} />
+                      </div>
+                      <Button type="button" onClick={handleGeneratePassword} className="w-full h-10 rounded-xl font-black uppercase tracking-widest text-[10px] gap-2">
+                        <Wand2 className="h-3.5 w-3.5" /> Gerar agora
+                      </Button>
+                    </PopoverContent>
+                  </Popover>
+
+                  <Button
+                      type="button"
+                      variant="outline"
                       onClick={handleGeneratePassword}
                       className="h-11 px-4 rounded-xl border-dashed border-primary/40 hover:bg-primary/5 hover:text-primary font-black uppercase tracking-widest text-[9px] gap-2"
                   >
                       <Wand2 className="h-3.5 w-3.5" /> Gerar
                   </Button>
               </div>
+
+              {/* Medidor de força ao vivo */}
+              {password && (
+                <div className="space-y-1.5 pt-1 animate-in fade-in duration-300">
+                  <div className="h-1.5 w-full bg-background border border-border/40 rounded-full overflow-hidden">
+                    <div className={cn("h-full rounded-full transition-all duration-500 ease-out", strengthColor)} style={{ width: `${strength}%` }} />
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">Força: <span className={cn(strength >= 80 ? "text-emerald-500" : strength >= 50 ? "text-amber-500" : "text-rose-500")}>{strengthLabel}</span></span>
+                    <span className="text-[9px] font-mono text-muted-foreground">{password.length} caracteres</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* URL */}

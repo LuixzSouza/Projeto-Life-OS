@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +13,7 @@ import {
     Moon, Plus, ArrowRight, BedDouble, Battery, 
     Loader2, Sparkles, Zap, Brain, Coffee, LucideIcon 
 } from "lucide-react";
-import { logMetric } from "@/app/(dashboard)/health/actions";
+import { logSleep } from "@/app/(dashboard)/health/actions";
 import { toast } from "sonner";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -35,8 +36,10 @@ interface SleepAnalysis {
 }
 
 export function SleepCard({ value, targetGoal = 7.5 }: SleepCardProps) {
+    const router = useRouter();
     const [isOpen, setIsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [customValue, setCustomValue] = useState("");
     const hours = Number(value) || 0;
 
     // --- ANÁLISE DINÂMICA ---
@@ -66,14 +69,23 @@ export function SleepCard({ value, targetGoal = 7.5 }: SleepCardProps) {
     const analysis = getAnalysis(hours);
 
     const handleQuickLog = async (val: number) => {
+        if (!val || val <= 0) {
+            toast.error("Informe uma duração válida.");
+            return;
+        }
         setIsLoading(true);
         try {
             const formData = new FormData();
-            formData.append("type", "SLEEP");
             formData.append("value", val.toString());
-            await logMetric(formData);
-            toast.success(`Log de ${val}h registrado.`);
-            setIsOpen(false);
+            const res = await logSleep(formData);
+            if (res.success) {
+                toast.success(`Log de ${val}h registrado.`);
+                setCustomValue("");
+                setIsOpen(false);
+                router.refresh();
+            } else {
+                toast.error(res.message);
+            }
         } catch {
             toast.error("Falha no uplink.");
         } finally {
@@ -138,15 +150,21 @@ export function SleepCard({ value, targetGoal = 7.5 }: SleepCardProps) {
 
                                 <div className="space-y-3">
                                     <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Personalizado</Label>
-                                    <Input 
-                                        type="number" step="0.1" placeholder="0.0" 
+                                    <Input
+                                        type="number" step="0.1" placeholder="0.0"
+                                        value={customValue}
+                                        onChange={(e) => setCustomValue(e.target.value)}
                                         className="h-12 rounded-xl bg-muted/40 border-border/60 shadow-inner font-bold text-center text-lg focus-visible:ring-primary/20"
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter') handleQuickLog(Number(e.currentTarget.value));
                                         }}
                                     />
                                 </div>
-                                <Button className="w-full h-12 rounded-xl font-black uppercase tracking-widest text-[10px]" disabled={isLoading}>
+                                <Button
+                                    className="w-full h-12 rounded-xl font-black uppercase tracking-widest text-[10px]"
+                                    disabled={isLoading || !customValue}
+                                    onClick={() => handleQuickLog(Number(customValue))}
+                                >
                                     {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Registrar"}
                                 </Button>
                             </div>

@@ -6,6 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { deleteAccount } from "@/app/(dashboard)/finance/actions";
 import { toast } from "sonner";
 import { AccountDialog } from "./account-dialog";
+import { useFormatCurrency } from "@/components/providers/currency-provider";
 
 interface AccountItem {
     id: string;
@@ -91,6 +92,7 @@ export function AccountsList({ accounts }: { accounts: AccountItem[] }) {
 
 function BankCard({ account, onEdit, onDelete }: { account: AccountItem, onEdit: () => void, onDelete: () => void }) {
     const [copied, setCopied] = useState(false);
+    const formatMoney = useFormatCurrency();
 
     const handleCopyBalance = () => {
         navigator.clipboard.writeText(account.balance.toString());
@@ -99,7 +101,7 @@ function BankCard({ account, onEdit, onDelete }: { account: AccountItem, onEdit:
         setTimeout(() => setCopied(false), 2000);
     };
 
-    const formattedBalance = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(account.balance);
+    const formattedBalance = formatMoney(account.balance);
 
     return (
         <div 

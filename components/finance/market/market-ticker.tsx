@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { TrendingUp, TrendingDown, DollarSign, Activity } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useFormatCurrency } from "@/components/providers/currency-provider";
 
 interface MarketData {
   symbol: string;
@@ -13,6 +14,7 @@ interface MarketData {
 }
 
 export function MarketTicker({ initialData }: { initialData: MarketData[] }) {
+  const formatCurrency = useFormatCurrency();
   // Estado local para permitir atualização client-side se quiser implementar depois
   const [data] = useState(initialData);
 
@@ -39,8 +41,8 @@ export function MarketTicker({ initialData }: { initialData: MarketData[] }) {
             <div className="flex items-end justify-between gap-2">
               <span className="text-lg font-bold font-mono">
                 {item.symbol === '^BVSP' 
-                  ? (item.regularMarketPrice / 1000).toFixed(1) + 'k' 
-                  : item.regularMarketPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  ? (item.regularMarketPrice / 1000).toFixed(1) + 'k'
+                  : formatCurrency(item.regularMarketPrice)}
               </span>
               
               <div className={cn(

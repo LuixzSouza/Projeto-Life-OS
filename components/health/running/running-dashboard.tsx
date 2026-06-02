@@ -9,10 +9,12 @@ import {
     Footprints, Timer, Calendar, TrendingUp, 
     MapPin, Plus, Zap, Trophy, Gauge, Activity, Clock 
 } from "lucide-react";
-import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer, CartesianGrid, YAxis } from "recharts";
+import { AreaChart, Area, XAxis, Tooltip, CartesianGrid, YAxis } from "recharts";
+import { ChartContainer } from "@/components/ui/chart-container";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { RunForm } from "./run-form";
+import { ImportRunsDialog } from "./import-runs-dialog";
 import { cn } from "@/lib/utils";
 
 // --- Tipagem Estrita ---
@@ -71,8 +73,8 @@ export function RunningDashboard({ runs }: { runs: RunWorkout[] }) {
                 {/* CTA Principal */}
                 <Dialog open={open} onOpenChange={setOpen}>
                     <DialogTrigger asChild>
-                        <Button className="w-full h-14 text-lg font-bold shadow-lg shadow-primary/20 bg-gradient-to-r from-primary to-primary/90 hover:to-primary active:scale-[0.98] transition-all">
-                            <Plus className="mr-2 h-6 w-6" /> Registrar Corrida
+                        <Button className="w-full h-12 text-base font-bold rounded-xl shadow-sm active:scale-[0.98] transition-all">
+                            <Plus className="mr-2 h-5 w-5" /> Registrar Corrida
                         </Button>
                     </DialogTrigger>
                     <DialogContent className="max-w-lg p-0 gap-0 bg-background border-border shadow-2xl rounded-xl overflow-hidden">
@@ -90,6 +92,9 @@ export function RunningDashboard({ runs }: { runs: RunWorkout[] }) {
                     </DialogContent>
                 </Dialog>
 
+                {/* Importação de arquivo (GPX/TCX/CSV) */}
+                <ImportRunsDialog />
+
                 {/* Card de Volume Total (Hero) */}
                 <Card className="relative overflow-hidden border-border/60 bg-card shadow-lg group">
                     {/* Background Decorativo */}
@@ -105,10 +110,10 @@ export function RunningDashboard({ runs }: { runs: RunWorkout[] }) {
                     </CardHeader>
                     <CardContent className="relative z-10 pt-4">
                         <div className="flex items-baseline gap-1 mb-6">
-                            <span className="text-6xl font-black tracking-tighter text-foreground">
+                            <span className="text-4xl font-bold tracking-tight text-foreground">
                                 {totalKm.toFixed(1)}
                             </span>
-                            <span className="text-xl font-bold text-muted-foreground">km</span>
+                            <span className="text-lg font-semibold text-muted-foreground">km</span>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-4">
@@ -141,10 +146,10 @@ export function RunningDashboard({ runs }: { runs: RunWorkout[] }) {
                             <div className="flex justify-between items-end">
                                 <div>
                                     <div className="flex items-baseline gap-1">
-                                        <span className="text-3xl font-black text-foreground tracking-tight">
+                                        <span className="text-3xl font-bold text-foreground tracking-tight">
                                             {bestRun.distance}
                                         </span>
-                                        <span className="text-sm font-bold text-muted-foreground">km</span>
+                                        <span className="text-sm font-semibold text-muted-foreground">km</span>
                                     </div>
                                     <p className="text-xs text-muted-foreground mt-1 font-medium">
                                         {format(new Date(bestRun.date), "d 'de' MMMM, yyyy", { locale: ptBR })}
@@ -173,7 +178,7 @@ export function RunningDashboard({ runs }: { runs: RunWorkout[] }) {
                     </CardHeader>
                     <CardContent className="h-[280px] w-full pt-6">
                         {chartData.length > 1 ? (
-                            <ResponsiveContainer width="100%" height="100%">
+                            <ChartContainer>
                                 <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                     <defs>
                                         <linearGradient id="colorKm" x1="0" y1="0" x2="0" y2="1">
@@ -228,7 +233,7 @@ export function RunningDashboard({ runs }: { runs: RunWorkout[] }) {
                                         activeDot={{ r: 6, fill: "hsl(var(--background))", stroke: "hsl(var(--primary))", strokeWidth: 2 }}
                                     />
                                 </AreaChart>
-                            </ResponsiveContainer>
+                            </ChartContainer>
                         ) : (
                             <div className="h-full flex flex-col items-center justify-center text-center px-4 space-y-2">
                                 <Activity className="h-8 w-8 text-muted-foreground/30" />
