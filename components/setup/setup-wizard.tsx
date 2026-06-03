@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useActionState } from "react";
+import Link from "next/link";
 import { setupSystem } from "@/app/actions/setup";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Sparkles, Loader2, RotateCcw } from "lucide-react";
+import { ArrowRight, Sparkles, Loader2, RotateCcw, AlertCircle, LogIn } from "lucide-react";
 import { toast } from "sonner";
 import { validatePasswordStrength } from "@/lib/password-policy";
 
@@ -43,9 +44,11 @@ interface SetupWizardProps {
 
 export function SetupWizard({ dbFromEnv = false }: SetupWizardProps) {
   const [step, setStep] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [restored, setRestored] = useState(false);
+
+  // Server Action via useActionState: erros voltam como estado (não 500 opaco).
+  const [actionState, formAction, isLoading] = useActionState(setupSystem, null);
 
   const [formData, setFormData] = useState<SetupFormData>({
     ...DEFAULT_FORM,
@@ -89,6 +92,14 @@ export function SetupWizard({ dbFromEnv = false }: SetupWizardProps) {
       /* ignore */
     }
   };
+
+  // Mostra o erro retornado pela Server Action (toast). O draft é preservado
+  // para o usuário corrigir e tentar de novo sem redigitar.
+  useEffect(() => {
+    if (actionState?.error) {
+      toast.error(actionState.error, { duration: 8000 });
+    }
+  }, [actionState]);
 
   const resetForm = () => {
     clearDraft();
@@ -155,11 +166,7 @@ export function SetupWizard({ dbFromEnv = false }: SetupWizardProps) {
       {/* --- CONTEÚDO DO FORMULÁRIO (Direita) --- */}
       <div className="flex-1 p-6 md:p-10 flex flex-col bg-card">
         <form
-          action={setupSystem}
-          onSubmit={() => {
-            setIsLoading(true);
-            clearDraft();
-          }}
+          action={formAction}
           className="flex-1 flex flex-col justify-between h-full"
         >
           {/* INPUTS OCULTOS: passam o state React para o FormData da Server Action */}
@@ -228,6 +235,23 @@ export function SetupWizard({ dbFromEnv = false }: SetupWizardProps) {
               {step === 4 && <StepReview formData={formData} dbFromEnv={dbFromEnv} />}
             </div>
           </div>
+
+          {/* ERRO DA INSTALAÇÃO (mensagem real, não 500 opaco) */}
+          {actionState?.error && (
+            <div className="mt-4 flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm animate-in fade-in slide-in-from-bottom-2">
+              <AlertCircle className="h-5 w-5 shrink-0 text-destructive mt-0.5" />
+              <div className="flex-1 space-y-2">
+                <p className="text-destructive font-medium leading-snug">{actionState.error}</p>
+                {actionState.existing && (
+                  <Link href="/login">
+                    <Button type="button" size="sm" variant="outline" className="gap-2">
+                      <LogIn className="h-3.5 w-3.5" /> Ir para o login
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* BOTÕES DE NAVEGAÇÃO */}
           <div className="flex justify-between pt-6 border-t border-border mt-auto">

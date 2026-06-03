@@ -62,8 +62,43 @@ function resolveProfileFromForm(formData: FormData): {
   return { profile: { mode: "local", databasePath: dbFilePath }, storagePath };
 }
 
-export async function setupSystem(formData: FormData) {
+/** Estado retornado para o wizard (useActionState). */
+export interface SetupState {
+  error?: string;
+  /** true quando o erro indica que já existe conta — wizard sugere /login. */
+  existing?: boolean;
+}
+
+/**
+ * Traduz erros técnicos (Turso/libSQL/fs) em mensagens acionáveis em pt-BR.
+ */
+function friendlyError(error: unknown, mode: "local" | "cloud"): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  const low = raw.toLowerCase();
+
+  if (mode === "cloud") {
+    if (low.includes("401") || low.includes("unauthor") || low.includes("jwt") || low.includes("token")) {
+      return "Falha de autenticação no Turso. Verifique o TURSO_AUTH_TOKEN (deve começar com 'eyJ…', não é a URL) nas variáveis de ambiente do servidor.";
+    }
+    if (low.includes("enotfound") || low.includes("getaddrinfo") || low.includes("fetch failed") || low.includes("econnrefused") || low.includes("url")) {
+      return "Não foi possível conectar ao banco Turso. Confira o TURSO_DATABASE_URL (formato libsql://...) e sua conexão.";
+    }
+  }
+
+  if (low.includes("baseline")) {
+    return "Arquivo de schema (baseline.sql) não encontrado no servidor. Problema de build/deploy.";
+  }
+  // Caso geral: devolve a mensagem original (já é informativa).
+  return raw;
+}
+
+export async function setupSystem(
+  _prevState: SetupState | null,
+  formData: FormData
+): Promise<SetupState> {
   let tempPrisma: PrismaClient | null = null;
+  // Default usado nas mensagens de erro antes de o perfil ser resolvido.
+  let mode: "local" | "cloud" = "local";
 
   try {
     console.log("🚀 Iniciando Setup Completo...");
@@ -75,6 +110,7 @@ export async function setupSystem(formData: FormData) {
     const { profile, storagePath } = envProfile
       ? { profile: envProfile, storagePath: "" }
       : resolveProfileFromForm(formData);
+    mode = profile.mode;
 
     // --- PARTE 2: CONEXÃO DIRETA + CRIAÇÃO DE SCHEMA ---
     // Cliente NOVO para o destino escolhido (ignora cache antigo). As tabelas
@@ -90,9 +126,10 @@ export async function setupSystem(formData: FormData) {
     if (existingUsers > 0) {
       setDbProfile(profile);
       await reconnectPrisma();
-      throw new Error(
-        "Já existe um banco do Life OS neste destino. Conexão restaurada — faça login com sua conta existente."
-      );
+      return {
+        existing: true,
+        error: "Já existe um banco do Life OS neste destino. Conexão restaurada — é só fazer login com sua conta.",
+      };
     }
 
     // --- PARTE 3: CRIAÇÃO DE DADOS ---
@@ -169,7 +206,7 @@ export async function setupSystem(formData: FormData) {
     await login(adminUser.id);
   } catch (error) {
     console.error("❌ Erro CRÍTICO no Setup:", error);
-    throw new Error(error instanceof Error ? error.message : "Falha desconhecida.");
+    return { error: friendlyError(error, mode) };
   } finally {
     if (tempPrisma) {
       await tempPrisma.$disconnect();
