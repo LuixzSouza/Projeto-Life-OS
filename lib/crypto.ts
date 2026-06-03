@@ -1,22 +1,33 @@
 // src/lib/crypto.ts
 import crypto from 'crypto';
+import { getOrCreateSecret } from './db-config';
 
 const ALGORITHM = 'aes-256-cbc';
 const IV_LENGTH = 16;
 
 /**
- * Chave primária: a configurada no .env (ENCRYPTION_KEY). É ela que cifra
- * TODOS os dados novos.
+ * Default histórico. Antes era usada para CIFRAR quando não havia ENCRYPTION_KEY
+ * — o que é inseguro em deploy público (a chave está versionada no repositório).
+ * Agora ela vive APENAS como chave legada de leitura, para decifrar dados que
+ * eventualmente foram gravados com ela. NUNCA é usada para cifrar dados novos.
  */
-const PRIMARY_KEY = process.env.ENCRYPTION_KEY || 'minha-chave-secreta-super-segura-32';
+const LEGACY_DEFAULT = 'minha-chave-secreta-super-segura-32';
+const LEGACY_KEYS = [LEGACY_DEFAULT];
 
 /**
- * Chaves legadas: segredos que JÁ podem ter cifrado dados existentes antes de
- * o usuário definir uma ENCRYPTION_KEY própria. Mantê-las aqui permite que o
- * decrypt continue lendo credenciais antigas (recuperação transparente).
- * NUNCA remova a default daqui sem antes re-criptografar o cofre.
+ * Chave primária (cifra TODOS os dados novos), resolvida de forma preguiçosa:
+ *   1. `process.env.ENCRYPTION_KEY` quando definida (obrigatória em produção/Vercel);
+ *   2. desktop/local sem .env → segredo forte auto-gerado e persistido no config;
+ *   3. serverless (Vercel) sem a env → `getOrCreateSecret` lança erro claro,
+ *      evitando cifrar o cofre com uma chave volátil/pública.
+ * Memoizada para não reprocessar a cada operação.
  */
-const LEGACY_KEYS = ['minha-chave-secreta-super-segura-32'];
+let cachedPrimaryKey: string | null = null;
+function getPrimaryKey(): string {
+  if (cachedPrimaryKey) return cachedPrimaryKey;
+  cachedPrimaryKey = process.env.ENCRYPTION_KEY?.trim() || getOrCreateSecret('ENCRYPTION_KEY');
+  return cachedPrimaryKey;
+}
 
 // AES-256 exige chave de exatamente 32 bytes. Normaliza qualquer segredo:
 // trunca se for maior, completa com zeros se for menor (evita "Invalid key length").
@@ -28,7 +39,7 @@ function normalizeKey(secret: string): string {
 function candidateKeys(): Buffer[] {
   const seen = new Set<string>();
   const keys: Buffer[] = [];
-  for (const secret of [PRIMARY_KEY, ...LEGACY_KEYS]) {
+  for (const secret of [getPrimaryKey(), ...LEGACY_KEYS]) {
     const norm = normalizeKey(secret);
     if (seen.has(norm)) continue;
     seen.add(norm);
@@ -42,7 +53,7 @@ const ENCRYPTED_RE = /^[0-9a-f]{32}:[0-9a-f]+$/i;
 
 export function encrypt(text: string): string {
   const iv = crypto.randomBytes(IV_LENGTH);
-  const cipher = crypto.createCipheriv(ALGORITHM, Buffer.from(normalizeKey(PRIMARY_KEY)), iv);
+  const cipher = crypto.createCipheriv(ALGORITHM, Buffer.from(normalizeKey(getPrimaryKey())), iv);
   const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
   return iv.toString('hex') + ':' + encrypted.toString('hex');
 }

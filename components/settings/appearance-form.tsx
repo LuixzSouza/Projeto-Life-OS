@@ -15,6 +15,7 @@ import { ProfileIdentityCard } from "@/components/settings/appearance/profile-id
 import { ThemePaletteCard } from "@/components/settings/appearance/theme-palette-card";
 import { AppearanceModeCard } from "@/components/settings/appearance/appearance-mode-card";
 import { RegionalCard } from "@/components/settings/appearance/regional-card";
+import { RoutineCard } from "@/components/settings/appearance/routine-card";
 import { BillingCard } from "@/components/settings/appearance/billing-card";
 
 interface AppearanceFormProps {
@@ -22,6 +23,9 @@ interface AppearanceFormProps {
   initialCurrency?: string | null;
   initialPixKey?: string | null;
   initialBusinessName?: string | null;
+  initialLanguage?: string | null;
+  initialWorkStart?: string | null;
+  initialWorkEnd?: string | null;
   userName?: string | null;
   userEmail?: string | null;
   userAvatar?: string | null;
@@ -33,6 +37,9 @@ export default function AppearanceForm({
   initialCurrency,
   initialPixKey,
   initialBusinessName,
+  initialLanguage,
+  initialWorkStart,
+  initialWorkEnd,
   userName,
   userEmail,
   userAvatar,
@@ -57,6 +64,9 @@ export default function AppearanceForm({
   const [currency, setCurrency] = useState(initialCurrency || "BRL");
   const [pixKey, setPixKey] = useState(initialPixKey || "");
   const [businessName, setBusinessName] = useState(initialBusinessName || "");
+  const [language, setLanguage] = useState(initialLanguage || "pt-BR");
+  const [workStart, setWorkStart] = useState(initialWorkStart || "09:00");
+  const [workEnd, setWorkEnd] = useState(initialWorkEnd || "18:00");
 
   const isPreset = THEME_PRESETS.some(c => c.name === themeColor);
 
@@ -132,6 +142,11 @@ export default function AppearanceForm({
     setIsLoading(true);
     formData.set("accentColor", themeColor);
     formData.set("currency", currency);
+    // Tema (claro/escuro) agora persiste no banco junto do perfil.
+    if (theme) formData.set("theme", theme);
+    formData.set("language", language);
+    formData.set("workStart", workStart);
+    formData.set("workEnd", workEnd);
 
     // Sempre persiste o estado atual (string vazia limpa a imagem no banco).
     formData.set("avatarUrl", avatarUrl || "");
@@ -187,6 +202,15 @@ export default function AppearanceForm({
       </div>
 
       <RegionalCard currency={currency} setCurrency={setCurrency} />
+
+      <RoutineCard
+        workStart={workStart}
+        setWorkStart={setWorkStart}
+        workEnd={workEnd}
+        setWorkEnd={setWorkEnd}
+        language={language}
+        setLanguage={setLanguage}
+      />
 
       <BillingCard
         pixKey={pixKey}

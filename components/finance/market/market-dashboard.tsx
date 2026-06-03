@@ -1,20 +1,122 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { MarketItem } from "@/lib/market-service";
+import { getMarketSnapshot, searchTickers, setWatchlist } from "@/app/(dashboard)/finance/actions";
+import type { TickerSuggestion } from "@/lib/ticker-utils";
+import { MARKET_POOL, pickRandom } from "@/lib/market-pool";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { 
-    TrendingUp, TrendingDown, Search, Activity, BarChart3, HelpCircle, Info 
+import {
+    TrendingUp, TrendingDown, Search, Activity, BarChart3, HelpCircle, RefreshCw, Star, Plus, Shuffle, Loader2, X
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { MarketDetailModal } from "./market-detail-modal";
 
-export function MarketDashboard({ data }: { data: MarketItem[] }) {
+const REFRESH_MS = 45000; // atualização automática a cada 45s
+
+export function MarketDashboard({ data: initialData, initialFavorites = [] }: { data: MarketItem[]; initialFavorites?: string[] }) {
+    const [data, setData] = useState<MarketItem[]>(initialData);
     const [search, setSearch] = useState("");
+    const [selected, setSelected] = useState<MarketItem | null>(null);
+    const [refreshing, setRefreshing] = useState(false);
+    const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
-    const filteredData = data.filter(item => 
+    // Favoritos (acompanhamento pessoal) — sincronizados no perfil (banco).
+    const [favorites, setFavorites] = useState<string[]>(initialFavorites);
+    const [favData, setFavData] = useState<MarketItem[]>([]);
+
+    // Painel de busca para acompanhar qualquer ativo.
+    const [addOpen, setAddOpen] = useState(false);
+    const [query, setQuery] = useState("");
+    const [suggestions, setSuggestions] = useState<TickerSuggestion[]>([]);
+    const [searching, setSearching] = useState(false);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Tickers da B3 atualmente exibidos (para o snapshot ao vivo manter a lista).
+    const stockTickers = useRef<string[]>(
+        initialData.filter((i) => ["STOCK", "FII", "ETF"].includes(i.type)).map((i) => i.ticker),
+    );
+
+    const refresh = useCallback(async () => {
+        setRefreshing(true);
+        try {
+            const fresh = await getMarketSnapshot(stockTickers.current);
+            if (fresh.length) { setData(fresh); setLastUpdated(new Date()); }
+        } finally {
+            setRefreshing(false);
+        }
+    }, []);
+
+    // Re-sorteia a lista de descoberta.
+    const discoverOthers = useCallback(async () => {
+        setRefreshing(true);
+        try {
+            const subset = pickRandom(MARKET_POOL, 18);
+            stockTickers.current = subset;
+            const fresh = await getMarketSnapshot(subset);
+            if (fresh.length) { setData(fresh); setLastUpdated(new Date()); }
+        } finally {
+            setRefreshing(false);
+        }
+    }, []);
+
+    // Favoritos são carregados do perfil (banco) via `initialFavorites` (props do servidor).
+    // Não usamos localStorage para manter sincronia entre dispositivos.
+
+    // Busca cotações dos favoritos.
+    useEffect(() => {
+        if (favorites.length === 0) { setFavData([]); return; }
+        let active = true;
+        const load = async () => {
+            const fresh = await getMarketSnapshot(favorites);
+            if (active) setFavData(fresh.filter((i) => favorites.includes(i.ticker)));
+        };
+        void load();
+        return () => { active = false; };
+    }, [favorites]);
+
+    // Polling automático enquanto a aba está visível.
+    useEffect(() => {
+        const id = setInterval(() => { if (!document.hidden) void refresh(); }, REFRESH_MS);
+        return () => clearInterval(id);
+    }, [refresh]);
+
+    // Busca com debounce para o painel "acompanhar ativo".
+    useEffect(() => {
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        const q = query.trim();
+        if (q.length < 1) { setSuggestions([]); setSearching(false); return; }
+        setSearching(true);
+        debounceRef.current = setTimeout(async () => {
+            const res = await searchTickers(q);
+            setSuggestions(res);
+            setSearching(false);
+        }, 350);
+        return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+    }, [query]);
+
+    const toggleFavorite = useCallback((ticker: string) => {
+        setFavorites((prev) => {
+            const next = prev.includes(ticker) ? prev.filter((t) => t !== ticker) : [...prev, ticker];
+            // Persiste no perfil (banco) — `setWatchlist` é idempotente (dedup + upsert).
+            void setWatchlist(next).catch(() => { /* falha silenciosa: estado local já refletiu */ });
+            return next;
+        });
+    }, []);
+
+    const favSet = useMemo(() => new Set(favorites), [favorites]);
+
+    // Lista final = favoritos primeiro, depois descoberta (sem duplicar).
+    const merged = useMemo(() => {
+        const favItems = favData.filter((i) => favSet.has(i.ticker));
+        const rest = data.filter((d) => !favSet.has(d.ticker));
+        return [...favItems, ...rest];
+    }, [favData, data, favSet]);
+
+    const filteredData = merged.filter(item =>
         item.name.toLowerCase().includes(search.toLowerCase()) || 
         item.ticker.toLowerCase().includes(search.toLowerCase())
     );
@@ -34,7 +136,7 @@ export function MarketDashboard({ data }: { data: MarketItem[] }) {
                 {/* Destaques do Topo */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     {data.filter(i => ['USD', 'BTC', 'CDI', 'IBOV'].includes(i.ticker) || i.ticker === 'IVVB11').slice(0, 4).map(item => (
-                        <MarketHighlightCard key={item.ticker} item={item} />
+                        <MarketHighlightCard key={item.ticker} item={item} onSelect={setSelected} isFav={favSet.has(item.ticker)} onToggleFav={toggleFavorite} />
                     ))}
                 </div>
 
@@ -49,16 +151,107 @@ export function MarketDashboard({ data }: { data: MarketItem[] }) {
                                     Acompanhe o valor atualizado de ações, fundos e moedas.
                                 </p>
                             </div>
-                            <div className="relative w-full sm:max-w-xs">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input 
-                                    placeholder="Buscar ativo (ex: PETR4)..." 
-                                    className="pl-9 bg-card border-border/60 h-10 transition-all focus-visible:ring-primary/20"
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                />
+                            <div className="flex items-center gap-2 w-full sm:w-auto">
+                                <div className="relative flex-1 sm:w-64">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        placeholder="Buscar ativo (ex: PETR4)..."
+                                        className="pl-9 bg-card border-border/60 h-10 transition-all focus-visible:ring-primary/20"
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                    />
+                                </div>
+                                <button
+                                    onClick={() => void refresh()}
+                                    disabled={refreshing}
+                                    title="Atualizar agora"
+                                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-border/60 bg-card text-muted-foreground transition-colors hover:text-primary hover:border-primary/30 disabled:opacity-50"
+                                >
+                                    <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+                                </button>
                             </div>
                         </div>
+
+                        <div className="flex flex-wrap items-center gap-3 -mt-2">
+                            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                <span className="relative flex h-2 w-2">
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
+                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                                </span>
+                                Ao vivo · {lastUpdated.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })} · auto 45s
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => void discoverOthers()}
+                                    disabled={refreshing}
+                                    className="flex items-center gap-1.5 rounded-lg bg-muted/60 px-3 py-1.5 text-xs font-bold text-foreground transition-colors hover:bg-muted disabled:opacity-50"
+                                >
+                                    <Shuffle className="h-3.5 w-3.5" /> Descobrir outras
+                                </button>
+                                <button
+                                    onClick={() => setAddOpen((v) => !v)}
+                                    className={cn("flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-colors",
+                                        addOpen ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary hover:bg-primary/20")}
+                                >
+                                    <Plus className="h-3.5 w-3.5" /> Acompanhar ativo
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Painel de busca para favoritar qualquer ativo */}
+                        {addOpen && (
+                            <div className="rounded-2xl border border-border/50 bg-card p-4 space-y-3">
+                                <div className="relative">
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
+                                    <Input
+                                        value={query}
+                                        onChange={(e) => setQuery(e.target.value)}
+                                        placeholder="Busque por nome ou código: Petrobras, PETR, Magalu, BTC…"
+                                        autoFocus
+                                        className="pl-9 rounded-xl"
+                                    />
+                                    {searching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground/50" />}
+                                </div>
+                                {suggestions.length > 0 && (
+                                    <div className="max-h-[220px] overflow-y-auto rounded-xl border border-border/40 divide-y divide-border/30">
+                                        {suggestions.map((s) => {
+                                            const fav = favSet.has(s.ticker);
+                                            return (
+                                                <div key={s.ticker} className="flex items-center gap-3 px-3 py-2.5">
+                                                    <div className="h-8 w-8 shrink-0 rounded-lg bg-muted/50 border border-border/40 flex items-center justify-center overflow-hidden">
+                                                        {s.logo
+                                                            // eslint-disable-next-line @next/next/no-img-element
+                                                            ? <img src={s.logo} alt="" className="h-full w-full object-contain" />
+                                                            : <span className="text-[10px] font-black text-muted-foreground">{s.ticker.slice(0, 2)}</span>}
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="font-bold text-sm text-foreground">{s.ticker}</p>
+                                                        <p className="text-[11px] text-muted-foreground truncate">{s.name}</p>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => toggleFavorite(s.ticker)}
+                                                        className={cn("flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-bold transition-colors",
+                                                            fav ? "bg-amber-500/15 text-amber-600 dark:text-amber-400" : "bg-primary/10 text-primary hover:bg-primary/20")}
+                                                    >
+                                                        <Star className={cn("h-3.5 w-3.5", fav && "fill-current")} /> {fav ? "Seguindo" : "Seguir"}
+                                                    </button>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                                {favorites.length > 0 && (
+                                    <div className="flex flex-wrap gap-1.5 pt-1">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mr-1 self-center">Seguindo:</span>
+                                        {favorites.map((t) => (
+                                            <button key={t} onClick={() => toggleFavorite(t)} className="flex items-center gap-1 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 px-2 py-1 text-xs font-bold hover:bg-amber-500/20 transition-colors">
+                                                {t} <X className="h-3 w-3" />
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         <Tabs defaultValue="all" className="w-full">
                             <TabsList className="bg-muted/50 p-1 mb-6 rounded-xl border border-border/40 w-full flex justify-start overflow-x-auto">
@@ -71,19 +264,21 @@ export function MarketDashboard({ data }: { data: MarketItem[] }) {
                                 <TabsTrigger value="macro" className="rounded-lg flex-1 min-w-[120px]">Câmbio & Macro</TabsTrigger>
                             </TabsList>
 
-                            <TabsContent value="all"><MarketGrid items={getFilteredByType('ALL')} /></TabsContent>
-                            <TabsContent value="stocks"><MarketGrid items={getFilteredByType('STOCKS')} /></TabsContent>
-                            <TabsContent value="fiis"><MarketGrid items={getFilteredByType('FIIS')} /></TabsContent>
-                            <TabsContent value="macro"><MarketGrid items={getFilteredByType('MACRO')} /></TabsContent>
+                            <TabsContent value="all"><MarketGrid items={getFilteredByType('ALL')} onSelect={setSelected} favSet={favSet} onToggleFav={toggleFavorite} /></TabsContent>
+                            <TabsContent value="stocks"><MarketGrid items={getFilteredByType('STOCKS')} onSelect={setSelected} favSet={favSet} onToggleFav={toggleFavorite} /></TabsContent>
+                            <TabsContent value="fiis"><MarketGrid items={getFilteredByType('FIIS')} onSelect={setSelected} favSet={favSet} onToggleFav={toggleFavorite} /></TabsContent>
+                            <TabsContent value="macro"><MarketGrid items={getFilteredByType('MACRO')} onSelect={setSelected} favSet={favSet} onToggleFav={toggleFavorite} /></TabsContent>
                         </Tabs>
                     </div>
 
                     {/* Sidebar com Top Movers */}
                     <div className="w-full lg:w-80 space-y-6">
-                        <TopMoversCard data={data} type="high" title="Maiores Altas" description="Ativos que mais valorizaram hoje." />
-                        <TopMoversCard data={data} type="low" title="Maiores Baixas" description="Ativos que mais desvalorizaram hoje." />
+                        <TopMoversCard data={data} type="high" title="Maiores Altas" description="Ativos que mais valorizaram hoje." onSelect={setSelected} />
+                        <TopMoversCard data={data} type="low" title="Maiores Baixas" description="Ativos que mais desvalorizaram hoje." onSelect={setSelected} />
                     </div>
                 </div>
+
+                <MarketDetailModal item={selected} onClose={() => setSelected(null)} />
             </div>
         </TooltipProvider>
     );
@@ -106,9 +301,21 @@ function InfoTooltip({ text }: { text: string }) {
 
 // --- COMPONENTES VISUAIS RICOS ---
 
-function MarketHighlightCard({ item }: { item: MarketItem }) {
+function FavStar({ active, onClick }: { active: boolean; onClick: () => void }) {
     return (
-        <Card className="border-border/60 shadow-sm hover:border-primary/30 transition-all bg-gradient-to-br from-card to-muted/20 group">
+        <button
+            onClick={(e) => { e.stopPropagation(); onClick(); }}
+            title={active ? "Deixar de seguir" : "Seguir este ativo"}
+            className={cn("rounded-lg p-1.5 transition-colors", active ? "text-amber-500" : "text-muted-foreground/40 hover:text-amber-500")}
+        >
+            <Star className={cn("h-4 w-4", active && "fill-current")} />
+        </button>
+    );
+}
+
+function MarketHighlightCard({ item, onSelect, isFav, onToggleFav }: { item: MarketItem; onSelect: (i: MarketItem) => void; isFav: boolean; onToggleFav: (t: string) => void }) {
+    return (
+        <Card onClick={() => onSelect(item)} className="border-border/60 shadow-sm hover:border-primary/30 transition-all bg-gradient-to-br from-card to-muted/20 group cursor-pointer">
             <CardContent className="p-5">
                 <div className="flex justify-between items-start mb-3">
                     <div className="flex items-center gap-3">
@@ -124,7 +331,10 @@ function MarketHighlightCard({ item }: { item: MarketItem }) {
                             <p className="text-sm font-semibold text-foreground truncate max-w-[100px]" title={item.name}>{item.name}</p>
                         </div>
                     </div>
-                    <BadgeVariation value={item.variation} />
+                    <div className="flex items-center gap-1">
+                        {["STOCK", "FII", "ETF"].includes(item.type) && <FavStar active={isFav} onClick={() => onToggleFav(item.ticker)} />}
+                        <BadgeVariation value={item.variation} />
+                    </div>
                 </div>
                 <div className="mt-4 flex items-baseline justify-between">
                     <span className="text-2xl font-mono font-bold tracking-tight text-foreground">{item.displayValue}</span>
@@ -135,7 +345,7 @@ function MarketHighlightCard({ item }: { item: MarketItem }) {
     )
 }
 
-function MarketGrid({ items }: { items: MarketItem[] }) {
+function MarketGrid({ items, onSelect, favSet, onToggleFav }: { items: MarketItem[]; onSelect: (i: MarketItem) => void; favSet: Set<string>; onToggleFav: (t: string) => void }) {
     if (items.length === 0) return (
         <div className="flex flex-col items-center justify-center py-16 text-center border-2 border-dashed border-border/50 rounded-xl bg-muted/5">
             <Search className="h-8 w-8 text-muted-foreground/40 mb-3" />
@@ -147,7 +357,7 @@ function MarketGrid({ items }: { items: MarketItem[] }) {
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {items.map(item => (
-                <div key={item.ticker} className="group relative flex flex-col p-4 rounded-xl border border-border/50 bg-card hover:bg-muted/30 hover:shadow-md hover:border-primary/20 transition-all duration-300">
+                <div key={item.ticker} onClick={() => onSelect(item)} className="group relative flex flex-col p-4 rounded-xl border border-border/50 bg-card hover:bg-muted/30 hover:shadow-md hover:border-primary/20 transition-all duration-300 cursor-pointer">
                     
                     {/* Header do Card */}
                     <div className="flex items-center justify-between mb-4">
@@ -166,7 +376,10 @@ function MarketGrid({ items }: { items: MarketItem[] }) {
                                 <p className="text-xs text-muted-foreground truncate max-w-[140px]" title={item.name}>{item.name}</p>
                             </div>
                         </div>
-                        <BadgeVariation value={item.variation} size="sm" />
+                        <div className="flex items-center gap-1">
+                            {["STOCK", "FII", "ETF"].includes(item.type) && <FavStar active={favSet.has(item.ticker)} onClick={() => onToggleFav(item.ticker)} />}
+                            <BadgeVariation value={item.variation} size="sm" />
+                        </div>
                     </div>
 
                     {/* Preço Principal */}
@@ -208,7 +421,7 @@ function MarketGrid({ items }: { items: MarketItem[] }) {
     )
 }
 
-function TopMoversCard({ data, type, title, description }: { data: MarketItem[], type: "high" | "low", title: string, description: string }) {
+function TopMoversCard({ data, type, title, description, onSelect }: { data: MarketItem[], type: "high" | "low", title: string, description: string, onSelect: (i: MarketItem) => void }) {
     const sorted = data
         .filter(i => i.type !== 'INDEX' && i.variation !== 0)
         .sort((a, b) => type === "high" ? b.variation - a.variation : a.variation - b.variation)
@@ -230,7 +443,7 @@ function TopMoversCard({ data, type, title, description }: { data: MarketItem[],
             <CardContent className="pt-0">
                 <div className="divide-y divide-border/30">
                     {sorted.map(item => (
-                        <div key={item.ticker} className="flex items-center justify-between py-3 text-sm group hover:bg-white/50 dark:hover:bg-black/20 px-4 -mx-4 transition-colors">
+                        <div key={item.ticker} onClick={() => onSelect(item)} className="flex items-center justify-between py-3 text-sm group hover:bg-white/50 dark:hover:bg-black/20 px-4 -mx-4 transition-colors cursor-pointer">
                             <div className="flex items-center gap-3">
                                 {item.logoUrl ? (
                                     <img src={item.logoUrl} className="w-5 h-5 rounded-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt="" />

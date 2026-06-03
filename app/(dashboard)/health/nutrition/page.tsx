@@ -4,6 +4,7 @@ import { Utensils } from "lucide-react";
 import { Metadata } from "next";
 import { HealthActions } from "@/components/health/health-actions";
 import { getCurrentUserId } from "@/lib/auth";
+import { getHealthGoals } from "@/app/(dashboard)/health/actions";
 import { suggestDailyGoal } from "@/lib/nutrition-calc";
 import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
 import { BackLink } from "@/components/ui/back-link";
@@ -56,6 +57,7 @@ export default async function NutritionPage(props: PageProps) {
 
   let suggestedGoal: number | null = null;
   let estimatedTdee: number | null = null;
+  let calorieOverride: number | null = null;
   let userName: string | undefined;
 
   let selectedDate = new Date();
@@ -125,6 +127,9 @@ export default async function NutritionPage(props: PageProps) {
     }
     userName = currentUser?.name ?? undefined;
 
+    // Override manual da meta calórica (centralizado no perfil/banco).
+    calorieOverride = (await getHealthGoals()).calorieGoalOverride;
+
     // Serialização Segura (Histórico)
     serializedDayMeals = dayMeals.map(m => ({
       id: m.id,
@@ -188,6 +193,7 @@ export default async function NutritionPage(props: PageProps) {
             mealPlan={serializedMealPlan}
             suggestedGoal={suggestedGoal}
             tdee={estimatedTdee}
+            calorieOverride={calorieOverride}
             userName={userName}
         />
       </PageContainer>

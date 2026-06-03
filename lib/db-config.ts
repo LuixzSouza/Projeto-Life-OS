@@ -134,13 +134,35 @@ export function isSystemInstalled(): boolean {
 // =========================================================
 
 /**
- * Retorna um segredo (ex.: JWT_SECRET) priorizando `process.env`.
- * Em builds desktop sem .env, gera um valor forte na 1ª vez e o persiste
- * no config, garantindo que sessões continuem válidas entre reinícios.
+ * Indica se estamos em um ambiente serverless de filesystem efêmero (ex.: Vercel),
+ * onde NÃO é possível gerar e persistir um segredo estável: cada cold start teria
+ * um valor novo, invalidando sessões (JWT) e tornando ilegível o cofre (ENCRYPTION).
+ * Sinais: a flag automática `VERCEL` ou o uso de banco na nuvem (TURSO_*).
+ */
+function isEphemeralServerless(): boolean {
+  return process.env.VERCEL === "1" || !!process.env.TURSO_DATABASE_URL;
+}
+
+/**
+ * Retorna um segredo (ex.: JWT_SECRET, ENCRYPTION_KEY) priorizando `process.env`.
+ * Em builds desktop sem .env, gera um valor forte na 1ª vez e o persiste no config,
+ * garantindo estabilidade entre reinícios.
+ *
+ * Em deploy serverless (Vercel) SEM a env definida, lança erro claro em vez de
+ * gerar um segredo volátil — porque um valor que muda a cada invocação quebraria
+ * o login e a leitura do cofre de chaves de forma silenciosa e perigosa.
  */
 export function getOrCreateSecret(name: string): string {
-  const fromEnv = process.env[name];
+  const fromEnv = process.env[name]?.trim();
   if (fromEnv) return fromEnv;
+
+  if (isEphemeralServerless()) {
+    throw new Error(
+      `${name} não está definido. Em deploy serverless (Vercel) o filesystem é efêmero ` +
+      `e não permite gerar um segredo estável — defina ${name} nas variáveis de ambiente. ` +
+      `Gere um valor forte com: node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"`
+    );
+  }
 
   const config = readConfig();
   const existing = config.secrets?.[name];

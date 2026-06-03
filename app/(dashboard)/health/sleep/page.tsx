@@ -4,6 +4,7 @@ import { Moon } from "lucide-react";
 import { Metadata } from "next";
 import { HealthActions } from "@/components/health/health-actions";
 import { getCurrentUserId } from "@/lib/auth";
+import { getHealthGoals } from "@/app/(dashboard)/health/actions";
 import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
 import { BackLink } from "@/components/ui/back-link";
 import { ErrorState } from "@/components/ui/error-state";
@@ -24,6 +25,7 @@ interface SerializedSleepData {
 
 export default async function SleepPage() {
   let serializedData: SerializedSleepData[] = [];
+  let sleepGoal: number | null = null;
   let hasError = false;
 
   try {
@@ -47,6 +49,9 @@ export default async function SleepPage() {
       date: item.date.toISOString(),
       value: item.value,
     }));
+
+    // Meta de sono centralizada no perfil (banco).
+    sleepGoal = (await getHealthGoals()).sleepGoalHours;
 
   } catch (error) {
     console.error("Critical Error in SleepPage:", error);
@@ -78,7 +83,7 @@ export default async function SleepPage() {
       </PageHeader>
 
       <PageContainer>
-        <SleepDashboard data={serializedData} />
+        <SleepDashboard data={serializedData} initialGoal={sleepGoal} />
       </PageContainer>
     </PageShell>
   );

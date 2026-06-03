@@ -18,8 +18,8 @@ import { SleepInsightCard } from "./sleep-insight-card";
 import { SleepHistoryCard } from "./sleep-history-card";
 import { BedtimeCalculator } from "./bedtime-calculator";
 
-export function SleepDashboard({ data }: { data: SleepEntry[] }) {
-  const [goal, setGoal] = useSleepGoal();
+export function SleepDashboard({ data, initialGoal }: { data: SleepEntry[]; initialGoal?: number | null }) {
+  const [goal, setGoal] = useSleepGoal(initialGoal);
 
   const insights = useMemo(() => computeSleepInsights(data, goal), [data, goal]);
 

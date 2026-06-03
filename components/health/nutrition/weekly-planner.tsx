@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,7 @@ import {
   Flame, Target, UtensilsCrossed, CheckCircle2, Sparkles, Wand2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { clearDayPlan, copyDayPlan } from "@/app/(dashboard)/health/actions";
+import { clearDayPlan, copyDayPlan, setCalorieGoalOverride } from "@/app/(dashboard)/health/actions";
 import { MacroEducation } from "./macro-education";
 import { ShoppingListDialog } from "./shopping-list-dialog";
 import { PrintMealPlanButton } from "./print-meal-plan-button";
@@ -31,44 +31,24 @@ import { MealSlotDialog } from "./meal-slot-dialog";
 export type { MealPlanSlot } from "./weekly-planner-types";
 import type { MealPlanSlot } from "./weekly-planner-types";
 
-const GOAL_STORAGE_KEY = "lifeos:nutrition:dailyGoal";
 const DEFAULT_GOAL = 2000;
 
-// --- Store do override manual da meta (localStorage, privacy-first) ---
-// null = usar a meta sugerida automaticamente pelo perfil corporal.
-// useSyncExternalStore evita mismatch de hidratação sem setState em efeito.
-let goalListeners: Array<() => void> = [];
-
-function readOverride(): number | null {
-  if (typeof window === "undefined") return null;
-  const stored = localStorage.getItem(GOAL_STORAGE_KEY);
-  if (stored === null || stored === "") return null;
-  const n = Number(stored);
-  return Number.isFinite(n) && n > 0 ? n : null;
-}
-
-function notifyGoal() {
-  goalListeners.forEach((l) => l());
-}
-
-function subscribeGoal(cb: () => void) {
-  goalListeners.push(cb);
-  return () => { goalListeners = goalListeners.filter((l) => l !== cb); };
-}
-
-function useGoalOverride() {
-  const override = useSyncExternalStore(subscribeGoal, readOverride, () => null);
+// --- Override manual da meta calórica (centralizado no perfil/banco) ---
+// null = usar a meta sugerida automaticamente pelo perfil corporal (TDEE).
+// Valor inicial vem do servidor; cada alteração persiste via server action —
+// sincroniza entre dispositivos (antes vivia no localStorage por dispositivo).
+function useGoalOverride(initial: number | null) {
+  const [override, setOverrideState] = useState<number | null>(initial);
 
   const setOverride = (value: number) => {
-    if (typeof window === "undefined") return;
-    localStorage.setItem(GOAL_STORAGE_KEY, String(Math.max(0, Math.round(value || 0))));
-    notifyGoal();
+    const safe = Math.max(0, Math.round(value || 0));
+    setOverrideState(safe); // otimista
+    void setCalorieGoalOverride(safe).catch(() => { /* estado local mantido */ });
   };
 
   const clearOverride = () => {
-    if (typeof window === "undefined") return;
-    localStorage.removeItem(GOAL_STORAGE_KEY);
-    notifyGoal();
+    setOverrideState(null);
+    void setCalorieGoalOverride(null).catch(() => { /* estado local mantido */ });
   };
 
   return { override, setOverride, clearOverride };
@@ -162,13 +142,15 @@ interface WeeklyPlannerProps {
   suggestedGoal?: number | null;
   /** Gasto energético estimado (para exibir no PDF/UI). */
   tdee?: number | null;
+  /** Override manual da meta calórica salvo no perfil (null = automático). */
+  initialOverride?: number | null;
   userName?: string;
 }
 
-export function WeeklyPlanner({ initialData, suggestedGoal = null, tdee = null, userName }: WeeklyPlannerProps) {
+export function WeeklyPlanner({ initialData, suggestedGoal = null, tdee = null, initialOverride = null, userName }: WeeklyPlannerProps) {
   const [activeDayIndex, setActiveDayIndex] = useState(0);
   const [view, setView] = useState<"day" | "week">("day");
-  const { override, setOverride, clearOverride } = useGoalOverride();
+  const { override, setOverride, clearOverride } = useGoalOverride(initialOverride);
 
   // Meta efetiva: override manual > sugestão do perfil > padrão.
   const goal = override ?? suggestedGoal ?? DEFAULT_GOAL;

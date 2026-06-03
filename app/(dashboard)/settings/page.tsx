@@ -207,6 +207,9 @@ export default async function SettingsPage() {
                         initialCurrency={settings?.currency}
                         initialPixKey={settings?.pixKey}
                         initialBusinessName={settings?.businessName}
+                        initialLanguage={settings?.language}
+                        initialWorkStart={settings?.workStart}
+                        initialWorkEnd={settings?.workEnd}
                         userName={user?.name}
                         userEmail={user?.email} 
                         userAvatar={user?.avatarUrl} 

@@ -76,6 +76,7 @@ model User {
   backupLogs        BackupLog[]
   challenges        Challenge[]
   challengeCheckins ChallengeCheckin[]
+  investmentHoldings InvestmentHolding[]
 
   // --- Tecido conectivo central (cross-módulo) ---
   tags          Tag[]
@@ -266,6 +267,7 @@ model LearningGoal {
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  deletedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -516,7 +518,12 @@ model Meeting {
   title    String
   rawNotes String  @default("")
   summary  String?
-  image    String?
+  image    String? // legado: 1ª imagem (compat). Galeria completa fica em `images`.
+  images   String? // JSON: array de data URLs (anexos da reunião)
+
+  participants String? // JSON: array de nomes dos participantes
+  tags         String? // JSON: array de etiquetas
+  decisions    String? // JSON: array de decisões destacadas
 
   projectId String?
   project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
@@ -608,6 +615,25 @@ model Portfolio {
 
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Posição da carteira de investimentos do usuário (ações, FIIs, ETFs, cripto).
+// O preço atual é buscado ao vivo via brapi/AwesomeAPI; aqui guardamos só
+// quantidade e preço médio de compra (cost basis).
+model InvestmentHolding {
+  id        String   @id @default(uuid())
+  ticker    String // ex.: PETR4, MXRF11, IVVB11, BTC
+  type      String   @default("STOCK") // STOCK | FII | ETF | CRYPTO
+  quantity  Decimal
+  avgPrice  Decimal // preço médio de compra (custo)
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // =========================================================
@@ -844,9 +870,15 @@ model Settings {
   googleBooksApiKey String?
   pluggyClientId    String?
   pluggySecret      String?
+  brapiToken        String? // brapi.dev — cotações da B3 (ações/FIIs/ETFs). Token grátis.
+  marketWatchlist   String? // JSON: tickers favoritados no Terminal de Mercado
 
   // Nutrição: busca online de alimentos (Open Food Facts — gratuita, sem chave)
   foodApiEnabled Boolean @default(true)
+
+  // Metas de saúde (centralizadas no perfil — sincronizam entre dispositivos)
+  sleepGoalHours      Float? // meta de sono em horas/noite (ex.: 8). null = padrão do sistema
+  calorieGoalOverride Int?   // override manual da meta calórica diária. null = usar sugestão do perfil (TDEE)
 
   // Localização de dados (Cuidado com caminhos absolutos como D:/ se for rodar em Linux/Docker)
   storagePath String? @default("D:/LifeOS_Data")

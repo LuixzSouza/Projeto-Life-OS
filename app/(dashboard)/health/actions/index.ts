@@ -7,3 +7,4 @@ export * from "./nutrition";
 export * from "./body";
 export * from "./challenge";
 export * from "./food-api";
+export * from "./goals";

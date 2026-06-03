@@ -1,33 +1,20 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useState } from "react";
 import { DEFAULT_SLEEP_GOAL } from "@/lib/sleep-math";
+import { setSleepGoal as persistSleepGoal } from "@/app/(dashboard)/health/actions";
 
-const KEY = "lifeos:sleep:goal";
+// Meta de sono centralizada no perfil (banco). O valor inicial chega do
+// servidor (`initial`) e cada alteração persiste via server action — sincroniza
+// entre dispositivos e sobrevive à limpeza de cache (antes vivia no localStorage).
+export function useSleepGoal(initial?: number | null): [number, (v: number) => void] {
+  const [goal, setGoalState] = useState<number>(initial ?? DEFAULT_SLEEP_GOAL);
 
-// Store local da meta de sono (privacy-first). useSyncExternalStore evita
-// mismatch de hidratação sem setState dentro de efeito.
-let listeners: Array<() => void> = [];
-
-function read(): number {
-  if (typeof window === "undefined") return DEFAULT_SLEEP_GOAL;
-  const v = localStorage.getItem(KEY);
-  const n = v ? Number(v) : NaN;
-  return Number.isFinite(n) && n > 0 && n <= 14 ? n : DEFAULT_SLEEP_GOAL;
-}
-
-function subscribe(cb: () => void) {
-  listeners.push(cb);
-  return () => { listeners = listeners.filter(l => l !== cb); };
-}
-
-export function useSleepGoal(): [number, (v: number) => void] {
-  const goal = useSyncExternalStore(subscribe, read, () => DEFAULT_SLEEP_GOAL);
   const setGoal = (v: number) => {
-    if (typeof window === "undefined") return;
     const safe = Math.max(4, Math.min(14, Math.round((v || DEFAULT_SLEEP_GOAL) * 2) / 2)); // passo de 0,5h
-    localStorage.setItem(KEY, String(safe));
-    listeners.forEach(l => l());
+    setGoalState(safe); // otimista — UI responde na hora
+    void persistSleepGoal(safe).catch(() => { /* falha silenciosa: estado local mantido */ });
   };
+
   return [goal, setGoal];
 }

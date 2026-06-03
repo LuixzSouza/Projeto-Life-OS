@@ -63,39 +63,72 @@ export async function updateAISettings(formData: FormData) {
 // ============================================================================
 // UPDATE SETTINGS (PERFIL)
 // ============================================================================
+// Valores aceitos para campos restritos (defesa contra dados arbitrários no form).
+const VALID_THEMES = ["light", "dark", "system"] as const;
+const VALID_LANGUAGES = ["pt-BR", "en-US", "es-ES"] as const;
+const HHMM_RE = /^([01]\d|2[0-3]):[0-5]\d$/; // HH:MM 24h
+
 export async function updateSettings(formData: FormData) {
-    const name = formData.get("name") as string;
-    const email = formData.get("email") as string;
-    const bio = formData.get("bio") as string;
-    const avatarUrl = formData.get("avatarUrl") as string;
-    const accentColor = formData.get("accentColor") as string;
-    const coverUrl = formData.get("coverUrl") as string;
-    // Moeda (Regional). Só sobrescreve se o form enviar o campo.
-    const currency = (formData.get("currency") as string) || undefined;
-    // Cobrança (Negócios). Campo vazio limpa; ausência do campo mantém.
-    const pixKey = formData.has("pixKey") ? ((formData.get("pixKey") as string)?.trim() || null) : undefined;
-    const businessName = formData.has("businessName") ? ((formData.get("businessName") as string)?.trim() || null) : undefined;
+    try {
+        const name = formData.get("name") as string;
+        const email = formData.get("email") as string;
+        const bio = formData.get("bio") as string;
+        const avatarUrl = formData.get("avatarUrl") as string;
+        const accentColor = formData.get("accentColor") as string;
+        const coverUrl = formData.get("coverUrl") as string;
+        // Moeda (Regional). Só sobrescreve se o form enviar o campo.
+        const currency = (formData.get("currency") as string) || undefined;
+        // Cobrança (Negócios). Campo vazio limpa; ausência do campo mantém.
+        const pixKey = formData.has("pixKey") ? ((formData.get("pixKey") as string)?.trim() || null) : undefined;
+        const businessName = formData.has("businessName") ? ((formData.get("businessName") as string)?.trim() || null) : undefined;
 
-    const userId = await requireUserId();
+        // Tema (claro/escuro/sistema) — persistido no banco para sincronizar entre
+        // dispositivos e ser incluído em backups/exportação (antes ficava órfão).
+        const themeRaw = formData.get("theme") as string | null;
+        const theme = themeRaw && (VALID_THEMES as readonly string[]).includes(themeRaw) ? themeRaw : undefined;
 
-    await prisma.user.update({
-        where: { id: userId },
-        data: { name, email, bio, avatarUrl, coverUrl }
-    });
+        // Idioma — só grava se enviado e válido.
+        const languageRaw = formData.get("language") as string | null;
+        const language = languageRaw && (VALID_LANGUAGES as readonly string[]).includes(languageRaw) ? languageRaw : undefined;
 
-    const billingData = {
-        ...(pixKey !== undefined ? { pixKey } : {}),
-        ...(businessName !== undefined ? { businessName } : {}),
-    };
+        // Horário de trabalho (usado na Agenda/Dashboard). Valida formato HH:MM.
+        const workStartRaw = formData.get("workStart") as string | null;
+        const workEndRaw = formData.get("workEnd") as string | null;
+        const workStart = workStartRaw && HHMM_RE.test(workStartRaw) ? workStartRaw : undefined;
+        const workEnd = workEndRaw && HHMM_RE.test(workEndRaw) ? workEndRaw : undefined;
 
-    await prisma.settings.upsert({
-        where: { userId },
-        update: { accentColor, ...(currency ? { currency } : {}), ...billingData },
-        create: { userId, accentColor, ...(currency ? { currency } : {}), ...billingData }
-    });
+        const userId = await requireUserId();
 
-    revalidatePath("/settings");
-    return { success: true };
+        await prisma.user.update({
+            where: { id: userId },
+            data: { name, email, bio, avatarUrl, coverUrl }
+        });
+
+        // Monta só os campos efetivamente enviados (undefined = não mexe).
+        const settingsData = {
+            accentColor,
+            ...(currency ? { currency } : {}),
+            ...(theme ? { theme } : {}),
+            ...(language ? { language } : {}),
+            ...(workStart ? { workStart } : {}),
+            ...(workEnd ? { workEnd } : {}),
+            ...(pixKey !== undefined ? { pixKey } : {}),
+            ...(businessName !== undefined ? { businessName } : {}),
+        };
+
+        await prisma.settings.upsert({
+            where: { userId },
+            update: settingsData,
+            create: { userId, ...settingsData }
+        });
+
+        revalidatePath("/settings");
+        revalidatePath("/");
+        return { success: true };
+    } catch (error) {
+        console.error("Erro ao salvar configurações de perfil:", error);
+        return { success: false, message: "Erro ao salvar no banco de dados." };
+    }
 }
 
 // ============================================================================
@@ -113,6 +146,7 @@ export async function updateApiKeys(formData: FormData) {
         const googleBooksApiKey = formData.get("googleBooksApiKey") as string;
         const pluggyClientId = formData.get("pluggyClientId") as string;
         const pluggySecret = formData.get("pluggySecret") as string;
+        const brapiToken = formData.get("brapiToken") as string;
 
         // Toggle da busca online de alimentos (Open Food Facts). Default: habilitado.
         const foodApiEnabled = formData.get("foodApiEnabled") !== "false";
@@ -127,6 +161,7 @@ export async function updateApiKeys(formData: FormData) {
             googleBooksApiKey: encryptKey(googleBooksApiKey),
             pluggyClientId: encryptKey(pluggyClientId),
             pluggySecret: encryptKey(pluggySecret),
+            brapiToken: encryptKey(brapiToken),
             foodApiEnabled,
         }
 

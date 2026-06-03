@@ -54,10 +54,11 @@ interface NutritionDashboardProps {
     mealPlan?: SerializedMealPlan[]; // Usando a tipagem correta agora
     suggestedGoal?: number | null;   // Meta calórica sugerida pelo perfil (TDEE)
     tdee?: number | null;            // Gasto energético estimado
+    calorieOverride?: number | null; // Override manual salvo no perfil (null = automático)
     userName?: string;
 }
 
-export function NutritionDashboard({ initialDate, meals, weekData, mealPlan = [], suggestedGoal = null, tdee = null, userName }: NutritionDashboardProps) {
+export function NutritionDashboard({ initialDate, meals, weekData, mealPlan = [], suggestedGoal = null, tdee = null, calorieOverride = null, userName }: NutritionDashboardProps) {
     const router = useRouter();
     const [date, setDate] = useState<Date | undefined>(new Date(initialDate));
     
@@ -241,6 +242,7 @@ export function NutritionDashboard({ initialDate, meals, weekData, mealPlan = []
                         initialData={mealPlan}
                         suggestedGoal={suggestedGoal}
                         tdee={tdee}
+                        initialOverride={calorieOverride}
                         userName={userName}
                     />
                 </TabsContent>
