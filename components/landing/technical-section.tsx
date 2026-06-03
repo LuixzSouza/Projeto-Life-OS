@@ -21,20 +21,20 @@ const FeatureCard = ({ icon: Icon, title, desc, color, delay }: FeatureProps) =>
         viewport={{ once: true }}
         transition={{ duration: 0.5, delay }}
         whileHover={{ y: -5 }}
-        className="group relative p-6 rounded-2xl bg-zinc-900/40 border border-white/5 overflow-hidden hover:bg-zinc-900/60 transition-colors"
+        className="group relative p-6 rounded-2xl bg-card/40 border border-border overflow-hidden hover:bg-card/60 transition-colors"
     >
         {/* Glow de Fundo no Hover */}
         <div className={cn("absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity duration-500 bg-gradient-to-br", color)} />
         
         {/* Ícone com fundo colorido */}
-        <div className={cn("inline-flex p-3 rounded-xl bg-zinc-800/50 mb-4 text-white group-hover:scale-110 transition-transform duration-300 ring-1 ring-white/10", color.replace("from-", "text-").split(" ")[0])}>
+        <div className={cn("inline-flex p-3 rounded-xl bg-muted/50 mb-4 text-foreground group-hover:scale-110 transition-transform duration-300 ring-1 ring-white/10", color.replace("from-", "text-").split(" ")[0])}>
             <Icon className="h-6 w-6" />
         </div>
         
-        <h3 className="text-lg font-bold text-white mb-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-zinc-400 transition-all">
+        <h3 className="text-lg font-bold text-foreground mb-2 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-zinc-400 transition-all">
             {title}
         </h3>
-        <p className="text-sm text-zinc-400 leading-relaxed group-hover:text-zinc-300">
+        <p className="text-sm text-muted-foreground leading-relaxed group-hover:text-foreground">
             {desc}
         </p>
     </motion.div>
@@ -42,7 +42,7 @@ const FeatureCard = ({ icon: Icon, title, desc, color, delay }: FeatureProps) =>
 
 export default function TechnicalSection() {
     return (
-        <section id="privacy" className="py-32 px-6 bg-[#09090b] border-t border-white/5 relative overflow-hidden">
+        <section id="privacy" className="py-32 px-6 bg-card border-t border-border relative overflow-hidden">
             
             {/* Background Effects */}
             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-[500px] bg-emerald-500/5 blur-[120px] rounded-full pointer-events-none" />
@@ -62,11 +62,11 @@ export default function TechnicalSection() {
                         <ShieldCheck className="h-3 w-3" /> Arquitetura Blindada
                     </motion.div>
                     
-                    <h2 className="text-4xl md:text-5xl font-bold mb-6 text-white tracking-tight">
+                    <h2 className="text-4xl md:text-5xl font-bold mb-6 text-foreground tracking-tight">
                         Seus dados, <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-500">suas regras.</span>
                     </h2>
                     
-                    <p className="text-lg text-zinc-400 leading-relaxed">
+                    <p className="text-lg text-muted-foreground leading-relaxed">
                         Esqueça a nuvem pública. O <strong>Life OS</strong> utiliza uma arquitetura de &quot;Cofre Local&quot;. 
                         Tudo fica gravado fisicamente no seu dispositivo, garantindo que ninguém além de você tenha acesso.
                     </p>
@@ -108,27 +108,27 @@ export default function TechnicalSection() {
                     viewport={{ once: true }}
                     className="relative p-1 rounded-3xl bg-gradient-to-r from-zinc-800 via-zinc-700 to-zinc-800"
                 >
-                    <div className="bg-[#0c0c0e] rounded-[22px] p-8 flex flex-col md:flex-row items-center justify-between gap-8">
+                    <div className="bg-card rounded-[22px] p-8 flex flex-col md:flex-row items-center justify-between gap-8">
                         
                         <div className="flex flex-col gap-2 max-w-xl">
                             <div className="flex items-center gap-2 mb-1">
                                 <Lock className="h-4 w-4 text-emerald-500" />
                                 <span className="text-xs font-bold text-emerald-500 uppercase tracking-wider">Engine de Dados</span>
                             </div>
-                            <h4 className="text-xl font-bold text-white">Powered by SQLite</h4>
-                            <p className="text-sm text-zinc-400 leading-relaxed">
+                            <h4 className="text-xl font-bold text-foreground">Powered by SQLite</h4>
+                            <p className="text-sm text-muted-foreground leading-relaxed">
                                 Utilizamos a mesma tecnologia de banco de dados confiada pela <strong>NASA</strong> em missões espaciais e pela <strong>Airbus</strong> em sistemas de voo. Robusto, inquebrável e portátil.
                             </p>
                         </div>
 
                         {/* Visual Tech Badges */}
                         <div className="flex items-center gap-3">
-                            <div className="flex flex-col items-center bg-zinc-900/50 border border-white/5 p-3 rounded-xl min-w-[100px]">
-                                <span className="text-xs text-zinc-500 uppercase font-bold mb-1">Latência</span>
-                                <span className="text-lg font-mono font-bold text-white">0ms</span>
+                            <div className="flex flex-col items-center bg-card/50 border border-border p-3 rounded-xl min-w-[100px]">
+                                <span className="text-xs text-muted-foreground uppercase font-bold mb-1">Latência</span>
+                                <span className="text-lg font-mono font-bold text-foreground">0ms</span>
                             </div>
-                            <div className="flex flex-col items-center bg-zinc-900/50 border border-white/5 p-3 rounded-xl min-w-[100px]">
-                                <span className="text-xs text-zinc-500 uppercase font-bold mb-1">Encryption</span>
+                            <div className="flex flex-col items-center bg-card/50 border border-border p-3 rounded-xl min-w-[100px]">
+                                <span className="text-xs text-muted-foreground uppercase font-bold mb-1">Encryption</span>
                                 <span className="text-lg font-mono font-bold text-emerald-400">AES-256</span>
                             </div>
                         </div>

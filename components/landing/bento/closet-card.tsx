@@ -64,8 +64,8 @@ export function ClosetCard() {
             {/* --- HEADER: RESUMO GERAL --- */}
             <div className="flex items-center justify-between mb-2">
                 <div className="flex flex-col">
-                    <span className="text-2xl font-bold text-white tabular-nums">{totalItems}</span>
-                    <span className="text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Peças no Total</span>
+                    <span className="text-2xl font-bold text-foreground tabular-nums">{totalItems}</span>
+                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">Peças no Total</span>
                 </div>
                 
                 {/* Donut Chart Simplificado (CSS Conic) */}
@@ -77,9 +77,9 @@ export function ClosetCard() {
                         }} 
                     >
                         {/* Mascara do centro */}
-                        <div className="absolute inset-1 bg-[#151515] rounded-full" />
+                        <div className="absolute inset-1 bg-card rounded-full" />
                     </div>
-                    <WashingMachine className="relative w-5 h-5 text-zinc-400" />
+                    <WashingMachine className="relative w-5 h-5 text-muted-foreground" />
                 </div>
             </div>
 
@@ -92,17 +92,17 @@ export function ClosetCard() {
                         <div key={cat.id} className="group flex flex-col gap-1.5">
                             {/* Linha de Info */}
                             <div className="flex items-center justify-between text-xs">
-                                <div className="flex items-center gap-2 text-zinc-300">
+                                <div className="flex items-center gap-2 text-foreground">
                                     <cat.icon className={cn("w-3.5 h-3.5", cat.color)} />
                                     <span className="font-medium">{cat.label}</span>
                                 </div>
-                                <div className="flex gap-1 text-[10px] font-mono text-zinc-500">
-                                    <span className="text-zinc-300">{cat.cleanCount}</span>/{cat.count}
+                                <div className="flex gap-1 text-[10px] font-mono text-muted-foreground">
+                                    <span className="text-foreground">{cat.cleanCount}</span>/{cat.count}
                                 </div>
                             </div>
 
                             {/* Barra de Progresso (Status de Limpeza) */}
-                            <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
+                            <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
                                 <motion.div 
                                     initial={{ width: 0 }}
                                     whileInView={{ width: `${percentage}%` }}
@@ -116,11 +116,11 @@ export function ClosetCard() {
             </div>
 
             {/* --- FOOTER: BOTÃO DE AÇÃO RÁPIDA --- */}
-            <button className="mt-2 w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-dashed border-zinc-700 hover:bg-zinc-800/50 hover:border-zinc-600 transition-all group">
-                <div className="bg-zinc-800 p-0.5 rounded group-hover:bg-zinc-700 transition-colors">
-                    <Plus className="w-3 h-3 text-zinc-400" />
+            <button className="mt-2 w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-dashed border-border hover:bg-muted/50 hover:border-border transition-all group">
+                <div className="bg-muted p-0.5 rounded group-hover:bg-zinc-700 transition-colors">
+                    <Plus className="w-3 h-3 text-muted-foreground" />
                 </div>
-                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest group-hover:text-zinc-300">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest group-hover:text-foreground">
                     Cadastrar Peça
                 </span>
             </button>

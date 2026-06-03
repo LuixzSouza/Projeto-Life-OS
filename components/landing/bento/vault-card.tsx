@@ -70,7 +70,7 @@ export function VaultCard() {
         description="Gerenciador criptografado."
         className="col-span-1 min-h-[260px]"
     >
-        <div className="relative w-full h-full bg-[#09090b] overflow-hidden">
+        <div className="relative w-full h-full bg-card overflow-hidden">
             
             <AnimatePresence mode="wait">
                 
@@ -85,22 +85,22 @@ export function VaultCard() {
                         {/* Ícone Pulsante */}
                         <div className="relative">
                             <div className="absolute inset-0 bg-emerald-500/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-                            <div className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 shadow-2xl relative group-hover:scale-105 transition-transform duration-300">
-                                <Lock className="h-8 w-8 text-zinc-500 group-hover:text-emerald-500 transition-colors" />
+                            <div className="p-4 rounded-2xl bg-card border border-border shadow-2xl relative group-hover:scale-105 transition-transform duration-300">
+                                <Lock className="h-8 w-8 text-muted-foreground group-hover:text-emerald-500 transition-colors" />
                             </div>
-                            <div className="absolute -top-1 -right-1 bg-zinc-900 rounded-full p-1 border border-zinc-800">
+                            <div className="absolute -top-1 -right-1 bg-card rounded-full p-1 border border-border">
                                 <ShieldCheck className="h-3 w-3 text-emerald-500" />
                             </div>
                         </div>
 
                         {/* Texto Matrix */}
                         <div className="flex flex-col items-center gap-1">
-                            <div className="h-8 px-4 flex items-center justify-center rounded-lg bg-black/40 border border-white/5 font-mono text-sm text-zinc-500 tracking-widest min-w-[140px]">
+                            <div className="h-8 px-4 flex items-center justify-center rounded-lg bg-background/40 border border-border font-mono text-sm text-muted-foreground tracking-widest min-w-[140px]">
                                 {displayText}
                             </div>
                             <div className="flex items-center gap-1.5 opacity-50">
-                                <Fingerprint className="h-3 w-3 text-zinc-600" />
-                                <span className="text-[9px] uppercase tracking-widest text-zinc-600">
+                                <Fingerprint className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
                                     Clique para Autenticar
                                 </span>
                             </div>
@@ -115,11 +115,11 @@ export function VaultCard() {
                         className="absolute inset-0 flex flex-col"
                     >
                         {/* Header Interno */}
-                        <div className="flex justify-between items-center px-4 py-2 border-b border-white/5 bg-emerald-900/10">
+                        <div className="flex justify-between items-center px-4 py-2 border-b border-border bg-emerald-900/10">
                             <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider flex items-center gap-1">
                                 <Unlock className="h-3 w-3" /> Desbloqueado
                             </span>
-                            <button onClick={lockVault} className="text-[9px] text-zinc-500 hover:text-zinc-300 underline">
+                            <button onClick={lockVault} className="text-[9px] text-muted-foreground hover:text-foreground underline">
                                 Bloquear
                             </button>
                         </div>
@@ -127,21 +127,21 @@ export function VaultCard() {
                         {/* Lista de Credenciais */}
                         <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
                             {CREDENTIALS.map((cred) => (
-                                <div key={cred.id} className="flex items-center justify-between p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors group">
+                                <div key={cred.id} className="flex items-center justify-between p-2 rounded-lg bg-foreground/5 hover:bg-foreground/10 transition-colors group">
                                     <div className="flex items-center gap-3 overflow-hidden">
-                                        <div className="w-8 h-8 rounded-md bg-zinc-800 flex items-center justify-center text-xs font-bold text-zinc-400 border border-white/5">
+                                        <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground border border-border">
                                             {cred.icon}
                                         </div>
                                         <div className="flex flex-col min-w-0">
-                                            <span className="text-xs font-medium text-zinc-200 truncate">{cred.service}</span>
-                                            <span className="text-[9px] text-zinc-500 truncate">{cred.username}</span>
+                                            <span className="text-xs font-medium text-foreground truncate">{cred.service}</span>
+                                            <span className="text-[9px] text-muted-foreground truncate">{cred.username}</span>
                                         </div>
                                     </div>
 
                                     {/* Botão Copiar */}
                                     <button 
                                         onClick={() => copyToClipboard(cred.pass, cred.id)}
-                                        className="p-1.5 rounded-md hover:bg-white/10 text-zinc-500 hover:text-white transition-colors relative"
+                                        className="p-1.5 rounded-md hover:bg-foreground/10 text-muted-foreground hover:text-foreground transition-colors relative"
                                         title="Copiar Senha"
                                     >
                                         {copiedId === cred.id ? (

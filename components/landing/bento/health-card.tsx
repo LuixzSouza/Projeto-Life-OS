@@ -83,7 +83,7 @@ export function HealthCard() {
         description="Saúde 360°."
         className="col-span-1 min-h-[260px]"
     >
-        <div className="flex flex-col h-full w-full bg-[#09090b] relative">
+        <div className="flex flex-col h-full w-full bg-card relative">
             
             {/* --- ÁREA CENTRAL (Compactada) --- */}
             <div className="flex-1 flex flex-col items-center justify-center relative p-2 min-h-0">
@@ -92,7 +92,7 @@ export function HealthCard() {
                 <div className="relative w-24 h-24 flex items-center justify-center shrink-0">
                     {/* Fundo do Anel */}
                     <svg className="w-full h-full -rotate-90">
-                        <circle cx="48" cy="48" r="42" stroke="currentColor" strokeWidth="5" fill="transparent" className="text-zinc-800" />
+                        <circle cx="48" cy="48" r="42" stroke="currentColor" strokeWidth="5" fill="transparent" className="text-muted" />
                         <motion.circle 
                             key={activeTab} // Reinicia animação ao trocar
                             cx="48" cy="48" r="42" 
@@ -117,8 +117,8 @@ export function HealthCard() {
                                 className="flex flex-col items-center"
                             >
                                 <currentData.icon className={cn("h-4 w-4 mb-0.5", currentData.color)} />
-                                <span className="text-base font-bold text-white leading-none">{currentData.value}</span>
-                                <span className="text-[9px] text-zinc-500 mt-0.5 font-medium">
+                                <span className="text-base font-bold text-foreground leading-none">{currentData.value}</span>
+                                <span className="text-[9px] text-muted-foreground mt-0.5 font-medium">
                                     {currentData.subValue}
                                 </span>
                             </motion.div>
@@ -134,7 +134,7 @@ export function HealthCard() {
             </div>
 
             {/* --- RODAPÉ: SELETORES (Compacto) --- */}
-            <div className="grid grid-cols-4 border-t border-white/5 bg-zinc-900/30 shrink-0">
+            <div className="grid grid-cols-4 border-t border-border bg-card/30 shrink-0">
                 {METRICS.map((metric) => {
                     const isActive = activeTab === metric.id;
                     const Icon = metric.icon;
@@ -146,7 +146,7 @@ export function HealthCard() {
                             onMouseEnter={() => setActiveTab(metric.id)}
                             className={cn(
                                 "flex flex-col items-center justify-center py-2 gap-1 transition-all duration-300 relative group",
-                                isActive ? "bg-white/5" : "hover:bg-white/5"
+                                isActive ? "bg-foreground/5" : "hover:bg-foreground/5"
                             )}
                         >
                             {/* Linha indicadora superior */}
@@ -159,11 +159,11 @@ export function HealthCard() {
                             
                             <Icon className={cn(
                                 "h-3.5 w-3.5 transition-colors", 
-                                isActive ? metric.color : "text-zinc-600 group-hover:text-zinc-400"
+                                isActive ? metric.color : "text-muted-foreground group-hover:text-muted-foreground"
                             )} />
                             <span className={cn(
                                 "text-[7px] font-bold uppercase tracking-wider",
-                                isActive ? "text-white" : "text-zinc-600"
+                                isActive ? "text-foreground" : "text-muted-foreground"
                             )}>
                                 {metric.label}
                             </span>

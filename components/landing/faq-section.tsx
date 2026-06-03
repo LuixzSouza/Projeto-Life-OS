@@ -70,7 +70,7 @@ export default function FAQSectionWithImages() {
   const [openIndex, setOpenIndex] = useState<number>(0);
 
   return (
-    <section id="faq" className="py-24 px-6 bg-[#09090b] border-t border-white/5 relative overflow-hidden">
+    <section id="faq" className="py-24 px-6 bg-card border-t border-border relative overflow-hidden">
       
       {/* Background Decorativo */}
       <div className="absolute right-0 top-1/4 w-[400px] h-[400px] bg-indigo-600/5 blur-[120px] rounded-full pointer-events-none" />
@@ -79,11 +79,11 @@ export default function FAQSectionWithImages() {
         
         {/* Header */}
         <div className="text-center mb-16">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900 border border-white/10 text-zinc-400 text-[10px] font-bold uppercase tracking-widest mb-4">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-card border border-border text-muted-foreground text-[10px] font-bold uppercase tracking-widest mb-4">
             <MessageCircle className="h-3 w-3 text-indigo-400" /> Transparência Total
           </div>
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">Perguntas Frequentes</h2>
-          <p className="text-zinc-400 max-w-2xl mx-auto">
+          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">Perguntas Frequentes</h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto">
             Arquitetura Local-First, privacidade e requisitos técnicos explicados.
           </p>
         </div>
@@ -101,20 +101,20 @@ export default function FAQSectionWithImages() {
                   className={cn(
                     "border rounded-xl overflow-hidden transition-all duration-300",
                     isOpen
-                      ? "bg-zinc-900 border-indigo-500/30 shadow-[0_0_20px_-5px_rgba(99,102,241,0.1)]"
-                      : "bg-zinc-900/30 border-white/5 hover:border-white/10"
+                      ? "bg-card border-indigo-500/30 shadow-[0_0_20px_-5px_rgba(99,102,241,0.1)]"
+                      : "bg-card/30 border-border hover:border-border"
                   )}
                 >
                   <button
                     onClick={() => setOpenIndex(isOpen ? -1 : i)}
                     className="w-full flex items-center justify-between p-5 text-left transition-colors group"
                   >
-                    <span className={cn("font-medium text-base pr-4 leading-tight", isOpen ? "text-white" : "text-zinc-400 group-hover:text-zinc-300")}>
+                    <span className={cn("font-medium text-base pr-4 leading-tight", isOpen ? "text-foreground" : "text-muted-foreground group-hover:text-foreground")}>
                       {item.q}
                     </span>
                     <div className={cn(
                       "p-1 rounded-full transition-all shrink-0",
-                      isOpen ? "bg-indigo-500 text-white rotate-0" : "bg-zinc-800 text-zinc-500 -rotate-90"
+                      isOpen ? "bg-indigo-500 text-foreground rotate-0" : "bg-muted text-muted-foreground -rotate-90"
                     )}>
                       {isOpen ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
                     </div>
@@ -129,7 +129,7 @@ export default function FAQSectionWithImages() {
                         transition={{ duration: 0.3, ease: "easeInOut" }}
                         className="overflow-hidden"
                       >
-                        <div className="p-5 pt-0 text-sm text-zinc-400 leading-relaxed border-t border-white/5">
+                        <div className="p-5 pt-0 text-sm text-muted-foreground leading-relaxed border-t border-border">
                             <div dangerouslySetInnerHTML={{ __html: item.a }} />
                         </div>
                       </motion.div>
@@ -141,10 +141,10 @@ export default function FAQSectionWithImages() {
             
             {/* Bloco de Contato Rápido */}
             <div className="pt-6 flex gap-3 flex-wrap">
-                 <a href="mailto:luiz.anttoniodesouza004@gmail.com" className="inline-flex items-center gap-2 text-xs font-medium text-zinc-500 hover:text-white transition-colors">
+                 <a href="mailto:luiz.anttoniodesouza004@gmail.com" className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
                     <Mail className="h-3 w-3" /> Reportar Bug
                  </a>
-                 <a href="#" className="inline-flex items-center gap-2 text-xs font-medium text-zinc-500 hover:text-white transition-colors">
+                 <a href="#" className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
                     <Package className="h-3 w-3" /> Acessar GitHub
                  </a>
             </div>
@@ -152,23 +152,23 @@ export default function FAQSectionWithImages() {
 
           {/* --- DIREITA: ÁREA VISUAL (JANELA DE APP STICKY) --- */}
           <div className="hidden lg:block sticky top-24 h-[420px]">
-            <div className="w-full h-full rounded-2xl bg-[#0F0F10] border border-white/10 shadow-2xl overflow-hidden flex flex-col relative group">
+            <div className="w-full h-full rounded-2xl bg-card border border-border shadow-2xl overflow-hidden flex flex-col relative group">
                 
                 {/* Header da Janela (Estilo Mac/Browser) */}
-                <div className="h-10 bg-zinc-900/90 backdrop-blur border-b border-white/5 flex items-center px-4 gap-2 shrink-0 justify-between z-20">
+                <div className="h-10 bg-card/90 backdrop-blur border-b border-border flex items-center px-4 gap-2 shrink-0 justify-between z-20">
                     <div className="flex gap-1.5">
                         <div className="w-2.5 h-2.5 rounded-full bg-red-500/20 border border-red-500/50" />
                         <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/20 border border-yellow-500/50" />
                         <div className="w-2.5 h-2.5 rounded-full bg-green-500/20 border border-green-500/50" />
                     </div>
-                    <div className="text-[10px] text-zinc-600 font-mono font-bold uppercase tracking-widest flex items-center gap-2">
+                    <div className="text-[10px] text-muted-foreground font-mono font-bold uppercase tracking-widest flex items-center gap-2">
                         <ImageIcon className="h-3 w-3" /> System Viewer
                     </div>
                     <div className="w-8" />
                 </div>
 
                 {/* Container da Imagem */}
-                <div className="flex-1 relative overflow-hidden bg-zinc-950">
+                <div className="flex-1 relative overflow-hidden bg-card">
                     <AnimatePresence mode="wait">
                         <motion.div
                             // A chave muda baseada no index, forçando a re-renderização e animação
@@ -183,13 +183,13 @@ export default function FAQSectionWithImages() {
                             {openIndex >= 0 && openIndex < FAQS.length 
                                 ? (
                                     // Usando 'fill' e 'object-cover' para a imagem preencher o container
-                                    <div className="w-full h-full relative bg-black">
+                                    <div className="w-full h-full relative bg-background">
                                         {FAQS[openIndex].visual}
                                     </div>
                                 )
                                 : (
-                                    <div className="h-full flex flex-col items-center justify-center text-zinc-700 gap-3">
-                                        <div className="h-12 w-12 rounded-full bg-zinc-900 flex items-center justify-center">
+                                    <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-3">
+                                        <div className="h-12 w-12 rounded-full bg-card flex items-center justify-center">
                                             <MessageCircle className="h-6 w-6 opacity-20" />
                                         </div>
                                         <p className="text-sm font-medium">Selecione uma pergunta</p>
@@ -200,7 +200,7 @@ export default function FAQSectionWithImages() {
                     </AnimatePresence>
                     
                     {/* Borda interna sutil para acabamento */}
-                    <div className="absolute inset-0 pointer-events-none border border-white/5 rounded-b-2xl" />
+                    <div className="absolute inset-0 pointer-events-none border border-border rounded-b-2xl" />
                 </div>
 
             </div>

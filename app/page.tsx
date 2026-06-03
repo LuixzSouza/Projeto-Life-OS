@@ -29,13 +29,12 @@ export default async function LandingPage() {
     };
 
     return (
-        <div className="min-h-screen bg-[#050505] text-white selection:bg-indigo-500/30 overflow-x-hidden font-sans">
-            
-            {/* --- BACKGROUND AMBIENT (Fixa no Server) --- */}
+        <div className="landing-surface relative min-h-screen overflow-x-hidden font-sans selection:bg-primary/25">
+
+            {/* --- BACKGROUND AMBIENT (themeable: light/dark) --- */}
             <div className="fixed inset-0 z-0 pointer-events-none">
-                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-800/10 blur-[120px] rounded-full" />
-                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-800/10 blur-[120px] rounded-full" />
-                <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-[0.03]" /> 
+                <div className="landing-grid absolute inset-0 opacity-60 [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_75%)]" />
+                <div className="landing-aurora" />
             </div>
 
             {/* Componentes */}

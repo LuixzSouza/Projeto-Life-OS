@@ -49,13 +49,13 @@ export function FinanceCard() {
       <div className="flex h-full w-full">
         
         {/* --- LADO ESQUERDO: METRICAS DINÂMICAS --- */}
-        <div className="flex flex-col justify-between p-5 w-[35%] border-r border-white/5 bg-zinc-900/30">
+        <div className="flex flex-col justify-between p-5 w-[35%] border-r border-border bg-card/30">
             <div className="space-y-1">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                     {activeData.label}
                 </p>
-                <div className="text-xl font-bold text-white tabular-nums">
-                    <span className="text-sm text-zinc-500 mr-1">R$</span>
+                <div className="text-xl font-bold text-foreground tabular-nums">
+                    <span className="text-sm text-muted-foreground mr-1">R$</span>
                     {activeData.balance.toLocaleString('pt-BR')}
                 </div>
             </div>
@@ -67,7 +67,7 @@ export function FinanceCard() {
                         <div className="p-1 rounded bg-emerald-500/20 text-emerald-500">
                             <ArrowUpRight className="h-3 w-3" />
                         </div>
-                        <span className="text-[10px] text-zinc-400">Entrada</span>
+                        <span className="text-[10px] text-muted-foreground">Entrada</span>
                     </div>
                     <span className="text-xs font-bold text-emerald-400 tabular-nums">
                         {activeData.income.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
@@ -80,7 +80,7 @@ export function FinanceCard() {
                         <div className="p-1 rounded bg-rose-500/20 text-rose-500">
                             <ArrowDownRight className="h-3 w-3" />
                         </div>
-                        <span className="text-[10px] text-zinc-400">Saída</span>
+                        <span className="text-[10px] text-muted-foreground">Saída</span>
                     </div>
                     <span className="text-xs font-bold text-rose-400 tabular-nums">
                         {activeData.expense.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
@@ -104,7 +104,7 @@ export function FinanceCard() {
                 <div key={i} className="relative flex-1 h-full flex items-end group/bar z-10">
                     
                     {/* Barra de Fundo (Placeholder) */}
-                    <div className="absolute bottom-0 w-full h-full bg-zinc-800/30 rounded-t-sm" />
+                    <div className="absolute bottom-0 w-full h-full bg-muted/30 rounded-t-sm" />
 
                     {/* Barra Ativa */}
                     <motion.div
@@ -123,13 +123,13 @@ export function FinanceCard() {
                         )}
                     >
                         {/* Brilho no topo da barra */}
-                        <div className="absolute top-0 w-full h-1 bg-white/20" />
+                        <div className="absolute top-0 w-full h-1 bg-foreground/20" />
                     </motion.div>
                     
                     {/* Label do Mês (Aparece no Hover) */}
                     <div className={cn(
-                        "absolute -bottom-6 left-1/2 -translate-x-1/2 text-[9px] font-mono text-zinc-500 transition-all duration-200",
-                        hoveredIndex === i ? "text-white font-bold -translate-y-1" : "opacity-0"
+                        "absolute -bottom-6 left-1/2 -translate-x-1/2 text-[9px] font-mono text-muted-foreground transition-all duration-200",
+                        hoveredIndex === i ? "text-foreground font-bold -translate-y-1" : "opacity-0"
                     )}>
                         {item.month}
                     </div>

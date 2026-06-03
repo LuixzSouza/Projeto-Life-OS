@@ -16,16 +16,16 @@ export function SetupGuideProgress({ currentStep, currentStepIndex, progressLabe
   return (
     <div className="mb-8 max-w-2xl mx-auto">
       <div className="flex items-center justify-between mb-4">
-        <div className="text-sm text-zinc-500">
+        <div className="text-sm text-muted-foreground">
           Passo {currentStepIndex + 1} de {STEP_ORDER.length}
         </div>
-        <div className="text-sm font-medium text-white">
+        <div className="text-sm font-medium text-foreground">
           {progressLabel}
         </div>
       </div>
 
       {/* Barra de Progresso */}
-      <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${((currentStepIndex + 1) / STEP_ORDER.length) * 100}%` }}
@@ -49,20 +49,20 @@ export function SetupGuideProgress({ currentStep, currentStepIndex, progressLabe
               "flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold mb-2",
               "transition-all duration-300",
               stepKey === currentStep
-                ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-white scale-110"
+                ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-foreground scale-110"
                 : index < currentStepIndex
                 ? "bg-emerald-500/20 text-emerald-400"
-                : "bg-zinc-800 text-zinc-500"
+                : "bg-muted text-muted-foreground"
             )}>
               {index + 1}
             </div>
             <span className={cn(
               "text-xs font-medium transition-colors",
               stepKey === currentStep
-                ? "text-white"
+                ? "text-foreground"
                 : index < currentStepIndex
                 ? "text-emerald-400"
-                : "text-zinc-600"
+                : "text-muted-foreground"
             )}>
               {STEPS[stepKey].progressLabel}
             </span>

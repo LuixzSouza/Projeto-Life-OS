@@ -35,7 +35,7 @@ export function SetupGuide() {
   };
 
   return (
-    <section id="config" className="py-24 md:py-32 px-4 sm:px-6 bg-[#050505] border-t border-white/5 relative overflow-hidden">
+    <section id="config" className="py-24 md:py-32 px-4 sm:px-6 bg-card border-t border-border relative overflow-hidden">
 
       {/* Background: Grid Tático com gradiente */}
       <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:60px_60px] opacity-10 pointer-events-none" />
@@ -51,7 +51,7 @@ export function SetupGuide() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-indigo-900/30 to-purple-900/30 border border-indigo-800/30 text-zinc-300 text-xs font-semibold uppercase tracking-widest mb-6"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-indigo-900/30 to-purple-900/30 border border-indigo-800/30 text-foreground text-xs font-semibold uppercase tracking-widest mb-6"
           >
             <Terminal className="h-3 w-3 text-indigo-400" />
             <span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
@@ -63,11 +63,11 @@ export function SetupGuide() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 tracking-tight"
+            className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6 tracking-tight"
           >
             Configure em <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">5 minutos</span>
             <br />
-            <span className="text-xl md:text-2xl text-zinc-400 font-normal">
+            <span className="text-xl md:text-2xl text-muted-foreground font-normal">
               Guia interativo com comandos prontos para copiar
             </span>
           </motion.h2>
@@ -76,7 +76,7 @@ export function SetupGuide() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="text-lg text-zinc-400 max-w-2xl mx-auto"
+            className="text-lg text-muted-foreground max-w-2xl mx-auto"
           >
             Siga este guia passo-a-passo para executar o Life OS localmente.
             Cada comando pode ser copiado com um clique.
@@ -100,17 +100,17 @@ export function SetupGuide() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
-            className="relative bg-gradient-to-b from-zinc-900/90 to-black/90 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-indigo-500/5 overflow-hidden"
+            className="relative bg-gradient-to-b from-zinc-900/90 to-black/90 backdrop-blur-xl border border-border rounded-2xl shadow-2xl shadow-indigo-500/5 overflow-hidden"
           >
             {/* Header do Card */}
-            <div className="px-6 py-4 border-b border-white/10 bg-gradient-to-r from-black/50 to-zinc-900/50">
+            <div className="px-6 py-4 border-b border-border bg-gradient-to-r from-black/50 to-zinc-900/50">
               <div className="flex items-center gap-3">
                 <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-r from-indigo-500/20 to-purple-500/20">
                   <stepData.icon className="h-5 w-5 text-indigo-400" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-xl font-bold text-white">{stepData.title}</h3>
-                  <p className="text-sm text-zinc-400">{stepData.subtitle}</p>
+                  <h3 className="text-xl font-bold text-foreground">{stepData.title}</h3>
+                  <p className="text-sm text-muted-foreground">{stepData.subtitle}</p>
                 </div>
 
                 {/* Controles de Navegação */}
@@ -120,7 +120,7 @@ export function SetupGuide() {
                       variant="ghost"
                       size="sm"
                       onClick={goToPrevStep}
-                      className="gap-2 text-zinc-400 hover:text-white hover:bg-white/5"
+                      className="gap-2 text-muted-foreground hover:text-foreground hover:bg-foreground/5"
                     >
                       <ChevronLeft className="h-4 w-4" />
                       Voltar
@@ -158,15 +158,15 @@ export function SetupGuide() {
             </div>
 
             {/* Footer do Card */}
-            <div className="px-6 py-4 border-t border-white/10 bg-black/50">
+            <div className="px-6 py-4 border-t border-border bg-background/50">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="text-sm text-zinc-500">
+                <div className="text-sm text-muted-foreground">
                   {currentStepIndex === STEP_ORDER.length - 1 ? (
                     "✨ Configuração completa! O sistema está pronto para uso."
                   ) : (
                     <>
-                      <span className="text-zinc-400">Próximo:</span>{' '}
-                      <span className="text-white font-medium">
+                      <span className="text-muted-foreground">Próximo:</span>{' '}
+                      <span className="text-foreground font-medium">
                         {STEPS[STEP_ORDER[currentStepIndex + 1]].title}
                       </span>
                     </>
@@ -179,7 +179,7 @@ export function SetupGuide() {
                       variant="outline"
                       size="sm"
                       onClick={() => goToStep('intro')}
-                      className="text-zinc-400 hover:text-white border-zinc-700"
+                      className="text-muted-foreground hover:text-foreground border-border"
                     >
                       <Terminal className="h-3 w-3 mr-2" />
                       Início
@@ -190,7 +190,7 @@ export function SetupGuide() {
                     href="https://github.com/LuixzSouza/Projeto-Life-OS"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition-colors"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-muted hover:bg-zinc-700 text-foreground text-sm font-medium transition-colors"
                   >
                     <GitBranch className="h-4 w-4" />
                     Ver Repositório
@@ -202,12 +202,12 @@ export function SetupGuide() {
 
           {/* Nota Informativa */}
           <div className="mt-8 max-w-2xl mx-auto">
-            <div className="p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/50">
+            <div className="p-4 rounded-xl bg-card/50 border border-border/50">
               <div className="flex items-start gap-3">
                 <Shield className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
                 <div className="space-y-2">
-                  <h4 className="font-semibold text-white text-sm">💡 Dica Importante</h4>
-                  <p className="text-sm text-zinc-400">
+                  <h4 className="font-semibold text-foreground text-sm">💡 Dica Importante</h4>
+                  <p className="text-sm text-muted-foreground">
                     Encontrou problemas? Consulte a documentação completa no <Link href={"https://github.com/LuixzSouza/Projeto-Life-OS"} target="_blank" className="text-indigo-400 underline"> GitHub </Link> ou abra uma issue.
                     Para dúvidas sobre Node.js ou Git, recomendamos os tutoriais oficiais.
                   </p>

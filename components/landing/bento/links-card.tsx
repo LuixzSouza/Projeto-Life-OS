@@ -31,7 +31,7 @@ const SAVED_LINKS: LinkItem[] = [
   { id: "1", label: "Tailwind Colors", url: "tailwindcss.com", category: "Dev", icon: Layout, color: "text-cyan-400" },
   { id: "2", label: "Lucide Icons", url: "lucide.dev", category: "Dev", icon:  LinkIcon, color: "text-orange-400" },
   { id: "3", label: "Figma Community", url: "figma.com", category: "Design", icon: Figma, color: "text-rose-400" },
-  { id: "4", label: "Next.js Docs", url: "nextjs.org", category: "Dev", icon: Github, color: "text-white" },
+  { id: "4", label: "Next.js Docs", url: "nextjs.org", category: "Dev", icon: Github, color: "text-foreground" },
   { id: "5", label: "Godly Website", url: "godly.website", category: "Ref", icon: BookMarked, color: "text-purple-400" },
 ];
 
@@ -51,17 +51,17 @@ export function LinksCard() {
         description="Repositório de referências."
         className="col-span-1 min-h-[260px]"
     >
-        <div className="flex flex-col h-full w-full bg-[#09090b] relative overflow-hidden">
+        <div className="flex flex-col h-full w-full bg-card relative overflow-hidden">
             
             {/* --- HEADER: BARRA DE BUSCA --- */}
-            <div className="p-3 pb-2 border-b border-white/5 bg-zinc-900/50 backdrop-blur-md z-20">
-                <div className="relative flex items-center bg-zinc-800 rounded-lg border border-white/5 focus-within:border-zinc-600 transition-colors">
-                    <Search className="absolute left-2.5 h-3.5 w-3.5 text-zinc-500" />
+            <div className="p-3 pb-2 border-b border-border bg-card/50 backdrop-blur-md z-20">
+                <div className="relative flex items-center bg-muted rounded-lg border border-border focus-within:border-border transition-colors">
+                    <Search className="absolute left-2.5 h-3.5 w-3.5 text-muted-foreground" />
                     <input 
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         placeholder="Buscar recurso..." 
-                        className="w-full bg-transparent border-none outline-none text-[11px] text-zinc-200 py-2 pl-8 pr-2 placeholder:text-zinc-600"
+                        className="w-full bg-transparent border-none outline-none text-[11px] text-foreground py-2 pl-8 pr-2 placeholder:text-muted-foreground"
                     />
                 </div>
             </div>
@@ -77,17 +77,17 @@ export function LinksCard() {
                             rel="noopener noreferrer"
                             initial={{ opacity: 0, x: -10 }}
                             animate={{ opacity: 1, x: 0 }}
-                            className="flex items-center justify-between p-2 rounded-lg hover:bg-white/5 border border-transparent hover:border-white/5 group transition-all cursor-pointer"
+                            className="flex items-center justify-between p-2 rounded-lg hover:bg-foreground/5 border border-transparent hover:border-border group transition-all cursor-pointer"
                         >
                             <div className="flex items-center gap-3">
-                                <div className="p-1.5 rounded-md bg-zinc-900 border border-white/5 group-hover:bg-zinc-800 transition-colors">
+                                <div className="p-1.5 rounded-md bg-card border border-border group-hover:bg-muted transition-colors">
                                     <link.icon className={cn("h-3.5 w-3.5", link.color)} />
                                 </div>
                                 <div className="flex flex-col">
-                                    <span className="text-[11px] font-medium text-zinc-200 group-hover:text-white transition-colors">
+                                    <span className="text-[11px] font-medium text-foreground group-hover:text-foreground transition-colors">
                                         {link.label}
                                     </span>
-                                    <span className="text-[9px] text-zinc-500 font-mono">
+                                    <span className="text-[9px] text-muted-foreground font-mono">
                                         {link.url}
                                     </span>
                                 </div>
@@ -95,15 +95,15 @@ export function LinksCard() {
 
                             {/* Categoria Badge */}
                             <div className="flex items-center gap-2">
-                                <span className="text-[8px] font-bold text-zinc-600 bg-zinc-900/50 px-1.5 py-0.5 rounded border border-white/5 uppercase tracking-wider">
+                                <span className="text-[8px] font-bold text-muted-foreground bg-card/50 px-1.5 py-0.5 rounded border border-border uppercase tracking-wider">
                                     {link.category}
                                 </span>
-                                <ArrowUpRight className="h-3 w-3 text-zinc-600 opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
+                                <ArrowUpRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
                             </div>
                         </motion.a>
                     ))
                 ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-zinc-600 gap-2 opacity-50">
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2 opacity-50">
                         <Search className="h-5 w-5" />
                         <span className="text-[10px]">Nenhum link encontrado</span>
                     </div>
@@ -111,9 +111,9 @@ export function LinksCard() {
             </div>
 
             {/* --- FOOTER: ADICIONAR NOVO --- */}
-            <div className="p-2 border-t border-white/5 bg-gradient-to-t from-black via-zinc-900/80 to-transparent z-10">
-                <button className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-dashed border-zinc-700 hover:bg-zinc-800/50 hover:border-zinc-500 hover:text-zinc-200 text-zinc-500 transition-all group">
-                    <div className="bg-zinc-800 p-0.5 rounded group-hover:bg-zinc-700 transition-colors">
+            <div className="p-2 border-t border-border bg-gradient-to-t from-black via-zinc-900/80 to-transparent z-10">
+                <button className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-dashed border-border hover:bg-muted/50 hover:border-border hover:text-foreground text-muted-foreground transition-all group">
+                    <div className="bg-muted p-0.5 rounded group-hover:bg-zinc-700 transition-colors">
                         <Plus className="h-3 w-3" />
                     </div>
                     <span className="text-[10px] font-bold uppercase tracking-widest">

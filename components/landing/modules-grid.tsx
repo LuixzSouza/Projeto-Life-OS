@@ -20,12 +20,15 @@ import { SettingsCard } from "./bento/settings-card";
 
 export default function ModulesGrid() {
   return (
-    <section id="modules" className="relative bg-[#050505] px-4 py-24">
+    <section id="modules" className="relative px-4 py-24">
       <div className="mx-auto max-w-7xl">
-        
+
         <div className="mb-12 md:text-center max-w-3xl mx-auto">
-            <h2 className="text-3xl font-bold text-white mb-2">Ecossistema Completo</h2>
-            <p className="text-zinc-400">Tudo o que você precisa, integrado em um único lugar.</p>
+            <span className="inline-flex items-center gap-2 px-3 py-1 mb-4 rounded-full border border-border bg-muted/50 text-xs font-medium text-muted-foreground">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary" /> 15+ módulos integrados
+            </span>
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-2 tracking-tight">Ecossistema Completo</h2>
+            <p className="text-muted-foreground text-lg">Tudo o que você precisa, integrado em um único lugar.</p>
         </div>
 
         {/* ESTRATÉGIA DO GRID (LG: 4 Colunas):

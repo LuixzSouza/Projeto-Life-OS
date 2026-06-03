@@ -69,17 +69,17 @@ export function CMSCard() {
         description="Controle multi-projetos via API."
         className="col-span-1 min-h-[260px]"
     >
-        <div className="flex h-full w-full bg-[#09090b] text-xs">
+        <div className="flex h-full w-full bg-card text-xs">
             
             {/* --- SIDEBAR: LISTA DE PROJETOS --- */}
-            <div className="w-1/3 border-r border-white/5 bg-zinc-900/30 flex flex-col p-2 gap-1">
+            <div className="w-1/3 border-r border-border bg-card/30 flex flex-col p-2 gap-1">
                 {PROJECTS.map((project) => (
                     <button
                         key={project.id}
                         onClick={() => setActiveId(project.id)}
                         className={cn(
                             "text-left p-2 rounded-lg transition-all relative group",
-                            activeId === project.id ? "bg-zinc-800 text-white" : "text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300"
+                            activeId === project.id ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                         )}
                     >
                         {/* Status Dot */}
@@ -117,11 +117,11 @@ export function CMSCard() {
                         <div>
                             <div className="flex justify-between items-start mb-4">
                                 <div>
-                                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                                    <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
                                         {activeProject.name}
-                                        <ArrowUpRight className="h-3 w-3 text-zinc-600" />
+                                        <ArrowUpRight className="h-3 w-3 text-muted-foreground" />
                                     </h4>
-                                    <span className="text-[10px] text-zinc-500 font-mono">{activeProject.framework}</span>
+                                    <span className="text-[10px] text-muted-foreground font-mono">{activeProject.framework}</span>
                                 </div>
                                 <div className="px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[9px] font-bold uppercase">
                                     {activeProject.status}
@@ -130,15 +130,15 @@ export function CMSCard() {
 
                             {/* Stats Grid */}
                             <div className="grid grid-cols-2 gap-2 mb-4">
-                                <div className="bg-zinc-800/50 p-2 rounded border border-white/5">
-                                    <div className="flex items-center gap-1.5 text-zinc-400 mb-1">
+                                <div className="bg-muted/50 p-2 rounded border border-border">
+                                    <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
                                         <Globe className="h-3 w-3" />
                                         <span className="text-[9px]">Visitas</span>
                                     </div>
-                                    <span className="text-white font-mono">{activeProject.visits}</span>
+                                    <span className="text-foreground font-mono">{activeProject.visits}</span>
                                 </div>
-                                <div className="bg-zinc-800/50 p-2 rounded border border-white/5">
-                                    <div className="flex items-center gap-1.5 text-zinc-400 mb-1">
+                                <div className="bg-muted/50 p-2 rounded border border-border">
+                                    <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
                                         <Server className="h-3 w-3" />
                                         <span className="text-[9px]">API Health</span>
                                     </div>
@@ -151,7 +151,7 @@ export function CMSCard() {
 
                         {/* Actions / API Console */}
                         <div className="space-y-2">
-                            <div className="flex justify-between items-center text-[9px] text-zinc-500">
+                            <div className="flex justify-between items-center text-[9px] text-muted-foreground">
                                 <span>Última Sincronização: {activeProject.lastSync}</span>
                                 <GitCommit className="h-3 w-3" />
                             </div>
@@ -159,7 +159,7 @@ export function CMSCard() {
                             <button 
                                 onClick={handleSync}
                                 disabled={isSyncing}
-                                className="w-full h-8 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
+                                className="w-full h-8 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-foreground rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
                             >
                                 {isSyncing ? (
                                     <>

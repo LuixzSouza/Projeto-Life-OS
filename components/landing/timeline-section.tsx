@@ -58,7 +58,7 @@ const TIMELINE: TimelineItem[] = [
 
 export default function TimelineSection() {
   return (
-    <section id="routine" className="py-32 px-6 border-t border-white/5 bg-[#050505] relative overflow-hidden">
+    <section id="routine" className="py-32 px-6 border-t border-border bg-card relative overflow-hidden">
       
       {/* Background Decorativo */}
       <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-indigo-900/5 to-transparent pointer-events-none" />
@@ -70,7 +70,7 @@ export default function TimelineSection() {
           <motion.div 
             initial={{ opacity: 0, y: 10 }}
             whileInView={{ opacity: 1, y: 0 }}
-            className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-800/50 border border-white/5 text-zinc-400 text-xs font-mono uppercase tracking-widest"
+            className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-muted/50 border border-border text-muted-foreground text-xs font-mono uppercase tracking-widest"
           >
             <LineChart className="h-3 w-3" /> Life OS Routine
           </motion.div>
@@ -79,7 +79,7 @@ export default function TimelineSection() {
             initial={{ opacity: 0, y: 10 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="text-3xl md:text-4xl font-bold text-white"
+            className="text-3xl md:text-4xl font-bold text-foreground"
           >
             Um dia na vida do seu <span className="text-indigo-400">Sistema Operacional</span>
           </motion.h2>
@@ -88,7 +88,7 @@ export default function TimelineSection() {
             initial={{ opacity: 0, y: 10 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="text-zinc-400 max-w-lg mx-auto text-lg leading-relaxed"
+            className="text-muted-foreground max-w-lg mx-auto text-lg leading-relaxed"
           >
             Da hora que acorda até ir dormir, cada interação alimenta seu banco de dados local, gerando inteligência real sobre sua vida.
           </motion.p>
@@ -96,7 +96,7 @@ export default function TimelineSection() {
 
         <div className="relative">
           {/* Linha Vertical Conectora (Trilha) */}
-          <div className="absolute left-[27px] top-4 bottom-4 w-[2px] bg-zinc-800 rounded-full">
+          <div className="absolute left-[27px] top-4 bottom-4 w-[2px] bg-muted rounded-full">
              {/* Efeito de preenchimento ao rolar (Opcional, mas dá um toque premium) */}
              <div className="absolute top-0 w-full h-full bg-gradient-to-b from-indigo-500/50 via-purple-500/20 to-zinc-800 opacity-30" />
           </div>
@@ -124,7 +124,7 @@ function TimelineCard({ item, index }: { item: TimelineItem; index: number }) {
             className="relative flex gap-8 group"
         >
             {/* Ícone / Marcador na Timeline */}
-            <div className="relative z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#09090b] border border-zinc-800 shadow-lg transition-all duration-300 group-hover:border-zinc-700 group-hover:scale-110 group-hover:shadow-[0_0_20px_-5px_rgba(99,102,241,0.3)]">
+            <div className="relative z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-card border border-border shadow-lg transition-all duration-300 group-hover:border-border group-hover:scale-110 group-hover:shadow-[0_0_20px_-5px_rgba(99,102,241,0.3)]">
                 <div className={`absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-10 transition-opacity duration-300 ${item.color.replace('text-', 'bg-')}`} />
                 <item.icon className={`h-6 w-6 transition-colors duration-300 ${item.color} opacity-80 group-hover:opacity-100`} />
             </div>
@@ -133,22 +133,22 @@ function TimelineCard({ item, index }: { item: TimelineItem; index: number }) {
             <div className="flex-1 pt-1.5">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-2">
                     {/* Hora */}
-                    <span className="text-sm font-mono text-white/90 font-bold bg-zinc-800/50 px-2 py-0.5 rounded border border-white/5">
+                    <span className="text-sm font-mono text-foreground/90 font-bold bg-muted/50 px-2 py-0.5 rounded border border-border">
                         {item.time}
                     </span>
                     
                     {/* Badge do Módulo */}
-                    <span className="text-[10px] uppercase tracking-widest font-bold text-zinc-500 flex items-center gap-1">
+                    <span className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground flex items-center gap-1">
                         <CheckCircle2 className="h-3 w-3" /> {item.module}
                     </span>
                 </div>
 
                 {/* Card visual */}
-                <div className="p-5 rounded-xl border border-white/5 bg-zinc-900/20 hover:bg-zinc-900/40 transition-colors group-hover:border-white/10">
-                    <h3 className="text-xl font-bold text-white mb-2 group-hover:text-indigo-100 transition-colors">
+                <div className="p-5 rounded-xl border border-border bg-card/20 hover:bg-card/40 transition-colors group-hover:border-border">
+                    <h3 className="text-xl font-bold text-foreground mb-2 group-hover:text-indigo-100 transition-colors">
                         {item.title}
                     </h3>
-                    <p className="text-zinc-400 text-sm leading-relaxed">
+                    <p className="text-muted-foreground text-sm leading-relaxed">
                         {item.desc}
                     </p>
                 </div>

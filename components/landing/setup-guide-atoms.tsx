@@ -33,7 +33,7 @@ export const CommandButton = ({
   return (
     <div className="space-y-3 pt-3 pb-5">
       {stepNumber && (
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-800/50 text-zinc-400 text-xs font-medium">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-muted/50 text-muted-foreground text-xs font-medium">
           <span className="flex items-center justify-center w-4 h-4 rounded-full bg-zinc-700 text-[10px]">
             {stepNumber}
           </span>
@@ -41,11 +41,11 @@ export const CommandButton = ({
         </div>
       )}
 
-      <p className="text-zinc-300 text-sm leading-relaxed">{description}</p>
+      <p className="text-foreground text-sm leading-relaxed">{description}</p>
 
       <div className="relative group">
         <code className={cn(
-          "block w-full text-left p-4 rounded-xl bg-zinc-800/80 text-sm font-mono whitespace-pre-wrap break-all border border-white/10 hover:border-white/20 transition-colors",
+          "block w-full text-left p-4 rounded-xl bg-muted/80 text-sm font-mono whitespace-pre-wrap break-all border border-border hover:border-border transition-colors",
           language === 'env' ? 'text-emerald-300/90' : 'text-cyan-300/90',
           "leading-relaxed"
         )}>
@@ -53,7 +53,7 @@ export const CommandButton = ({
         </code>
         <button
           onClick={handleCopy}
-          className="absolute right-3 top-3 p-2 rounded-lg bg-zinc-800/90 backdrop-blur-sm text-white/80 hover:bg-zinc-700 hover:text-white transition-all duration-200 shadow-lg hover:shadow-zinc-800/50"
+          className="absolute right-3 top-3 p-2 rounded-lg bg-muted/90 backdrop-blur-sm text-foreground/80 hover:bg-zinc-700 hover:text-foreground transition-all duration-200 shadow-lg hover:shadow-zinc-800/50"
           title={copied ? "Copiado!" : "Copiar comando"}
           aria-label={copied ? "Copiado" : "Copiar comando"}
         >
@@ -94,23 +94,23 @@ export const RequirementItem = ({
   linkText?: string;
   isOptional?: boolean;
 }) => (
-  <li className="flex items-start gap-4 p-4 rounded-xl bg-zinc-800/30 hover:bg-zinc-800/50 transition-colors">
+  <li className="flex items-start gap-4 p-4 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors">
     <div className={cn(
       "flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-lg",
-      isOptional ? "bg-zinc-800/50 text-zinc-400" : "bg-indigo-900/30 text-indigo-400"
+      isOptional ? "bg-muted/50 text-muted-foreground" : "bg-indigo-900/30 text-indigo-400"
     )}>
       <Icon className="h-5 w-5" />
     </div>
     <div className="flex-1 space-y-2">
       <div className="flex items-center gap-2">
-        <h4 className="font-semibold text-white">{title}</h4>
+        <h4 className="font-semibold text-foreground">{title}</h4>
         {isOptional && (
-          <span className="px-2 py-0.5 bg-zinc-800 text-zinc-400 text-xs rounded-full">
+          <span className="px-2 py-0.5 bg-muted text-muted-foreground text-xs rounded-full">
             Opcional
           </span>
         )}
       </div>
-      <div className="text-zinc-400 text-sm leading-relaxed">
+      <div className="text-muted-foreground text-sm leading-relaxed">
         {description}
       </div>
       {link && (

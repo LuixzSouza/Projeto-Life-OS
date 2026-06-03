@@ -33,32 +33,32 @@ const FeatureCard = ({ icon: Icon, title, value, subtext, color, onMouseEnter, o
     onMouseLeave={onMouseLeave}
   >
     <div className="
-      relative w-64 p-4 rounded-2xl border border-white/10 bg-[#050505]/90 backdrop-blur-md shadow-2xl 
+      landing-card relative w-64 p-4 rounded-2xl shadow-2xl
       cursor-pointer transition-all duration-300 pointer-events-auto group/card
-      hover:scale-110 hover:bg-[#0A0A0A] hover:border-indigo-500/50 hover:shadow-[0_0_60px_-15px_rgba(99,102,241,0.6)]
+      hover:scale-110 hover:border-primary/50 hover:shadow-[0_0_60px_-15px_var(--color-primary)]
     ">
       {/* Linha brilhante no topo */}
-      <div className="absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-indigo-500/80 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity" />
+      <div className="absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-primary/80 to-transparent opacity-0 group-hover/card:opacity-100 transition-opacity" />
 
       <div className="flex items-start justify-between mb-3">
-        <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center text-white shadow-inner ring-1 ring-inset ring-white/10 transition-colors group-hover/card:ring-white/30", color)}>
+        <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center text-white shadow-inner ring-1 ring-inset ring-white/20 transition-colors group-hover/card:ring-white/40", color)}>
           <Icon className="h-5 w-5" />
         </div>
-        
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/5 border border-white/5">
+
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-muted/60 border border-border/60">
           <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_#10b981]" />
-          <span className="text-[9px] font-mono text-zinc-400 uppercase tracking-wider group-hover/card:text-white transition-colors">Active</span>
+          <span className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider group-hover/card:text-foreground transition-colors">Active</span>
         </div>
       </div>
-      
+
       <div>
-        <p className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider mb-0.5">{title}</p>
-        <p className="text-xl font-bold text-zinc-100 leading-tight tracking-tight">{value}</p>
-        
+        <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-0.5">{title}</p>
+        <p className="text-xl font-bold text-foreground leading-tight tracking-tight">{value}</p>
+
         {/* Informação Extra */}
         <div className="grid grid-rows-[0fr] group-hover/card:grid-rows-[1fr] transition-all duration-300 ease-out">
           <div className="overflow-hidden">
-            <div className="mt-3 pt-3 border-t border-white/5 flex items-center gap-2 text-xs text-indigo-300 font-medium">
+            <div className="mt-3 pt-3 border-t border-border/60 flex items-center gap-2 text-xs text-primary font-medium">
               <Activity className="h-3 w-3" /> {subtext}
             </div>
           </div>
@@ -76,11 +76,11 @@ export default function HeroSection({ authState }: HeroProps) {
 
   return (
     <section className="relative min-h-[95vh] flex flex-col justify-center overflow-hidden pt-20 pb-20">
-      
-      {/* BACKGROUND */}
-      <div className="absolute inset-0 bg-[#030303] pointer-events-none">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1200px] h-[800px] bg-indigo-600/5 rounded-full blur-[130px]" />
-        <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-purple-900/10 rounded-full blur-[100px]" />
+
+      {/* BACKGROUND (transparente — deixa a aurora themeable da página aparecer) */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1200px] h-[800px] bg-primary/5 rounded-full blur-[130px]" />
+        <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-violet-500/10 rounded-full blur-[100px]" />
       </div>
 
       <div className="container relative z-10 px-6 mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
@@ -91,34 +91,34 @@ export default function HeroSection({ authState }: HeroProps) {
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6 }}
-            className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-zinc-800 bg-zinc-900/50 backdrop-blur-sm group cursor-default hover:border-indigo-500/30 transition-colors"
+            className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-border bg-muted/50 backdrop-blur-sm group cursor-default hover:border-primary/40 transition-colors"
           >
              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
             </span>
-            <span className="text-xs font-medium text-zinc-300 group-hover:text-indigo-300 transition-colors">Sistema Operacional Pessoal v1.0</span>
+            <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">Sistema Operacional Pessoal v1.0</span>
           </motion.div>
 
-          <motion.h1 
+          <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.8 }}
-            className="text-5xl md:text-7xl font-bold tracking-tight text-white leading-[1.1]"
+            className="text-5xl md:text-7xl font-bold tracking-tight text-foreground leading-[1.1]"
           >
             Sua vida, <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-emerald-400 animate-gradient-x">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 via-violet-500 to-emerald-500 animate-gradient-x">
                 Conectada e Local.
             </span>
           </motion.h1>
 
-          <motion.p 
+          <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4, duration: 0.8 }}
-            className="text-lg text-zinc-400 leading-relaxed"
+            className="text-lg text-muted-foreground leading-relaxed"
           >
-            O <strong>Life OS</strong> centraliza finanças, projetos, estudos e saúde em um único banco de dados SQLite. Sem assinaturas. Privacidade total.
+            O <strong className="text-foreground">Life OS</strong> centraliza finanças, projetos, estudos e saúde em um único banco de dados SQLite. Sem assinaturas. Privacidade total.
           </motion.p>
 
           <motion.div 
@@ -128,13 +128,13 @@ export default function HeroSection({ authState }: HeroProps) {
             className="flex flex-col sm:flex-row items-center gap-4 pt-4 justify-center lg:justify-start"
           >
             <Link href={targetUrl} className="w-full sm:w-auto">
-              <Button className="w-full sm:w-auto h-14 px-8 rounded-full bg-white text-black hover:bg-zinc-200 text-lg font-bold shadow-[0_0_30px_-5px_rgba(255,255,255,0.2)] transition-all hover:scale-105 active:scale-95">
-                {isLoggedIn ? "Acessar Dashboard" : "Começar Agora"} 
+              <Button className="w-full sm:w-auto h-14 px-8 rounded-full bg-primary text-primary-foreground hover:opacity-90 text-lg font-bold shadow-lg shadow-primary/20 transition-all hover:scale-105 active:scale-95">
+                {isLoggedIn ? "Acessar Dashboard" : "Começar Agora"}
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
             <Link href="#modules" className="w-full sm:w-auto">
-              <Button variant="ghost" className="w-full sm:w-auto h-14 px-8 rounded-full text-zinc-300 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10">
+              <Button variant="ghost" className="w-full sm:w-auto h-14 px-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted border border-transparent hover:border-border">
                 Explorar Módulos
               </Button>
             </Link>
@@ -152,23 +152,23 @@ export default function HeroSection({ authState }: HeroProps) {
             className="absolute z-30 flex items-center justify-center pointer-events-none"
           >
              {/* Efeitos de Energia */}
-             <div className="absolute w-[500px] h-[500px] bg-indigo-500/5 rounded-full blur-[120px] animate-pulse" />
-             <div className="absolute w-72 h-72 rounded-full border border-indigo-500/10 border-t-indigo-400/40 animate-[spin_10s_linear_infinite]" />
-             <div className="absolute w-60 h-60 rounded-full border border-purple-500/10 border-b-purple-400/40 animate-[spin_15s_linear_infinite_reverse]" />
-             <div className="absolute w-44 h-44 rounded-full border border-dashed border-white/5 animate-[spin_25s_linear_infinite]" />
+             <div className="absolute w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] animate-pulse" />
+             <div className="absolute w-72 h-72 rounded-full border border-primary/10 border-t-primary/50 animate-[spin_10s_linear_infinite]" />
+             <div className="absolute w-60 h-60 rounded-full border border-violet-500/10 border-b-violet-500/50 animate-[spin_15s_linear_infinite_reverse]" />
+             <div className="absolute w-44 h-44 rounded-full border border-dashed border-border animate-[spin_25s_linear_infinite]" />
 
              {/* A Esfera Sólida (Núcleo) */}
-             <div className="relative w-36 h-36 rounded-full bg-[#030303] border border-indigo-500/30 shadow-[0_0_80px_-20px_rgba(99,102,241,0.6)] flex items-center justify-center group cursor-pointer pointer-events-auto hover:scale-105 transition-transform duration-500">
+             <div className="relative w-36 h-36 rounded-full bg-card border border-primary/30 shadow-[0_0_80px_-20px_var(--color-primary)] flex items-center justify-center group cursor-pointer pointer-events-auto hover:scale-105 transition-transform duration-500">
                 {/* Efeito Radar */}
-                <div className="absolute inset-0 rounded-full bg-[conic-gradient(from_0deg,transparent_0_300deg,rgba(99,102,241,0.2)_360deg)] animate-[spin_4s_linear_infinite]" />
-                <div className="absolute inset-1 rounded-full bg-[#050505]" />
-                
+                <div className="absolute inset-0 rounded-full bg-[conic-gradient(from_0deg,transparent_0_300deg,var(--color-primary)_360deg)] opacity-30 animate-[spin_4s_linear_infinite]" />
+                <div className="absolute inset-1 rounded-full bg-background" />
+
                 {/* Conteúdo */}
                 <div className="relative z-10 flex flex-col items-center gap-1">
-                    <Cpu className="h-10 w-10 text-indigo-400 animate-pulse drop-shadow-[0_0_15px_rgba(99,102,241,1)]" />
+                    <Cpu className="h-10 w-10 text-primary animate-pulse drop-shadow-[0_0_15px_var(--color-primary)]" />
                     <div className="flex flex-col items-center">
-                        <span className="text-[10px] font-bold font-mono text-white tracking-[0.2em]">CORE</span>
-                        <span className="text-[8px] font-mono text-indigo-400/70">ONLINE</span>
+                        <span className="text-[10px] font-bold font-mono text-foreground tracking-[0.2em]">CORE</span>
+                        <span className="text-[8px] font-mono text-primary/70">ONLINE</span>
                     </div>
                 </div>
              </div>
@@ -179,7 +179,7 @@ export default function HeroSection({ authState }: HeroProps) {
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
              
              {/* Trilho Visual (Fixo e com Z-index baixo) */}
-             <div className="absolute w-[450px] h-[450px] rounded-full border border-white/5 border-dashed z-10" />
+             <div className="absolute w-[450px] h-[450px] rounded-full border border-border/70 border-dashed z-10" />
 
              {/* === CARD 1: FINANÇAS === */}
              {/* O container de rotação (div) recebe o Z-Index dinâmico */}
@@ -229,7 +229,7 @@ export default function HeroSection({ authState }: HeroProps) {
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
              
              {/* Trilho Visual (z-0 para ficar bem no fundo) */}
-             <div className="absolute w-[700px] h-[700px] rounded-full border border-white/5 z-0" />
+             <div className="absolute w-[700px] h-[700px] rounded-full border border-border/50 z-0" />
 
              {/* === CARD 3: PROJETOS === */}
              <div 

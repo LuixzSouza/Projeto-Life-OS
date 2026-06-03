@@ -25,7 +25,7 @@ export function OverviewCard() {
         description="Performance semanal."
         className="col-span-1 min-h-[180px]" // Altura fixa compatível com o grid
     >
-        <div className="flex flex-col h-full w-full bg-[#09090b] relative overflow-hidden">
+        <div className="flex flex-col h-full w-full bg-card relative overflow-hidden">
             
             <div className="flex flex-1 gap-4 p-4 pb-0">
                 
@@ -33,13 +33,13 @@ export function OverviewCard() {
                 <div className="flex flex-col justify-between pb-4 w-[40%] shrink-0">
                     <div>
                         <div className="flex items-end gap-2">
-                            <span className="text-4xl font-bold text-white tracking-tighter">84%</span>
+                            <span className="text-4xl font-bold text-foreground tracking-tighter">84%</span>
                             <div className="flex items-center text-emerald-500 mb-1.5">
                                 <ArrowUpRight className="h-3 w-3" />
                                 <span className="text-[10px] font-bold">12%</span>
                             </div>
                         </div>
-                        <span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Score Diário</span>
+                        <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Score Diário</span>
                     </div>
 
                     {/* Mini Stats */}
@@ -49,8 +49,8 @@ export function OverviewCard() {
                                 <Zap className="h-3 w-3" />
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-[9px] text-zinc-500 uppercase">Foco</span>
-                                <span className="text-xs font-bold text-zinc-200">4h 20m</span>
+                                <span className="text-[9px] text-muted-foreground uppercase">Foco</span>
+                                <span className="text-xs font-bold text-foreground">4h 20m</span>
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -58,8 +58,8 @@ export function OverviewCard() {
                                 <Target className="h-3 w-3" />
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-[9px] text-zinc-500 uppercase">Metas</span>
-                                <span className="text-xs font-bold text-zinc-200">8 / 10</span>
+                                <span className="text-[9px] text-muted-foreground uppercase">Metas</span>
+                                <span className="text-xs font-bold text-foreground">8 / 10</span>
                             </div>
                         </div>
                     </div>
@@ -83,7 +83,7 @@ export function OverviewCard() {
                                 content={({ active, payload }) => {
                                     if (active && payload && payload.length) {
                                     return (
-                                        <div className="bg-zinc-900 border border-white/10 px-2 py-1 rounded shadow-xl">
+                                        <div className="bg-card border border-border px-2 py-1 rounded shadow-xl">
                                             <p className="text-[10px] font-bold text-indigo-400">{payload[0].value}%</p>
                                         </div>
                                     );
@@ -106,7 +106,7 @@ export function OverviewCard() {
             </div>
 
             {/* Rodapé Decorativo (Barra de Tendência) */}
-            <div className="h-1 w-full bg-zinc-900 mt-auto flex">
+            <div className="h-1 w-full bg-card mt-auto flex">
                 <div className="w-[84%] h-full bg-gradient-to-r from-indigo-500 to-purple-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]" />
             </div>
 

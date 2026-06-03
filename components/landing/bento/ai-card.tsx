@@ -44,9 +44,9 @@ const PROVIDER_STYLES: Record<ProviderKey, ProviderStyle> = {
         id: "ollama",
         label: "Ollama (Local)",
         icon: HardDrive, 
-        color: "text-zinc-400",
-        bgColor: "bg-zinc-800",
-        borderColor: "border-zinc-700"
+        color: "text-muted-foreground",
+        bgColor: "bg-muted",
+        borderColor: "border-border"
     },
     openai: {
         id: "openai",
@@ -211,11 +211,11 @@ export function AICard() {
       icon={Bot}
       className="col-span-2 row-span-2 h-full"
     >
-      <div className="flex flex-col h-full bg-[#09090b] relative overflow-hidden font-sans">
+      <div className="flex flex-col h-full bg-card relative overflow-hidden font-sans">
         
         {/* --- NOVO: HUD SUPERIOR (MOSTRA TODAS AS IAs) --- */}
         <div className="absolute top-0 inset-x-0 p-3 flex justify-center z-20 bg-gradient-to-b from-[#09090b] to-transparent">
-            <div className="flex items-center gap-2 p-1.5 rounded-full bg-zinc-900/80 border border-white/5 backdrop-blur-md shadow-xl">
+            <div className="flex items-center gap-2 p-1.5 rounded-full bg-card/80 border border-border backdrop-blur-md shadow-xl">
                 {(Object.keys(PROVIDER_STYLES) as ProviderKey[]).map((key) => {
                     const style = PROVIDER_STYLES[key];
                     const Icon = style.icon;
@@ -229,7 +229,7 @@ export function AICard() {
                                 isActive ? cn(style.bgColor, "scale-110 shadow-lg") : "opacity-30 hover:opacity-50"
                             )}
                         >
-                            <Icon className={cn("w-3.5 h-3.5", isActive ? style.color : "text-zinc-400")} />
+                            <Icon className={cn("w-3.5 h-3.5", isActive ? style.color : "text-muted-foreground")} />
                             {isActive && (
                                 <span className={cn("absolute -bottom-1 w-1 h-1 rounded-full", style.color.replace("text-", "bg-"))} />
                             )}
@@ -266,12 +266,12 @@ export function AICard() {
                             "h-8 w-8 rounded-full flex items-center justify-center shrink-0 border transition-colors duration-500",
                             msg.role === "assistant" 
                                 ? cn(currentStyle.bgColor, currentStyle.borderColor)
-                                : "bg-zinc-800 border-zinc-700"
+                                : "bg-muted border-border"
                         )}>
                             {msg.role === "assistant" ? (
                                 <CurrentIcon className={cn("h-4 w-4", currentStyle.color)} />
                             ) : (
-                                <div className="h-4 w-4 text-zinc-400" /> 
+                                <div className="h-4 w-4 text-muted-foreground" /> 
                             )}
                         </div>
 
@@ -279,14 +279,14 @@ export function AICard() {
                         <div className={cn(
                             "flex flex-col max-w-[85%] rounded-2xl px-4 py-2.5 text-xs leading-relaxed transition-colors duration-500",
                             msg.role === "user" 
-                                ? "bg-zinc-800 text-white rounded-tr-none" 
-                                : "bg-transparent text-zinc-300 border border-zinc-800 rounded-tl-none"
+                                ? "bg-muted text-foreground rounded-tr-none" 
+                                : "bg-transparent text-foreground border border-border rounded-tl-none"
                         )}>
                             <div className="whitespace-pre-wrap">
                                 {msg.content.split("```").map((part: string, i: number) => {
                                     if (i % 2 === 1) { // Código
                                         return (
-                                            <div key={i} className="my-2 rounded bg-[#111] border border-white/10 p-2 font-mono text-[10px] text-emerald-400 overflow-x-hidden">
+                                            <div key={i} className="my-2 rounded bg-card border border-border p-2 font-mono text-[10px] text-emerald-400 overflow-x-hidden">
                                                 {part.replace(/^tsx\n|^js\n/, "")}
                                             </div>
                                         );
@@ -296,7 +296,7 @@ export function AICard() {
                                     return (
                                         <span key={i}>
                                             {parts.map((p, j) => 
-                                                p.startsWith("**") ? <strong key={j} className="text-white font-semibold">{p.replace(/\*\*/g, "")}</strong> : p
+                                                p.startsWith("**") ? <strong key={j} className="text-foreground font-semibold">{p.replace(/\*\*/g, "")}</strong> : p
                                             )}
                                         </span>
                                     );
@@ -320,7 +320,7 @@ export function AICard() {
                     <div className={cn("h-8 w-8 rounded-full flex items-center justify-center shrink-0 border", currentStyle.bgColor, currentStyle.borderColor)}>
                         <CurrentIcon className={cn("h-4 w-4 animate-pulse", currentStyle.color)} />
                     </div>
-                    <div className="flex items-center gap-1 bg-zinc-900 px-4 py-3 rounded-2xl rounded-tl-none border border-zinc-800 w-fit">
+                    <div className="flex items-center gap-1 bg-card px-4 py-3 rounded-2xl rounded-tl-none border border-border w-fit">
                         <span className={cn("w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:-0.3s]", currentStyle.color.replace("text-", "bg-"))}></span>
                         <span className={cn("w-1.5 h-1.5 rounded-full animate-bounce [animation-delay:-0.15s]", currentStyle.color.replace("text-", "bg-"))}></span>
                         <span className={cn("w-1.5 h-1.5 rounded-full animate-bounce", currentStyle.color.replace("text-", "bg-"))}></span>
@@ -336,7 +336,7 @@ export function AICard() {
                 {/* A "Pílula" (Badge) flutuante acima do input */}
                 <div className="flex justify-center mb-2">
                     <span className={cn(
-                        "text-[9px] uppercase font-bold tracking-widest px-3 py-1 rounded-full border bg-black/80 backdrop-blur shadow-sm transition-colors duration-500 flex items-center gap-1.5",
+                        "text-[9px] uppercase font-bold tracking-widest px-3 py-1 rounded-full border bg-background/80 backdrop-blur shadow-sm transition-colors duration-500 flex items-center gap-1.5",
                         currentStyle.color,
                         currentStyle.borderColor
                     )}>
@@ -347,20 +347,20 @@ export function AICard() {
 
                 {/* O Input Container */}
                 <div className={cn(
-                    "flex items-center gap-2 bg-[#09090b] border rounded-2xl p-1.5 shadow-lg transition-all duration-500",
+                    "flex items-center gap-2 bg-card border rounded-2xl p-1.5 shadow-lg transition-all duration-500",
                     currentStyle.borderColor
                 )}>
                     <input 
                         disabled
                         placeholder={`Pergunte ao ${currentStyle.label.split(" ")[0]}...`} 
                         value={inputText}
-                        className="flex-1 bg-transparent border-none outline-none text-xs text-zinc-200 px-3 placeholder:text-zinc-600 font-medium h-9"
+                        className="flex-1 bg-transparent border-none outline-none text-xs text-foreground px-3 placeholder:text-muted-foreground font-medium h-9"
                     />
                     <div className={cn(
                         "h-8 w-8 rounded-xl flex items-center justify-center transition-all shrink-0",
                         inputText.length > 0 
                             ? "bg-white text-black shadow-md scale-100" 
-                            : "bg-zinc-800 text-zinc-600"
+                            : "bg-muted text-muted-foreground"
                     )}>
                         <ArrowUp className="h-4 w-4" />
                     </div>

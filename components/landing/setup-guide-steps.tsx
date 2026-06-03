@@ -15,8 +15,8 @@ export const STEPS: Record<SetupStepKey, StepData> = {
     content: (
       <div className="space-y-6">
         <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-900/20 to-purple-900/20 border border-indigo-800/30">
-          <p className="text-zinc-300 leading-relaxed">
-            O <span className="font-semibold text-white">Life OS</span> é um sistema operacional pessoal completo desenvolvido para operar 100% localmente.
+          <p className="text-foreground leading-relaxed">
+            O <span className="font-semibold text-foreground">Life OS</span> é um sistema operacional pessoal completo desenvolvido para operar 100% localmente.
             Este guia irá ajudá-lo a configurar o ambiente de desenvolvimento necessário.
           </p>
         </div>
@@ -25,7 +25,7 @@ export const STEPS: Record<SetupStepKey, StepData> = {
           <div className="flex items-start gap-3 p-4 rounded-xl bg-red-900/10 border border-red-800/30">
             <Shield className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
             <div className="space-y-2">
-              <h4 className="font-bold text-white text-sm">Importante</h4>
+              <h4 className="font-bold text-foreground text-sm">Importante</h4>
               <p className="text-sm text-red-300/90">
                 É necessário conhecimento básico de Terminal/Linha de Comando.
                 Recomendamos que usuários inexperientes busquem tutoriais básicos antes de prosseguir.
@@ -43,7 +43,7 @@ export const STEPS: Record<SetupStepKey, StepData> = {
     progressLabel: "Pré-requisitos",
     content: (
       <div className="space-y-4">
-        <p className="text-zinc-400 text-sm">
+        <p className="text-muted-foreground text-sm">
           Antes de começar, certifique-se de ter os seguintes programas instalados:
         </p>
 
@@ -54,7 +54,7 @@ export const STEPS: Record<SetupStepKey, StepData> = {
             description={
               <>
                 <p>Motor de execução JavaScript necessário para o Next.js</p>
-                <p className="text-xs text-zinc-500 mt-1">Inclui o NPM (Node Package Manager)</p>
+                <p className="text-xs text-muted-foreground mt-1">Inclui o NPM (Node Package Manager)</p>
               </>
             }
             link="https://nodejs.org/"
@@ -75,7 +75,7 @@ export const STEPS: Record<SetupStepKey, StepData> = {
             description={
               <div className="space-y-1">
                 <p>Interface para executar comandos:</p>
-                <ul className="text-xs text-zinc-500 list-disc list-inside pl-2 space-y-1">
+                <ul className="text-xs text-muted-foreground list-disc list-inside pl-2 space-y-1">
                   <li><strong>Windows:</strong> PowerShell, CMD, ou Windows Terminal</li>
                   <li><strong>macOS:</strong> Terminal, iTerm2</li>
                   <li><strong>Linux:</strong> Terminal padrão da distribuição</li>
@@ -94,12 +94,12 @@ export const STEPS: Record<SetupStepKey, StepData> = {
           />
         </ul>
 
-        <div className="mt-6 p-4 rounded-xl bg-zinc-800/30 border border-zinc-700/50">
-          <h4 className="font-semibold text-white text-sm mb-2">Verificação rápida</h4>
-          <p className="text-sm text-zinc-400">
+        <div className="mt-6 p-4 rounded-xl bg-muted/30 border border-border/50">
+          <h4 className="font-semibold text-foreground text-sm mb-2">Verificação rápida</h4>
+          <p className="text-sm text-muted-foreground">
             Após instalar, abra seu terminal e execute:
           </p>
-          <code className="block mt-2 p-3 rounded-lg bg-zinc-900 text-xs font-mono text-cyan-300">
+          <code className="block mt-2 p-3 rounded-lg bg-card text-xs font-mono text-cyan-300">
             node --version && git --version
           </code>
         </div>
@@ -113,7 +113,7 @@ export const STEPS: Record<SetupStepKey, StepData> = {
     progressLabel: "Comandos",
     content: (
       <div className="space-y-6">
-        <p className="text-zinc-400 text-sm">
+        <p className="text-muted-foreground text-sm">
           Abra o terminal na pasta onde deseja instalar o projeto e execute os comandos abaixo:
         </p>
 
@@ -139,8 +139,8 @@ export const STEPS: Record<SetupStepKey, StepData> = {
         />
 
         <div className="mt-8 p-4 rounded-xl bg-gradient-to-r from-indigo-900/20 to-purple-900/20 border border-indigo-800/30">
-          <h4 className="font-semibold text-white text-sm mb-2">Dica</h4>
-          <p className="text-sm text-zinc-300">
+          <h4 className="font-semibold text-foreground text-sm mb-2">Dica</h4>
+          <p className="text-sm text-foreground">
             Se encontrar erros durante a instalação, certifique-se de estar usando a versão correta do Node.js (v18+).
             Você pode verificar com <code className="text-cyan-300 text-xs">node --version</code>
           </p>
@@ -155,14 +155,14 @@ export const STEPS: Record<SetupStepKey, StepData> = {
     progressLabel: "Banco de Dados",
     content: (
       <div className="space-y-6">
-        <p className="text-zinc-400 text-sm leading-relaxed">
+        <p className="text-muted-foreground text-sm leading-relaxed">
           O Life OS armazena seus dados em um arquivo SQLite portátil. Você define onde esse arquivo (.db) deve ficar.
         </p>
 
         {/* Explicação da Configuração (Step 3.1) */}
-        <div className="p-4 rounded-xl bg-zinc-800/30 border border-zinc-700/50">
-          <h4 className="font-semibold text-white text-base mb-3">1. Crie o arquivo <code className="text-emerald-300">.env</code></h4>
-          <p className="text-sm text-zinc-400 mb-3">
+        <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
+          <h4 className="font-semibold text-foreground text-base mb-3">1. Crie o arquivo <code className="text-emerald-300">.env</code></h4>
+          <p className="text-sm text-muted-foreground mb-3">
             Insira este conteúdo na raiz do projeto. O caminho padrão salva o banco na pasta `prisma/`:
           </p>
 
@@ -179,33 +179,33 @@ DATABASE_URL="file:./prisma/life_os.db"
         </div>
 
         {/* Explicação sobre Armazenamento (Step 3.2 - Opcional, mas crucial) */}
-        <div className="p-4 rounded-xl bg-zinc-800/50 border border-zinc-700/50">
-          <h4 className="font-semibold text-white text-base mb-2 flex items-center gap-2">
+        <div className="p-4 rounded-xl bg-muted/50 border border-border/50">
+          <h4 className="font-semibold text-foreground text-base mb-2 flex items-center gap-2">
             <ArrowRight className="h-4 w-4 text-indigo-400 shrink-0" />
             Armazenamento Opcional
           </h4>
-          <p className="text-sm text-zinc-400 mb-3">
+          <p className="text-sm text-muted-foreground mb-3">
             Você pode alterar o caminho para um HD externo ou uma pasta sincronizada com a nuvem (como Google Drive) **após o primeiro uso**.
           </p>
 
           <div className="space-y-2 text-sm">
-            <p className="text-zinc-300 flex items-center gap-2">
+            <p className="text-foreground flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
               **Recomendação:** Use uma pasta sincronizada para ter backup automático.
             </p>
-            <p className="text-zinc-300 flex items-center gap-2">
+            <p className="text-foreground flex items-center gap-2">
               <Code className="h-4 w-4 text-indigo-400 shrink-0" />
               **Exemplo de Caminho (Windows):** <code className="text-cyan-300">DATABASE_URL=&quot;file:D:/LifeOS_Data/life.db&quot;</code>
             </p>
           </div>
 
-          <p className="text-xs text-zinc-500 mt-3">
+          <p className="text-xs text-muted-foreground mt-3">
             <span className="font-bold">Atenção:</span> Se alterar o caminho aqui, o Next.js precisará ser reiniciado. Você também poderá mudar este caminho diretamente na seção &quot;Configurações {'>'} Dados & Backup&quot; do sistema após o login.
           </p>
         </div>
 
         {/* Comando de Criação (Step 3.3) */}
-        <h4 className="font-semibold text-white text-base pt-2">2. Crie o Banco e as Tabelas</h4>
+        <h4 className="font-semibold text-foreground text-base pt-2">2. Crie o Banco e as Tabelas</h4>
         <CommandButton
           stepNumber={4}
           command="npx prisma db push"
@@ -214,7 +214,7 @@ DATABASE_URL="file:./prisma/life_os.db"
         />
 
         <div className="p-4 rounded-xl bg-emerald-900/10 border border-emerald-800/30 mt-4">
-          <h4 className="font-semibold text-white text-sm mb-2 flex items-center gap-2">
+          <h4 className="font-semibold text-foreground text-sm mb-2 flex items-center gap-2">
             <Shield className="h-4 w-4 text-emerald-400" />
             Privacidade Garantida
           </h4>
@@ -241,38 +241,38 @@ DATABASE_URL="file:./prisma/life_os.db"
 
         <div className="p-6 rounded-2xl bg-gradient-to-br from-indigo-900/30 to-purple-900/30 border border-indigo-800/50 text-center">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 mb-4">
-            <CheckCircle2 className="h-6 w-6 text-white" />
+            <CheckCircle2 className="h-6 w-6 text-foreground" />
           </div>
 
-          <h3 className="text-xl font-bold text-white mb-2">Configuração Concluída!</h3>
-          <p className="text-zinc-300 mb-4">
+          <h3 className="text-xl font-bold text-foreground mb-2">Configuração Concluída!</h3>
+          <p className="text-foreground mb-4">
             O Life OS está pronto para ser executado localmente
           </p>
 
-          <div className="inline-block p-4 rounded-xl bg-black/50 border border-white/10">
-            <div className="text-sm text-zinc-400 mb-2">Acesse em:</div>
+          <div className="inline-block p-4 rounded-xl bg-background/50 border border-border">
+            <div className="text-sm text-muted-foreground mb-2">Acesse em:</div>
             <Link target="_blank" href={"http://localhost:3000"} className="text-2xl font-bold text-emerald-400 font-mono">
               http://localhost:3000
             </Link>
           </div>
 
-          <p className="text-sm text-zinc-500 mt-6">
+          <p className="text-sm text-muted-foreground mt-6">
             Após acessar, você será redirecionado para o <strong>Assistente de Configuração Inicial</strong>
           </p>
         </div>
 
-        <div className="p-4 rounded-xl bg-zinc-800/30 border border-zinc-700/50">
-          <h4 className="font-semibold text-white text-sm mb-2">Comandos úteis para desenvolvimento</h4>
+        <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
+          <h4 className="font-semibold text-foreground text-sm mb-2">Comandos úteis para desenvolvimento</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
             <div>
-              <p className="text-xs text-zinc-500 mb-1">Para parar o servidor:</p>
-              <code className="block p-2 rounded-lg bg-zinc-900 text-xs font-mono text-zinc-400">
+              <p className="text-xs text-muted-foreground mb-1">Para parar o servidor:</p>
+              <code className="block p-2 rounded-lg bg-card text-xs font-mono text-muted-foreground">
                 Ctrl + C
               </code>
             </div>
             <div>
-              <p className="text-xs text-zinc-500 mb-1">Para reinstalar dependências:</p>
-              <code className="block p-2 rounded-lg bg-zinc-900 text-xs font-mono text-zinc-400">
+              <p className="text-xs text-muted-foreground mb-1">Para reinstalar dependências:</p>
+              <code className="block p-2 rounded-lg bg-card text-xs font-mono text-muted-foreground">
                 npm ci
               </code>
             </div>

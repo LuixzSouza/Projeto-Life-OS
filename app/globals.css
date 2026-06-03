@@ -359,8 +359,86 @@ body.privacy-mode-active .privacy-blur:hover {
   }
 }
 
+/* Gradiente animado horizontal (usado em textos/realces da landing). */
+@keyframes gradient-x {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* Brilho pulsante suave para realces da landing. */
+@keyframes aurora-pulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.08); }
+}
+
 @layer utilities {
   .animate-fade-in {
     animation: fade-in 0.4s ease-out both;
+  }
+
+  /* ---------------------------------------------------------------
+     LANDING — superfícies e realces que respondem ao tema (light/dark)
+     --------------------------------------------------------------- */
+
+  /* Texto com gradiente da marca animado (indigo → violet → emerald). */
+  .animate-gradient-x {
+    background-size: 200% 200%;
+    animation: gradient-x 6s ease infinite;
+  }
+
+  /* Fundo base da landing: claro suave no light, quase-preto no dark.
+     Usa os tokens do tema, então acompanha o toggle automaticamente. */
+  .landing-surface {
+    @apply bg-background text-foreground;
+  }
+
+  /* Grade sutil de fundo (blueprint) que clareia/escurece com o tema. */
+  .landing-grid {
+    background-image:
+      linear-gradient(to right, color-mix(in oklch, var(--foreground) 6%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklch, var(--foreground) 6%, transparent) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+
+  /* Manchas de "aurora" coloridas — leves no light, mais vivas no dark. */
+  .landing-aurora {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .landing-aurora::before,
+  .landing-aurora::after {
+    content: "";
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(120px);
+    animation: aurora-pulse 12s ease-in-out infinite;
+  }
+  .landing-aurora::before {
+    width: 45%;
+    height: 45%;
+    top: -8%;
+    left: -8%;
+    background: color-mix(in oklch, var(--primary) 22%, transparent);
+  }
+  .landing-aurora::after {
+    width: 42%;
+    height: 42%;
+    bottom: -10%;
+    right: -8%;
+    background: oklch(0.62 0.2 300 / 0.18);
+    animation-delay: -6s;
+  }
+  .dark .landing-aurora::before {
+    background: color-mix(in oklch, var(--primary) 30%, transparent);
+  }
+  .dark .landing-aurora::after {
+    background: oklch(0.55 0.24 300 / 0.28);
+  }
+
+  /* Cartão de vidro da landing, themeable (substitui bg-[#111] fixos). */
+  .landing-card {
+    @apply bg-card/70 backdrop-blur-xl border border-border/60;
   }
 }

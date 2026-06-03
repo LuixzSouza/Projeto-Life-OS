@@ -63,10 +63,10 @@ export function SettingsCard() {
         {/* Glow de Fundo */}
         <div className={cn("absolute inset-0 bg-gradient-to-tr to-transparent opacity-20 transition-colors duration-700 pointer-events-none", currentGlow)} />
 
-        <div className="flex h-full w-full bg-[#09090b]">
+        <div className="flex h-full w-full bg-card">
             
             {/* --- SIDEBAR DE NAVEGAÇÃO --- */}
-            <div className="w-[70px] border-r border-white/5 flex flex-col items-center py-4 gap-4 bg-zinc-900/30 z-20">
+            <div className="w-[70px] border-r border-border flex flex-col items-center py-4 gap-4 bg-card/30 z-20">
                 {menuItems.map((item) => {
                     const Icon = item.icon;
                     const isActive = activeTab === item.id;
@@ -76,7 +76,7 @@ export function SettingsCard() {
                             onClick={() => setActiveTab(item.id as Tab)}
                             className={cn(
                                 "p-2.5 rounded-xl transition-all duration-300 relative group",
-                                isActive ? "bg-white/10 text-white" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                                isActive ? "bg-foreground/10 text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
                             )}
                             title={item.label}
                         >
@@ -109,19 +109,19 @@ export function SettingsCard() {
                                     <div className={cn("w-10 h-6 rounded-full p-1 flex items-center transition-colors", darkMode ? "bg-zinc-700" : "bg-zinc-300")}>
                                         <motion.div layout className="w-4 h-4 rounded-full bg-white shadow-sm" />
                                     </div>
-                                    <span className="text-xs font-medium text-zinc-400">{darkMode ? "Dark Mode" : "Light Mode"}</span>
+                                    <span className="text-xs font-medium text-muted-foreground">{darkMode ? "Dark Mode" : "Light Mode"}</span>
                                 </div>
                                 <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setSoundOn(!soundOn)}>
-                                    <div className={cn("w-10 h-6 rounded-full p-1 flex items-center transition-colors", soundOn ? "bg-emerald-500" : "bg-zinc-800 border border-zinc-700")}>
+                                    <div className={cn("w-10 h-6 rounded-full p-1 flex items-center transition-colors", soundOn ? "bg-emerald-500" : "bg-muted border border-border")}>
                                         <motion.div layout className={cn("w-4 h-4 rounded-full shadow-sm", soundOn ? "bg-white" : "bg-zinc-500")} />
                                     </div>
-                                    <span className="text-xs font-medium text-zinc-400">Sons</span>
+                                    <span className="text-xs font-medium text-muted-foreground">Sons</span>
                                 </div>
                             </div>
 
                             {/* Cores */}
                             <div className="space-y-2">
-                                <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">Cor de Destaque</span>
+                                <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Cor de Destaque</span>
                                 <div className="flex gap-3">
                                     {themes.map((theme) => (
                                         <button 
@@ -146,22 +146,22 @@ export function SettingsCard() {
                             initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}
                             className="flex flex-col gap-3 h-full"
                         >
-                            <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Chaves de API</h3>
+                            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Chaves de API</h3>
                             
                             {["OpenAI (GPT-4)", "Anthropic (Claude)", "Database (Supabase)"].map((label, i) => (
                                 <div key={i} className="space-y-1">
-                                    <label className="text-[10px] text-zinc-500">{label}</label>
+                                    <label className="text-[10px] text-muted-foreground">{label}</label>
                                     <div className="flex gap-2">
-                                        <div className="flex-1 h-8 bg-zinc-800/50 border border-white/5 rounded-lg flex items-center px-3 relative">
+                                        <div className="flex-1 h-8 bg-muted/50 border border-border rounded-lg flex items-center px-3 relative">
                                             <input 
                                                 type={showKey === String(i) ? "text" : "password"} 
                                                 value="sk-89210391203912039"
                                                 disabled
-                                                className="bg-transparent border-none outline-none text-xs text-zinc-300 w-full font-mono"
+                                                className="bg-transparent border-none outline-none text-xs text-foreground w-full font-mono"
                                             />
                                             <button 
                                                 onClick={() => setShowKey(showKey === String(i) ? null : String(i))}
-                                                className="absolute right-2 text-zinc-500 hover:text-white"
+                                                className="absolute right-2 text-muted-foreground hover:text-foreground"
                                             >
                                                 {showKey === String(i) ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
                                             </button>
@@ -197,16 +197,16 @@ export function SettingsCard() {
 
                             {/* Storage Usage */}
                             <div className="space-y-2">
-                                <div className="flex justify-between text-[10px] text-zinc-400">
+                                <div className="flex justify-between text-[10px] text-muted-foreground">
                                     <span className="flex items-center gap-1"><HardDrive className="h-3 w-3" /> Armazenamento</span>
-                                    <span className="text-zinc-200">1.2 GB / 5 GB</span>
+                                    <span className="text-foreground">1.2 GB / 5 GB</span>
                                 </div>
-                                <div className="h-2 w-full bg-zinc-800 rounded-full overflow-hidden">
+                                <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
                                     <div className="h-full w-[24%] bg-indigo-500 rounded-full" />
                                 </div>
                             </div>
 
-                            <button className="w-full py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px] font-bold rounded-lg flex items-center justify-center gap-2 transition-all">
+                            <button className="w-full py-2 bg-muted hover:bg-zinc-700 text-foreground text-[10px] font-bold rounded-lg flex items-center justify-center gap-2 transition-all">
                                 <RefreshCw className="h-3 w-3" /> Fazer Backup Agora
                             </button>
                         </motion.div>
@@ -221,7 +221,7 @@ export function SettingsCard() {
                         >
                             <div className="relative">
                                 <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 p-0.5">
-                                    <div className="w-full h-full rounded-full bg-zinc-900 border-2 border-transparent flex items-center justify-center text-xl font-bold text-white">
+                                    <div className="w-full h-full rounded-full bg-card border-2 border-transparent flex items-center justify-center text-xl font-bold text-foreground">
                                         LA
                                     </div>
                                 </div>
@@ -231,14 +231,14 @@ export function SettingsCard() {
                             <div className="text-center space-y-1 w-full">
                                 <input 
                                     value="Luiz Antônio" 
-                                    className="bg-transparent text-center text-sm font-bold text-white border-b border-transparent hover:border-zinc-700 focus:border-indigo-500 outline-none w-full transition-colors pb-1"
+                                    className="bg-transparent text-center text-sm font-bold text-foreground border-b border-transparent hover:border-border focus:border-indigo-500 outline-none w-full transition-colors pb-1"
                                 />
-                                <p className="text-[10px] text-zinc-500">Fullstack Developer</p>
+                                <p className="text-[10px] text-muted-foreground">Fullstack Developer</p>
                             </div>
 
                             <div className="flex gap-2 w-full">
-                                <button className="flex-1 py-1.5 bg-zinc-800 rounded text-[10px] text-zinc-400 hover:text-white transition-colors">Editar Bio</button>
-                                <button className="flex-1 py-1.5 bg-zinc-800 rounded text-[10px] text-zinc-400 hover:text-white transition-colors">Logout</button>
+                                <button className="flex-1 py-1.5 bg-muted rounded text-[10px] text-muted-foreground hover:text-foreground transition-colors">Editar Bio</button>
+                                <button className="flex-1 py-1.5 bg-muted rounded text-[10px] text-muted-foreground hover:text-foreground transition-colors">Logout</button>
                             </div>
                         </motion.div>
                     )}

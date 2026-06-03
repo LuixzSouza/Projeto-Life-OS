@@ -39,7 +39,7 @@ export function BaseCard({
       onClick={onClick}
       // MUDANÇA: h-full w-full garante que ele ocupe exatamente o tamanho da div pai do Grid
       className={cn(
-        "group relative flex flex-col h-full w-full overflow-hidden rounded-2xl border border-white/10 bg-[#111111] hover:border-white/20 transition-all cursor-pointer",
+        "group relative flex flex-col h-full w-full overflow-hidden rounded-2xl border border-border/60 bg-card hover:border-primary/30 transition-all cursor-pointer shadow-sm hover:shadow-md",
         className
       )}
     >
@@ -50,7 +50,7 @@ export function BaseCard({
           background: useMotionTemplate`
             radial-gradient(
               500px circle at ${mouseX}px ${mouseY}px,
-              rgba(255,255,255,0.08),
+              color-mix(in oklch, var(--color-primary) 12%, transparent),
               transparent 80%
             )
           `,
@@ -58,13 +58,13 @@ export function BaseCard({
       />
 
       {/* Header Compacto */}
-      <div className="p-4 z-20 shrink-0 flex items-center gap-3 border-b border-white/5 bg-[#111111]">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-zinc-400 group-hover:text-white group-hover:bg-white/10 transition-colors">
+      <div className="p-4 z-20 shrink-0 flex items-center gap-3 border-b border-border/60 bg-card">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground group-hover:text-primary group-hover:bg-primary/10 transition-colors">
             <Icon className="h-4 w-4" />
           </div>
           <div className="flex flex-col">
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider">{title}</h3>
-            {description && <span className="text-[10px] text-zinc-500 truncate max-w-[150px]">{description}</span>}
+            <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">{title}</h3>
+            {description && <span className="text-[10px] text-muted-foreground truncate max-w-[150px]">{description}</span>}
           </div>
       </div>
 

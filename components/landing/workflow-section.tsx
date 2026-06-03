@@ -21,7 +21,7 @@ interface WorkflowCardProps {
 
 export default function WorkflowSection() {
   return (
-    <section id="ai" className="py-32 px-6 border-t border-white/5 bg-[#050505] relative overflow-hidden min-h-screen flex items-center">
+    <section id="ai" className="py-32 px-6 border-t border-border bg-card relative overflow-hidden min-h-screen flex items-center">
         
         {/* --- BACKGROUND --- */}
         <div className="absolute top-0 left-0 w-full h-full bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none z-0" />
@@ -46,7 +46,7 @@ export default function WorkflowSection() {
                     whileInView={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.1 }}
                 >
-                    <h2 className="text-4xl md:text-5xl font-bold text-white leading-tight">
+                    <h2 className="text-4xl md:text-5xl font-bold text-foreground leading-tight">
                         Seus dados não vivem<br />
                         em silos isolados.
                     </h2>
@@ -56,7 +56,7 @@ export default function WorkflowSection() {
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.2 }}
-                    className="text-zinc-400 text-lg leading-relaxed"
+                    className="text-muted-foreground text-lg leading-relaxed"
                 >
                     O <strong>Life OS</strong> entende que sua produtividade depende da sua saúde física. Se você dormiu mal, o sistema ajusta suas metas. Se gastou demais, ele alerta sobre o orçamento. Tudo conectado via SQLite local.
                 </motion.p>
@@ -76,8 +76,8 @@ export default function WorkflowSection() {
                         >
                             <div className="mt-1.5 h-2 w-2 rounded-full bg-indigo-500 shrink-0 group-hover:bg-purple-400 group-hover:shadow-[0_0_10px_rgba(168,85,247,0.8)] transition-all duration-300" />
                             <div>
-                                <h4 className="text-white font-bold text-sm group-hover:text-indigo-300 transition-colors">{item.title}</h4>
-                                <p className="text-zinc-500 text-sm leading-snug">{item.desc}</p>
+                                <h4 className="text-foreground font-bold text-sm group-hover:text-indigo-300 transition-colors">{item.title}</h4>
+                                <p className="text-muted-foreground text-sm leading-snug">{item.desc}</p>
                             </div>
                         </motion.div>
                     ))}
@@ -89,7 +89,7 @@ export default function WorkflowSection() {
                 <div className="relative w-full max-w-md">
                     
                     {/* TRILHA DA LINHA DO TEMPO */}
-                    <div className="absolute left-8 top-0 bottom-0 w-[2px] bg-zinc-800/30 rounded-full overflow-hidden">
+                    <div className="absolute left-8 top-0 bottom-0 w-[2px] bg-muted/30 rounded-full overflow-hidden">
                         {/* ✅ ANIMAÇÃO DO FEIXE DE LUZ RESTAURADA E MELHORADA */}
                         <motion.div 
                             // Aumentei a altura (h-150px) e o brilho para ficar mais visível
@@ -114,7 +114,7 @@ export default function WorkflowSection() {
                         label="Dados de Entrada"
                         title={
                             <>
-                                <span className="block text-xs text-zinc-500 mb-1 font-mono">Input: HealthMetric</span>
+                                <span className="block text-xs text-muted-foreground mb-1 font-mono">Input: HealthMetric</span>
                                 Sono detectado: <span className="text-rose-400 font-bold">5h 20m</span>. Recuperação baixa.
                             </>
                         }
@@ -130,7 +130,7 @@ export default function WorkflowSection() {
                         label="Life OS Intelligence"
                         title={
                             <>
-                                <span className="block text-xs text-zinc-500 mb-1 font-mono">Process: Settings/AI</span>
+                                <span className="block text-xs text-muted-foreground mb-1 font-mono">Process: Settings/AI</span>
                                 Analisando contexto... Risco de fadiga cognitiva elevado.
                             </>
                         }
@@ -147,7 +147,7 @@ export default function WorkflowSection() {
                         label="Ação Automática"
                         title={
                             <>
-                                <span className="block text-xs text-zinc-500 mb-1 font-mono">Output: Task/Event</span>
+                                <span className="block text-xs text-muted-foreground mb-1 font-mono">Output: Task/Event</span>
                                 <span className="text-emerald-400 font-bold">✓ Agenda Otimizada.</span> Sessão de estudo reduzida em 30min.
                             </>
                         }
@@ -201,9 +201,9 @@ function WorkflowCard({
             transition={{ delay, duration: 0.5 }}
             className={`
                 group relative ml-12 mb-6 p-5 rounded-2xl
-                bg-[#0A0A0A]/90 backdrop-blur-xl border border-white/5
+                bg-card/90 backdrop-blur-xl border border-border
                 flex items-start gap-4 transition-all duration-500
-                hover:-translate-y-1 hover:bg-[#0F0F0F]
+                hover:-translate-y-1 hover:bg-card
                 ${borderColors[accentColor]}
                 ${glowColors[accentColor]}
                 ${isSystem ? 'shadow-[0_0_40px_-10px_rgba(99,102,241,0.1)] border-indigo-500/20 ring-1 ring-indigo-500/10' : 'shadow-lg'}
@@ -213,7 +213,7 @@ function WorkflowCard({
             <div className={`
                 absolute -left-[39px] top-8 -translate-y-1/2 w-4 h-4 rounded-full 
                 border-[3px] border-[#050505] z-10 transition-all duration-300 
-                bg-zinc-800 shadow-sm
+                bg-muted shadow-sm
                 ${dotColors[accentColor]}
             `} />
             
@@ -227,7 +227,7 @@ function WorkflowCard({
                 <div className={`text-[10px] font-bold uppercase tracking-widest mb-1.5 opacity-70 ${iconColor}`}>
                     {label}
                 </div>
-                <div className="text-sm font-medium text-zinc-300 group-hover:text-white transition-colors leading-relaxed truncate-multiline">
+                <div className="text-sm font-medium text-foreground group-hover:text-foreground transition-colors leading-relaxed truncate-multiline">
                     {title}
                 </div>
             </div>
