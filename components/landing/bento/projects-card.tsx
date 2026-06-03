@@ -39,7 +39,7 @@ export function ProjectsCard() {
   
   // Estado das Tarefas (Projetos)
   const [tasks, setTasks] = useState([
-    { id: 1, text: "Design System", done: true, tag: "UI", color: "bg-pink-500" },
+    { id: 1, text: "Design System", done: true, tag: "UI", color: "bg-primary" },
     { id: 2, text: "API Routes", done: false, tag: "Dev", color: "bg-blue-500" },
     { id: 3, text: "Deploy Vercel", done: false, tag: "Infra", color: "bg-emerald-500" },
   ]);

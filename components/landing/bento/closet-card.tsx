@@ -41,8 +41,8 @@ const INVENTORY: InventoryCategory[] = [
     count: 8, 
     cleanCount: 8, 
     icon: Footprints, 
-    color: "text-purple-400",
-    barColor: "bg-purple-500"
+    color: "text-primary",
+    barColor: "bg-primary"
   },
 ];
 

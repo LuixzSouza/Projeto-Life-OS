@@ -40,7 +40,7 @@ const MEDIA_DATA: MediaItem[] = [
   { id: "4", title: "Cyberpunk 2077", subtitle: "Phantom Liberty", type: "game", icon: Gamepad2, color: "text-yellow-400", status: "backlog" },
   
   // Wishlist
-  { id: "5", title: "GTA VI", subtitle: "Lançamento 2025", type: "game", icon: Gamepad2, color: "text-purple-400", status: "wishlist" },
+  { id: "5", title: "GTA VI", subtitle: "Lançamento 2025", type: "game", icon: Gamepad2, color: "text-primary", status: "wishlist" },
 ];
 
 export function EntertainmentCard() {

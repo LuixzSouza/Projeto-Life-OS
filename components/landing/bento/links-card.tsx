@@ -32,7 +32,7 @@ const SAVED_LINKS: LinkItem[] = [
   { id: "2", label: "Lucide Icons", url: "lucide.dev", category: "Dev", icon:  LinkIcon, color: "text-orange-400" },
   { id: "3", label: "Figma Community", url: "figma.com", category: "Design", icon: Figma, color: "text-rose-400" },
   { id: "4", label: "Next.js Docs", url: "nextjs.org", category: "Dev", icon: Github, color: "text-foreground" },
-  { id: "5", label: "Godly Website", url: "godly.website", category: "Ref", icon: BookMarked, color: "text-purple-400" },
+  { id: "5", label: "Godly Website", url: "godly.website", category: "Ref", icon: BookMarked, color: "text-primary" },
 ];
 
 export function LinksCard() {

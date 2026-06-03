@@ -64,8 +64,8 @@ const METRICS: HealthMetric[] = [
     value: "7h 42m", 
     subValue: "88%", 
     icon: Moon, 
-    color: "text-purple-400", 
-    ringColor: "text-purple-500",
+    color: "text-primary",
+    ringColor: "text-primary",
     percent: 90 
   },
 ];

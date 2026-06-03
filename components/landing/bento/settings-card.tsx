@@ -220,7 +220,7 @@ export function SettingsCard() {
                             className="flex flex-col gap-4 h-full justify-center items-center"
                         >
                             <div className="relative">
-                                <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 p-0.5">
+                                <div className="w-16 h-16 rounded-full bg-gradient-brand p-0.5">
                                     <div className="w-full h-full rounded-full bg-card border-2 border-transparent flex items-center justify-center text-xl font-bold text-foreground">
                                         LA
                                     </div>

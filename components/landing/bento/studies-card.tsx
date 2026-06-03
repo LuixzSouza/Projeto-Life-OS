@@ -126,7 +126,7 @@ function GamificationView() {
                 <motion.div 
                     initial={{ width: 0 }} 
                     animate={{ width: "85%" }} 
-                    className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" 
+                    className="h-full bg-gradient-brand"
                 />
             </div>
         </div>

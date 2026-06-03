@@ -107,7 +107,7 @@ export function OverviewCard() {
 
             {/* Rodapé Decorativo (Barra de Tendência) */}
             <div className="h-1 w-full bg-card mt-auto flex">
-                <div className="w-[84%] h-full bg-gradient-to-r from-indigo-500 to-purple-500 shadow-[0_0_10px_rgba(99,102,241,0.5)]" />
+                <div className="w-[84%] h-full bg-gradient-brand shadow-[0_0_10px_var(--color-primary)]" />
             </div>
 
         </div>

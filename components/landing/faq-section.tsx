@@ -73,14 +73,14 @@ export default function FAQSectionWithImages() {
     <section id="faq" className="py-24 px-6 bg-card border-t border-border relative overflow-hidden">
       
       {/* Background Decorativo */}
-      <div className="absolute right-0 top-1/4 w-[400px] h-[400px] bg-indigo-600/5 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute right-0 top-1/4 w-[400px] h-[400px] bg-primary/5 blur-[120px] rounded-full pointer-events-none" />
 
       <div className="max-w-6xl mx-auto relative z-10">
         
         {/* Header */}
         <div className="text-center mb-16">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-card border border-border text-muted-foreground text-[10px] font-bold uppercase tracking-widest mb-4">
-            <MessageCircle className="h-3 w-3 text-indigo-400" /> Transparência Total
+            <MessageCircle className="h-3 w-3 text-primary" /> Transparência Total
           </div>
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">Perguntas Frequentes</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
@@ -101,7 +101,7 @@ export default function FAQSectionWithImages() {
                   className={cn(
                     "border rounded-xl overflow-hidden transition-all duration-300",
                     isOpen
-                      ? "bg-card border-indigo-500/30 shadow-[0_0_20px_-5px_rgba(99,102,241,0.1)]"
+                      ? "bg-card border-primary/30 shadow-[0_0_20px_-5px_var(--color-primary)]"
                       : "bg-card/30 border-border hover:border-border"
                   )}
                 >
@@ -114,7 +114,7 @@ export default function FAQSectionWithImages() {
                     </span>
                     <div className={cn(
                       "p-1 rounded-full transition-all shrink-0",
-                      isOpen ? "bg-indigo-500 text-foreground rotate-0" : "bg-muted text-muted-foreground -rotate-90"
+                      isOpen ? "bg-primary text-primary-foreground rotate-0" : "bg-muted text-muted-foreground -rotate-90"
                     )}>
                       {isOpen ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
                     </div>
@@ -206,7 +206,7 @@ export default function FAQSectionWithImages() {
             </div>
             
             {/* Glow / Reflexo abaixo da janela */}
-            <div className="absolute -bottom-6 left-10 right-10 h-10 bg-indigo-500/20 blur-2xl rounded-full opacity-50" />
+            <div className="absolute -bottom-6 left-10 right-10 h-10 bg-primary/20 blur-2xl rounded-full opacity-50" />
           </div>
 
         </div>

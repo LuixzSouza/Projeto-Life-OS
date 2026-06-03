@@ -33,7 +33,7 @@ const TIMELINE: TimelineItem[] = [
   { 
     time: "09:30", 
     icon: BrainCircuit, 
-    color: "text-indigo-400",
+    color: "text-primary",
     module: "PROJECTS & FOCUS",
     title: "Deep Work Block", 
     desc: "Hora de focar. Você seleciona uma Tarefa de Alta Prioridade vinculada a um Projeto Ativo. O Timer Pomodoro inicia e o status muda para 'Em Foco'." 
@@ -49,7 +49,7 @@ const TIMELINE: TimelineItem[] = [
   { 
     time: "21:00", 
     icon: Moon, 
-    color: "text-purple-400",
+    color: "text-primary",
     module: "AI & JOURNAL",
     title: "Fechamento Inteligente", 
     desc: "A IA (AiChat) analisa tudo o que foi feito, gasto e monitorado. Ela gera um resumo no seu Diário e sugere a preparação para amanhã." 
@@ -61,7 +61,7 @@ export default function TimelineSection() {
     <section id="routine" className="py-32 px-6 border-t border-border bg-card relative overflow-hidden">
       
       {/* Background Decorativo */}
-      <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-indigo-900/5 to-transparent pointer-events-none" />
+      <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-primary/5 to-transparent pointer-events-none" />
 
       <div className="max-w-4xl mx-auto relative z-10">
         
@@ -81,7 +81,7 @@ export default function TimelineSection() {
             transition={{ delay: 0.1 }}
             className="text-3xl md:text-4xl font-bold text-foreground"
           >
-            Um dia na vida do seu <span className="text-indigo-400">Sistema Operacional</span>
+            Um dia na vida do seu <span className="text-primary">Sistema Operacional</span>
           </motion.h2>
           
           <motion.p 
@@ -98,7 +98,7 @@ export default function TimelineSection() {
           {/* Linha Vertical Conectora (Trilha) */}
           <div className="absolute left-[27px] top-4 bottom-4 w-[2px] bg-muted rounded-full">
              {/* Efeito de preenchimento ao rolar (Opcional, mas dá um toque premium) */}
-             <div className="absolute top-0 w-full h-full bg-gradient-to-b from-indigo-500/50 via-purple-500/20 to-zinc-800 opacity-30" />
+             <div className="absolute top-0 w-full h-full bg-gradient-to-b from-primary/50 via-primary/20 to-transparent opacity-40" />
           </div>
 
           <div className="space-y-12">
@@ -124,7 +124,7 @@ function TimelineCard({ item, index }: { item: TimelineItem; index: number }) {
             className="relative flex gap-8 group"
         >
             {/* Ícone / Marcador na Timeline */}
-            <div className="relative z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-card border border-border shadow-lg transition-all duration-300 group-hover:border-border group-hover:scale-110 group-hover:shadow-[0_0_20px_-5px_rgba(99,102,241,0.3)]">
+            <div className="relative z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-card border border-border shadow-lg transition-all duration-300 group-hover:border-border group-hover:scale-110 group-hover:shadow-[0_0_20px_-5px_var(--color-primary)]">
                 <div className={`absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-10 transition-opacity duration-300 ${item.color.replace('text-', 'bg-')}`} />
                 <item.icon className={`h-6 w-6 transition-colors duration-300 ${item.color} opacity-80 group-hover:opacity-100`} />
             </div>
@@ -145,7 +145,7 @@ function TimelineCard({ item, index }: { item: TimelineItem; index: number }) {
 
                 {/* Card visual */}
                 <div className="p-5 rounded-xl border border-border bg-card/20 hover:bg-card/40 transition-colors group-hover:border-border">
-                    <h3 className="text-xl font-bold text-foreground mb-2 group-hover:text-indigo-100 transition-colors">
+                    <h3 className="text-xl font-bold text-foreground mb-2 group-hover:text-primary transition-colors">
                         {item.title}
                     </h3>
                     <p className="text-muted-foreground text-sm leading-relaxed">
