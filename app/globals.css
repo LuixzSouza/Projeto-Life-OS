@@ -380,10 +380,20 @@ body.privacy-mode-active .privacy-blur:hover {
      LANDING — superfícies e realces que respondem ao tema (light/dark)
      --------------------------------------------------------------- */
 
-  /* Texto com gradiente da marca animado (indigo → violet → emerald). */
+  /* Texto com gradiente da marca animado. */
   .animate-gradient-x {
     background-size: 200% 200%;
     animation: gradient-x 6s ease infinite;
+  }
+
+  /* Gradiente da marca derivado do ACCENT (primary): varia só a tonalidade,
+     então acompanha o tema sorteado/escolhido em vez de ficar roxo fixo.
+     Use .text-gradient-brand em textos e .bg-gradient-brand em elementos. */
+  .text-gradient-brand {
+    @apply bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent;
+  }
+  .bg-gradient-brand {
+    @apply bg-gradient-to-r from-primary to-primary/70;
   }
 
   /* Fundo base da landing: claro suave no light, quase-preto no dark.
@@ -440,5 +450,22 @@ body.privacy-mode-active .privacy-blur:hover {
   /* Cartão de vidro da landing, themeable (substitui bg-[#111] fixos). */
   .landing-card {
     @apply bg-card/70 backdrop-blur-xl border border-border/60;
+  }
+}
+
+/* ---------------------------------------------------------------
+   ACESSIBILIDADE — respeita "reduzir movimento" do sistema.
+   Quem ativa essa preferência (vestibular, foco, bateria) recebe a
+   landing estática: órbitas, auroras, gradientes e reveals param de
+   animar (padrão recomendado: anima quase-instantâneo até o estado final).
+   --------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .landing-surface *,
+  .landing-surface *::before,
+  .landing-surface *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
