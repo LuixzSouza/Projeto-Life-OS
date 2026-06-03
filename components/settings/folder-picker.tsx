@@ -40,12 +40,16 @@ export function FolderPicker({ onSelect, currentPath }: FolderPickerProps) {
         try {
             const result = await listDirectories(path);
             
-            if (result.success && result.directories) {
+            if (result.success) {
                 setFolders(result.directories);
                 if (result.path && !result.isRoot) {
                     setBrowsingPath(result.path);
                 } else if (result.isRoot) {
                     setBrowsingPath("Este Computador");
+                }
+                // Aviso suave quando o caminho pedido não existia e caímos no fallback.
+                if (result.notice) {
+                    toast.info(result.notice);
                 }
             } else {
                 setError(result.error || "Erro desconhecido");

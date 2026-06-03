@@ -1,40 +1,109 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { setupSystem } from "@/app/actions/setup";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Sparkles, Loader2 } from "lucide-react";
+import { ArrowRight, Sparkles, Loader2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { validatePasswordStrength } from "@/lib/password-policy";
 
-import { STEPS, type SetupFormData } from "./wizard-types";
+import { STEPS, type SetupFormData, type DbProviderId } from "./wizard-types";
 import { WizardSidebar } from "./wizard-sidebar";
 import { StepProfile } from "./steps/step-profile";
 import { StepSystem } from "./steps/step-system";
 import { StepIntelligence } from "./steps/step-intelligence";
 import { StepReview } from "./steps/step-review";
 
-export function SetupWizard() {
+const DRAFT_KEY = "lifeos-setup-draft-v1";
+
+const DEFAULT_FORM: SetupFormData = {
+  name: "",
+  email: "",
+  password: "",
+  bio: "",
+  currency: "BRL",
+  workStart: "09:00",
+  workEnd: "18:00",
+  aiProvider: "ollama",
+  theme: "system",
+  dbProvider: "turso",
+  storageMode: "cloud",
+  storagePath: "C:\\LifeOS_Data",
+  tursoUrl: "",
+  tursoToken: "",
+};
+
+// Campos sensíveis que NÃO são persistidos no localStorage (segredo externo).
+const SENSITIVE_KEYS: (keyof SetupFormData)[] = ["tursoToken"];
+
+interface SetupWizardProps {
+  /** No deploy serverless (Vercel) o banco já vem das env vars (TURSO_*). */
+  dbFromEnv?: boolean;
+}
+
+export function SetupWizard({ dbFromEnv = false }: SetupWizardProps) {
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [restored, setRestored] = useState(false);
 
-  // Estado central do formulário
   const [formData, setFormData] = useState<SetupFormData>({
-    name: "",
-    email: "",
-    password: "",
-    bio: "",
-    currency: "BRL",
-    workStart: "09:00",
-    workEnd: "18:00",
-    aiProvider: "ollama",
-    theme: "system",
-    storageMode: "local",
-    storagePath: "C:\\LifeOS_Data", // Padrão Windows (escapado para JS)
-    tursoUrl: "",
-    tursoToken: "",
+    ...DEFAULT_FORM,
+    dbProvider: dbFromEnv ? "turso" : DEFAULT_FORM.dbProvider,
   });
+
+  // Evita salvar o rascunho antes de restaurar (não sobrescreve com defaults).
+  const hydrated = useRef(false);
+
+  // --- 1. RESTAURA o rascunho salvo (não perde dados ao recarregar a página) ---
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw) as Partial<SetupFormData>;
+        setFormData((prev) => ({ ...prev, ...saved }));
+        setRestored(true);
+      }
+    } catch {
+      /* localStorage indisponível — segue com defaults */
+    }
+    hydrated.current = true;
+  }, []);
+
+  // --- 2. PERSISTE o rascunho a cada mudança (exceto campos sensíveis) ---
+  useEffect(() => {
+    if (!hydrated.current) return;
+    try {
+      const toSave: Partial<SetupFormData> = { ...formData };
+      for (const key of SENSITIVE_KEYS) delete toSave[key];
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(toSave));
+    } catch {
+      /* ignore */
+    }
+  }, [formData]);
+
+  const clearDraft = () => {
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const resetForm = () => {
+    clearDraft();
+    setFormData({ ...DEFAULT_FORM, dbProvider: dbFromEnv ? "turso" : DEFAULT_FORM.dbProvider });
+    setStep(1);
+    setRestored(false);
+    toast.success("Formulário reiniciado.");
+  };
+
+  const setDbProvider = (id: DbProviderId) =>
+    setFormData((f) => ({
+      ...f,
+      dbProvider: id,
+      storageMode: id === "local" ? "local" : "cloud",
+    }));
 
   const nextStep = () => {
     // Validação do Passo 1
@@ -49,9 +118,14 @@ export function SetupWizard() {
         return;
       }
     }
-    // Validação do Passo 2
-    if (step === 2) {
-      if (formData.storageMode === "cloud") {
+    // Validação do Passo 2 (banco)
+    if (step === 2 && !dbFromEnv) {
+      if (formData.dbProvider === "local") {
+        if (!formData.storagePath) {
+          toast.error("O caminho do banco de dados é obrigatório.");
+          return;
+        }
+      } else if (formData.dbProvider === "turso") {
         if (!formData.tursoUrl.trim()) {
           toast.error("Informe a URL do banco na nuvem (Turso).");
           return;
@@ -60,9 +134,6 @@ export function SetupWizard() {
           toast.error("URL inválida. Use libsql://... ou https://...");
           return;
         }
-      } else if (!formData.storagePath) {
-        toast.error("O caminho do banco de dados é obrigatório.");
-        return;
       }
     }
     setStep((s) => Math.min(s + 1, 4));
@@ -71,8 +142,10 @@ export function SetupWizard() {
   const prevStep = () => setStep((s) => Math.max(s - 1, 1));
   const goToStep = (s: number) => { if (s < step) setStep(s); };
 
-  // Cálculo de progresso visual
   const progress = ((step - 1) / (STEPS.length - 1)) * 100;
+
+  // storageMode efetivo que a Server Action consome.
+  const effectiveStorageMode = formData.dbProvider === "local" ? "local" : "cloud";
 
   return (
     <div className="w-full max-w-5xl bg-background rounded-2xl shadow-2xl overflow-hidden border border-border flex flex-col md:flex-row min-h-[600px] animate-in fade-in zoom-in-95 duration-500">
@@ -83,7 +156,10 @@ export function SetupWizard() {
       <div className="flex-1 p-6 md:p-10 flex flex-col bg-card">
         <form
           action={setupSystem}
-          onSubmit={() => setIsLoading(true)}
+          onSubmit={() => {
+            setIsLoading(true);
+            clearDraft();
+          }}
           className="flex-1 flex flex-col justify-between h-full"
         >
           {/* INPUTS OCULTOS: passam o state React para o FormData da Server Action */}
@@ -96,25 +172,39 @@ export function SetupWizard() {
           <input type="hidden" name="workEnd" value={formData.workEnd} />
           <input type="hidden" name="aiProvider" value={formData.aiProvider} />
           <input type="hidden" name="theme" value={formData.theme} />
-          <input type="hidden" name="storageMode" value={formData.storageMode} />
+          <input type="hidden" name="storageMode" value={effectiveStorageMode} />
           <input type="hidden" name="storagePath" value={formData.storagePath} />
           <input type="hidden" name="tursoUrl" value={formData.tursoUrl} />
           <input type="hidden" name="tursoToken" value={formData.tursoToken} />
 
           <div className="space-y-8">
-            <div className="space-y-1">
-              <h2 className="text-2xl font-bold tracking-tight text-foreground">
-                {step === 1 && "Olá! Crie seu Perfil Admin."}
-                {step === 2 && "Localização dos Dados"}
-                {step === 3 && "Cérebro Digital (IA)"}
-                {step === 4 && "Revisão Final"}
-              </h2>
-              <p className="text-muted-foreground text-sm">
-                {step === 1 && "Configure sua credencial mestre de acesso."}
-                {step === 2 && "Defina onde o banco de dados (SQLite) será salvo."}
-                {step === 3 && "Escolha o motor de inteligência do sistema."}
-                {step === 4 && "Tudo pronto. Vamos inicializar o Life OS."}
-              </p>
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <h2 className="text-2xl font-bold tracking-tight text-foreground">
+                  {step === 1 && "Olá! Crie seu Perfil Admin."}
+                  {step === 2 && "Onde seus dados vão morar"}
+                  {step === 3 && "Cérebro Digital (IA)"}
+                  {step === 4 && "Revisão Final"}
+                </h2>
+                <p className="text-muted-foreground text-sm">
+                  {step === 1 && "Configure sua credencial mestre de acesso."}
+                  {step === 2 && "Escolha o banco de dados que vai guardar tudo."}
+                  {step === 3 && "Escolha o motor de inteligência do sistema."}
+                  {step === 4 && "Tudo pronto. Vamos inicializar o Life OS."}
+                </p>
+              </div>
+
+              {/* Aviso de rascunho restaurado + reiniciar */}
+              {restored && step === 1 && (
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="shrink-0 flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground border border-border rounded-lg px-2.5 py-1.5 transition-colors"
+                  title="Limpar dados salvos e recomeçar"
+                >
+                  <RotateCcw className="h-3 w-3" /> Recomeçar
+                </button>
+              )}
             </div>
 
             <div className="min-h-[300px] pt-2">
@@ -126,9 +216,16 @@ export function SetupWizard() {
                   setShowPassword={setShowPassword}
                 />
               )}
-              {step === 2 && <StepSystem formData={formData} setFormData={setFormData} />}
+              {step === 2 && (
+                <StepSystem
+                  formData={formData}
+                  setFormData={setFormData}
+                  setDbProvider={setDbProvider}
+                  dbFromEnv={dbFromEnv}
+                />
+              )}
               {step === 3 && <StepIntelligence formData={formData} setFormData={setFormData} />}
-              {step === 4 && <StepReview formData={formData} />}
+              {step === 4 && <StepReview formData={formData} dbFromEnv={dbFromEnv} />}
             </div>
           </div>
 

@@ -21,6 +21,15 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "5mb",
     },
   },
+
+  // CRÍTICO (Vercel): o `ensureSchema()` lê `prisma/baseline.sql` via fs em
+  // runtime. O rastreamento de arquivos do Next só inclui imports estáticos —
+  // leituras dinâmicas de arquivo NÃO são detectadas, então o baseline ficava
+  // de fora da função serverless e o setup quebrava com 500 ("Baseline não
+  // encontrado"). Forçamos a inclusão do arquivo no bundle de toda rota.
+  outputFileTracingIncludes: {
+    "/**": ["./prisma/baseline.sql"],
+  },
 };
 
 export default nextConfig;

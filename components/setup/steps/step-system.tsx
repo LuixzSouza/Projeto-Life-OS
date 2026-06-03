@@ -1,102 +1,119 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { HardDrive, FolderInput, Cloud } from "lucide-react";
+import { FolderInput, Cloud, CheckCircle2, Lock, Info } from "lucide-react";
 import { FolderPicker } from "@/components/settings/folder-picker";
-import type { SetupFormData } from "../wizard-types";
+import {
+  DB_PROVIDERS,
+  type SetupFormData,
+  type DbProviderId,
+} from "../wizard-types";
 
 interface StepSystemProps {
   formData: SetupFormData;
   setFormData: React.Dispatch<React.SetStateAction<SetupFormData>>;
+  setDbProvider: (id: DbProviderId) => void;
+  dbFromEnv?: boolean;
 }
 
-export function StepSystem({ formData, setFormData }: StepSystemProps) {
-  return (
-    <div className="space-y-8 animate-in slide-in-from-right-8 fade-in duration-300">
-      {/* Seletor de modo de armazenamento (híbrido) */}
-      <div className="grid grid-cols-2 gap-3">
-        <button
-          type="button"
-          onClick={() => setFormData({ ...formData, storageMode: "local" })}
-          className={cn(
-            "flex flex-col items-start gap-1.5 p-4 rounded-xl border text-left transition-all",
-            formData.storageMode === "local"
-              ? "border-primary bg-primary/10 shadow-sm"
-              : "border-border bg-muted/20 hover:border-primary/30"
-          )}
-        >
-          <HardDrive className={cn("h-5 w-5", formData.storageMode === "local" ? "text-primary" : "text-muted-foreground")} />
-          <span className="text-sm font-semibold text-foreground">Pasta local (SQLite)</span>
-          <span className="text-[11px] text-muted-foreground leading-tight">
-            Seus dados ficam num arquivo no seu computador. Privado e portátil.
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setFormData({ ...formData, storageMode: "cloud" })}
-          className={cn(
-            "flex flex-col items-start gap-1.5 p-4 rounded-xl border text-left transition-all",
-            formData.storageMode === "cloud"
-              ? "border-primary bg-primary/10 shadow-sm"
-              : "border-border bg-muted/20 hover:border-primary/30"
-          )}
-        >
-          <Cloud className={cn("h-5 w-5", formData.storageMode === "cloud" ? "text-primary" : "text-muted-foreground")} />
-          <span className="text-sm font-semibold text-foreground">Banco na nuvem (Turso)</span>
-          <span className="text-[11px] text-muted-foreground leading-tight">
-            Sincronize entre dispositivos. Ideal para deploy (Vercel) e acesso web.
-          </span>
-        </button>
-      </div>
-
-      {formData.storageMode === "local" ? (
-        <div className="space-y-3 p-4 rounded-xl border border-border bg-muted/20">
-          <Label className="text-foreground flex items-center gap-2 text-base font-semibold">
-            <HardDrive className="h-5 w-5" /> Localização do Banco de Dados
-          </Label>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            O arquivo <code>life_os.db</code> será criado nesta pasta.
-          </p>
-          <div className="grid gap-2 pt-2">
-            <Label htmlFor="storagePath" className="text-xs font-semibold uppercase text-muted-foreground">Caminho da Pasta</Label>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <FolderInput className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="storagePath"
-                  value={formData.storagePath}
-                  onChange={(e) => setFormData({ ...formData, storagePath: e.target.value })}
-                  placeholder="Ex: C:\LifeOS_Data"
-                  className="pl-9 bg-background font-mono text-xs border-border h-10"
-                />
-              </div>
-
-              <div className="shrink-0">
-                <FolderPicker
-                  currentPath={formData.storagePath}
-                  onSelect={(newPath) => setFormData({ ...formData, storagePath: newPath })}
-                />
-              </div>
+export function StepSystem({ formData, setFormData, setDbProvider, dbFromEnv }: StepSystemProps) {
+  // --- Caso 1: deploy web — banco já definido pelas env vars (Turso) ---
+  if (dbFromEnv) {
+    return (
+      <div className="space-y-6 animate-in slide-in-from-right-8 fade-in duration-300">
+        <div className="flex items-start gap-4 p-5 rounded-xl border border-emerald-500/30 bg-emerald-500/5">
+          <div className="p-2.5 rounded-lg bg-emerald-500/10 text-emerald-500 shrink-0">
+            <Cloud className="h-6 w-6" />
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <p className="font-bold text-foreground">Banco na nuvem (Turso) já configurado</p>
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
             </div>
-            <p className="text-[10px] text-zinc-500">Dica: Use um caminho curto e sem espaços se possível (ex: C:\LifeOS).</p>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Este ambiente já está conectado a um banco Turso através das variáveis
+              de ambiente do servidor. Você não precisa informar nada aqui — é só
+              continuar.
+            </p>
           </div>
         </div>
-      ) : (
+
+        <WorkPreferences formData={formData} setFormData={setFormData} />
+      </div>
+    );
+  }
+
+  // --- Caso 2: escolha do provedor (desktop / local dev) ---
+  return (
+    <div className="space-y-6 animate-in slide-in-from-right-8 fade-in duration-300">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {DB_PROVIDERS.map((p) => {
+          const selected = formData.dbProvider === p.id;
+          const disabled = !p.available;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              disabled={disabled}
+              onClick={() => !disabled && setDbProvider(p.id)}
+              title={p.description}
+              className={cn(
+                "relative flex flex-col items-start gap-1.5 p-3.5 rounded-xl border text-left transition-all",
+                disabled
+                  ? "border-border bg-muted/10 opacity-60 cursor-not-allowed"
+                  : selected
+                    ? "border-primary bg-primary/10 shadow-sm"
+                    : "border-border bg-muted/20 hover:border-primary/40 hover:bg-muted/40"
+              )}
+            >
+              {/* Badge canto superior direito */}
+              {p.badge && (
+                <span
+                  className={cn(
+                    "absolute top-2 right-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full",
+                    disabled
+                      ? "bg-muted text-muted-foreground"
+                      : p.badge === "Recomendado"
+                        ? "bg-emerald-500/15 text-emerald-600"
+                        : "bg-sky-500/15 text-sky-600"
+                  )}
+                >
+                  {p.badge}
+                </span>
+              )}
+              <p.icon className={cn("h-5 w-5", disabled ? "text-muted-foreground" : selected ? "text-primary" : p.accent)} />
+              <span className="text-sm font-semibold text-foreground flex items-center gap-1">
+                {p.name}
+                {disabled && <Lock className="h-3 w-3 text-muted-foreground" />}
+              </span>
+              <span className="text-[10px] text-muted-foreground leading-tight">{p.tagline}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Descrição do provedor selecionado */}
+      <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/30 rounded-lg p-3 border border-border">
+        <Info className="h-4 w-4 shrink-0 mt-0.5 text-primary" />
+        <span>{DB_PROVIDERS.find((p) => p.id === formData.dbProvider)?.description}</span>
+      </div>
+
+      {/* Painel de configuração do provedor ativo */}
+      {formData.dbProvider === "turso" && (
         <div className="space-y-3 p-4 rounded-xl border border-border bg-muted/20">
-          <Label className="text-foreground flex items-center gap-2 text-base font-semibold">
-            <Cloud className="h-5 w-5" /> Conexão com o Turso
+          <Label className="text-foreground flex items-center gap-2 text-sm font-semibold">
+            <Cloud className="h-4 w-4" /> Conexão com o Turso
           </Label>
-          <p className="text-sm text-muted-foreground leading-relaxed">
+          <p className="text-xs text-muted-foreground leading-relaxed">
             Crie um banco grátis em{" "}
             <a href="https://turso.tech" target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-2">
               turso.tech
             </a>{" "}
-            e cole a URL e o token de autenticação do banco.
+            e cole a URL e o token de autenticação.
           </p>
-          <div className="grid gap-3 pt-2">
+          <div className="grid gap-3 pt-1">
             <div className="grid gap-1.5">
-              <Label htmlFor="tursoUrl" className="text-xs font-semibold uppercase text-muted-foreground">URL do Banco</Label>
+              <Label htmlFor="tursoUrl" className="text-[11px] font-semibold uppercase text-muted-foreground">URL do Banco</Label>
               <Input
                 id="tursoUrl"
                 value={formData.tursoUrl}
@@ -106,7 +123,9 @@ export function StepSystem({ formData, setFormData }: StepSystemProps) {
               />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="tursoToken" className="text-xs font-semibold uppercase text-muted-foreground">Token de Autenticação</Label>
+              <Label htmlFor="tursoToken" className="text-[11px] font-semibold uppercase text-muted-foreground">
+                Token de Autenticação
+              </Label>
               <Input
                 id="tursoToken"
                 type="password"
@@ -115,33 +134,83 @@ export function StepSystem({ formData, setFormData }: StepSystemProps) {
                 placeholder="eyJhbGciOi..."
                 className="bg-background font-mono text-xs border-border h-10"
               />
+              <p className="text-[10px] text-amber-600/90">
+                ⚠️ O token começa com <code>eyJ…</code> — não é a URL. Gere com{" "}
+                <code>turso db tokens create &lt;nome&gt;</code>.
+              </p>
             </div>
-            <p className="text-[10px] text-zinc-500">
-              Gere o token com <code>turso db tokens create &lt;nome&gt;</code> ou no painel do Turso.
-            </p>
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-6">
-        <div className="space-y-3">
-          <Label>Horário de Trabalho</Label>
-          <div className="flex items-center gap-2">
-            <Input type="time" value={formData.workStart} onChange={(e) => setFormData({ ...formData, workStart: e.target.value })} className="bg-muted/30" />
-            <span>até</span>
-            <Input type="time" value={formData.workEnd} onChange={(e) => setFormData({ ...formData, workEnd: e.target.value })} className="bg-muted/30" />
+      {formData.dbProvider === "local" && (
+        <div className="space-y-3 p-4 rounded-xl border border-border bg-muted/20">
+          <Label className="text-foreground flex items-center gap-2 text-sm font-semibold">
+            <FolderInput className="h-4 w-4" /> Localização do Banco
+          </Label>
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            O arquivo <code>life_os.db</code> será criado nesta pasta. (Disponível
+            apenas no app desktop — no deploy web use o Turso.)
+          </p>
+          <div className="flex gap-2 pt-1">
+            <div className="relative flex-1">
+              <FolderInput className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={formData.storagePath}
+                onChange={(e) => setFormData({ ...formData, storagePath: e.target.value })}
+                placeholder="Ex: C:\LifeOS_Data"
+                className="pl-9 bg-background font-mono text-xs border-border h-10"
+              />
+            </div>
+            <div className="shrink-0">
+              <FolderPicker
+                currentPath={formData.storagePath}
+                onSelect={(newPath) => setFormData({ ...formData, storagePath: newPath })}
+              />
+            </div>
           </div>
         </div>
-        <div className="space-y-3">
-          <Label>Moeda</Label>
-          <div className="flex gap-2">
-            {['BRL', 'USD', 'EUR'].map(c => (
-              <div key={c} onClick={() => setFormData({ ...formData, currency: c })}
-                className={cn("cursor-pointer px-3 py-2 rounded border text-sm", formData.currency === c ? "bg-primary/10 border-primary text-primary" : "border-border text-muted-foreground")}>
-                {c}
-              </div>
-            ))}
-          </div>
+      )}
+
+      <WorkPreferences formData={formData} setFormData={setFormData} />
+    </div>
+  );
+}
+
+// --- Sub-bloco: horário de trabalho + moeda (comum aos dois casos) ---
+function WorkPreferences({
+  formData,
+  setFormData,
+}: {
+  formData: SetupFormData;
+  setFormData: React.Dispatch<React.SetStateAction<SetupFormData>>;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-6">
+      <div className="space-y-2">
+        <Label>Horário de Trabalho</Label>
+        <div className="flex items-center gap-2">
+          <Input type="time" value={formData.workStart} onChange={(e) => setFormData({ ...formData, workStart: e.target.value })} className="bg-muted/30" />
+          <span className="text-muted-foreground text-sm">até</span>
+          <Input type="time" value={formData.workEnd} onChange={(e) => setFormData({ ...formData, workEnd: e.target.value })} className="bg-muted/30" />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label>Moeda</Label>
+        <div className="flex gap-2">
+          {["BRL", "USD", "EUR"].map((c) => (
+            <button
+              type="button"
+              key={c}
+              onClick={() => setFormData({ ...formData, currency: c })}
+              className={cn(
+                "px-3 py-2 rounded border text-sm transition-colors",
+                formData.currency === c ? "bg-primary/10 border-primary text-primary" : "border-border text-muted-foreground hover:border-primary/40"
+              )}
+            >
+              {c}
+            </button>
+          ))}
         </div>
       </div>
     </div>

@@ -136,10 +136,19 @@ export async function updateStoragePath(formData: FormData) {
   }
 }
 
-export async function listDirectories(currentPath: string) {
+interface DirEntry {
+  name: string;
+  path: string;
+  type: string;
+}
+type ListDirResult =
+  | { success: true; path: string; directories: DirEntry[]; isRoot: boolean; notice?: string }
+  | { success: false; error: string };
+
+export async function listDirectories(currentPath: string): Promise<ListDirResult> {
   try {
     if (currentPath === "ROOT" && os.platform() === 'win32') {
-        const drives = [];
+        const drives: DirEntry[] = [];
         for (let i = 65; i <= 90; i++) {
             const drive = String.fromCharCode(i) + ":\\";
             try {
@@ -150,11 +159,22 @@ export async function listDirectories(currentPath: string) {
         return { success: true, path: "Este Computador", directories: drives, isRoot: true };
     }
 
-    const searchPath = currentPath && currentPath !== "Este Computador" ? currentPath : os.homedir();
+    let searchPath = currentPath && currentPath !== "Este Computador" ? currentPath : os.homedir();
+
+    // Caminho ainda não existe (ex.: pasta padrão sugerida que será criada depois):
+    // não é erro — caímos na pasta do usuário para a pessoa navegar e escolher.
+    let fallbackUsed = false;
+    if (!fs.existsSync(searchPath)) {
+      searchPath = os.homedir();
+      fallbackUsed = true;
+    }
+
     const entries = fs.readdirSync(searchPath, { withFileTypes: true });
 
     const directories = entries
       .filter(entry => entry.isDirectory())
+      // Ignora pastas ocultas/sistema (ruído) mantendo as comuns.
+      .filter(entry => !entry.name.startsWith("$") && entry.name !== "System Volume Information")
       .map(entry => ({
         name: entry.name,
         path: path.join(searchPath, entry.name),
@@ -162,9 +182,23 @@ export async function listDirectories(currentPath: string) {
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
 
-    return { success: true, path: searchPath, directories, isRoot: false };
+    return {
+      success: true,
+      path: searchPath,
+      directories,
+      isRoot: false,
+      ...(fallbackUsed ? { notice: "A pasta sugerida ainda não existe — ela será criada ao concluir. Escolha onde salvar." } : {}),
+    };
 
   } catch (error) {
-    return { success: false, error: "Acesso negado ou pasta inválida." };
+    // Distingue permissão de caminho inexistente para uma mensagem útil.
+    const code = (error as NodeJS.ErrnoException)?.code;
+    const message =
+      code === "EACCES" || code === "EPERM"
+        ? "Sem permissão para acessar esta pasta. Tente outra ou rode o app com permissão."
+        : code === "ENOENT"
+          ? "Esta pasta não existe mais. Voltando para um local válido."
+          : "Não foi possível ler esta pasta. Tente outra localização.";
+    return { success: false, error: message };
   }
 }

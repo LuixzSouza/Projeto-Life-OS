@@ -124,11 +124,19 @@ export async function setupSystem(formData: FormData) {
       },
     });
 
+    // Modelo padrão por provedor (o usuário pode trocar depois em Configurações).
+    const DEFAULT_MODELS: Record<string, string> = {
+      ollama: "llama3",
+      openai: "gpt-4o",
+      groq: "llama-3.3-70b-versatile",
+      gemini: "gemini-1.5-flash",
+    };
+
     await tempPrisma.settings.create({
       data: {
         aiProvider, theme, currency, workStart, workEnd,
         language: "pt-BR",
-        aiModel: aiProvider === "ollama" ? "llama3" : "gpt-4o",
+        aiModel: DEFAULT_MODELS[aiProvider] ?? "gpt-4o",
         onboardingCompleted: true,
         userId: adminUser.id,
         storagePath: storagePath,
