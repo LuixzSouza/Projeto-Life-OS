@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { ModelSelector } from "@/components/ai/model-selector";
 import { DeleteChatForm } from "../../../components/ai/delete-chat-form";
 import { getAiStatus, providerMeta, stripPending, extractActions } from "@/lib/ai-help";
+import { isEphemeralServerless } from "@/lib/db-config";
 
 export const dynamic = 'force-dynamic';
 
@@ -58,7 +59,7 @@ export default async function AIPage({ searchParams }: AIPageProps) {
     const keyPresent = providerInfo.local
         ? true
         : !!(settings as unknown as Record<string, string | null>)?.[providerInfo.keyField ?? ""];
-    const aiStatus = getAiStatus(currentProvider, keyPresent);
+    const aiStatus = getAiStatus(currentProvider, keyPresent, isEphemeralServerless());
 
     // Limite de contexto dinâmico (por provedor/modelo).
     const getContextLimit = (provider: string, model: string) => {

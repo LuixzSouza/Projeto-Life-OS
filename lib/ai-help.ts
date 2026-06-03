@@ -40,10 +40,20 @@ export interface AiStatus {
   getKeyUrl?: string;  // link para gerar a chave
 }
 
-export function getAiStatus(provider: string | null | undefined, hasKey: boolean): AiStatus {
+export function getAiStatus(provider: string | null | undefined, hasKey: boolean, serverless = false): AiStatus {
   const meta = providerMeta(provider);
 
   if (meta.local) {
+    // Em deploy serverless (Vercel) NÃO existe Ollama em localhost — usá-lo
+    // resultaria num "fetch failed" críptico. Tratamos como não-configurado e
+    // orientamos a trocar para um provedor de nuvem direto pelas Configurações.
+    if (serverless) {
+      return {
+        configured: false, provider: meta.id, label: meta.label, local: true,
+        reason: "O provedor atual é o Ollama (local), mas o app está rodando em um servidor (deploy) sem Ollama disponível.",
+        setup: "Vá em Configurações → IA, escolha um provedor de nuvem (OpenAI, Groq, Google Gemini, DeepSeek ou Mistral) e cole sua API Key.",
+      };
+    }
     return {
       configured: true, provider: meta.id, label: meta.label, local: true,
       reason: "Modo local (Ollama). Requer o Ollama rodando em localhost:11434.",

@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { requireUserId } from "@/lib/auth";
 import { decryptKey } from "@/lib/settings-crypto";
 import { getAiStatus, providerMeta, setupMessage, extractPending, stripPending, encodePending, encodeActions } from "@/lib/ai-help";
+import { isEphemeralServerless } from "@/lib/db-config";
 import { callAIProvider } from "./providers";
 import { AIKeys, ChatHistoryItem } from "./types";
 
@@ -56,7 +57,7 @@ export async function sendMessage(chatId: string | undefined, userMessage: strin
     const keyValue = meta.local ? "ok" : keys[meta.id as keyof AIKeys];
     const envFallback = meta.local ? true : !!process.env[`${provider.toUpperCase()}_API_KEY`];
     const hasKey = meta.local ? true : (!!keyValue || envFallback);
-    const status = getAiStatus(provider, hasKey);
+    const status = getAiStatus(provider, hasKey, isEphemeralServerless());
     if (!status.configured) {
         return { success: false, error: setupMessage(status) };
     }

@@ -139,7 +139,7 @@ export function isSystemInstalled(): boolean {
  * um valor novo, invalidando sessões (JWT) e tornando ilegível o cofre (ENCRYPTION).
  * Sinais: a flag automática `VERCEL` ou o uso de banco na nuvem (TURSO_*).
  */
-function isEphemeralServerless(): boolean {
+export function isEphemeralServerless(): boolean {
   return process.env.VERCEL === "1" || !!process.env.TURSO_DATABASE_URL;
 }
 
