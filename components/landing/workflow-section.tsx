@@ -1,244 +1,237 @@
 // components/landing/workflow-section.tsx
 "use client";
 
-import React from "react";
-import { BrainCircuit, Calendar, Activity, Layers } from "lucide-react";
-import { motion } from "framer-motion";
+import {
+  BrainCircuit,
+  Calendar,
+  Activity,
+  Layers,
+  type LucideIcon,
+} from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
+import type { ReactNode } from "react";
 
-// 1. Definição de Tipos Estritos
-type AccentColor = 'rose' | 'indigo' | 'emerald';
-
-interface WorkflowCardProps {
-    icon: React.ReactNode;
-    iconColor: string;
-    bgIcon: string;
-    label: string;
-    title: React.ReactNode;
-    delay: number;
-    accentColor: AccentColor;
-    isSystem?: boolean;
+/* --- Estágio do pipeline (Input -> Intelligence -> Output) --- */
+interface Stage {
+  n: string;
+  icon: LucideIcon;
+  label: string;
+  code: string;
+  body: ReactNode;
+  live?: boolean;
 }
 
+const STAGES: Stage[] = [
+  {
+    n: "01",
+    icon: Activity,
+    label: "Dados de entrada",
+    code: "Input: HealthMetric",
+    body: (
+      <>
+        Sono detectado:{" "}
+        <strong className="font-bold text-foreground">5h 20m</strong>. Recuperação
+        baixa.
+      </>
+    ),
+  },
+  {
+    n: "02",
+    icon: BrainCircuit,
+    label: "Life OS Intelligence",
+    code: "Process: Settings/AI",
+    body: <>Analisando contexto… risco de fadiga cognitiva elevado.</>,
+    live: true,
+  },
+  {
+    n: "03",
+    icon: Calendar,
+    label: "Ação automática",
+    code: "Output: Task/Event",
+    body: (
+      <>
+        <strong className="font-bold text-primary">✓ Agenda otimizada.</strong>{" "}
+        Sessão de estudo reduzida em 30 min.
+      </>
+    ),
+  },
+];
+
+const BULLETS = [
+  {
+    title: "Saúde & Produtividade",
+    desc: "Dados de sono e treino influenciam a agenda.",
+  },
+  {
+    title: "Finanças & Metas",
+    desc: "Compras ajustam automaticamente orçamentos futuros.",
+  },
+  {
+    title: "Privacidade total",
+    desc: "Seus dados processados localmente, sem nuvem externa.",
+  },
+];
+
 export default function WorkflowSection() {
+  const reduceMotion = useReducedMotion();
+
   return (
-    <section id="ai" className="py-32 px-6 border-t border-border bg-card relative overflow-hidden min-h-screen flex items-center">
-        
-        {/* --- BACKGROUND --- */}
-        <div className="absolute top-0 left-0 w-full h-full bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,#000_70%,transparent_100%)] pointer-events-none z-0" />
-        <div className="absolute top-1/2 right-0 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 blur-[120px] rounded-full pointer-events-none opacity-40 z-0" />
-        <div className="absolute bottom-0 left-20 w-[400px] h-[400px] bg-primary/10 blur-[100px] rounded-full pointer-events-none opacity-30 z-0" />
+    <section
+      id="ai"
+      className="relative flex items-center overflow-hidden border-t border-border/60 px-6 py-32"
+    >
+      {/* fundo themeable (grade + glows no accent) */}
+      <div className="landing-grid pointer-events-none absolute inset-0 opacity-50 [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,black_70%,transparent_100%)]" />
+      <div className="pointer-events-none absolute right-0 top-1/2 h-[600px] w-[600px] -translate-y-1/2 rounded-full bg-primary/10 opacity-50 blur-[120px]" />
+      <div className="pointer-events-none absolute bottom-0 left-20 h-[400px] w-[400px] rounded-full bg-primary/10 opacity-40 blur-[100px]" />
 
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center gap-20 relative z-10 w-full">
-            
-            {/* --- ESQUERDA: TEXTO --- */}
-            <div className="flex-1 space-y-8">
-                <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5 }}
-                    className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-bold uppercase tracking-widest border border-primary/20 shadow-[0_0_20px_-6px_var(--color-primary)]"
-                >
-                    <Layers className="h-3 w-3" /> Contexto Unificado
-                </motion.div>
-                
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.1 }}
-                >
-                    <h2 className="text-4xl md:text-5xl font-bold text-foreground leading-tight">
-                        Seus dados não vivem<br />
-                        em silos isolados.
-                    </h2>
-                </motion.div>
-                
-                <motion.p 
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.2 }}
-                    className="text-muted-foreground text-lg leading-relaxed"
-                >
-                    O <strong>Life OS</strong> entende que sua produtividade depende da sua saúde física. Se você dormiu mal, o sistema ajusta suas metas. Se gastou demais, ele alerta sobre o orçamento. Tudo conectado via SQLite local.
-                </motion.p>
+      <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center gap-16 md:flex-row md:gap-20">
+        {/* --- ESQUERDA: NARRATIVA --- */}
+        <div className="flex-1 space-y-8">
+          <motion.span
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-widest text-primary shadow-[0_0_20px_-6px_var(--color-primary)]"
+          >
+            <Layers className="size-3.5" /> Contexto Unificado
+          </motion.span>
 
-                <div className="space-y-6 pt-4">
-                    {[
-                        { title: "Saúde & Produtividade", desc: "Dados de sono e treino influenciam a agenda." },
-                        { title: "Finanças & Metas", desc: "Compras ajustam automaticamente orçamentos futuros." },
-                        { title: "Privacidade Total", desc: "Seus dados processados localmente, sem nuvem externa." }
-                    ].map((item, i) => (
-                        <motion.div 
-                            key={i}
-                            initial={{ opacity: 0, x: -20 }}
-                            whileInView={{ opacity: 1, x: 0 }}
-                            transition={{ duration: 0.5, delay: 0.3 + (i * 0.1) }}
-                            className="flex gap-4 group cursor-default"
-                        >
-                            <div className="mt-1.5 h-2 w-2 rounded-full bg-primary shrink-0 group-hover:bg-primary/80 group-hover:shadow-[0_0_10px_var(--color-primary)] transition-all duration-300" />
-                            <div>
-                                <h4 className="text-foreground font-bold text-sm group-hover:text-primary transition-colors">{item.title}</h4>
-                                <p className="text-muted-foreground text-sm leading-snug">{item.desc}</p>
-                            </div>
-                        </motion.div>
-                    ))}
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className="text-4xl font-bold leading-tight tracking-tight text-foreground md:text-5xl"
+          >
+            Seus dados não vivem
+            <br />
+            em <span className="text-gradient-brand">silos isolados.</span>
+          </motion.h2>
+
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="text-lg leading-relaxed text-muted-foreground"
+          >
+            O <strong className="text-foreground">Life OS</strong> entende que sua
+            produtividade depende da sua saúde física. Se você dormiu mal, o sistema
+            ajusta suas metas. Se gastou demais, ele alerta sobre o orçamento. Tudo
+            conectado via SQLite local.
+          </motion.p>
+
+          <div className="space-y-5 pt-2">
+            {BULLETS.map((item, i) => (
+              <motion.div
+                key={item.title}
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: 0.3 + i * 0.1 }}
+                className="group flex gap-4"
+              >
+                <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary transition-all duration-300 group-hover:shadow-[0_0_10px_var(--color-primary)]" />
+                <div>
+                  <h4 className="text-sm font-bold text-foreground transition-colors group-hover:text-primary">
+                    {item.title}
+                  </h4>
+                  <p className="text-sm leading-snug text-muted-foreground">
+                    {item.desc}
+                  </p>
                 </div>
-            </div>
-
-            {/* --- DIREITA: WORKFLOW --- */}
-            <div className="flex-1 w-full flex justify-center perspective-1000">
-                <div className="relative w-full max-w-md">
-                    
-                    {/* TRILHA DA LINHA DO TEMPO */}
-                    <div className="absolute left-8 top-0 bottom-0 w-[2px] bg-muted/30 rounded-full overflow-hidden">
-                        {/* ✅ ANIMAÇÃO DO FEIXE DE LUZ RESTAURADA E MELHORADA */}
-                        <motion.div 
-                            // Aumentei a altura (h-150px) e o brilho para ficar mais visível
-                            className="absolute top-0 w-full h-[150px] bg-gradient-to-b from-transparent via-primary/80 to-transparent shadow-[0_0_16px_0px_var(--color-primary)]"
-                            // Começa bem acima (-40%) e termina bem abaixo (140%) para garantir o loop suave sem "pulo"
-                            animate={{ top: ["-40%", "140%"] }}
-                            transition={{ 
-                                duration: 3, // Duração do ciclo
-                                repeat: Infinity, // Repete para sempre
-                                ease: "easeInOut", // Acelera no meio, suave nas pontas
-                                repeatDelay: 0 // Sem pausa para fluxo contínuo
-                            }}
-                        />
-                    </div>
-
-                    {/* CARD 1: INPUT DE DADOS (SAÚDE) */}
-                    <WorkflowCard 
-                        icon={<Activity className="h-5 w-5" />}
-                        iconColor="text-rose-400"
-                        bgIcon="bg-rose-500/10"
-                        accentColor="rose"
-                        label="Dados de Entrada"
-                        title={
-                            <>
-                                <span className="block text-xs text-muted-foreground mb-1 font-mono">Input: HealthMetric</span>
-                                Sono detectado: <span className="text-rose-400 font-bold">5h 20m</span>. Recuperação baixa.
-                            </>
-                        }
-                        delay={0.2}
-                    />
-
-                    {/* CARD 2: PROCESSAMENTO (IA) */}
-                    <WorkflowCard 
-                        icon={<BrainCircuit className="h-5 w-5" />}
-                        iconColor="text-primary"
-                        bgIcon="bg-primary/10"
-                        accentColor="indigo"
-                        label="Life OS Intelligence"
-                        title={
-                            <>
-                                <span className="block text-xs text-muted-foreground mb-1 font-mono">Process: Settings/AI</span>
-                                Analisando contexto... Risco de fadiga cognitiva elevado.
-                            </>
-                        }
-                        delay={0.4}
-                        isSystem={true}
-                    />
-
-                    {/* CARD 3: AÇÃO (AGENDA) */}
-                    <WorkflowCard 
-                        icon={<Calendar className="h-5 w-5" />}
-                        iconColor="text-emerald-400"
-                        bgIcon="bg-emerald-500/10"
-                        accentColor="emerald"
-                        label="Ação Automática"
-                        title={
-                            <>
-                                <span className="block text-xs text-muted-foreground mb-1 font-mono">Output: Task/Event</span>
-                                <span className="text-emerald-400 font-bold">✓ Agenda Otimizada.</span> Sessão de estudo reduzida em 30min.
-                            </>
-                        }
-                        delay={0.6}
-                    />
-
-                </div>
-            </div>
-
+              </motion.div>
+            ))}
+          </div>
         </div>
+
+        {/* --- DIREITA: O PIPELINE --- */}
+        <div className="flex w-full flex-1 justify-center">
+          <div className="relative w-full max-w-md">
+            {/* trilho do pipeline + feixe de luz fluindo */}
+            <div className="absolute left-[22px] top-2 bottom-2 w-px overflow-hidden rounded-full bg-border/70">
+              {!reduceMotion && (
+                <motion.div
+                  className="absolute top-0 h-[150px] w-full bg-gradient-to-b from-transparent via-primary/80 to-transparent shadow-[0_0_16px_0px_var(--color-primary)]"
+                  animate={{ top: ["-40%", "140%"] }}
+                  transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+                />
+              )}
+            </div>
+
+            <div className="space-y-5">
+              {STAGES.map((stage, i) => (
+                <StageCard
+                  key={stage.n}
+                  stage={stage}
+                  index={i}
+                  reduceMotion={!!reduceMotion}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
   );
 }
 
-// --- SUB-COMPONENTE TIPADO ---
-function WorkflowCard({ 
-    icon, 
-    iconColor, 
-    bgIcon, 
-    label, 
-    title, 
-    delay, 
-    accentColor, 
-    isSystem = false 
-}: WorkflowCardProps) {
+function StageCard({
+  stage,
+  index,
+  reduceMotion,
+}: {
+  stage: Stage;
+  index: number;
+  reduceMotion: boolean;
+}) {
+  const Icon = stage.icon;
+  return (
+    <motion.div
+      initial={reduceMotion ? false : { opacity: 0, x: 20, scale: 0.96 }}
+      whileInView={{ opacity: 1, x: 0, scale: 1 }}
+      viewport={{ once: true, margin: "-50px" }}
+      transition={{ duration: 0.5, delay: 0.15 + index * 0.15 }}
+      className={`group relative ml-12 flex items-start gap-4 rounded-2xl border bg-card/80 p-5 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-card ${
+        stage.live
+          ? "border-primary/30 shadow-[0_0_40px_-10px_var(--color-primary)] ring-1 ring-primary/10"
+          : "border-border/60 shadow-sm hover:border-primary/30 hover:shadow-[0_0_30px_-8px_var(--color-primary)]"
+      }`}
+    >
+      {/* nó na trilha */}
+      <span className="absolute -left-8 top-7 size-3 -translate-y-1/2 rounded-full border-[3px] border-background bg-primary shadow-sm transition-transform duration-300 group-hover:scale-125" />
 
-    // Mapas de cores tipados
-    const borderColors: Record<AccentColor, string> = {
-        rose: "group-hover:border-rose-500/30",
-        indigo: "group-hover:border-primary/30",
-        emerald: "group-hover:border-emerald-500/30",
-    };
+      {/* ícone do estágio */}
+      <div className="relative mt-0.5 grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20 transition-transform duration-300 group-hover:scale-105">
+        <Icon className="size-5" />
+        {/* número do estágio */}
+        <span className="absolute -right-2 -top-2 grid size-5 place-items-center rounded-full border border-primary/20 bg-background font-mono text-[10px] font-bold text-primary">
+          {stage.n}
+        </span>
+      </div>
 
-    const glowColors: Record<AccentColor, string> = {
-        rose: "group-hover:shadow-[0_0_30px_-5px_rgba(244,63,94,0.15)]",
-        indigo: "group-hover:shadow-[0_0_30px_-5px_var(--color-primary)]",
-        emerald: "group-hover:shadow-[0_0_30px_-5px_rgba(16,185,129,0.15)]",
-    };
+      {/* conteúdo */}
+      <div className="min-w-0 flex-1">
+        <div className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-primary/80">
+          {stage.label}
+        </div>
+        <p className="mb-1 font-mono text-xs text-muted-foreground">{stage.code}</p>
+        <div className="text-sm font-medium leading-relaxed text-foreground">
+          {stage.body}
+        </div>
+      </div>
 
-    const dotColors: Record<AccentColor, string> = {
-        rose: "group-hover:bg-rose-500 group-hover:border-rose-900/50",
-        indigo: "group-hover:bg-primary group-hover:border-primary/50",
-        emerald: "group-hover:bg-emerald-500 group-hover:border-emerald-900/50",
-    };
-
-    return (
-        <motion.div 
-            initial={{ opacity: 0, x: 20, scale: 0.95 }}
-            whileInView={{ opacity: 1, x: 0, scale: 1 }}
-            viewport={{ margin: "-50px" }}
-            transition={{ delay, duration: 0.5 }}
-            className={`
-                group relative ml-12 mb-6 p-5 rounded-2xl
-                bg-card/90 backdrop-blur-xl border border-border
-                flex items-start gap-4 transition-all duration-500
-                hover:-translate-y-1 hover:bg-card
-                ${borderColors[accentColor]}
-                ${glowColors[accentColor]}
-                ${isSystem ? 'shadow-[0_0_40px_-10px_var(--color-primary)] border-primary/20 ring-1 ring-primary/10' : 'shadow-lg'}
-            `}
-        >
-            {/* Ponto na linha do tempo */}
-            <div className={`
-                absolute -left-[39px] top-8 -translate-y-1/2 w-4 h-4 rounded-full 
-                border-[3px] border-background z-10 transition-all duration-300 
-                bg-muted shadow-sm
-                ${dotColors[accentColor]}
-            `} />
-            
-            {/* Ícone */}
-            <div className={`mt-1 h-10 w-10 shrink-0 rounded-lg ${bgIcon} flex items-center justify-center ${iconColor} shadow-inner ring-1 ring-white/5 group-hover:scale-105 transition-transform duration-500`}>
-                {icon}
-            </div>
-            
-            {/* Conteúdo */}
-            <div className="flex-1 min-w-0">
-                <div className={`text-[10px] font-bold uppercase tracking-widest mb-1.5 opacity-70 ${iconColor}`}>
-                    {label}
-                </div>
-                <div className="text-sm font-medium text-foreground group-hover:text-foreground transition-colors leading-relaxed truncate-multiline">
-                    {title}
-                </div>
-            </div>
-
-            {/* Indicador de Pulsação (Apenas para Sistema) */}
-            {isSystem && (
-                <div className="absolute top-4 right-4 flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-                </div>
-            )}
-        </motion.div>
-    )
+      {/* pulso "ao vivo" no card de processamento */}
+      {stage.live && (
+        <span className="absolute right-4 top-4 flex size-2">
+          {!reduceMotion && (
+            <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-75" />
+          )}
+          <span className="relative inline-flex size-2 rounded-full bg-primary" />
+        </span>
+      )}
+    </motion.div>
+  );
 }

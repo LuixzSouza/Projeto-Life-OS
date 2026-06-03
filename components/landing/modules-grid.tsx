@@ -1,80 +1,76 @@
 "use client";
 
-import React from "react";
+import { LayoutGrid } from "lucide-react";
 
-// Imports
+// Central
 import { OverviewCard } from "./bento/overview-card";
 import { AgendaCard } from "./bento/agenda-card";
 import { AICard } from "./bento/ai-card";
-import { FinanceCard } from "./bento/finance-card";
+// Profissional
 import { ProjectsCard } from "./bento/projects-card";
+import { JobsCard } from "./bento/jobs-card";
+import { BusinessCard } from "./bento/business-card";
+import { FinanceCard } from "./bento/finance-card";
+// Pessoal
 import { HealthCard } from "./bento/health-card";
 import { StudiesCard } from "./bento/studies-card";
-import { ClosetCard } from "./bento/closet-card";
 import { EntertainmentCard } from "./bento/entertainment-card";
+import { ClosetCard } from "./bento/closet-card";
+import { ConnectionsCard } from "./bento/connections-card";
+// Sistema
 import { CMSCard } from "./bento/cms-card";
 import { LinksCard } from "./bento/links-card";
 import { VaultCard } from "./bento/vault-card";
-import { ConnectionsCard } from "./bento/connections-card";
 import { SettingsCard } from "./bento/settings-card";
 
 export default function ModulesGrid() {
   return (
-    <section id="modules" className="relative px-4 py-24">
-      <div className="mx-auto max-w-7xl">
+    <section id="modules" className="relative overflow-hidden border-t border-border/60 px-4 py-24">
+      {/* fundo themeable */}
+      <div className="landing-grid pointer-events-none absolute inset-0 opacity-40 [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_80%)]" />
+      <div className="pointer-events-none absolute left-1/2 top-10 h-[420px] w-full max-w-4xl -translate-x-1/2 rounded-full bg-primary/10 blur-[130px]" />
 
-        <div className="mb-12 md:text-center max-w-3xl mx-auto">
-            <span className="inline-flex items-center gap-2 px-3 py-1 mb-4 rounded-full border border-border bg-muted/50 text-xs font-medium text-muted-foreground">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary" /> 15+ módulos integrados
-            </span>
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-2 tracking-tight">Ecossistema Completo</h2>
-            <p className="text-muted-foreground text-lg">Tudo o que você precisa, integrado em um único lugar.</p>
+      <div className="relative z-10 mx-auto max-w-7xl">
+        <div className="mx-auto mb-12 max-w-3xl md:text-center">
+          <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-widest text-primary">
+            <LayoutGrid className="size-3.5" /> 16 módulos integrados
+          </span>
+          <h2 className="mb-2 text-3xl font-bold tracking-tight text-foreground md:text-4xl">
+            Ecossistema Completo
+          </h2>
+          <p className="text-lg text-muted-foreground">
+            Da rotina ao negócio — tudo o que o Life OS faz, num só lugar.
+          </p>
         </div>
 
-        {/* ESTRATÉGIA DO GRID (LG: 4 Colunas):
-            R1: [Visão(1)] [Agenda(1)] [   IA (2x2)   ]
-            R2: [  Financeiro (2)    ] [..............]
-            R3: [ Proj(1) ] [Saúde(1)] [Estudos(1)] [Closet(1)]
-            R4: [..(2x2)..] [Entre(1)] [ CMS(1)  ] [Links (1)]
-            R5: [Vault(1)] [Conex(1)] [ Configurações (2) ]
+        {/*
+          Bento na ordem dos grupos da sidebar real:
+          Central · Profissional · Pessoal · Sistema.
         */}
+        <div className="grid auto-rows-[minmax(160px,auto)] grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+          {/* Central */}
+          <OverviewCard />
+          <AgendaCard />
+          <AICard />
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 auto-rows-[minmax(160px,auto)]">
-            
-            {/* --- LINHA 1: DASHBOARD DIÁRIO --- */}
-            {/* Visão e Agenda lado a lado */}
-            <OverviewCard />
-            <AgendaCard />
-            
-            {/* IA ocupando o canto direito (2x2) */}
-            <AICard />
+          {/* Profissional */}
+          <ProjectsCard />
+          <JobsCard />
+          <BusinessCard />
+          <FinanceCard />
 
-            {/* --- LINHA 2: FLUXO DE CAIXA --- */}
-            {/* Financeiro ocupa a esquerda, embaixo de Visão/Agenda */}
-            <FinanceCard />
+          {/* Pessoal */}
+          <HealthCard />
+          <StudiesCard />
+          <EntertainmentCard />
+          <ClosetCard />
+          <ConnectionsCard />
 
-            {/* --- LINHA 3 & 4: PRODUTIVIDADE E LAZER MISTURADOS --- */}
-            
-            {/* Projetos: Alto na esquerda (ocupa linhas 3 e 4 na col 1) */}
-            <ProjectsCard /> 
-
-            {/* Linha 3 (Meio): Saúde, Estudos, Closet */}
-            <HealthCard />
-            <StudiesCard />
-            <ClosetCard />
-
-            {/* Linha 4 (Abaixo): Entretenimento e Ferramentas */}
-            <EntertainmentCard />
-            <CMSCard />
-            <LinksCard />
-
-            {/* --- LINHA 5: SISTEMA E SEGURANÇA --- */}
-            <VaultCard />
-            <ConnectionsCard />
-            
-            {/* Configurações fecha a base (2 colunas) */}
-            <SettingsCard />
-
+          {/* Sistema */}
+          <CMSCard />
+          <LinksCard />
+          <VaultCard />
+          <SettingsCard />
         </div>
       </div>
     </section>

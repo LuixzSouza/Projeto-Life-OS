@@ -52,8 +52,8 @@ export default async function DashboardPage() {
     prisma.transaction.aggregate({ where: { type: 'INCOME', userId }, _sum: { amount: true } }),
     prisma.transaction.aggregate({ where: { type: 'EXPENSE', userId }, _sum: { amount: true } }),
     prisma.transaction.findMany({ where: { userId }, take: 5, orderBy: { date: 'desc' }, include: { account: true } }),
-    prisma.task.count({ where: { isDone: false, userId } }),
-    prisma.task.count({ where: { isDone: true, userId } }),
+    prisma.task.count({ where: { isDone: false, userId, deletedAt: null } }),
+    prisma.task.count({ where: { isDone: true, userId, deletedAt: null } }),
     prisma.studySession.findMany({ where: { userId }, include: { subject: true } }),
     prisma.event.findFirst({ where: { startTime: { gte: new Date() }, userId }, orderBy: { startTime: 'asc' } }),
     prisma.mediaItem.findMany({ where: { status: 'IN_PROGRESS', userId }, take: 3 }),
@@ -182,6 +182,7 @@ export default async function DashboardPage() {
         studySessionsCount={studyStats.length}
         nextEvent={nextEvent}
         formatCurrency={formatCurrency}
+        currency={currency}
       />
 
       {/* --- GRID PRINCIPAL --- */}

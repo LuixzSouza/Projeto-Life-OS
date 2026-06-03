@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { usePathname } from "next/navigation";
 
 interface ThemeColorContextType {
   themeColor: string;
@@ -60,6 +61,18 @@ export function ThemeColorProvider({ children, initialColor = "theme-blue" }: Th
   const [themeColor, setThemeColorState] = React.useState<string>(initialColor);
   const [isMounted, setIsMounted] = React.useState(false);
 
+  // A landing ("/") é INDEPENDENTE do app: ignora a cor salva (settings/localStorage)
+  // e sorteia um accent a cada carregamento — showcase de personalização. O restante
+  // do app respeita a escolha do usuário normalmente.
+  const pathname = usePathname();
+  const isLanding = pathname === "/";
+
+  // Guarda o accent sorteado da landing por carregamento de página. Sem isso, um
+  // re-render (ex.: leitura do localStorage no mount muda `themeColor`) re-rodaria o
+  // efeito e sortearia OUTRA cor — causando um flash. Resetado ao sair da landing,
+  // então uma navegação SPA de volta para "/" sorteia de novo.
+  const landingPickRef = React.useRef<string | null>(null);
+
   React.useEffect(() => {
     setIsMounted(true);
     // Se tiver algo salvo no localStorage, tem preferência sobre o banco (opcional)
@@ -85,6 +98,30 @@ export function ThemeColorProvider({ children, initialColor = "theme-blue" }: Th
     root.style.removeProperty("--ring");
     root.style.removeProperty("--primary-foreground");
 
+    // LANDING: cor sorteada a cada load, ignorando settings/localStorage.
+    if (isLanding) {
+      // Reaproveita o sorteio que o script inline (pré-paint, em app/layout.tsx)
+      // já aplicou — assim NÃO piscamos. Numa navegação SPA para "/" o script não
+      // roda, então sorteamos aqui. O ref mantém a cor estável entre re-renders.
+      if (!landingPickRef.current) {
+        const w = window as unknown as { __landingAccent?: string };
+        const fromScript = w.__landingAccent;
+        landingPickRef.current =
+          fromScript && PRESET_CLASSES.includes(fromScript)
+            ? fromScript
+            : PRESET_CLASSES[Math.floor(Math.random() * PRESET_CLASSES.length)];
+        // Consome o valor: numa volta via SPA queremos sortear de novo, não reusar.
+        w.__landingAccent = undefined;
+      }
+      const pick = landingPickRef.current;
+      root.setAttribute("data-theme", pick);
+      root.classList.add(pick);
+      return;
+    }
+
+    // Saiu da landing: limpa o sorteio para que um retorno a "/" gere uma nova cor.
+    landingPickRef.current = null;
+
     if (themeColor.startsWith("#")) {
       // Cor customizada -> injeta variáveis CSS inline (vale para TODO o app).
       // As variáveis aqui guardam a COR COMPLETA (Tailwind v4: var(--primary) é
@@ -109,7 +146,7 @@ export function ThemeColorProvider({ children, initialColor = "theme-blue" }: Th
       root.setAttribute("data-theme", themeColor);
       root.classList.add(themeColor);
     }
-  }, [themeColor, isMounted]);
+  }, [themeColor, isMounted, isLanding]);
 
   return (
     <ThemeColorContext.Provider value={{ themeColor, setThemeColor }}>

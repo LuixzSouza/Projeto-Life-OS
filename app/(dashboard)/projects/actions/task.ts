@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireUserId } from "@/lib/auth";
+import { logActivity } from "@/lib/activity";
 import {
   getString, getBoolean, getNumber, getEnumValue, getDate,
   TASK_PRIORITIES, TASK_STATUSES,
@@ -35,7 +36,7 @@ export async function createTask(formData: FormData) {
     resolvedProjectId = owned ? projectId : null;
   }
 
-  await prisma.task.create({
+  const created = await prisma.task.create({
     data: {
       title,
       description,
@@ -50,6 +51,14 @@ export async function createTask(formData: FormData) {
       isStarred: false,
       progress: 0,
     },
+  });
+
+  await logActivity({
+    action: "CREATE",
+    module: "tasks",
+    entityType: "task",
+    entityId: created.id,
+    summary: `Criou a tarefa "${created.title}"`,
   });
 
   revalidatePath("/projects");
@@ -105,13 +114,33 @@ export async function toggleTask(taskId: string, isDone: boolean) {
     },
   });
 
+  await logActivity({
+    action: !isDone ? "COMPLETE" : "REOPEN",
+    module: "tasks",
+    entityType: "task",
+    entityId: taskId,
+    summary: !isDone ? "Concluiu uma tarefa" : "Reabriu uma tarefa",
+  });
+
   revalidatePath("/projects");
 }
 
+// Soft-delete: a tarefa vai para a Lixeira (deletedAt) e some das listagens.
+// Restaurar/excluir em definitivo: ver app/(dashboard)/trash.
 export async function deleteTask(taskId: string) {
   const userId = await requireUserId();
-  await prisma.task.deleteMany({
+  const task = await prisma.task.findFirst({ where: { id: taskId, userId }, select: { title: true } });
+  await prisma.task.updateMany({
     where: { id: taskId, userId },
+    data: { deletedAt: new Date() },
+  });
+
+  await logActivity({
+    action: "DELETE",
+    module: "tasks",
+    entityType: "task",
+    entityId: taskId,
+    summary: task ? `Moveu "${task.title}" para a lixeira` : "Excluiu uma tarefa",
   });
 
   revalidatePath("/projects");

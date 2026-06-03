@@ -1,219 +1,185 @@
 "use client";
 
-import { 
-  BookOpen, 
-  RotateCw, 
-  Check, 
-  X, 
-  Clock, 
-  Trophy, 
-  BrainCircuit, 
-  Play, 
-  Pause, 
-  Zap,
-  Target,
-  LucideIcon
-} from "lucide-react";
+import { BookOpen, Check, X, Clock, Trophy, BrainCircuit, Play, Pause, Target, Zap } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { BaseCard } from "./base-card";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
-// --- TIPAGEM ESTRITA (Correção do ANY) ---
 type StudyTab = "pomodoro" | "cards" | "game";
 
 interface TabItem {
-    id: StudyTab;
-    icon: LucideIcon;
-    label: string;
+  id: StudyTab;
+  icon: LucideIcon;
+  label: string;
 }
 
-// --- SUB-COMPONENTES PARA CADA MODO ---
-
-// 1. MODO POMODORO (Ajustado para caber)
+// model StudySession: focus/pomodoro.
 function PomodoroView() {
   const [isActive, setIsActive] = useState(false);
-  
   return (
-    <div className="flex flex-col items-center justify-center h-full gap-2">
-        {/* Timer Visual (Levemente menor) */}
-        <div className="relative w-20 h-20 flex items-center justify-center">
-            <svg className="w-full h-full -rotate-90">
-                <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-muted" />
-                <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-indigo-500" strokeDasharray="226" strokeDashoffset="60" strokeLinecap="round" />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-xl font-bold text-foreground tracking-widest font-mono">24:59</span>
-                <span className="text-[8px] text-muted-foreground uppercase tracking-widest">Foco</span>
-            </div>
+    <div className="flex h-full flex-col items-center justify-center gap-2">
+      <div className="relative flex size-20 items-center justify-center">
+        <svg className="size-full -rotate-90">
+          <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-muted" />
+          <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-primary" strokeDasharray="226" strokeDashoffset="60" strokeLinecap="round" />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="font-mono text-xl font-bold tracking-widest text-foreground">24:59</span>
+          <span className="text-[8px] uppercase tracking-widest text-muted-foreground">Foco</span>
         </div>
-
-        {/* Controles */}
-        <button 
-            onClick={() => setIsActive(!isActive)}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-indigo-500 hover:bg-indigo-400 text-foreground text-[10px] font-bold transition-all active:scale-95"
-        >
-            {isActive ? <Pause className="h-3 w-3" /> : <Play className="h-3 w-3" />}
-            {isActive ? "PAUSAR" : "INICIAR"}
-        </button>
+      </div>
+      <button
+        onClick={() => setIsActive(!isActive)}
+        className="flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-[10px] font-bold text-primary-foreground transition-all active:scale-95"
+      >
+        {isActive ? <Pause className="size-3" /> : <Play className="size-3" />}
+        {isActive ? "PAUSAR" : "INICIAR"}
+      </button>
     </div>
   );
 }
 
-// 2. MODO FLASHCARDS (Altura ajustada)
+// model Flashcard: box (Leitner), term, definition.
 function FlashcardView() {
   const [flipped, setFlipped] = useState(false);
-
   return (
-    <div className="relative w-full h-full flex items-center justify-center perspective-1000 group/study">
-        <motion.div 
-            className="w-full h-20 relative cursor-pointer" // Altura reduzida para 20
-            onClick={() => setFlipped(!flipped)}
-            whileTap={{ scale: 0.98 }}
-            animate={{ rotateY: flipped ? 180 : 0 }}
-            transition={{ duration: 0.4 }}
-            style={{ transformStyle: "preserve-3d" }}
-        >
-            {/* FRENTE */}
-            <div className="absolute inset-0 bg-muted border border-border rounded-xl flex flex-col items-center justify-center p-2 shadow-lg" style={{ backfaceVisibility: 'hidden' }}>
-                <span className="text-[8px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 absolute top-2 right-2 font-bold">Hard</span>
-                <p className="text-[9px] text-muted-foreground mb-0.5 uppercase tracking-widest">React Hook</p>
-                <p className="text-xs font-bold text-foreground text-center">Função do <span className="text-indigo-400 font-mono">useMemo</span>?</p>
+    <div className="perspective-1000 flex size-full items-center justify-center">
+      <motion.div
+        className="relative h-20 w-full cursor-pointer"
+        onClick={() => setFlipped(!flipped)}
+        whileTap={{ scale: 0.98 }}
+        animate={{ rotateY: flipped ? 180 : 0 }}
+        transition={{ duration: 0.4 }}
+        style={{ transformStyle: "preserve-3d" }}
+      >
+        {/* Frente */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center rounded-xl border border-border bg-muted p-2 shadow-lg" style={{ backfaceVisibility: "hidden" }}>
+          <span className="absolute right-2 top-2 rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[8px] font-bold text-primary">Caixa 3</span>
+          <p className="mb-0.5 text-[9px] uppercase tracking-widest text-muted-foreground">React Hook</p>
+          <p className="text-center text-xs font-bold text-foreground">
+            Função do <span className="font-mono text-primary">useMemo</span>?
+          </p>
+        </div>
+        {/* Verso */}
+        <div className="absolute inset-0 flex flex-col items-center justify-between rounded-xl border border-primary/30 bg-card p-2 shadow-lg" style={{ transform: "rotateY(180deg)", backfaceVisibility: "hidden" }}>
+          <div className="flex flex-1 items-center justify-center px-1 text-center">
+            <p className="text-[10px] leading-tight text-foreground">Memoizar valores computados caros.</p>
+          </div>
+          <div className="flex w-full gap-1.5">
+            <div className="flex h-5 flex-1 items-center justify-center rounded border border-border bg-muted/60 text-muted-foreground transition-colors hover:bg-muted">
+              <X className="size-3" />
             </div>
-
-            {/* VERSO */}
-            <div className="absolute inset-0 bg-card border border-indigo-500/30 rounded-xl flex flex-col items-center justify-between p-2 shadow-lg" style={{ transform: "rotateY(180deg)", backfaceVisibility: 'hidden' }}>
-                <div className="flex-1 flex items-center justify-center text-center px-1">
-                    <p className="text-[10px] text-foreground leading-tight">Memoizar valores computados caros.</p>
-                </div>
-                {/* Botões SM-2 */}
-                <div className="flex gap-1.5 w-full">
-                    <div className="h-5 flex-1 rounded bg-rose-500/20 flex items-center justify-center text-rose-500 hover:bg-rose-500 hover:text-foreground transition-colors"><X className="h-3 w-3" /></div>
-                    <div className="h-5 flex-1 rounded bg-emerald-500/20 flex items-center justify-center text-emerald-500 hover:bg-emerald-500 hover:text-foreground transition-colors"><Check className="h-3 w-3" /></div>
-                </div>
+            <div className="flex h-5 flex-1 items-center justify-center rounded bg-primary/15 text-primary transition-colors hover:bg-primary hover:text-primary-foreground">
+              <Check className="size-3" />
             </div>
-        </motion.div>
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 }
 
-// 3. MODO QUIZ
-function GamificationView() {
+// models LearningGoal / UserStats (streak, metas).
+function GoalsView() {
   return (
-    <div className="flex flex-col h-full justify-center gap-2 px-1">
-        
-        {/* Stats Row */}
-        <div className="grid grid-cols-2 gap-2">
-            <div className="bg-muted/50 p-2 rounded-lg border border-border flex flex-col items-center">
-                <Target className="h-4 w-4 text-emerald-500 mb-1" />
-                <span className="text-base font-bold text-foreground">85%</span>
-                <span className="text-[8px] text-muted-foreground uppercase">Precisão</span>
-            </div>
-            <div className="bg-muted/50 p-2 rounded-lg border border-border flex flex-col items-center">
-                <Zap className="h-4 w-4 text-amber-500 mb-1" />
-                <span className="text-base font-bold text-foreground">12</span>
-                <span className="text-[8px] text-muted-foreground uppercase">Streak</span>
-            </div>
+    <div className="flex h-full flex-col justify-center gap-2 px-1">
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex flex-col items-center rounded-lg border border-border/60 bg-muted/50 p-2">
+          <Target className="mb-1 size-4 text-primary" />
+          <span className="text-base font-bold text-foreground">85%</span>
+          <span className="text-[8px] uppercase text-muted-foreground">Precisão</span>
         </div>
-
-        {/* Daily Goal */}
-        <div className="space-y-1">
-            <div className="flex justify-between text-[9px] text-muted-foreground">
-                <span>XP Diário</span>
-                <span>850/1k</span>
-            </div>
-            <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                <motion.div 
-                    initial={{ width: 0 }} 
-                    animate={{ width: "85%" }} 
-                    className="h-full bg-gradient-brand"
-                />
-            </div>
+        <div className="flex flex-col items-center rounded-lg border border-border/60 bg-muted/50 p-2">
+          <Zap className="mb-1 size-4 text-primary" />
+          <span className="text-base font-bold text-foreground">12</span>
+          <span className="text-[8px] uppercase text-muted-foreground">Streak</span>
         </div>
+      </div>
+      <div className="space-y-1">
+        <div className="flex justify-between text-[9px] text-muted-foreground">
+          <span>Meta diária</span>
+          <span>51 / 60 min</span>
+        </div>
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+          <motion.div initial={{ width: 0 }} whileInView={{ width: "85%" }} className="h-full bg-gradient-brand" />
+        </div>
+      </div>
     </div>
   );
 }
 
 export function StudiesCard() {
-  const [activeTab, setActiveTab] = useState<StudyTab>("pomodoro");
-
+  const [active, setActive] = useState<StudyTab>("pomodoro");
   const tabs: TabItem[] = [
     { id: "pomodoro", icon: Clock, label: "Foco" },
     { id: "cards", icon: BookOpen, label: "Cards" },
-    { id: "game", icon: Trophy, label: "Rank" },
+    { id: "game", icon: Trophy, label: "Metas" },
   ];
 
   return (
-    <BaseCard 
-        title="Study Lab" 
-        icon={BrainCircuit} 
-        description="Hub de estudos integrado."
-        className="col-span-1 h-full min-h-[260px]:"
-    >
-        <div className="flex flex-col h-full w-full bg-card">
-            
-            {/* --- HEADER GAMIFICADO --- */}
-            <div className="px-4 py-2 border-b border-border flex justify-between items-center bg-card/50 shrink-0">
-                <div className="flex items-center gap-1.5">
-                    <div className="w-5 h-5 rounded-md bg-yellow-500/20 flex items-center justify-center border border-yellow-500/30">
-                        <Trophy className="h-3 w-3 text-yellow-500" />
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="text-[8px] text-muted-foreground uppercase font-bold">Nível 12</span>
-                        <div className="w-10 h-1 bg-muted rounded-full mt-0.5">
-                            <div className="w-[60%] h-full bg-yellow-500 rounded-full" />
-                        </div>
-                    </div>
-                </div>
-                <div className="text-[9px] font-mono text-muted-foreground">
-                    <span className="text-foreground font-bold">1.2k</span> XP
-                </div>
+    <BaseCard title="Estudos" icon={BrainCircuit} description="Sessões, flashcards e metas." className="col-span-1 h-full min-h-[260px]">
+      <div className="flex h-full w-full flex-col">
+        {/* Header com nível/streak (UserStats) */}
+        <div className="flex shrink-0 items-center justify-between border-b border-border/60 px-4 py-2">
+          <div className="flex items-center gap-1.5">
+            <div className="grid size-5 place-items-center rounded-md border border-primary/30 bg-primary/10">
+              <Trophy className="size-3 text-primary" />
             </div>
-
-            {/* --- CONTEÚDO PRINCIPAL (Flex-1 para ocupar espaço) --- */}
-            <div className="flex-1 p-3 relative overflow-hidden flex flex-col justify-center">
-                <AnimatePresence mode="wait">
-                    <motion.div
-                        key={activeTab}
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ duration: 0.2 }}
-                        className="h-full w-full"
-                    >
-                        {activeTab === "pomodoro" && <PomodoroView />}
-                        {activeTab === "cards" && <FlashcardView />}
-                        {activeTab === "game" && <GamificationView />}
-                    </motion.div>
-                </AnimatePresence>
+            <div className="flex flex-col">
+              <span className="text-[8px] font-bold uppercase text-muted-foreground">Nível 12</span>
+              <div className="mt-0.5 h-1 w-10 rounded-full bg-muted">
+                <div className="h-full w-[60%] rounded-full bg-gradient-brand" />
+              </div>
             </div>
-
-            {/* --- MENU INFERIOR --- */}
-            <div className="p-2 border-t border-border bg-card/30 shrink-0">
-                <div className="flex justify-between items-center bg-muted/50 rounded-lg p-1">
-                    {tabs.map((tab) => {
-                        const Icon = tab.icon;
-                        const isActive = activeTab === tab.id;
-                        return (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={cn(
-                                    "flex items-center justify-center gap-1.5 flex-1 py-1.5 rounded-md text-[9px] font-bold uppercase tracking-wide transition-all",
-                                    isActive 
-                                        ? "bg-zinc-700 text-foreground shadow-sm" 
-                                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                                )}
-                            >
-                                <Icon className="h-3 w-3" />
-                                {tab.label}
-                            </button>
-                        )
-                    })}
-                </div>
-            </div>
-
+          </div>
+          <div className="font-mono text-[9px] text-muted-foreground">
+            <span className="font-bold text-foreground">1.2k</span> XP
+          </div>
         </div>
+
+        {/* Conteúdo */}
+        <div className="relative flex flex-1 flex-col justify-center overflow-hidden p-3">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={active}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.2 }}
+              className="size-full"
+            >
+              {active === "pomodoro" && <PomodoroView />}
+              {active === "cards" && <FlashcardView />}
+              {active === "game" && <GoalsView />}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* Menu */}
+        <div className="shrink-0 border-t border-border/60 p-2">
+          <div className="flex items-center justify-between rounded-lg bg-muted/50 p-1">
+            {tabs.map((tab) => {
+              const TabIcon = tab.icon;
+              const isActive = active === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActive(tab.id)}
+                  className={cn(
+                    "flex flex-1 items-center justify-center gap-1.5 rounded-md py-1.5 text-[9px] font-bold uppercase tracking-wide transition-all",
+                    isActive ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <TabIcon className="size-3" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
     </BaseCard>
   );
 }

@@ -17,12 +17,12 @@ export default async function ProjectsPage() {
       orderBy: { updatedAt: "desc" },
       select: {
         id: true, slug: true, title: true, description: true, status: true, color: true, updatedAt: true,
-        _count: { select: { tasks: true } },
-        tasks: { where: { isDone: true }, select: { id: true } },
+        _count: { select: { tasks: { where: { deletedAt: null } } } },
+        tasks: { where: { isDone: true, deletedAt: null }, select: { id: true } },
       },
     }),
-    prisma.task.aggregate({ where: { projectId: null, userId }, _count: { id: true } }),
-    prisma.task.count({ where: { projectId: null, isDone: true, userId } }),
+    prisma.task.aggregate({ where: { projectId: null, userId, deletedAt: null }, _count: { id: true } }),
+    prisma.task.count({ where: { projectId: null, isDone: true, userId, deletedAt: null } }),
   ]);
 
   // Serialização para o explorador (client).

@@ -52,3 +52,11 @@ prisma/*.db-journal
 
 # config de instalação local (caminho do banco + segredos da máquina)
 life-os-config.json
+
+# launcher local (PID do servidor em background + logs)
+.life-os-server.pid
+/logs/
+
+# IDE (Visual Studio gera índices/cache pesados — nunca versionar)
+.vs/
+*.vsidx

@@ -6,83 +6,74 @@ import { BaseCard } from "./base-card";
 import { cn } from "@/lib/utils";
 
 export function AgendaCard() {
-  // Gerando dias para preencher o grid (4 semanas perfeitas para visual limpo)
   const days = Array.from({ length: 28 }, (_, i) => i + 1);
-  const currentDay = 14; 
-  const events = [3, 14, 22, 27]; // Dias com eventos simulados
-
-  const weekDays = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+  const currentDay = 14;
+  const events = [3, 14, 22, 27]; // dias com eventos (model Event)
+  const weekDays = ["D", "S", "T", "Q", "Q", "S", "S"];
 
   return (
     <BaseCard
       title="Agenda"
-      description="" // Descrição vazia para focar no visual
+      description="Eventos e rotina."
       icon={Calendar}
       className="col-span-1 row-span-1"
     >
-      <div className="p-4 w-full h-full flex flex-col items-center justify-between">
-        
-        {/* --- CABEÇALHO DO CALENDÁRIO --- */}
-        <div className="flex justify-between items-center w-full max-w-[200px] mb-2 px-1">
-            <span className="text-xs font-bold text-foreground">Outubro</span>
-            <span className="text-[10px] text-muted-foreground font-mono">2025</span>
+      <div className="flex h-full w-full flex-col items-center justify-between p-4">
+        {/* Cabeçalho do mês */}
+        <div className="mb-2 flex w-full max-w-[200px] items-center justify-between px-1">
+          <span className="text-xs font-bold text-foreground">Junho</span>
+          <span className="font-mono text-[10px] text-muted-foreground">2026</span>
         </div>
 
-        {/* --- GRID DE DIAS --- */}
-        <div className="grid grid-cols-7 gap-1 w-full max-w-[200px]">
-            {/* Headers (Dias da Semana) */}
-            {weekDays.map((d, i) => (
-                // CORREÇÃO AQUI: Usando 'i' (index) como key, pois 'd' se repete
-                <span key={i} className="text-[9px] text-muted-foreground text-center font-bold">
-                    {d}
-                </span>
-            ))}
-            
-            {/* Dias Numéricos */}
-            {days.map(day => {
-                const isToday = day === currentDay;
-                const hasEvent = events.includes(day);
+        {/* Grid de dias */}
+        <div className="grid w-full max-w-[200px] grid-cols-7 gap-1">
+          {weekDays.map((d, i) => (
+            <span key={i} className="text-center text-[9px] font-bold text-muted-foreground">
+              {d}
+            </span>
+          ))}
 
-                return (
-                    <div 
-                        key={day} 
-                        className={cn(
-                            "h-6 w-full rounded-md flex items-center justify-center text-[10px] relative transition-all cursor-default group",
-                            isToday 
-                                ? "bg-white text-black font-bold shadow-lg scale-105 z-10" 
-                                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                        )}
-                    >
-                        {day}
-                        
-                        {/* Indicador de Evento (Bolinha) */}
-                        {hasEvent && (
-                            <div className={cn(
-                                "absolute bottom-0.5 w-1 h-1 rounded-full",
-                                isToday ? "bg-indigo-600" : "bg-indigo-500"
-                            )} />
-                        )}
-                    </div>
-                );
-            })}
-        </div>
-        
-        {/* --- RODAPÉ: PRÓXIMO EVENTO --- */}
-        <div className="mt-3 w-full bg-muted/40 border border-border rounded-lg p-2.5 flex items-center gap-3 hover:bg-muted/60 transition-colors cursor-pointer group">
-            <div className="h-8 w-8 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-400 group-hover:text-indigo-300 transition-colors">
-                <Clock className="h-4 w-4" />
-            </div>
-            <div className="flex flex-col">
-                <p className="text-[9px] text-muted-foreground font-medium flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> 
-                    Agora
-                </p>
-                <p className="text-[10px] text-foreground font-semibold truncate max-w-[120px]">
-                    Reunião de Projeto
-                </p>
-            </div>
+          {days.map((day) => {
+            const isToday = day === currentDay;
+            const hasEvent = events.includes(day);
+            return (
+              <div
+                key={day}
+                className={cn(
+                  "relative flex h-6 w-full items-center justify-center rounded-md text-[10px] transition-all",
+                  isToday
+                    ? "z-10 scale-105 bg-primary font-bold text-primary-foreground shadow-lg"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                {day}
+                {hasEvent && (
+                  <div
+                    className={cn(
+                      "absolute bottom-0.5 size-1 rounded-full",
+                      isToday ? "bg-primary-foreground" : "bg-primary"
+                    )}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
 
+        {/* Próximo evento */}
+        <div className="group mt-3 flex w-full cursor-pointer items-center gap-3 rounded-lg border border-border/60 bg-muted/40 p-2.5 transition-colors hover:border-primary/30">
+          <div className="grid size-8 place-items-center rounded-full bg-primary/10 text-primary">
+            <Clock className="size-4" />
+          </div>
+          <div className="flex flex-col">
+            <p className="flex items-center gap-1 text-[9px] font-medium text-muted-foreground">
+              <span className="size-1.5 animate-pulse rounded-full bg-primary" /> Agora
+            </p>
+            <p className="max-w-[120px] truncate text-[10px] font-semibold text-foreground">
+              Reunião de Projeto
+            </p>
+          </div>
+        </div>
       </div>
     </BaseCard>
   );

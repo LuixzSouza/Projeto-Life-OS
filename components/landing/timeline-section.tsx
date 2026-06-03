@@ -1,158 +1,184 @@
 // components/landing/timeline-section.tsx
 "use client";
 
-import { 
-  Sun, 
-  BrainCircuit, 
-  Wallet, 
-  Moon, 
-  CheckCircle2, 
-  LineChart 
+import {
+  Sunrise,
+  BrainCircuit,
+  Wallet,
+  Moon,
+  LineChart,
+  type LucideIcon,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, useScroll, useReducedMotion } from "framer-motion";
+import { useRef } from "react";
 
-// Tipagem para os itens da timeline
 interface TimelineItem {
   time: string;
-  icon: React.ElementType;
-  color: string;
+  icon: LucideIcon;
   module: string;
   title: string;
   desc: string;
 }
 
 const TIMELINE: TimelineItem[] = [
-  { 
-    time: "07:00", 
-    icon: Sun, 
-    color: "text-amber-400",
-    module: "HEALTH & DASHBOARD",
-    title: "Sincronização Biológica", 
-    desc: "O dia começa com o registro de sono e humor (HealthMetric). O sistema calcula sua 'Bateria Social' e ajusta a dificuldade das tarefas sugeridas no Dashboard." 
+  {
+    time: "07:00",
+    icon: Sunrise,
+    module: "Health & Dashboard",
+    title: "Sincronização biológica",
+    desc: "O dia começa com o registro de sono e humor (HealthMetric). O sistema calcula sua 'Bateria Social' e ajusta a dificuldade das tarefas sugeridas no Dashboard.",
   },
-  { 
-    time: "09:30", 
-    icon: BrainCircuit, 
-    color: "text-primary",
-    module: "PROJECTS & FOCUS",
-    title: "Deep Work Block", 
-    desc: "Hora de focar. Você seleciona uma Tarefa de Alta Prioridade vinculada a um Projeto Ativo. O Timer Pomodoro inicia e o status muda para 'Em Foco'." 
+  {
+    time: "09:30",
+    icon: BrainCircuit,
+    module: "Projects & Focus",
+    title: "Deep work block",
+    desc: "Hora de focar. Você seleciona uma tarefa de alta prioridade vinculada a um projeto ativo. O timer Pomodoro inicia e o status muda para 'Em Foco'.",
   },
-  { 
-    time: "14:00", 
-    icon: Wallet, 
-    color: "text-emerald-400",
-    module: "FINANCE",
-    title: "Gestão de Ativos", 
-    desc: "Pausa para o almoço e atualização financeira. Registro rápido de despesas (Transaction) e verificação do saldo das contas e meta do Wishlist." 
+  {
+    time: "14:00",
+    icon: Wallet,
+    module: "Finance",
+    title: "Gestão de ativos",
+    desc: "Pausa para o almoço e atualização financeira. Registro rápido de despesas (Transaction) e verificação do saldo das contas e da meta do Wishlist.",
   },
-  { 
-    time: "21:00", 
-    icon: Moon, 
-    color: "text-primary",
-    module: "AI & JOURNAL",
-    title: "Fechamento Inteligente", 
-    desc: "A IA (AiChat) analisa tudo o que foi feito, gasto e monitorado. Ela gera um resumo no seu Diário e sugere a preparação para amanhã." 
+  {
+    time: "21:00",
+    icon: Moon,
+    module: "AI & Journal",
+    title: "Fechamento inteligente",
+    desc: "A IA (AiChat) analisa tudo o que foi feito, gasto e monitorado. Ela gera um resumo no seu Diário e sugere a preparação para amanhã.",
   },
 ];
 
 export default function TimelineSection() {
-  return (
-    <section id="routine" className="py-32 px-6 border-t border-border bg-card relative overflow-hidden">
-      
-      {/* Background Decorativo */}
-      <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-primary/5 to-transparent pointer-events-none" />
+  const reduceMotion = useReducedMotion();
 
-      <div className="max-w-4xl mx-auto relative z-10">
-        
-        {/* Cabeçalho da Seção */}
-        <div className="text-center mb-20 space-y-4">
-          <motion.div 
+  // Trilha do dia que se preenche no accent conforme a seção é rolada.
+  const trackRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: trackRef,
+    offset: ["start 65%", "end 60%"],
+  });
+
+  return (
+    <section
+      id="routine"
+      className="relative overflow-hidden border-t border-border/60 px-6 py-32"
+    >
+      {/* fundo themeable (grade + glow no accent) */}
+      <div className="landing-grid pointer-events-none absolute inset-0 opacity-50 [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_75%)]" />
+      <div className="pointer-events-none absolute right-0 top-1/4 h-[420px] w-1/2 max-w-xl rounded-full bg-primary/10 blur-[120px]" />
+
+      <div className="relative z-10 mx-auto max-w-4xl">
+        {/* --- HEADER --- */}
+        <div className="mx-auto mb-16 max-w-2xl space-y-5 text-center">
+          <motion.span
             initial={{ opacity: 0, y: 10 }}
             whileInView={{ opacity: 1, y: 0 }}
-            className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-muted/50 border border-border text-muted-foreground text-xs font-mono uppercase tracking-widest"
+            viewport={{ once: true }}
+            className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 font-mono text-xs uppercase tracking-widest text-primary"
           >
-            <LineChart className="h-3 w-3" /> Life OS Routine
-          </motion.div>
-          
-          <motion.h2 
+            <LineChart className="size-3.5" /> Life OS Routine
+          </motion.span>
+
+          <motion.h2
             initial={{ opacity: 0, y: 10 }}
             whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
             transition={{ delay: 0.1 }}
-            className="text-3xl md:text-4xl font-bold text-foreground"
+            className="text-3xl font-bold tracking-tight text-foreground md:text-4xl"
           >
-            Um dia na vida do seu <span className="text-primary">Sistema Operacional</span>
+            Um dia na vida do seu{" "}
+            <span className="text-gradient-brand">Sistema Operacional</span>
           </motion.h2>
-          
-          <motion.p 
+
+          <motion.p
             initial={{ opacity: 0, y: 10 }}
             whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
             transition={{ delay: 0.2 }}
-            className="text-muted-foreground max-w-lg mx-auto text-lg leading-relaxed"
+            className="mx-auto max-w-lg text-lg leading-relaxed text-muted-foreground"
           >
-            Da hora que acorda até ir dormir, cada interação alimenta seu banco de dados local, gerando inteligência real sobre sua vida.
+            Da hora que acorda até ir dormir, cada interação alimenta seu banco de
+            dados local — gerando inteligência real sobre a sua vida.
           </motion.p>
         </div>
 
-        <div className="relative">
-          {/* Linha Vertical Conectora (Trilha) */}
-          <div className="absolute left-[27px] top-4 bottom-4 w-[2px] bg-muted rounded-full">
-             {/* Efeito de preenchimento ao rolar (Opcional, mas dá um toque premium) */}
-             <div className="absolute top-0 w-full h-full bg-gradient-to-b from-primary/50 via-primary/20 to-transparent opacity-40" />
+        {/* --- TRILHA DO DIA --- */}
+        <div ref={trackRef} className="relative">
+          {/* trilho base + preenchimento no accent (segue o scroll) */}
+          <div className="absolute left-7 top-2 bottom-2 w-px -translate-x-1/2 overflow-hidden rounded-full bg-border/70">
+            {reduceMotion ? (
+              <div className="absolute inset-0 bg-gradient-to-b from-primary to-primary/30" />
+            ) : (
+              <motion.div
+                className="absolute inset-x-0 top-0 h-full origin-top bg-gradient-to-b from-primary to-primary/30"
+                style={{ scaleY: scrollYProgress }}
+              />
+            )}
           </div>
 
-          <div className="space-y-12">
+          <div className="space-y-10">
             {TIMELINE.map((item, i) => (
-              <TimelineCard key={i} item={item} index={i} />
+              <RoutineRow
+                key={item.time}
+                item={item}
+                index={i}
+                reduceMotion={!!reduceMotion}
+              />
             ))}
           </div>
         </div>
-
       </div>
     </section>
   );
 }
 
-// Componente Extraído para Limpeza e Tipagem
-function TimelineCard({ item, index }: { item: TimelineItem; index: number }) {
-    return (
-        <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ margin: "-50px" }}
-            transition={{ duration: 0.5, delay: index * 0.1 }}
-            className="relative flex gap-8 group"
-        >
-            {/* Ícone / Marcador na Timeline */}
-            <div className="relative z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-card border border-border shadow-lg transition-all duration-300 group-hover:border-border group-hover:scale-110 group-hover:shadow-[0_0_20px_-5px_var(--color-primary)]">
-                <div className={`absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-10 transition-opacity duration-300 ${item.color.replace('text-', 'bg-')}`} />
-                <item.icon className={`h-6 w-6 transition-colors duration-300 ${item.color} opacity-80 group-hover:opacity-100`} />
-            </div>
+function RoutineRow({
+  item,
+  index,
+  reduceMotion,
+}: {
+  item: TimelineItem;
+  index: number;
+  reduceMotion: boolean;
+}) {
+  const Icon = item.icon;
+  return (
+    <motion.div
+      initial={reduceMotion ? false : { opacity: 0, y: 24 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-60px" }}
+      transition={{ duration: 0.5, delay: index * 0.08 }}
+      className="group relative flex gap-5"
+    >
+      {/* nó na trilha */}
+      <div className="relative z-10 grid size-14 shrink-0 place-items-center rounded-2xl border border-primary/30 bg-card/80 shadow-sm backdrop-blur transition-all duration-300 group-hover:scale-110 group-hover:border-primary/60 group-hover:shadow-[0_0_24px_-6px_var(--color-primary)]">
+        <span className="absolute inset-0 rounded-2xl bg-primary/10 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+        <Icon className="relative size-6 text-primary" />
+      </div>
 
-            {/* Card de Conteúdo */}
-            <div className="flex-1 pt-1.5">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-2">
-                    {/* Hora */}
-                    <span className="text-sm font-mono text-foreground/90 font-bold bg-muted/50 px-2 py-0.5 rounded border border-border">
-                        {item.time}
-                    </span>
-                    
-                    {/* Badge do Módulo */}
-                    <span className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground flex items-center gap-1">
-                        <CheckCircle2 className="h-3 w-3" /> {item.module}
-                    </span>
-                </div>
+      {/* card de conteúdo */}
+      <div className="flex-1 pt-1">
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <span className="rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 font-mono text-sm font-bold text-primary">
+            {item.time}
+          </span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+            {item.module}
+          </span>
+        </div>
 
-                {/* Card visual */}
-                <div className="p-5 rounded-xl border border-border bg-card/20 hover:bg-card/40 transition-colors group-hover:border-border">
-                    <h3 className="text-xl font-bold text-foreground mb-2 group-hover:text-primary transition-colors">
-                        {item.title}
-                    </h3>
-                    <p className="text-muted-foreground text-sm leading-relaxed">
-                        {item.desc}
-                    </p>
-                </div>
-            </div>
-        </motion.div>
-    )
+        <div className="rounded-2xl border border-border/60 bg-card/40 p-5 transition-colors duration-300 group-hover:border-primary/30 group-hover:bg-card/70">
+          <h3 className="mb-1.5 text-lg font-bold text-foreground transition-colors group-hover:text-primary">
+            {item.title}
+          </h3>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            {item.desc}
+          </p>
+        </div>
+      </div>
+    </motion.div>
+  );
 }

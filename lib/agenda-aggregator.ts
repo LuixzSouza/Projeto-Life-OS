@@ -62,7 +62,7 @@ export async function getAgendaItems(rangeStart: Date, rangeEnd: Date): Promise<
     prisma.friend.findMany({ where: { userId } }), // aniversários precisam de todos
     prisma.transaction.findMany({ where: { userId, date: range } }),
     prisma.jobApplication.findMany({ where: { userId, appliedDate: range } }),
-    prisma.task.findMany({ where: { userId, dueDate: range } }),
+    prisma.task.findMany({ where: { userId, dueDate: range, deletedAt: null } }),
     prisma.challengeCheckin.findMany({ where: { userId, date: range }, include: { challenge: { select: { title: true } } } }),
     prisma.meeting.findMany({ where: { userId, createdAt: range } }),
     prisma.invoice.findMany({ where: { userId, dueDate: range } }),

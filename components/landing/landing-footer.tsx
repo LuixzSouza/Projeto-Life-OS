@@ -1,110 +1,159 @@
 "use client";
 
-import { Github, Twitter, Linkedin, ArrowRight, Heart } from "lucide-react";
+import { Github, Mail, ArrowRight, Heart, BookText } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
+import { usePathname } from "next/navigation";
+
+const REPO = "https://github.com/LuixzSouza/Projeto-Life-OS";
+const PROFILE = "https://github.com/LuixzSouza";
+
+type LinkKind = "anchor" | "page" | "external";
+interface FooterLink {
+  label: string;
+  href: string;
+  kind: LinkKind;
+}
+
+const COLUMNS: { title: string; links: FooterLink[] }[] = [
+  {
+    title: "Produto",
+    links: [
+      { label: "Módulos", href: "/#modules", kind: "anchor" },
+      { label: "Inteligência IA", href: "/#ai", kind: "anchor" },
+      { label: "Privacidade", href: "/#privacy", kind: "anchor" },
+      { label: "Rotina", href: "/#routine", kind: "anchor" },
+    ],
+  },
+  {
+    title: "Recursos",
+    links: [
+      { label: "Instalar localmente", href: "/#config", kind: "anchor" },
+      { label: "Dúvidas frequentes", href: "/#faq", kind: "anchor" },
+      { label: "Changelog", href: "/changelog", kind: "page" },
+      { label: "Documentação", href: REPO, kind: "external" },
+    ],
+  },
+  {
+    title: "Projeto",
+    links: [
+      { label: "Política de Privacidade", href: "/privacy", kind: "page" },
+      { label: "Termos de Uso", href: "/terms", kind: "page" },
+      { label: "Contato", href: "/contact", kind: "page" },
+      { label: "Open Source (MIT)", href: REPO, kind: "external" },
+    ],
+  },
+];
 
 export default function LandingFooter() {
+  const pathname = usePathname();
+
+  // Âncoras: na landing rolam suave com offset do header; fora dela, o Link
+  // navega para "/#secao" e o browser cuida do scroll após carregar.
+  const handleAnchor = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    const hash = href.split("#")[1];
+    if (pathname === "/" && hash) {
+      const el = document.getElementById(hash);
+      if (el) {
+        e.preventDefault();
+        window.scrollTo({ top: el.getBoundingClientRect().top + window.scrollY - 80, behavior: "smooth" });
+      }
+    }
+  };
+
+  const linkClass = "transition-colors hover:text-primary";
+
   return (
-    <footer className="bg-card border-t border-border pt-16 pb-8">
-      <div className="max-w-6xl mx-auto px-6">
-        
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-12 mb-16">
-          
-          {/* --- COLUNA 1: MARCA & NEWSLETTER (Ocupa 5 colunas) --- */}
-          <div className="md:col-span-5 space-y-6">
-            <div className="flex items-center gap-2 font-bold text-xl text-foreground">
-              <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center shadow-[0_0_15px_-2px_var(--color-primary)]">
-                <span className="text-white text-sm font-mono">L</span>
-              </div>
-              Life OS
-            </div>
-            
-            <p className="text-muted-foreground text-sm leading-relaxed max-w-sm">
-              O sistema operacional definitivo para sua vida pessoal e profissional. 
-              Organize tarefas, saúde, finanças e conhecimento em um único lugar seguro e local.
+    <footer className="relative border-t border-border/60 bg-card pb-8 pt-16">
+      {/* fio de accent no topo */}
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
+
+      <div className="mx-auto max-w-6xl px-6">
+        <div className="mb-16 grid grid-cols-1 gap-12 md:grid-cols-12">
+          {/* Marca + newsletter */}
+          <div className="space-y-6 md:col-span-5">
+            <Link href="/" className="flex items-center gap-3">
+              <Image src="/logo.webp" width={36} height={36} alt="Life OS" />
+              <span className="text-xl font-bold tracking-tight text-foreground">Life OS</span>
+            </Link>
+
+            <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
+              O sistema operacional para a sua vida — tarefas, saúde, finanças e conhecimento num
+              único arquivo SQLite, <strong className="text-foreground">local e seu</strong>. Sem
+              nuvem obrigatória, sem assinatura.
             </p>
 
-            {/* Input Newsletter */}
             <div className="flex flex-col gap-2">
-              <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Fique atualizado</span>
-              <div className="flex gap-2">
-                <input 
-                  type="email" 
-                  placeholder="seu@email.com" 
-                  className="bg-card border border-border rounded-lg px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors w-full max-w-[240px]"
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                Acompanhe o projeto
+              </span>
+              <form className="flex gap-2" onSubmit={(e) => e.preventDefault()}>
+                <input
+                  type="email"
+                  placeholder="seu@email.com"
+                  className="w-full max-w-[240px] rounded-lg border border-border/60 bg-background px-4 py-2 text-sm text-foreground transition-colors placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 />
-                <button className="bg-primary text-primary-foreground p-2 rounded-lg hover:opacity-90 transition-opacity">
-                  <ArrowRight className="h-4 w-4" />
+                <button
+                  type="submit"
+                  aria-label="Inscrever"
+                  className="grid place-items-center rounded-lg bg-primary px-3 text-primary-foreground transition-all hover:opacity-90 hover:shadow-[0_0_20px_-6px_var(--color-primary)]"
+                >
+                  <ArrowRight className="size-4" />
                 </button>
-              </div>
+              </form>
             </div>
           </div>
 
-          {/* --- COLUNAS DE LINKS (Ocupa 7 colunas restantes) --- */}
-          <div className="md:col-span-7 grid grid-cols-2 md:grid-cols-3 gap-8">
-            
-            {/* Grupo 1: Produto */}
-            <div className="space-y-4">
-              <h4 className="text-sm font-bold text-foreground">Produto</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link href="#" className="hover:text-primary transition-colors">Funcionalidades</Link></li>
-                <li><Link href="#" className="hover:text-primary transition-colors">Integrações</Link></li>
-                <li><Link href="#" className="hover:text-primary transition-colors">Changelog</Link></li>
-                <li><Link href="#" className="hover:text-primary transition-colors">Download App</Link></li>
-              </ul>
-            </div>
-
-            {/* Grupo 2: Recursos */}
-            <div className="space-y-4">
-              <h4 className="text-sm font-bold text-foreground">Recursos</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link href="#" className="hover:text-primary transition-colors">Documentação</Link></li>
-                <li><Link href="#" className="hover:text-primary transition-colors">API Reference</Link></li>
-                <li><Link href="#" className="hover:text-primary transition-colors">Comunidade</Link></li>
-                <li><Link href="#" className="hover:text-primary transition-colors">Blog</Link></li>
-              </ul>
-            </div>
-
-            {/* Grupo 3: Legal/Sobre */}
-            <div className="space-y-4">
-              <h4 className="text-sm font-bold text-foreground">Sobre</h4>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link href="#" className="hover:text-primary transition-colors">Privacidade</Link></li>
-                <li><Link href="#" className="hover:text-primary transition-colors">Termos de Uso</Link></li>
-                <li><Link href="#" className="hover:text-primary transition-colors">Contato</Link></li>
-                <li>
-                    <a 
-                        href="https://github.com/LuixzSouza" 
-                        target="_blank" 
-                        rel="noreferrer" 
-                        className="flex items-center gap-2 hover:text-foreground transition-colors"
-                    >
-                        <Github className="h-4 w-4" /> Open Source
-                    </a>
-                </li>
-              </ul>
-            </div>
-
+          {/* Colunas de links */}
+          <div className="grid grid-cols-2 gap-8 md:col-span-7 md:grid-cols-3">
+            {COLUMNS.map((col) => (
+              <div key={col.title} className="space-y-4">
+                <h4 className="text-sm font-bold text-foreground">{col.title}</h4>
+                <ul className="space-y-2 text-sm text-muted-foreground">
+                  {col.links.map((link) => (
+                    <li key={link.label}>
+                      {link.kind === "external" ? (
+                        <a href={link.href} target="_blank" rel="noreferrer" className={linkClass}>
+                          {link.label}
+                        </a>
+                      ) : (
+                        <Link
+                          href={link.href}
+                          onClick={link.kind === "anchor" ? (e) => handleAnchor(e, link.href) : undefined}
+                          className={linkClass}
+                        >
+                          {link.label}
+                        </Link>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* --- RODAPÉ INFERIOR (Bottom Bar) --- */}
-        <div className="pt-8 border-t border-border flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-muted-foreground">
-            © 2025 Life OS. Todos os direitos reservados.
-          </p>
+        {/* Barra inferior */}
+        <div className="flex flex-col items-center justify-between gap-4 border-t border-border/60 pt-8 md:flex-row">
+          <p className="text-xs text-muted-foreground">© 2026 Life OS · Open source sob licença MIT.</p>
 
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
-            Feito com <Heart className="h-3 w-3 text-red-900 fill-red-900" /> por <span className="text-muted-foreground font-bold">Luiz Antônio</span>
+            Feito com <Heart className="size-3 fill-primary text-primary" /> por{" "}
+            <span className="font-bold text-foreground">Luiz Antônio</span>
           </div>
 
-          <div className="flex items-center gap-6">
-            <Link href="#" className="text-muted-foreground hover:text-foreground transition-colors"><Twitter className="h-4 w-4" /></Link>
-            <Link href="#" className="text-muted-foreground hover:text-foreground transition-colors"><Github className="h-4 w-4" /></Link>
-            <Link href="#" className="text-muted-foreground hover:text-foreground transition-colors"><Linkedin className="h-4 w-4" /></Link>
+          <div className="flex items-center gap-4">
+            <a href={REPO} target="_blank" rel="noreferrer" aria-label="Repositório no GitHub" className="text-muted-foreground transition-colors hover:text-primary">
+              <Github className="size-4" />
+            </a>
+            <Link href="/contact" aria-label="Contato" className="text-muted-foreground transition-colors hover:text-primary">
+              <Mail className="size-4" />
+            </Link>
+            <a href={PROFILE} target="_blank" rel="noreferrer" aria-label="Perfil do desenvolvedor" className="text-muted-foreground transition-colors hover:text-primary">
+              <BookText className="size-4" />
+            </a>
           </div>
         </div>
-
       </div>
     </footer>
   );

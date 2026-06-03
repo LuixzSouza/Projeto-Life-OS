@@ -2,7 +2,7 @@ import { Boxes, BadgeDollarSign, Database, ShieldCheck } from "lucide-react";
 
 // Números-âncora que resumem a proposta de valor do Life OS.
 const STATS = [
-  { icon: Boxes, value: "15+", label: "Módulos integrados", hint: "Finanças, saúde, estudos, CRM e mais" },
+  { icon: Boxes, value: "16", label: "Módulos integrados", hint: "Finanças, saúde, estudos, CRM e mais" },
   { icon: BadgeDollarSign, value: "R$0", label: "Mensalidade", hint: "Sem assinatura — pra sempre" },
   { icon: Database, value: "1", label: "Arquivo SQLite", hint: "Portátil e 100% seu" },
   { icon: ShieldCheck, value: "100%", label: "Local & privado", hint: "Open source, sem rastreio" },
@@ -14,8 +14,8 @@ export default function StatsSection() {
       <div className="mx-auto max-w-7xl">
         {/* Cabeçalho no padrão da landing (pill + h2 + subtítulo) */}
         <div className="mb-12 md:text-center max-w-3xl mx-auto">
-          <span className="inline-flex items-center gap-2 px-3 py-1 mb-4 rounded-full border border-border bg-muted/50 text-xs font-medium text-muted-foreground">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary" /> Por que Life OS
+          <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-widest text-primary">
+            <span className="size-1.5 rounded-full bg-primary" /> Por que Life OS
           </span>
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-2 tracking-tight">
             Feito para durar — e respeitar você

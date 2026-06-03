@@ -1,252 +1,195 @@
 "use client";
 
-import { 
-  Settings, 
-  User, 
-  Palette, 
-  Key, 
-  Database, 
-  Moon, 
-  Sun, 
-  Volume2, 
-  VolumeX, 
-  Eye, 
-  EyeOff, 
-  Save, 
-  HardDrive,
-  RefreshCw,
-  Server
+import {
+  Settings, User, Palette, Key, Database, Eye, EyeOff, Save, HardDrive, RefreshCw, Bot, Lock,
 } from "lucide-react";
 import { BaseCard } from "./base-card";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-// --- TIPOS ---
 type Tab = "profile" | "appearance" | "api" | "database";
+
+// Presets reais do accent dinâmico (mesmas cores do globals.css / data-theme).
+const PRESETS = [
+  { id: "blue", color: "oklch(0.55 0.20 260)" },
+  { id: "green", color: "oklch(0.55 0.18 145)" },
+  { id: "orange", color: "oklch(0.60 0.18 35)" },
+  { id: "violet", color: "oklch(0.55 0.22 280)" },
+  { id: "rose", color: "oklch(0.55 0.20 350)" },
+];
+
+// model Settings.aiProvider / chaves (openaiKey, groqKey, googleKey...).
+const AI_KEYS = ["OpenAI (GPT-4o)", "Groq (Llama)", "Gemini (Google)"];
 
 export function SettingsCard() {
   const [activeTab, setActiveTab] = useState<Tab>("appearance");
-  
-  // Estados de Configuração
   const [darkMode, setDarkMode] = useState(true);
-  const [soundOn, setSoundOn] = useState(false);
-  const [activeColor, setActiveColor] = useState("emerald");
+  const [privacy, setPrivacy] = useState(false);
+  const [accent, setAccent] = useState("blue");
   const [showKey, setShowKey] = useState<string | null>(null);
 
-  // Temas
-  const themes = [
-    { id: "zinc", class: "bg-zinc-200", glow: "from-zinc-500/20" },
-    { id: "indigo", class: "bg-indigo-500", glow: "from-indigo-500/20" },
-    { id: "emerald", class: "bg-emerald-500", glow: "from-emerald-500/20" },
-    { id: "rose", class: "bg-rose-500", glow: "from-rose-500/20" },
-    { id: "orange", class: "bg-orange-500", glow: "from-orange-500/20" },
-  ];
-
-  // Menu Lateral
   const menuItems = [
     { id: "profile", icon: User, label: "Perfil" },
     { id: "appearance", icon: Palette, label: "Visual" },
-    { id: "api", icon: Key, label: "Chaves" },
+    { id: "api", icon: Key, label: "IA & Chaves" },
     { id: "database", icon: Database, label: "Dados" },
-  ];
-
-  const currentGlow = themes.find(t => t.id === activeColor)?.glow || "from-emerald-500/20";
+  ] as const;
 
   return (
-    <BaseCard 
-        title="Painel de Controle" 
-        icon={Settings} 
-        description="Sistema & Preferências."
-        className="col-span-2 md:col-span-2 min-h-[260px]"
-    >
-        {/* Glow de Fundo */}
-        <div className={cn("absolute inset-0 bg-gradient-to-tr to-transparent opacity-20 transition-colors duration-700 pointer-events-none", currentGlow)} />
-
-        <div className="flex h-full w-full bg-card">
-            
-            {/* --- SIDEBAR DE NAVEGAÇÃO --- */}
-            <div className="w-[70px] border-r border-border flex flex-col items-center py-4 gap-4 bg-card/30 z-20">
-                {menuItems.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = activeTab === item.id;
-                    return (
-                        <button
-                            key={item.id}
-                            onClick={() => setActiveTab(item.id as Tab)}
-                            className={cn(
-                                "p-2.5 rounded-xl transition-all duration-300 relative group",
-                                isActive ? "bg-foreground/10 text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
-                            )}
-                            title={item.label}
-                        >
-                            <Icon className="h-5 w-5" />
-                            {isActive && (
-                                <motion.div 
-                                    layoutId="active-tab-indicator"
-                                    className="absolute left-0 top-2 bottom-2 w-1 bg-indigo-500 rounded-r-full"
-                                />
-                            )}
-                        </button>
-                    )
-                })}
-            </div>
-
-            {/* --- CONTEÚDO DINÂMICO --- */}
-            <div className="flex-1 p-5 relative overflow-hidden">
-                <AnimatePresence mode="wait">
-                    
-                    {/* 1. ABA APARÊNCIA (O que você já gostou) */}
-                    {activeTab === "appearance" && (
-                        <motion.div 
-                            key="appearance"
-                            initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}
-                            className="flex flex-col gap-6 h-full justify-center"
-                        >
-                            {/* Toggles */}
-                            <div className="flex items-center gap-8">
-                                <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setDarkMode(!darkMode)}>
-                                    <div className={cn("w-10 h-6 rounded-full p-1 flex items-center transition-colors", darkMode ? "bg-zinc-700" : "bg-zinc-300")}>
-                                        <motion.div layout className="w-4 h-4 rounded-full bg-white shadow-sm" />
-                                    </div>
-                                    <span className="text-xs font-medium text-muted-foreground">{darkMode ? "Dark Mode" : "Light Mode"}</span>
-                                </div>
-                                <div className="flex items-center gap-3 cursor-pointer group" onClick={() => setSoundOn(!soundOn)}>
-                                    <div className={cn("w-10 h-6 rounded-full p-1 flex items-center transition-colors", soundOn ? "bg-emerald-500" : "bg-muted border border-border")}>
-                                        <motion.div layout className={cn("w-4 h-4 rounded-full shadow-sm", soundOn ? "bg-white" : "bg-zinc-500")} />
-                                    </div>
-                                    <span className="text-xs font-medium text-muted-foreground">Sons</span>
-                                </div>
-                            </div>
-
-                            {/* Cores */}
-                            <div className="space-y-2">
-                                <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold">Cor de Destaque</span>
-                                <div className="flex gap-3">
-                                    {themes.map((theme) => (
-                                        <button 
-                                            key={theme.id}
-                                            onClick={() => setActiveColor(theme.id)}
-                                            className={cn(
-                                                "w-6 h-6 rounded-full transition-transform hover:scale-110",
-                                                theme.class,
-                                                activeColor === theme.id ? "ring-2 ring-white ring-offset-2 ring-offset-[#09090b]" : "opacity-60"
-                                            )}
-                                        />
-                                    ))}
-                                </div>
-                            </div>
-                        </motion.div>
-                    )}
-
-                    {/* 2. ABA CHAVES API (Gestão de Conexões) */}
-                    {activeTab === "api" && (
-                        <motion.div 
-                            key="api"
-                            initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}
-                            className="flex flex-col gap-3 h-full"
-                        >
-                            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Chaves de API</h3>
-                            
-                            {["OpenAI (GPT-4)", "Anthropic (Claude)", "Database (Supabase)"].map((label, i) => (
-                                <div key={i} className="space-y-1">
-                                    <label className="text-[10px] text-muted-foreground">{label}</label>
-                                    <div className="flex gap-2">
-                                        <div className="flex-1 h-8 bg-muted/50 border border-border rounded-lg flex items-center px-3 relative">
-                                            <input 
-                                                type={showKey === String(i) ? "text" : "password"} 
-                                                value="sk-89210391203912039"
-                                                disabled
-                                                className="bg-transparent border-none outline-none text-xs text-foreground w-full font-mono"
-                                            />
-                                            <button 
-                                                onClick={() => setShowKey(showKey === String(i) ? null : String(i))}
-                                                className="absolute right-2 text-muted-foreground hover:text-foreground"
-                                            >
-                                                {showKey === String(i) ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                                            </button>
-                                        </div>
-                                        <button className="h-8 w-8 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/50 rounded-lg flex items-center justify-center text-indigo-400">
-                                            <Save className="h-3.5 w-3.5" />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </motion.div>
-                    )}
-
-                    {/* 3. ABA BANCO DE DADOS (Status do Sistema) */}
-                    {activeTab === "database" && (
-                        <motion.div 
-                            key="database"
-                            initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}
-                            className="flex flex-col gap-4 h-full justify-center"
-                        >
-                            <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-emerald-500 rounded-lg text-black">
-                                        <Server className="h-4 w-4" />
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <span className="text-xs font-bold text-emerald-400">PostgreSQL (Prisma)</span>
-                                        <span className="text-[10px] text-emerald-600/80">Status: Operacional</span>
-                                    </div>
-                                </div>
-                                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                            </div>
-
-                            {/* Storage Usage */}
-                            <div className="space-y-2">
-                                <div className="flex justify-between text-[10px] text-muted-foreground">
-                                    <span className="flex items-center gap-1"><HardDrive className="h-3 w-3" /> Armazenamento</span>
-                                    <span className="text-foreground">1.2 GB / 5 GB</span>
-                                </div>
-                                <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                                    <div className="h-full w-[24%] bg-indigo-500 rounded-full" />
-                                </div>
-                            </div>
-
-                            <button className="w-full py-2 bg-muted hover:bg-zinc-700 text-foreground text-[10px] font-bold rounded-lg flex items-center justify-center gap-2 transition-all">
-                                <RefreshCw className="h-3 w-3" /> Fazer Backup Agora
-                            </button>
-                        </motion.div>
-                    )}
-
-                    {/* 4. ABA PERFIL */}
-                    {activeTab === "profile" && (
-                        <motion.div 
-                            key="profile"
-                            initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}
-                            className="flex flex-col gap-4 h-full justify-center items-center"
-                        >
-                            <div className="relative">
-                                <div className="w-16 h-16 rounded-full bg-gradient-brand p-0.5">
-                                    <div className="w-full h-full rounded-full bg-card border-2 border-transparent flex items-center justify-center text-xl font-bold text-foreground">
-                                        LA
-                                    </div>
-                                </div>
-                                <div className="absolute bottom-0 right-0 w-5 h-5 bg-emerald-500 border-2 border-[#09090b] rounded-full" />
-                            </div>
-                            
-                            <div className="text-center space-y-1 w-full">
-                                <input 
-                                    value="Luiz Antônio" 
-                                    className="bg-transparent text-center text-sm font-bold text-foreground border-b border-transparent hover:border-border focus:border-indigo-500 outline-none w-full transition-colors pb-1"
-                                />
-                                <p className="text-[10px] text-muted-foreground">Fullstack Developer</p>
-                            </div>
-
-                            <div className="flex gap-2 w-full">
-                                <button className="flex-1 py-1.5 bg-muted rounded text-[10px] text-muted-foreground hover:text-foreground transition-colors">Editar Bio</button>
-                                <button className="flex-1 py-1.5 bg-muted rounded text-[10px] text-muted-foreground hover:text-foreground transition-colors">Logout</button>
-                            </div>
-                        </motion.div>
-                    )}
-
-                </AnimatePresence>
-            </div>
-
+    <BaseCard title="Configurações" icon={Settings} description="Sistema e preferências." className="col-span-2 md:col-span-2 min-h-[260px]">
+      <div className="flex h-full w-full">
+        {/* Sidebar */}
+        <div className="z-20 flex w-[70px] flex-col items-center gap-3 border-r border-border/60 py-4">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={cn(
+                  "relative rounded-xl p-2.5 transition-all duration-300",
+                  isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-primary/5 hover:text-foreground"
+                )}
+                title={item.label}
+              >
+                <Icon className="size-5" />
+                {isActive && <motion.div layoutId="active-settings-tab" className="absolute bottom-2 left-0 top-2 w-1 rounded-r-full bg-primary" />}
+              </button>
+            );
+          })}
         </div>
+
+        {/* Conteúdo */}
+        <div className="relative flex-1 overflow-hidden p-5">
+          <AnimatePresence mode="wait">
+            {activeTab === "appearance" && (
+              <motion.div key="appearance" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="flex h-full flex-col justify-center gap-6">
+                <div className="flex items-center gap-8">
+                  <button onClick={() => setDarkMode(!darkMode)} className="flex items-center gap-3">
+                    <div className={cn("flex h-6 w-10 items-center rounded-full p-1 transition-colors", darkMode ? "bg-primary" : "bg-muted")}>
+                      <motion.div layout className="size-4 rounded-full bg-background shadow-sm" />
+                    </div>
+                    <span className="text-xs font-medium text-muted-foreground">{darkMode ? "Dark" : "Light"}</span>
+                  </button>
+                  <button onClick={() => setPrivacy(!privacy)} className="flex items-center gap-3">
+                    <div className={cn("flex h-6 w-10 items-center rounded-full p-1 transition-colors", privacy ? "bg-primary" : "bg-muted")}>
+                      <motion.div layout className="size-4 rounded-full bg-background shadow-sm" />
+                    </div>
+                    <span className="text-xs font-medium text-muted-foreground">Privacidade</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Accent (sorteado na landing)</span>
+                  <div className="flex gap-3">
+                    {PRESETS.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => setAccent(p.id)}
+                        style={{ backgroundColor: p.color }}
+                        className={cn(
+                          "size-6 rounded-full transition-transform hover:scale-110",
+                          accent === p.id ? "ring-2 ring-primary ring-offset-2 ring-offset-card" : "opacity-70"
+                        )}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === "api" && (
+              <motion.div key="api" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="flex h-full flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <Bot className="size-4 text-primary" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">IA híbrida — chaves</h3>
+                </div>
+                {AI_KEYS.map((label, i) => (
+                  <div key={label} className="space-y-1">
+                    <label className="text-[10px] text-muted-foreground">{label}</label>
+                    <div className="flex gap-2">
+                      <div className="relative flex h-8 flex-1 items-center rounded-lg border border-border/60 bg-muted/50 px-3">
+                        <input
+                          type={showKey === String(i) ? "text" : "password"}
+                          value="sk-89210391203912039"
+                          disabled
+                          className="w-full border-none bg-transparent font-mono text-xs text-foreground outline-none"
+                        />
+                        <button onClick={() => setShowKey(showKey === String(i) ? null : String(i))} className="absolute right-2 text-muted-foreground hover:text-primary">
+                          {showKey === String(i) ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+                        </button>
+                      </div>
+                      <button className="grid size-8 place-items-center rounded-lg border border-primary/30 bg-primary/10 text-primary transition-colors hover:bg-primary/20">
+                        <Save className="size-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </motion.div>
+            )}
+
+            {activeTab === "database" && (
+              <motion.div key="database" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="flex h-full flex-col justify-center gap-4">
+                <div className="flex items-center justify-between rounded-xl border border-primary/20 bg-primary/10 p-3">
+                  <div className="flex items-center gap-3">
+                    <div className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
+                      <Database className="size-4" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-bold text-foreground">SQLite (Prisma)</span>
+                      <span className="text-[10px] text-muted-foreground">~/LifeOS_Data/life-os.db</span>
+                    </div>
+                  </div>
+                  <div className="size-2 animate-pulse rounded-full bg-primary" />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between text-[10px] text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <HardDrive className="size-3" /> Tamanho do banco
+                    </span>
+                    <span className="text-foreground">12.4 MB</span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                    <div className="h-full w-[24%] rounded-full bg-gradient-brand" />
+                  </div>
+                </div>
+
+                <button className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary py-2 text-[10px] font-bold text-primary-foreground transition-all hover:opacity-90">
+                  <RefreshCw className="size-3" /> Fazer backup agora
+                </button>
+              </motion.div>
+            )}
+
+            {activeTab === "profile" && (
+              <motion.div key="profile" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="flex h-full flex-col items-center justify-center gap-4">
+                <div className="relative">
+                  <div className="size-16 rounded-full bg-gradient-brand p-0.5">
+                    <div className="flex size-full items-center justify-center rounded-full bg-card text-xl font-bold text-foreground">LA</div>
+                  </div>
+                  <div className="absolute bottom-0 right-0 size-5 rounded-full border-2 border-card bg-primary" />
+                </div>
+                <div className="w-full space-y-1 text-center">
+                  <input
+                    value="Luiz Antônio"
+                    readOnly
+                    className="w-full border-b border-transparent bg-transparent pb-1 text-center text-sm font-bold text-foreground outline-none transition-colors hover:border-border focus:border-primary"
+                  />
+                  <p className="text-[10px] text-muted-foreground">Fullstack Developer</p>
+                </div>
+                <div className="flex w-full gap-2">
+                  <button className="flex-1 rounded bg-muted py-1.5 text-[10px] text-muted-foreground transition-colors hover:text-foreground">Editar bio</button>
+                  <button className="flex flex-1 items-center justify-center gap-1 rounded bg-muted py-1.5 text-[10px] text-muted-foreground transition-colors hover:text-foreground">
+                    <Lock className="size-2.5" /> Bloquear
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
     </BaseCard>
   );
 }

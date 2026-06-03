@@ -40,7 +40,7 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
   const [agendaItems, pendingTasks, routineItems] = await Promise.all([
     getAgendaItems(rangeStart, rangeEnd),
     prisma.task.findMany({
-      where: { isDone: false, userId },
+      where: { isDone: false, userId, deletedAt: null },
       orderBy: { dueDate: "asc" },
       take: 10,
       include: { project: projectSelect },

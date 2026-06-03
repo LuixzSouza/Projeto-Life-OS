@@ -22,11 +22,11 @@ export const STEPS: Record<SetupStepKey, StepData> = {
         </div>
 
         <div className="space-y-4">
-          <div className="flex items-start gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/20">
-            <Shield className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+          <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
+            <Shield className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
             <div className="space-y-2">
               <h4 className="font-bold text-foreground text-sm">Importante</h4>
-              <p className="text-sm text-red-600 dark:text-red-300/90">
+              <p className="text-sm text-amber-700 dark:text-amber-300/90">
                 É necessário conhecimento básico de Terminal/Linha de Comando.
                 Recomendamos que usuários inexperientes busquem tutoriais básicos antes de prosseguir.
               </p>
@@ -99,7 +99,7 @@ export const STEPS: Record<SetupStepKey, StepData> = {
           <p className="text-sm text-muted-foreground">
             Após instalar, abra seu terminal e execute:
           </p>
-          <code className="block mt-2 p-3 rounded-lg bg-card text-xs font-mono text-cyan-600 dark:text-cyan-300">
+          <code className="block mt-2 p-3 rounded-lg bg-muted text-xs font-mono text-primary">
             node --version && git --version
           </code>
         </div>
@@ -142,7 +142,7 @@ export const STEPS: Record<SetupStepKey, StepData> = {
           <h4 className="font-semibold text-foreground text-sm mb-2">Dica</h4>
           <p className="text-sm text-foreground">
             Se encontrar erros durante a instalação, certifique-se de estar usando a versão correta do Node.js (v18+).
-            Você pode verificar com <code className="text-cyan-600 dark:text-cyan-300 text-xs">node --version</code>
+            Você pode verificar com <code className="text-primary text-xs">node --version</code>
           </p>
         </div>
       </div>
@@ -161,7 +161,7 @@ export const STEPS: Record<SetupStepKey, StepData> = {
 
         {/* Explicação da Configuração (Step 3.1) */}
         <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
-          <h4 className="font-semibold text-foreground text-base mb-3">1. Crie o arquivo <code className="text-emerald-600 dark:text-emerald-300">.env</code></h4>
+          <h4 className="font-semibold text-foreground text-base mb-3">1. Crie o arquivo <code className="text-primary">.env</code></h4>
           <p className="text-sm text-muted-foreground mb-3">
             Insira este conteúdo na raiz do projeto. O caminho padrão salva o banco na pasta `prisma/`:
           </p>
@@ -190,12 +190,12 @@ DATABASE_URL="file:./prisma/life_os.db"
 
           <div className="space-y-2 text-sm">
             <p className="text-foreground flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+              <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
               <span><strong>Recomendação:</strong> use uma pasta sincronizada para ter backup automático.</span>
             </p>
             <p className="text-foreground flex flex-wrap items-center gap-2">
-              <Code className="h-4 w-4 text-primary dark:text-primary shrink-0" />
-              <strong>Exemplo (Windows):</strong> <code className="text-cyan-600 dark:text-cyan-300">DATABASE_URL=&quot;file:D:/LifeOS_Data/life.db&quot;</code>
+              <Code className="h-4 w-4 text-primary shrink-0" />
+              <strong>Exemplo (Windows):</strong> <code className="text-primary">DATABASE_URL=&quot;file:D:/LifeOS_Data/life.db&quot;</code>
             </p>
           </div>
 
@@ -213,12 +213,12 @@ DATABASE_URL="file:./prisma/life_os.db"
           language="bash"
         />
 
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 mt-4">
+        <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 mt-4">
           <h4 className="font-semibold text-foreground text-sm mb-2 flex items-center gap-2">
-            <Shield className="h-4 w-4 text-emerald-500" />
+            <Shield className="h-4 w-4 text-primary" />
             Privacidade Garantida
           </h4>
-          <p className="text-sm text-emerald-700 dark:text-emerald-300/90 leading-relaxed">
+          <p className="text-sm text-muted-foreground leading-relaxed">
             Seus dados nunca são enviados para a nuvem. O arquivo de banco de dados (`.db`) é seu e fica **apenas** no caminho que você definiu.
           </p>
         </div>
@@ -251,7 +251,7 @@ DATABASE_URL="file:./prisma/life_os.db"
 
           <div className="inline-block p-4 rounded-xl bg-background/50 border border-border">
             <div className="text-sm text-muted-foreground mb-2">Acesse em:</div>
-            <Link target="_blank" href={"http://localhost:3000"} className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+            <Link target="_blank" href={"http://localhost:3000"} className="text-2xl font-bold text-primary font-mono">
               http://localhost:3000
             </Link>
           </div>

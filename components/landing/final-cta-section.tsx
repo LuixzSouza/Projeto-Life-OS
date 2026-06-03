@@ -37,8 +37,8 @@ export default function FinalCTASection({ authState }: FinalCTAProps) {
           <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/80 to-transparent" />
 
           <div className="relative z-10 mx-auto max-w-2xl space-y-6">
-            <span className="inline-flex items-center gap-2 rounded-full border border-border bg-muted/50 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur-sm">
-              <Sparkles className="h-3.5 w-3.5 text-primary" /> Pronto em menos de 2 minutos
+            <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-widest text-primary backdrop-blur-sm">
+              <Sparkles className="size-3.5" /> Pronto em menos de 2 minutos
             </span>
 
             <h2 className="text-4xl font-bold tracking-tight text-foreground md:text-5xl">
@@ -72,7 +72,7 @@ export default function FinalCTASection({ authState }: FinalCTAProps) {
             </div>
 
             <p className="flex items-center justify-center gap-1.5 pt-2 text-xs text-muted-foreground">
-              <Lock className="h-3.5 w-3.5 text-emerald-500" />
+              <Lock className="size-3.5 text-primary" />
               100% local · open source · privacidade por padrão
             </p>
           </div>

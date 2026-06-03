@@ -5,7 +5,16 @@ import { decrypt } from "@/lib/auth";
 // 1. Rotas que não exigem autenticação
 // "/" é a landing page de marketing — pública por design (ela própria trata
 // o estado deslogado e direciona para /setup ou /login conforme o caso).
-const publicRoutes = ["/", "/login", "/setup"];
+// As páginas institucionais do rodapé (grupo (marketing)) também são públicas.
+const publicRoutes = [
+  "/",
+  "/login",
+  "/setup",
+  "/privacy",
+  "/terms",
+  "/contact",
+  "/changelog",
+];
 
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
@@ -20,7 +29,7 @@ export async function proxy(request: NextRequest) {
   if (cookie) {
     try {
       session = await decrypt(cookie);
-    } catch (err) {
+    } catch {
       session = null;
     }
   }

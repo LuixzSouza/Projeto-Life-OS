@@ -93,10 +93,10 @@ export default async function ProjectDetailPage(props: ProjectDetailPageProps) {
     sortBy === "order" ? [{ order: "asc" }, { createdAt: "desc" }] : [{ createdAt: "desc" }];
 
   const [tasks, allStats, rawMeetings] = await Promise.all([
-    prisma.task.findMany({ where, orderBy }),
+    prisma.task.findMany({ where: { ...where, deletedAt: null }, orderBy }),
     prisma.task.groupBy({
         by: ['isDone'],
-        where: { projectId: dbProjectId, userId },
+        where: { projectId: dbProjectId, userId, deletedAt: null },
         _count: { isDone: true }
     }),
     prisma.meeting.findMany({

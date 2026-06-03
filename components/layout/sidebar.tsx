@@ -16,6 +16,8 @@ import type { UserData } from "./sidebar-types";
 import { groupedSidebarItems, mobileNavItems, isActiveRoute } from "./sidebar-config";
 import { SidebarLink } from "./sidebar-link";
 import { UserProfileSection } from "./user-profile-section";
+import { NotificationBell } from "@/components/notifications/notification-bell";
+import type { NotificationInbox } from "@/lib/notifications";
 
 /* -------------------------------------------------------------------------- */
 /* Persistência do estado recolhido (localStorage, sem mismatch de hidratação) */
@@ -41,7 +43,7 @@ function useSidebarCollapsed(): [boolean, (v: boolean) => void] {
   return [collapsed, setCollapsed];
 }
 
-export function Sidebar({ user }: { user?: UserData | null }) {
+export function Sidebar({ user, inbox }: { user?: UserData | null; inbox: NotificationInbox }) {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useSidebarCollapsed();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -84,20 +86,24 @@ export function Sidebar({ user }: { user?: UserData | null }) {
             )}
           </Link>
           {!isCollapsed && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsCollapsed(true)}
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
-              title="Recolher menu"
-            >
-              <PanelLeftClose size={18} />
-            </Button>
+            <div className="flex items-center gap-0.5">
+              <NotificationBell initial={inbox} />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsCollapsed(true)}
+                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                title="Recolher menu"
+              >
+                <PanelLeftClose size={18} />
+              </Button>
+            </div>
           )}
         </div>
 
         {isCollapsed && (
-          <div className="mb-1 flex justify-center border-b border-border/40 py-2">
+          <div className="mb-1 flex flex-col items-center gap-1 border-b border-border/40 py-2">
+            <NotificationBell initial={inbox} isCollapsed />
             <Button
               variant="ghost"
               size="icon"
@@ -151,6 +157,9 @@ export function Sidebar({ user }: { user?: UserData | null }) {
               <Image width={20} height={20} src="/logo.webp" alt="Logo" className="dark:invert" />
             </div>
             <SheetTitle className="mt-0 text-lg font-extrabold">Life OS</SheetTitle>
+            <div className="ml-auto">
+              <NotificationBell initial={inbox} />
+            </div>
           </SheetHeader>
 
           <ScrollArea className="flex-1 px-3 py-5">

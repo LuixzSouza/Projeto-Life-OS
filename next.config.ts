@@ -9,10 +9,8 @@ const nextConfig: NextConfig = {
     ]
   },
   
-  // Ignorar erros de TypeScript no build (ainda suportado no config)
-  typescript: {
-    ignoreBuildErrors: true,
-  },
+  // Type-safety no build: o código está 100% type-clean (tsc --noEmit = 0 erros),
+  // então deixamos o build FALHAR em erros de tipo — pega bugs cedo, não os esconde.
 
   // Server Actions: o padrão de 1MB barra uploads de foto (avatar/capa) em
   // base64. As imagens já são comprimidas no cliente; isto é só folga extra.
@@ -20,6 +18,15 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: "5mb",
     },
+    // Tree-shaking de barrel imports: importa só o que é usado destas libs
+    // grandes, reduzindo o JS enviado ao navegador (bundle menor = mais rápido).
+    optimizePackageImports: [
+      "lucide-react",
+      "recharts",
+      "framer-motion",
+      "date-fns",
+      "@radix-ui/react-icons",
+    ],
   },
 
   // CRÍTICO (Vercel): o `ensureSchema()` lê `prisma/baseline.sql` via fs em

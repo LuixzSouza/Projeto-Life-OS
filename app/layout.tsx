@@ -113,6 +113,27 @@ export default async function RootLayout({
       data-theme={themeClass}
       className={`${geistSans.variable} ${geistMono.variable}`}
     >
+      <head>
+        {/*
+          LANDING ("/"): sorteia o accent ANTES da primeira pintura, sobrescrevendo
+          o data-theme que o servidor renderizou (que, para usuário logado, seria a
+          cor salva nas settings). Sem isso, a cor das settings apareceria por um
+          instante antes do React trocar — o flash que o usuário via no reload.
+          Roda só em carregamento real; navegação SPA é tratada pelo provider, que
+          reaproveita window.__landingAccent para não piscar.
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              `(function(){try{if(location.pathname==="/"){` +
+              `var p=["theme-blue","theme-green","theme-orange","theme-violet","theme-rose"];` +
+              `var c=p[Math.floor(Math.random()*p.length)];` +
+              `window.__landingAccent=c;` +
+              `document.documentElement.setAttribute("data-theme",c);` +
+              `}}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body className={`antialiased bg-background text-foreground`}>
         <ClientProviders themeClass={themeClass} currency={currency}>
           <SecurityProvider initialSettings={securitySettings}>

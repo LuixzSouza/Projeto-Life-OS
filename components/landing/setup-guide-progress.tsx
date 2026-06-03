@@ -51,7 +51,7 @@ export function SetupGuideProgress({ currentStep, currentStepIndex, progressLabe
               stepKey === currentStep
                 ? "bg-gradient-brand text-primary-foreground scale-110 shadow-lg shadow-primary/20"
                 : index < currentStepIndex
-                ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+                ? "bg-primary/15 text-primary ring-1 ring-inset ring-primary/20"
                 : "bg-muted text-muted-foreground"
             )}>
               {index + 1}
@@ -61,7 +61,7 @@ export function SetupGuideProgress({ currentStep, currentStepIndex, progressLabe
               stepKey === currentStep
                 ? "text-foreground"
                 : index < currentStepIndex
-                ? "text-emerald-600 dark:text-emerald-400"
+                ? "text-primary"
                 : "text-muted-foreground"
             )}>
               {STEPS[stepKey].progressLabel}

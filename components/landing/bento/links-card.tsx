@@ -1,128 +1,103 @@
 "use client";
 
-import { 
-  Link as LinkIcon, 
-  Search, 
-  Plus, 
-  ArrowUpRight, 
-  Github, 
-  Figma, 
-  Layout, 
-  BookMarked,
-  LucideIcon
-} from "lucide-react";
+import { Link as LinkIcon, Search, Plus, ArrowUpRight, Github, Figma, Layout, BookMarked, Star } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { BaseCard } from "./base-card";
 import { motion } from "framer-motion";
-import { cn } from "@/lib/utils";
 import { useState } from "react";
 
-// --- TIPAGEM ---
+// model SavedLink: title, url, category, isFavorite.
 interface LinkItem {
   id: string;
   label: string;
   url: string;
-  category: "Dev" | "Design" | "Ref";
+  category: string;
   icon: LucideIcon;
-  color: string;
+  favorite?: boolean;
 }
 
-// --- DADOS (SEUS LINKS SALVOS) ---
 const SAVED_LINKS: LinkItem[] = [
-  { id: "1", label: "Tailwind Colors", url: "tailwindcss.com", category: "Dev", icon: Layout, color: "text-cyan-400" },
-  { id: "2", label: "Lucide Icons", url: "lucide.dev", category: "Dev", icon:  LinkIcon, color: "text-orange-400" },
-  { id: "3", label: "Figma Community", url: "figma.com", category: "Design", icon: Figma, color: "text-rose-400" },
-  { id: "4", label: "Next.js Docs", url: "nextjs.org", category: "Dev", icon: Github, color: "text-foreground" },
-  { id: "5", label: "Godly Website", url: "godly.website", category: "Ref", icon: BookMarked, color: "text-primary" },
+  { id: "1", label: "Tailwind CSS", url: "tailwindcss.com", category: "Dev", icon: Layout, favorite: true },
+  { id: "2", label: "Lucide Icons", url: "lucide.dev", category: "Dev", icon: LinkIcon },
+  { id: "3", label: "Figma Community", url: "figma.com", category: "Design", icon: Figma },
+  { id: "4", label: "Next.js Docs", url: "nextjs.org", category: "Dev", icon: Github, favorite: true },
+  { id: "5", label: "Godly Website", url: "godly.website", category: "Ref", icon: BookMarked },
 ];
 
 export function LinksCard() {
   const [search, setSearch] = useState("");
-
-  // Filtra os links baseado na busca
-  const filteredLinks = SAVED_LINKS.filter(link => 
-    link.label.toLowerCase().includes(search.toLowerCase()) || 
-    link.category.toLowerCase().includes(search.toLowerCase())
+  const filtered = SAVED_LINKS.filter(
+    (l) => l.label.toLowerCase().includes(search.toLowerCase()) || l.category.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
-    <BaseCard 
-        title="Links & Recursos" 
-        icon={LinkIcon} 
-        description="Repositório de referências."
-        className="col-span-1 min-h-[260px]"
-    >
-        <div className="flex flex-col h-full w-full bg-card relative overflow-hidden">
-            
-            {/* --- HEADER: BARRA DE BUSCA --- */}
-            <div className="p-3 pb-2 border-b border-border bg-card/50 backdrop-blur-md z-20">
-                <div className="relative flex items-center bg-muted rounded-lg border border-border focus-within:border-border transition-colors">
-                    <Search className="absolute left-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                    <input 
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Buscar recurso..." 
-                        className="w-full bg-transparent border-none outline-none text-[11px] text-foreground py-2 pl-8 pr-2 placeholder:text-muted-foreground"
-                    />
-                </div>
-            </div>
-
-            {/* --- LISTA DE LINKS (SCROLLABLE) --- */}
-            <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
-                {filteredLinks.length > 0 ? (
-                    filteredLinks.map((link) => (
-                        <motion.a
-                            key={link.id}
-                            href={`https://${link.url}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            className="flex items-center justify-between p-2 rounded-lg hover:bg-foreground/5 border border-transparent hover:border-border group transition-all cursor-pointer"
-                        >
-                            <div className="flex items-center gap-3">
-                                <div className="p-1.5 rounded-md bg-card border border-border group-hover:bg-muted transition-colors">
-                                    <link.icon className={cn("h-3.5 w-3.5", link.color)} />
-                                </div>
-                                <div className="flex flex-col">
-                                    <span className="text-[11px] font-medium text-foreground group-hover:text-foreground transition-colors">
-                                        {link.label}
-                                    </span>
-                                    <span className="text-[9px] text-muted-foreground font-mono">
-                                        {link.url}
-                                    </span>
-                                </div>
-                            </div>
-
-                            {/* Categoria Badge */}
-                            <div className="flex items-center gap-2">
-                                <span className="text-[8px] font-bold text-muted-foreground bg-card/50 px-1.5 py-0.5 rounded border border-border uppercase tracking-wider">
-                                    {link.category}
-                                </span>
-                                <ArrowUpRight className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
-                            </div>
-                        </motion.a>
-                    ))
-                ) : (
-                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2 opacity-50">
-                        <Search className="h-5 w-5" />
-                        <span className="text-[10px]">Nenhum link encontrado</span>
-                    </div>
-                )}
-            </div>
-
-            {/* --- FOOTER: ADICIONAR NOVO --- */}
-            <div className="p-2 border-t border-border bg-gradient-to-t from-black via-zinc-900/80 to-transparent z-10">
-                <button className="w-full flex items-center justify-center gap-2 py-2 rounded-lg border border-dashed border-border hover:bg-muted/50 hover:border-border hover:text-foreground text-muted-foreground transition-all group">
-                    <div className="bg-muted p-0.5 rounded group-hover:bg-zinc-700 transition-colors">
-                        <Plus className="h-3 w-3" />
-                    </div>
-                    <span className="text-[10px] font-bold uppercase tracking-widest">
-                        Salvar Novo Link
-                    </span>
-                </button>
-            </div>
-
+    <BaseCard title="Links & Apps" icon={LinkIcon} description="Repositório de referências." className="col-span-1 min-h-[260px]">
+      <div className="relative flex h-full w-full flex-col overflow-hidden">
+        {/* Busca */}
+        <div className="z-20 border-b border-border/60 p-3 pb-2">
+          <div className="relative flex items-center rounded-lg border border-border/60 bg-muted transition-colors focus-within:border-primary/40">
+            <Search className="absolute left-2.5 size-3.5 text-muted-foreground" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar recurso…"
+              className="w-full border-none bg-transparent py-2 pl-8 pr-2 text-[11px] text-foreground outline-none placeholder:text-muted-foreground"
+            />
+          </div>
         </div>
+
+        {/* Lista */}
+        <div className="custom-scrollbar flex-1 space-y-1 overflow-y-auto p-2">
+          {filtered.length > 0 ? (
+            filtered.map((link) => {
+              const Icon = link.icon;
+              return (
+                <motion.a
+                  key={link.id}
+                  href={`https://${link.url}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="group flex items-center justify-between rounded-lg border border-transparent p-2 transition-all hover:border-primary/20 hover:bg-primary/5"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="grid size-7 place-items-center rounded-md border border-border/60 bg-card text-primary transition-colors group-hover:bg-primary/10">
+                      <Icon className="size-3.5" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="flex items-center gap-1 text-[11px] font-medium text-foreground">
+                        {link.label}
+                        {link.favorite && <Star className="size-2.5 fill-primary text-primary" />}
+                      </span>
+                      <span className="font-mono text-[9px] text-muted-foreground">{link.url}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-primary">
+                      {link.category}
+                    </span>
+                    <ArrowUpRight className="size-3 -translate-x-2 text-muted-foreground opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100" />
+                  </div>
+                </motion.a>
+              );
+            })
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground opacity-50">
+              <Search className="size-5" />
+              <span className="text-[10px]">Nenhum link encontrado</span>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="border-t border-border/60 bg-background/50 p-2">
+          <button className="group flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border/60 py-2 text-muted-foreground transition-all hover:border-primary/40 hover:bg-primary/5 hover:text-foreground">
+            <Plus className="size-3 group-hover:text-primary" />
+            <span className="text-[10px] font-bold uppercase tracking-widest">Salvar novo link</span>
+          </button>
+        </div>
+      </div>
     </BaseCard>
   );
 }

@@ -1,25 +1,24 @@
 "use client";
 
-import { Key, Lock, Unlock, Fingerprint, ShieldCheck, Copy, Check, Eye, EyeOff } from "lucide-react";
+import { Key, Lock, Unlock, Fingerprint, ShieldCheck, Copy, Check } from "lucide-react";
 import { BaseCard } from "./base-card";
-import { useState, useRef, useEffect } from "react";
-import { cn } from "@/lib/utils";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-// --- TIPOS ---
+// model AccessItem: title, username, password, category.
 interface Credential {
   id: string;
   service: string;
   username: string;
-  pass: string; // Na vida real, isso viria criptografado
-  icon: string; // Inicial ou URL
+  pass: string;
+  icon: string;
 }
 
 const CREDENTIALS: Credential[] = [
   { id: "1", service: "Google (Principal)", username: "luiz.dev@gmail.com", pass: "Goo_##992", icon: "G" },
   { id: "2", service: "AWS Console", username: "root-luiz", pass: "aws-x82-live", icon: "A" },
-  { id: "3", service: "Netflix", username: "familia_souza", pass: "pipoca2025", icon: "N" },
-  { id: "4", service: "Spotify", username: "luiz_music", pass: "spotify_vibe", icon: "S" },
+  { id: "3", service: "Cliente · Studio Aurora", username: "admin", pass: "aurora-2026", icon: "S" },
+  { id: "4", service: "Vercel", username: "luiz", pass: "vercel_vibe", icon: "V" },
 ];
 
 export function VaultCard() {
@@ -31,22 +30,19 @@ export function VaultCard() {
   const TARGET_TEXT = "ACCESS_GRANTED";
   const CHARS = "!@#$%^&*()_+-=[]{}|;:,.<>?/ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-  // --- EFEITO MATRIX (DESBLOQUEIO) ---
   const unlockVault = () => {
     let iteration = 0;
-    clearInterval(intervalRef.current as NodeJS.Timeout);
-
+    if (intervalRef.current) clearInterval(intervalRef.current);
     intervalRef.current = setInterval(() => {
       setDisplayText((prev) =>
-        prev.split("").map((_, index) => {
-            if (index < iteration) return TARGET_TEXT[index];
-            return CHARS[Math.floor(Math.random() * CHARS.length)];
-        }).join("")
+        prev
+          .split("")
+          .map((_, index) => (index < iteration ? TARGET_TEXT[index] : CHARS[Math.floor(Math.random() * CHARS.length)]))
+          .join("")
       );
-
       if (iteration >= TARGET_TEXT.length) {
-        clearInterval(intervalRef.current as NodeJS.Timeout);
-        setTimeout(() => setLocked(false), 500); // Abre o cofre após o efeito
+        if (intervalRef.current) clearInterval(intervalRef.current);
+        setTimeout(() => setLocked(false), 500);
       }
       iteration += 1 / 2;
     }, 30);
@@ -64,113 +60,86 @@ export function VaultCard() {
   };
 
   return (
-    <BaseCard 
-        title="Cofre de Senhas" 
-        icon={Key} 
-        description="Gerenciador criptografado."
-        className="col-span-1 min-h-[260px]"
-    >
-        <div className="relative w-full h-full bg-card overflow-hidden">
-            
-            <AnimatePresence mode="wait">
-                
-                {/* --- ESTADO 1: BLOQUEADO (SUA ANIMAÇÃO) --- */}
-                {locked ? (
-                    <motion.div 
-                        key="locked"
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="absolute inset-0 flex flex-col items-center justify-center gap-4 cursor-pointer group"
-                        onClick={unlockVault} // Agora clica para abrir
+    <BaseCard title="Acessos" icon={Key} description="Cofre criptografado (keyring)." className="col-span-1 min-h-[260px]">
+      <div className="relative h-full w-full overflow-hidden">
+        <AnimatePresence mode="wait">
+          {locked ? (
+            <motion.div
+              key="locked"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="group absolute inset-0 flex cursor-pointer flex-col items-center justify-center gap-4"
+              onClick={unlockVault}
+            >
+              <div className="relative">
+                <div className="absolute inset-0 rounded-full bg-primary/20 opacity-0 blur-xl transition-opacity group-hover:opacity-100" />
+                <div className="relative rounded-2xl border border-border/60 bg-card p-4 shadow-2xl transition-transform duration-300 group-hover:scale-105">
+                  <Lock className="size-8 text-muted-foreground transition-colors group-hover:text-primary" />
+                </div>
+                <div className="absolute -right-1 -top-1 rounded-full border border-border/60 bg-card p-1">
+                  <ShieldCheck className="size-3 text-primary" />
+                </div>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <div className="flex h-8 min-w-[140px] items-center justify-center rounded-lg border border-border/60 bg-background/40 px-4 font-mono text-sm tracking-widest text-muted-foreground">
+                  {displayText}
+                </div>
+                <div className="flex items-center gap-1.5 opacity-60">
+                  <Fingerprint className="size-3 text-muted-foreground" />
+                  <span className="text-[9px] uppercase tracking-widest text-muted-foreground">Clique para autenticar</span>
+                </div>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div key="unlocked" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="absolute inset-0 flex flex-col">
+              <div className="flex items-center justify-between border-b border-border/60 bg-primary/5 px-4 py-2">
+                <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-primary">
+                  <Unlock className="size-3" /> Desbloqueado
+                </span>
+                <button onClick={lockVault} className="text-[9px] text-muted-foreground underline hover:text-foreground">
+                  Bloquear
+                </button>
+              </div>
+
+              <div className="custom-scrollbar flex-1 space-y-1 overflow-y-auto p-2">
+                {CREDENTIALS.map((cred) => (
+                  <div key={cred.id} className="group flex items-center justify-between rounded-lg bg-primary/[0.04] p-2 transition-colors hover:bg-primary/10">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <div className="grid size-8 place-items-center rounded-md border border-border/60 bg-muted text-xs font-bold text-primary">
+                        {cred.icon}
+                      </div>
+                      <div className="flex min-w-0 flex-col">
+                        <span className="truncate text-xs font-medium text-foreground">{cred.service}</span>
+                        <span className="truncate text-[9px] text-muted-foreground">{cred.username}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => copyToClipboard(cred.pass, cred.id)}
+                      className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+                      title="Copiar senha"
                     >
-                        {/* Ícone Pulsante */}
-                        <div className="relative">
-                            <div className="absolute inset-0 bg-emerald-500/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-                            <div className="p-4 rounded-2xl bg-card border border-border shadow-2xl relative group-hover:scale-105 transition-transform duration-300">
-                                <Lock className="h-8 w-8 text-muted-foreground group-hover:text-emerald-500 transition-colors" />
-                            </div>
-                            <div className="absolute -top-1 -right-1 bg-card rounded-full p-1 border border-border">
-                                <ShieldCheck className="h-3 w-3 text-emerald-500" />
-                            </div>
-                        </div>
+                      {copiedId === cred.id ? <Check className="size-3.5 text-primary" /> : <Copy className="size-3.5" />}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-                        {/* Texto Matrix */}
-                        <div className="flex flex-col items-center gap-1">
-                            <div className="h-8 px-4 flex items-center justify-center rounded-lg bg-background/40 border border-border font-mono text-sm text-muted-foreground tracking-widest min-w-[140px]">
-                                {displayText}
-                            </div>
-                            <div className="flex items-center gap-1.5 opacity-50">
-                                <Fingerprint className="h-3 w-3 text-muted-foreground" />
-                                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
-                                    Clique para Autenticar
-                                </span>
-                            </div>
-                        </div>
-                    </motion.div>
-                ) : (
-                    
-                    /* --- ESTADO 2: DESBLOQUEADO (LISTA DE SENHAS) --- */
-                    <motion.div 
-                        key="unlocked"
-                        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}
-                        className="absolute inset-0 flex flex-col"
-                    >
-                        {/* Header Interno */}
-                        <div className="flex justify-between items-center px-4 py-2 border-b border-border bg-emerald-900/10">
-                            <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider flex items-center gap-1">
-                                <Unlock className="h-3 w-3" /> Desbloqueado
-                            </span>
-                            <button onClick={lockVault} className="text-[9px] text-muted-foreground hover:text-foreground underline">
-                                Bloquear
-                            </button>
-                        </div>
-
-                        {/* Lista de Credenciais */}
-                        <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
-                            {CREDENTIALS.map((cred) => (
-                                <div key={cred.id} className="flex items-center justify-between p-2 rounded-lg bg-foreground/5 hover:bg-foreground/10 transition-colors group">
-                                    <div className="flex items-center gap-3 overflow-hidden">
-                                        <div className="w-8 h-8 rounded-md bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground border border-border">
-                                            {cred.icon}
-                                        </div>
-                                        <div className="flex flex-col min-w-0">
-                                            <span className="text-xs font-medium text-foreground truncate">{cred.service}</span>
-                                            <span className="text-[9px] text-muted-foreground truncate">{cred.username}</span>
-                                        </div>
-                                    </div>
-
-                                    {/* Botão Copiar */}
-                                    <button 
-                                        onClick={() => copyToClipboard(cred.pass, cred.id)}
-                                        className="p-1.5 rounded-md hover:bg-foreground/10 text-muted-foreground hover:text-foreground transition-colors relative"
-                                        title="Copiar Senha"
-                                    >
-                                        {copiedId === cred.id ? (
-                                            <Check className="h-3.5 w-3.5 text-emerald-500" />
-                                        ) : (
-                                            <Copy className="h-3.5 w-3.5" />
-                                        )}
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    </motion.div>
-                )}
-
-            </AnimatePresence>
-
-            {/* Efeito Scanner (Só aparece na transição ou bloqueado) */}
-            <AnimatePresence>
-                {locked && (
-                    <motion.div 
-                        initial={{ top: "-10%" }}
-                        animate={{ top: "110%" }}
-                        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", repeatDelay: 1 }}
-                        className="absolute w-full h-[10px] bg-emerald-500/20 blur-md pointer-events-none"
-                    />
-                )}
-            </AnimatePresence>
-
-        </div>
+        {/* Scanner */}
+        <AnimatePresence>
+          {locked && (
+            <motion.div
+              initial={{ top: "-10%" }}
+              animate={{ top: "110%" }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", repeatDelay: 1 }}
+              className="pointer-events-none absolute h-[10px] w-full bg-primary/20 blur-md"
+            />
+          )}
+        </AnimatePresence>
+      </div>
     </BaseCard>
   );
 }

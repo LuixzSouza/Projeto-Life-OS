@@ -2,12 +2,12 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { TrendingUp, Wallet, ArrowUpRight, ArrowDownRight, DollarSign } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { Wallet, ArrowUpRight, ArrowDownRight, LineChart } from "lucide-react";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { BaseCard } from "./base-card";
 
-// Dados simulados mais ricos
+// models Account (balance) + Transaction (income/expense). Subrotas: Investimentos, Mercado, Transações.
 const CHART_DATA = [
   { month: "Jan", income: 35, expense: 20, label: "Janeiro" },
   { month: "Fev", income: 60, expense: 35, label: "Fevereiro" },
@@ -20,121 +20,100 @@ const CHART_DATA = [
 export function FinanceCard() {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
-  // Calcula os totais (ou pega do item em hover)
   const activeData = useMemo(() => {
     if (hoveredIndex !== null) {
+      const d = CHART_DATA[hoveredIndex];
       return {
-        income: CHART_DATA[hoveredIndex].income * 100, // Valor simulado
-        expense: CHART_DATA[hoveredIndex].expense * 100,
-        label: CHART_DATA[hoveredIndex].label,
-        balance: (CHART_DATA[hoveredIndex].income - CHART_DATA[hoveredIndex].expense) * 100
+        income: d.income * 100,
+        expense: d.expense * 100,
+        label: d.label,
+        balance: (d.income - d.expense) * 100,
       };
     }
-    // Default (Visão Geral)
-    return {
-      income: 12450, // Média ou Total
-      expense: 3400,
-      label: "Visão Geral",
-      balance: 9050
-    };
+    return { income: 12450, expense: 3400, label: "Visão geral", balance: 9050 };
   }, [hoveredIndex]);
 
+  const fmt = (n: number) =>
+    n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+
   return (
-    <BaseCard
-      title="Financeiro"
-      description="Fluxo de caixa inteligente."
-      icon={Wallet}
-      className="col-span-2 md:col-span-2 lg:col-span-2"
-    >
+    <BaseCard title="Financeiro" description="Contas, fluxo e investimentos." icon={Wallet} className="col-span-2 md:col-span-2 lg:col-span-2">
       <div className="flex h-full w-full">
-        
-        {/* --- LADO ESQUERDO: METRICAS DINÂMICAS --- */}
-        <div className="flex flex-col justify-between p-5 w-[35%] border-r border-border bg-card/30">
-            <div className="space-y-1">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    {activeData.label}
-                </p>
-                <div className="text-xl font-bold text-foreground tabular-nums">
-                    <span className="text-sm text-muted-foreground mr-1">R$</span>
-                    {activeData.balance.toLocaleString('pt-BR')}
+        {/* Métricas dinâmicas */}
+        <div className="flex w-[35%] flex-col justify-between border-r border-border/60 bg-card/30 p-5">
+          <div className="space-y-1">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{activeData.label}</p>
+            <div className="text-xl font-bold tabular-nums text-foreground">
+              <span className="mr-1 text-sm text-muted-foreground">R$</span>
+              {activeData.balance.toLocaleString("pt-BR")}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {/* Entrada (seta p/ cima) */}
+            <div className="flex items-center justify-between rounded-lg border border-primary/15 bg-primary/5 p-2">
+              <div className="flex items-center gap-2">
+                <div className="rounded bg-primary/15 p-1 text-primary">
+                  <ArrowUpRight className="size-3" />
                 </div>
+                <span className="text-[10px] text-muted-foreground">Entrada</span>
+              </div>
+              <span className="text-xs font-bold tabular-nums text-foreground">{fmt(activeData.income)}</span>
             </div>
 
-            <div className="space-y-3">
-                {/* Receitas */}
-                <div className="group flex items-center justify-between p-2 rounded-lg bg-emerald-500/5 border border-emerald-500/10 transition-colors">
-                    <div className="flex items-center gap-2">
-                        <div className="p-1 rounded bg-emerald-500/20 text-emerald-500">
-                            <ArrowUpRight className="h-3 w-3" />
-                        </div>
-                        <span className="text-[10px] text-muted-foreground">Entrada</span>
-                    </div>
-                    <span className="text-xs font-bold text-emerald-400 tabular-nums">
-                        {activeData.income.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
-                    </span>
+            {/* Saída (seta p/ baixo) */}
+            <div className="flex items-center justify-between rounded-lg border border-border/60 bg-muted/40 p-2">
+              <div className="flex items-center gap-2">
+                <div className="rounded bg-muted p-1 text-muted-foreground">
+                  <ArrowDownRight className="size-3" />
                 </div>
-
-                {/* Despesas */}
-                <div className="group flex items-center justify-between p-2 rounded-lg bg-rose-500/5 border border-rose-500/10 transition-colors">
-                    <div className="flex items-center gap-2">
-                        <div className="p-1 rounded bg-rose-500/20 text-rose-500">
-                            <ArrowDownRight className="h-3 w-3" />
-                        </div>
-                        <span className="text-[10px] text-muted-foreground">Saída</span>
-                    </div>
-                    <span className="text-xs font-bold text-rose-400 tabular-nums">
-                        {activeData.expense.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
-                    </span>
-                </div>
+                <span className="text-[10px] text-muted-foreground">Saída</span>
+              </div>
+              <span className="text-xs font-bold tabular-nums text-muted-foreground">{fmt(activeData.expense)}</span>
             </div>
+          </div>
         </div>
 
-        {/* --- LADO DIREITO: GRÁFICO INTERATIVO --- */}
-        <div className="relative flex-1 flex items-end justify-between gap-2 px-6 pb-6 pt-8">
-            
-            {/* Linhas de Grid (Fundo) */}
-            <div className="absolute inset-0 px-6 pb-6 pt-8 flex flex-col justify-between pointer-events-none opacity-20">
-                <div className="w-full h-px bg-zinc-500 border-t border-dashed" />
-                <div className="w-full h-px bg-zinc-500 border-t border-dashed" />
-                <div className="w-full h-px bg-zinc-500 border-t border-dashed" />
+        {/* Gráfico interativo */}
+        <div className="relative flex flex-1 items-end justify-between gap-2 px-6 pb-6 pt-8">
+          {/* linhas de grid themeable */}
+          <div className="pointer-events-none absolute inset-0 flex flex-col justify-between px-6 pb-6 pt-8 opacity-30">
+            <div className="h-px w-full border-t border-dashed border-border" />
+            <div className="h-px w-full border-t border-dashed border-border" />
+            <div className="h-px w-full border-t border-dashed border-border" />
+          </div>
+
+          {CHART_DATA.map((item, i) => (
+            <div key={item.month} className="group/bar relative z-10 flex h-full flex-1 items-end">
+              <div className="absolute bottom-0 h-full w-full rounded-t-sm bg-muted/30" />
+              <motion.div
+                initial={{ height: 0 }}
+                whileInView={{ height: `${item.income}%` }}
+                transition={{ duration: 0.6, delay: i * 0.05, type: "spring", bounce: 0 }}
+                onMouseEnter={() => setHoveredIndex(i)}
+                onMouseLeave={() => setHoveredIndex(null)}
+                className={cn(
+                  "relative w-full cursor-crosshair overflow-hidden rounded-t-sm transition-all duration-200",
+                  hoveredIndex === i
+                    ? "z-20 bg-gradient-brand shadow-[0_0_15px_-2px_var(--color-primary)]"
+                    : hoveredIndex !== null
+                      ? "bg-muted opacity-50"
+                      : "bg-primary/70"
+                )}
+              >
+                <div className="absolute top-0 h-1 w-full bg-foreground/20" />
+              </motion.div>
+
+              <div className={cn("absolute -bottom-6 left-1/2 -translate-x-1/2 font-mono text-[9px] text-muted-foreground transition-all duration-200", hoveredIndex === i ? "-translate-y-1 font-bold text-foreground" : "opacity-0")}>
+                {item.month}
+              </div>
             </div>
+          ))}
 
-            {/* Barras */}
-            {CHART_DATA.map((item, i) => (
-                <div key={i} className="relative flex-1 h-full flex items-end group/bar z-10">
-                    
-                    {/* Barra de Fundo (Placeholder) */}
-                    <div className="absolute bottom-0 w-full h-full bg-muted/30 rounded-t-sm" />
-
-                    {/* Barra Ativa */}
-                    <motion.div
-                        initial={{ height: 0 }}
-                        whileInView={{ height: `${item.income}%` }}
-                        transition={{ duration: 0.6, delay: i * 0.05, type: "spring", bounce: 0 }}
-                        onMouseEnter={() => setHoveredIndex(i)}
-                        onMouseLeave={() => setHoveredIndex(null)}
-                        className={cn(
-                            "w-full rounded-t-sm cursor-crosshair relative overflow-hidden transition-all duration-200",
-                            hoveredIndex === i 
-                                ? "bg-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.3)] z-20" 
-                                : hoveredIndex !== null // Se estiver hover em outro, diminui opacidade deste
-                                    ? "bg-zinc-700 opacity-40"
-                                    : "bg-emerald-600 opacity-80"
-                        )}
-                    >
-                        {/* Brilho no topo da barra */}
-                        <div className="absolute top-0 w-full h-1 bg-foreground/20" />
-                    </motion.div>
-                    
-                    {/* Label do Mês (Aparece no Hover) */}
-                    <div className={cn(
-                        "absolute -bottom-6 left-1/2 -translate-x-1/2 text-[9px] font-mono text-muted-foreground transition-all duration-200",
-                        hoveredIndex === i ? "text-foreground font-bold -translate-y-1" : "opacity-0"
-                    )}>
-                        {item.month}
-                    </div>
-                </div>
-            ))}
+          {/* selo de módulo */}
+          <div className="absolute right-3 top-3 flex items-center gap-1 text-[9px] font-bold uppercase tracking-wider text-primary/70">
+            <LineChart className="size-3" /> +18%
+          </div>
         </div>
       </div>
     </BaseCard>
