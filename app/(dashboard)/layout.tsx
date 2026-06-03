@@ -2,6 +2,11 @@ import { Sidebar } from "@/components/layout/sidebar"; // ou o caminho correto
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserId } from "@/lib/auth";
 
+// Páginas do dashboard são conteúdo autenticado por-usuário: nunca devem ser
+// prerenderizadas no build (consultariam o banco vazio na Vercel → erro P2021).
+// force-dynamic garante render por requisição.
+export const dynamic = "force-dynamic";
+
 export default async function DashboardLayout({
   children,
 }: {
