@@ -3,9 +3,9 @@ import type { NextRequest } from "next/server";
 import { decrypt } from "@/lib/auth";
 
 // 1. Rotas que não exigem autenticação
-// Removi o "/" daqui para que o sistema seja 100% privado. 
-// Se você quiser uma página inicial pública, adicione "/" de volta.
-const publicRoutes = ["/login", "/setup"];
+// "/" é a landing page de marketing — pública por design (ela própria trata
+// o estado deslogado e direciona para /setup ou /login conforme o caso).
+const publicRoutes = ["/", "/login", "/setup"];
 
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
