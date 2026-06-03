@@ -7,7 +7,7 @@ import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-s
 export default async function LinksPage() {
   const userId = await getCurrentUserId()
   const links = await prisma.savedLink.findMany({
-    where: { userId },
+    where: { userId, deletedAt: null },
     orderBy: { createdAt: "desc" },
   })
 

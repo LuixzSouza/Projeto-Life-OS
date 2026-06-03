@@ -76,15 +76,18 @@ Usam referência **polimórfica** (`entityType` + `entityId`) para apontar para 
 - **Linha do Tempo** (`/timeline`): lê `getRecentActivity`, agrupa por dia. Link no menu (grupo Central).
 - **Lixeira** (`/trash`): `app/(dashboard)/trash/{actions,page}.tsx` + `components/trash/trash-client.tsx`.
   Restaurar / excluir em definitivo / esvaziar. Link no menu (grupo Sistema).
-- **Soft-delete de Tarefas**: `deleteTask` agora seta `deletedAt` (vai pra lixeira); reads de tarefa
-  filtram `deletedAt: null` em dashboard, projects (lista + counts), projects/[slug], agenda e agenda-aggregator.
+- **Soft-delete + Lixeira** ativo em: **Tarefas, Links, Desejos (Wishlist), Mídia (Entretenimento)**.
+  O delete seta `deletedAt`; os reads de cada um filtram `deletedAt: null` (dashboard, página do módulo,
+  agenda/agregador conforme o caso). A `/trash` lista os 4 tipos com restaurar/excluir/esvaziar.
 - **ActivityLog**: `createTask`/`toggleTask`/`deleteTask` registram atividade — padrão a replicar nos demais módulos.
 
 ### Próximos passos (sugestão)
 1. Espalhar `logActivity` + `notify` nas demais mutações (pagar fatura, criar transação/evento…).
-2. Estender o **soft-delete** (deletedAt + filtro nos reads) e a lixeira aos outros modelos
-   (Transaction, Project, Note, SavedLink, MediaItem, Event, WishlistItem, Friend, Client, WardrobeItem).
-   NOTA: reads de IA (`lib/ai-data.ts`, `lib/ai-context.ts`) ainda NÃO filtram deletedAt — incluir ao estender.
+2. Estender o **soft-delete** aos modelos restantes: Note, Event, Friend, Client, WardrobeItem (padrão limpo);
+   e com cuidado Transaction (mexe no saldo da conta) e Project (cascateia tarefas). Lembrar de incluir o
+   tipo na `/trash` (actions.ts switch + trash-client TYPE_ICON/LABEL).
+   NOTA: reads de IA (`lib/ai-data.ts`, `lib/ai-context.ts`), backup e storage-analytics ainda NÃO filtram
+   deletedAt — itens na lixeira aparecem lá (aceitável; incluir filtro ao estender se incomodar).
 3. UI de **tags** (filtro cross-módulo) e **central de anexos**.
 
 ---

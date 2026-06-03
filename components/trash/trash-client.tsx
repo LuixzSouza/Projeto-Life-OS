@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Trash2, RotateCcw, X, ListTodo, AlertTriangle } from "lucide-react";
+import { Trash2, RotateCcw, X, ListTodo, AlertTriangle, Bookmark, Gift, Film } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { restoreItem, purgeItem, emptyTrash, type TrashItem } from "@/app/(dashboard)/trash/actions";
 
-const TYPE_ICON: Record<string, React.ElementType> = { task: ListTodo };
-const TYPE_LABEL: Record<string, string> = { task: "Tarefa" };
+const TYPE_ICON: Record<string, React.ElementType> = { task: ListTodo, link: Bookmark, wishlist: Gift, media: Film };
+const TYPE_LABEL: Record<string, string> = { task: "Tarefa", link: "Link", wishlist: "Desejo", media: "Mídia" };
 
 function ago(iso: string): string {
   const d = new Date(iso);

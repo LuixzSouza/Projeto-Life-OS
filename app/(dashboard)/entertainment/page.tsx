@@ -14,7 +14,7 @@ export default async function EntertainmentPage() {
   // 1. Busca os itens no banco
   const userId = await getCurrentUserId();
   const rawItems = await prisma.mediaItem.findMany({
-    where: { userId },
+    where: { userId, deletedAt: null },
     orderBy: { createdAt: "desc" },
   });
 

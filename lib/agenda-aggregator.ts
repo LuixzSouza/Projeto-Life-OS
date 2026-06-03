@@ -57,7 +57,7 @@ export async function getAgendaItems(rangeStart: Date, rangeEnd: Date): Promise<
     prisma.studySession.findMany({ where: { userId, date: range }, include: { subject: { select: { title: true } } } }),
     prisma.healthMetric.findMany({ where: { userId, type: "SLEEP", date: range } }),
     prisma.bodyMeasurement.findMany({ where: { userId, date: range } }),
-    prisma.mediaItem.findMany({ where: { userId, updatedAt: range } }),
+    prisma.mediaItem.findMany({ where: { userId, updatedAt: range, deletedAt: null } }),
     prisma.wardrobeItem.findMany({ where: { userId, lastWorn: range } }),
     prisma.friend.findMany({ where: { userId } }), // aniversários precisam de todos
     prisma.transaction.findMany({ where: { userId, date: range } }),

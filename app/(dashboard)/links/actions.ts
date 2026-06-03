@@ -159,7 +159,7 @@ async function probeLink(url: string): Promise<boolean> {
 export async function checkLinksHealth(): Promise<LinkHealth> {
   const userId = await requireUserId();
   const links = await prisma.savedLink.findMany({
-    where: { userId },
+    where: { userId, deletedAt: null },
     select: { id: true, url: true },
   });
 
@@ -181,9 +181,9 @@ export async function checkLinksHealth(): Promise<LinkHealth> {
 export async function deleteLink(id: string) {
   try {
     const userId = await requireUserId();
-    await prisma.savedLink.deleteMany({ where: { id, userId } });
+    await prisma.savedLink.updateMany({ where: { id, userId }, data: { deletedAt: new Date() } });
     revalidatePath("/links");
-    return { success: true, message: "Link removido." };
+    return { success: true, message: "Link movido para a lixeira." };
   } catch (error) {
     console.error(error);
     return { success: false, message: "Erro ao remover." };

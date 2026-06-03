@@ -72,6 +72,6 @@ export async function addSavings(formData: FormData) {
 
 export async function deleteWishlist(id: string) {
     const userId = await requireUserId();
-    await prisma.wishlistItem.deleteMany({ where: { id, userId } });
+    await prisma.wishlistItem.updateMany({ where: { id, userId }, data: { deletedAt: new Date() } });
     revalidatePath("/finance");
 }

@@ -371,12 +371,13 @@ export async function deleteMediaItem(id: string) {
   try {
       const userId = await getAuthenticatedUserId();
       if (!userId) return { success: false, message: "Não autenticado." };
-      await prisma.mediaItem.deleteMany({
-          where: { id, userId }
+      await prisma.mediaItem.updateMany({
+          where: { id, userId },
+          data: { deletedAt: new Date() }
       });
 
       revalidatePath("/entertainment");
-      return { success: true, message: "Item removido com sucesso." };
+      return { success: true, message: "Item movido para a lixeira." };
   } catch (error) {
       console.error("Erro ao deletar:", error);
       return { success: false, message: "Erro ao remover item." };

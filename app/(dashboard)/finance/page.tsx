@@ -31,7 +31,7 @@ export default async function FinancePage() {
         take: 50,
         include: { account: true },
       }),
-      prisma.wishlistItem.findMany({ where: { userId }, orderBy: { priority: "desc" } }),
+      prisma.wishlistItem.findMany({ where: { userId, deletedAt: null }, orderBy: { priority: "desc" } }),
       prisma.recurringExpense.findMany({
         where: { userId },
         orderBy: { dayOfMonth: "asc" },

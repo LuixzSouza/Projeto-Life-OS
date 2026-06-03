@@ -56,7 +56,7 @@ export default async function DashboardPage() {
     prisma.task.count({ where: { isDone: true, userId, deletedAt: null } }),
     prisma.studySession.findMany({ where: { userId }, include: { subject: true } }),
     prisma.event.findFirst({ where: { startTime: { gte: new Date() }, userId }, orderBy: { startTime: 'asc' } }),
-    prisma.mediaItem.findMany({ where: { status: 'IN_PROGRESS', userId }, take: 3 }),
+    prisma.mediaItem.findMany({ where: { status: 'IN_PROGRESS', userId, deletedAt: null }, take: 3 }),
     prisma.project.findMany({ where: { userId }, take: 3, orderBy: { updatedAt: 'desc' } }),
     userId ? prisma.settings.findUnique({ where: { userId } }) : null,
     prisma.client.findMany({
@@ -70,7 +70,7 @@ export default async function DashboardPage() {
     prisma.healthMetric.aggregate({ where: { type: "WATER", date: { gte: today }, userId }, _sum: { value: true } }),
     prisma.meal.aggregate({ where: { date: { gte: today }, userId }, _sum: { calories: true } }),
     prisma.aiMessage.count({ where: { createdAt: { gte: today }, userId } }),
-    prisma.savedLink.findMany({ where: { userId }, take: 4, orderBy: { createdAt: 'desc' } }),
+    prisma.savedLink.findMany({ where: { userId, deletedAt: null }, take: 4, orderBy: { createdAt: 'desc' } }),
     prisma.wardrobeItem.findMany({ where: { isFavorite: true, userId: userId ?? "" }, take: 3 })
   ]);
 
