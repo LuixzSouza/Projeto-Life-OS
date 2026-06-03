@@ -80,6 +80,11 @@ function friendlyError(error: unknown, mode: "local" | "cloud"): string {
     if (low.includes("401") || low.includes("unauthor") || low.includes("jwt") || low.includes("token")) {
       return "Falha de autenticação no Turso. Verifique o TURSO_AUTH_TOKEN (deve começar com 'eyJ…', não é a URL) nas variáveis de ambiente do servidor.";
     }
+    // HTTP 400 / SERVER_ERROR do Turso quase sempre = token inválido (é comum
+    // colar a URL no campo do token por engano). Aponta direto pra causa.
+    if (low.includes("400") || low.includes("server_error")) {
+      return "O Turso rejeitou a conexão (HTTP 400). Quase sempre é o TURSO_AUTH_TOKEN errado — confirme que é o token JWT (começa com 'eyJ…'), NÃO a URL do banco. Gere com: turso db tokens create <nome-do-banco>.";
+    }
     if (low.includes("enotfound") || low.includes("getaddrinfo") || low.includes("fetch failed") || low.includes("econnrefused") || low.includes("url")) {
       return "Não foi possível conectar ao banco Turso. Confira o TURSO_DATABASE_URL (formato libsql://...) e sua conexão.";
     }
@@ -90,6 +95,28 @@ function friendlyError(error: unknown, mode: "local" | "cloud"): string {
   }
   // Caso geral: devolve a mensagem original (já é informativa).
   return raw;
+}
+
+/**
+ * Valida um perfil de nuvem ANTES de tentar conectar. Pega os erros de
+ * configuração mais comuns (token ausente, ou a URL colada no campo do token)
+ * e lança uma mensagem acionável — em vez de deixar o Turso responder um
+ * "HTTP 400" críptico lá na frente.
+ */
+function assertValidCloudProfile(profile: DbProfile): void {
+  if (profile.mode !== "cloud") return;
+  const token = profile.authToken?.trim();
+  if (!token) {
+    throw new Error(
+      "TURSO_AUTH_TOKEN ausente. Gere um token com `turso db tokens create <nome-do-banco>` e configure nas variáveis de ambiente do servidor."
+    );
+  }
+  // O token é um JWT (começa com 'eyJ…'). Se vier uma URL, foi colado o campo errado.
+  if (/^(libsql|wss?|https?):\/\//i.test(token)) {
+    throw new Error(
+      "TURSO_AUTH_TOKEN contém uma URL, não um token. O token é um JWT que começa com 'eyJ…' — confira se você não colou a URL do banco (TURSO_DATABASE_URL) no campo do token."
+    );
+  }
 }
 
 export async function setupSystem(
@@ -111,6 +138,10 @@ export async function setupSystem(
       ? { profile: envProfile, storagePath: "" }
       : resolveProfileFromForm(formData);
     mode = profile.mode;
+
+    // Pega config de nuvem inválida (token ausente / URL no lugar do token)
+    // antes de gastar uma viagem ao Turso só pra receber um 400 opaco.
+    assertValidCloudProfile(profile);
 
     // --- PARTE 2: CONEXÃO DIRETA + CRIAÇÃO DE SCHEMA ---
     // Cliente NOVO para o destino escolhido (ignora cache antigo). As tabelas
