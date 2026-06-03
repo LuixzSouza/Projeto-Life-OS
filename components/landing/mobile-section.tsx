@@ -37,12 +37,12 @@ export function SetupGuide() {
   return (
     <section id="config" className="py-24 md:py-32 px-4 sm:px-6 bg-card border-t border-border relative overflow-hidden">
 
-      {/* Background: Grid Tático com gradiente */}
-      <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:60px_60px] opacity-10 pointer-events-none" />
+      {/* Background: grade tática themeable (clareia/escurece com o tema) */}
+      <div className="landing-grid absolute inset-0 opacity-50 pointer-events-none [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_75%)]" />
 
       {/* Gradientes de fundo */}
-      <div className="absolute top-0 left-0 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl" />
-      <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl" />
+      <div className="absolute top-0 left-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
+      <div className="absolute bottom-0 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
 
       <div className="max-w-6xl mx-auto relative z-10">
 
@@ -51,10 +51,10 @@ export function SetupGuide() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gradient-to-r from-indigo-900/30 to-purple-900/30 border border-indigo-800/30 text-foreground text-xs font-semibold uppercase tracking-widest mb-6"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 text-xs font-semibold uppercase tracking-widest mb-6"
           >
-            <Terminal className="h-3 w-3 text-indigo-400" />
-            <span className="bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+            <Terminal className="h-3 w-3 text-primary dark:text-primary" />
+            <span className="text-gradient-brand">
               Setup Local Guiado
             </span>
           </motion.div>
@@ -65,7 +65,7 @@ export function SetupGuide() {
             transition={{ delay: 0.1 }}
             className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6 tracking-tight"
           >
-            Configure em <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">5 minutos</span>
+            Configure em <span className="text-gradient-brand">5 minutos</span>
             <br />
             <span className="text-xl md:text-2xl text-muted-foreground font-normal">
               Guia interativo com comandos prontos para copiar
@@ -100,13 +100,13 @@ export function SetupGuide() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
-            className="relative bg-gradient-to-b from-zinc-900/90 to-black/90 backdrop-blur-xl border border-border rounded-2xl shadow-2xl shadow-indigo-500/5 overflow-hidden"
+            className="landing-card relative rounded-2xl shadow-2xl shadow-primary/5 overflow-hidden"
           >
             {/* Header do Card */}
-            <div className="px-6 py-4 border-b border-border bg-gradient-to-r from-black/50 to-zinc-900/50">
+            <div className="px-6 py-4 border-b border-border bg-muted/30">
               <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-r from-indigo-500/20 to-purple-500/20">
-                  <stepData.icon className="h-5 w-5 text-indigo-400" />
+                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-r from-primary/15 to-primary/15 ring-1 ring-inset ring-primary/10">
+                  <stepData.icon className="h-5 w-5 text-primary dark:text-primary" />
                 </div>
                 <div className="flex-1">
                   <h3 className="text-xl font-bold text-foreground">{stepData.title}</h3>
@@ -131,7 +131,7 @@ export function SetupGuide() {
                     <Button
                       size="sm"
                       onClick={goToNextStep}
-                      className="gap-2 bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600"
+                      className="gap-2 bg-gradient-brand text-primary-foreground hover:opacity-90"
                     >
                       Próximo
                       <ChevronRight className="h-4 w-4" />
@@ -190,7 +190,7 @@ export function SetupGuide() {
                     href="https://github.com/LuixzSouza/Projeto-Life-OS"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-muted hover:bg-zinc-700 text-foreground text-sm font-medium transition-colors"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-muted hover:bg-muted/60 hover:border-primary/40 text-foreground text-sm font-medium transition-colors"
                   >
                     <GitBranch className="h-4 w-4" />
                     Ver Repositório
@@ -208,7 +208,7 @@ export function SetupGuide() {
                 <div className="space-y-2">
                   <h4 className="font-semibold text-foreground text-sm">💡 Dica Importante</h4>
                   <p className="text-sm text-muted-foreground">
-                    Encontrou problemas? Consulte a documentação completa no <Link href={"https://github.com/LuixzSouza/Projeto-Life-OS"} target="_blank" className="text-indigo-400 underline"> GitHub </Link> ou abra uma issue.
+                    Encontrou problemas? Consulte a documentação completa no <Link href={"https://github.com/LuixzSouza/Projeto-Life-OS"} target="_blank" className="text-primary underline"> GitHub </Link> ou abra uma issue.
                     Para dúvidas sobre Node.js ou Git, recomendamos os tutoriais oficiais.
                   </p>
                 </div>

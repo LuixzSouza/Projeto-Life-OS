@@ -33,8 +33,8 @@ export const CommandButton = ({
   return (
     <div className="space-y-3 pt-3 pb-5">
       {stepNumber && (
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-muted/50 text-muted-foreground text-xs font-medium">
-          <span className="flex items-center justify-center w-4 h-4 rounded-full bg-zinc-700 text-[10px]">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
+          <span className="flex items-center justify-center w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
             {stepNumber}
           </span>
           Passo {stepNumber}
@@ -43,36 +43,39 @@ export const CommandButton = ({
 
       <p className="text-foreground text-sm leading-relaxed">{description}</p>
 
-      <div className="relative group">
+      {/* Janela de terminal — sempre escura de propósito (como um terminal real),
+          o que dá um visual premium e mantém contraste alto nos dois temas. */}
+      <div className="group relative overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-lg">
+        {/* Barra superior estilo macOS */}
+        <div className="flex items-center gap-2 border-b border-zinc-800 bg-zinc-900 px-4 py-2.5">
+          <span className="flex gap-1.5">
+            <span className="h-3 w-3 rounded-full bg-red-500/90" />
+            <span className="h-3 w-3 rounded-full bg-yellow-500/90" />
+            <span className="h-3 w-3 rounded-full bg-green-500/90" />
+          </span>
+          <span className="ml-2 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+            {language === 'env' ? 'arquivo .env' : 'terminal'}
+          </span>
+          <button
+            onClick={handleCopy}
+            className="ml-auto inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100"
+            title={copied ? "Copiado!" : "Copiar comando"}
+            aria-label={copied ? "Copiado" : "Copiar comando"}
+          >
+            {copied ? (
+              <><CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> Copiado</>
+            ) : (
+              <><Copy className="h-3.5 w-3.5" /> Copiar</>
+            )}
+          </button>
+        </div>
+        {/* Corpo do comando */}
         <code className={cn(
-          "block w-full text-left p-4 rounded-xl bg-muted/80 text-sm font-mono whitespace-pre-wrap break-all border border-border hover:border-border transition-colors",
-          language === 'env' ? 'text-emerald-300/90' : 'text-cyan-300/90',
-          "leading-relaxed"
+          "block w-full whitespace-pre-wrap break-all p-4 text-left font-mono text-sm leading-relaxed",
+          language === 'env' ? 'text-emerald-300' : 'text-cyan-300'
         )}>
           {command}
         </code>
-        <button
-          onClick={handleCopy}
-          className="absolute right-3 top-3 p-2 rounded-lg bg-muted/90 backdrop-blur-sm text-foreground/80 hover:bg-zinc-700 hover:text-foreground transition-all duration-200 shadow-lg hover:shadow-zinc-800/50"
-          title={copied ? "Copiado!" : "Copiar comando"}
-          aria-label={copied ? "Copiado" : "Copiar comando"}
-        >
-          {copied ? (
-            <CheckCircle2 className="h-4 w-4 text-emerald-400 animate-pulse" />
-          ) : (
-            <Copy className="h-4 w-4" />
-          )}
-        </button>
-
-        {/* Indicador de linguagem */}
-        <div className={cn(
-          "absolute left-3 -top-2 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider",
-          language === 'env'
-            ? "bg-emerald-900/30 text-emerald-400 border border-emerald-800/50"
-            : "bg-cyan-900/30 text-cyan-400 border border-cyan-800/50"
-        )}>
-          {language === 'env' ? 'Variável de Ambiente' : 'Terminal'}
-        </div>
       </div>
     </div>
   );
@@ -97,7 +100,7 @@ export const RequirementItem = ({
   <li className="flex items-start gap-4 p-4 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors">
     <div className={cn(
       "flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-lg",
-      isOptional ? "bg-muted/50 text-muted-foreground" : "bg-indigo-900/30 text-indigo-400"
+      isOptional ? "bg-muted/50 text-muted-foreground" : "bg-primary/10 text-primary"
     )}>
       <Icon className="h-5 w-5" />
     </div>
@@ -118,7 +121,7 @@ export const RequirementItem = ({
           href={link}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-indigo-400 hover:text-indigo-300 text-sm font-medium transition-colors group"
+          className="inline-flex items-center gap-1 text-primary hover:text-primary/80 text-sm font-medium transition-colors group"
         >
           {linkText || "Saiba mais"}
           <ArrowUpRight className="h-3 w-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />

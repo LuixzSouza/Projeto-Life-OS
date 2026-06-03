@@ -30,7 +30,7 @@ export function SetupGuideProgress({ currentStep, currentStepIndex, progressLabe
           initial={{ width: 0 }}
           animate={{ width: `${((currentStepIndex + 1) / STEP_ORDER.length) * 100}%` }}
           transition={{ duration: 0.5 }}
-          className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"
+          className="h-full bg-gradient-brand rounded-full"
         />
       </div>
 
@@ -49,9 +49,9 @@ export function SetupGuideProgress({ currentStep, currentStepIndex, progressLabe
               "flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold mb-2",
               "transition-all duration-300",
               stepKey === currentStep
-                ? "bg-gradient-to-r from-indigo-500 to-purple-500 text-foreground scale-110"
+                ? "bg-gradient-brand text-primary-foreground scale-110 shadow-lg shadow-primary/20"
                 : index < currentStepIndex
-                ? "bg-emerald-500/20 text-emerald-400"
+                ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400"
                 : "bg-muted text-muted-foreground"
             )}>
               {index + 1}
@@ -61,7 +61,7 @@ export function SetupGuideProgress({ currentStep, currentStepIndex, progressLabe
               stepKey === currentStep
                 ? "text-foreground"
                 : index < currentStepIndex
-                ? "text-emerald-400"
+                ? "text-emerald-600 dark:text-emerald-400"
                 : "text-muted-foreground"
             )}>
               {STEPS[stepKey].progressLabel}

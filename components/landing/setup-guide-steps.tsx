@@ -14,7 +14,7 @@ export const STEPS: Record<SetupStepKey, StepData> = {
     progressLabel: "Introdução",
     content: (
       <div className="space-y-6">
-        <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-900/20 to-purple-900/20 border border-indigo-800/30">
+        <div className="p-4 rounded-xl bg-gradient-to-br from-primary/10 to-primary/10 border border-primary/20">
           <p className="text-foreground leading-relaxed">
             O <span className="font-semibold text-foreground">Life OS</span> é um sistema operacional pessoal completo desenvolvido para operar 100% localmente.
             Este guia irá ajudá-lo a configurar o ambiente de desenvolvimento necessário.
@@ -22,11 +22,11 @@ export const STEPS: Record<SetupStepKey, StepData> = {
         </div>
 
         <div className="space-y-4">
-          <div className="flex items-start gap-3 p-4 rounded-xl bg-red-900/10 border border-red-800/30">
-            <Shield className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
+          <div className="flex items-start gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/20">
+            <Shield className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
             <div className="space-y-2">
               <h4 className="font-bold text-foreground text-sm">Importante</h4>
-              <p className="text-sm text-red-300/90">
+              <p className="text-sm text-red-600 dark:text-red-300/90">
                 É necessário conhecimento básico de Terminal/Linha de Comando.
                 Recomendamos que usuários inexperientes busquem tutoriais básicos antes de prosseguir.
               </p>
@@ -99,7 +99,7 @@ export const STEPS: Record<SetupStepKey, StepData> = {
           <p className="text-sm text-muted-foreground">
             Após instalar, abra seu terminal e execute:
           </p>
-          <code className="block mt-2 p-3 rounded-lg bg-card text-xs font-mono text-cyan-300">
+          <code className="block mt-2 p-3 rounded-lg bg-card text-xs font-mono text-cyan-600 dark:text-cyan-300">
             node --version && git --version
           </code>
         </div>
@@ -138,18 +138,18 @@ export const STEPS: Record<SetupStepKey, StepData> = {
           language="bash"
         />
 
-        <div className="mt-8 p-4 rounded-xl bg-gradient-to-r from-indigo-900/20 to-purple-900/20 border border-indigo-800/30">
+        <div className="mt-8 p-4 rounded-xl bg-gradient-to-r from-primary/10 to-primary/10 border border-primary/20">
           <h4 className="font-semibold text-foreground text-sm mb-2">Dica</h4>
           <p className="text-sm text-foreground">
             Se encontrar erros durante a instalação, certifique-se de estar usando a versão correta do Node.js (v18+).
-            Você pode verificar com <code className="text-cyan-300 text-xs">node --version</code>
+            Você pode verificar com <code className="text-cyan-600 dark:text-cyan-300 text-xs">node --version</code>
           </p>
         </div>
       </div>
     )
   },
   database: {
-    title: "3. Configuração do Banco de Dados",
+    title: "Configuração do Banco de Dados",
     subtitle: "Controle total sobre o armazenamento local dos seus dados (SQLite)",
     icon: Database,
     progressLabel: "Banco de Dados",
@@ -161,7 +161,7 @@ export const STEPS: Record<SetupStepKey, StepData> = {
 
         {/* Explicação da Configuração (Step 3.1) */}
         <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
-          <h4 className="font-semibold text-foreground text-base mb-3">1. Crie o arquivo <code className="text-emerald-300">.env</code></h4>
+          <h4 className="font-semibold text-foreground text-base mb-3">1. Crie o arquivo <code className="text-emerald-600 dark:text-emerald-300">.env</code></h4>
           <p className="text-sm text-muted-foreground mb-3">
             Insira este conteúdo na raiz do projeto. O caminho padrão salva o banco na pasta `prisma/`:
           </p>
@@ -181,21 +181,21 @@ DATABASE_URL="file:./prisma/life_os.db"
         {/* Explicação sobre Armazenamento (Step 3.2 - Opcional, mas crucial) */}
         <div className="p-4 rounded-xl bg-muted/50 border border-border/50">
           <h4 className="font-semibold text-foreground text-base mb-2 flex items-center gap-2">
-            <ArrowRight className="h-4 w-4 text-indigo-400 shrink-0" />
+            <ArrowRight className="h-4 w-4 text-primary shrink-0" />
             Armazenamento Opcional
           </h4>
           <p className="text-sm text-muted-foreground mb-3">
-            Você pode alterar o caminho para um HD externo ou uma pasta sincronizada com a nuvem (como Google Drive) **após o primeiro uso**.
+            Você pode alterar o caminho para um HD externo ou uma pasta sincronizada com a nuvem (como Google Drive) <strong className="text-foreground">após o primeiro uso</strong>.
           </p>
 
           <div className="space-y-2 text-sm">
             <p className="text-foreground flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-              **Recomendação:** Use uma pasta sincronizada para ter backup automático.
+              <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+              <span><strong>Recomendação:</strong> use uma pasta sincronizada para ter backup automático.</span>
             </p>
-            <p className="text-foreground flex items-center gap-2">
-              <Code className="h-4 w-4 text-indigo-400 shrink-0" />
-              **Exemplo de Caminho (Windows):** <code className="text-cyan-300">DATABASE_URL=&quot;file:D:/LifeOS_Data/life.db&quot;</code>
+            <p className="text-foreground flex flex-wrap items-center gap-2">
+              <Code className="h-4 w-4 text-primary dark:text-primary shrink-0" />
+              <strong>Exemplo (Windows):</strong> <code className="text-cyan-600 dark:text-cyan-300">DATABASE_URL=&quot;file:D:/LifeOS_Data/life.db&quot;</code>
             </p>
           </div>
 
@@ -213,12 +213,12 @@ DATABASE_URL="file:./prisma/life_os.db"
           language="bash"
         />
 
-        <div className="p-4 rounded-xl bg-emerald-900/10 border border-emerald-800/30 mt-4">
+        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 mt-4">
           <h4 className="font-semibold text-foreground text-sm mb-2 flex items-center gap-2">
-            <Shield className="h-4 w-4 text-emerald-400" />
+            <Shield className="h-4 w-4 text-emerald-500" />
             Privacidade Garantida
           </h4>
-          <p className="text-sm text-emerald-300/90 leading-relaxed">
+          <p className="text-sm text-emerald-700 dark:text-emerald-300/90 leading-relaxed">
             Seus dados nunca são enviados para a nuvem. O arquivo de banco de dados (`.db`) é seu e fica **apenas** no caminho que você definiu.
           </p>
         </div>
@@ -239,9 +239,9 @@ DATABASE_URL="file:./prisma/life_os.db"
           language="bash"
         />
 
-        <div className="p-6 rounded-2xl bg-gradient-to-br from-indigo-900/30 to-purple-900/30 border border-indigo-800/50 text-center">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 mb-4">
-            <CheckCircle2 className="h-6 w-6 text-foreground" />
+        <div className="p-6 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/10 border border-primary/20 text-center">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gradient-brand mb-4 shadow-lg shadow-primary/20">
+            <CheckCircle2 className="h-6 w-6 text-primary-foreground" />
           </div>
 
           <h3 className="text-xl font-bold text-foreground mb-2">Configuração Concluída!</h3>
@@ -251,7 +251,7 @@ DATABASE_URL="file:./prisma/life_os.db"
 
           <div className="inline-block p-4 rounded-xl bg-background/50 border border-border">
             <div className="text-sm text-muted-foreground mb-2">Acesse em:</div>
-            <Link target="_blank" href={"http://localhost:3000"} className="text-2xl font-bold text-emerald-400 font-mono">
+            <Link target="_blank" href={"http://localhost:3000"} className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 font-mono">
               http://localhost:3000
             </Link>
           </div>

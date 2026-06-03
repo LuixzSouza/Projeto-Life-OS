@@ -13,8 +13,8 @@ export default function LandingFooter() {
           {/* --- COLUNA 1: MARCA & NEWSLETTER (Ocupa 5 colunas) --- */}
           <div className="md:col-span-5 space-y-6">
             <div className="flex items-center gap-2 font-bold text-xl text-foreground">
-              <div className="h-8 w-8 bg-indigo-600 rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(79,70,229,0.4)]">
-                <span className="text-foreground text-sm font-mono">L</span>
+              <div className="h-8 w-8 bg-primary rounded-lg flex items-center justify-center shadow-[0_0_15px_-2px_var(--color-primary)]">
+                <span className="text-white text-sm font-mono">L</span>
               </div>
               Life OS
             </div>
@@ -31,9 +31,9 @@ export default function LandingFooter() {
                 <input 
                   type="email" 
                   placeholder="seu@email.com" 
-                  className="bg-card border border-border rounded-lg px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-indigo-500 transition-colors w-full max-w-[240px]"
+                  className="bg-card border border-border rounded-lg px-4 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors w-full max-w-[240px]"
                 />
-                <button className="bg-white text-black p-2 rounded-lg hover:bg-zinc-200 transition-colors">
+                <button className="bg-primary text-primary-foreground p-2 rounded-lg hover:opacity-90 transition-opacity">
                   <ArrowRight className="h-4 w-4" />
                 </button>
               </div>
@@ -47,10 +47,10 @@ export default function LandingFooter() {
             <div className="space-y-4">
               <h4 className="text-sm font-bold text-foreground">Produto</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link href="#" className="hover:text-indigo-400 transition-colors">Funcionalidades</Link></li>
-                <li><Link href="#" className="hover:text-indigo-400 transition-colors">Integrações</Link></li>
-                <li><Link href="#" className="hover:text-indigo-400 transition-colors">Changelog</Link></li>
-                <li><Link href="#" className="hover:text-indigo-400 transition-colors">Download App</Link></li>
+                <li><Link href="#" className="hover:text-primary transition-colors">Funcionalidades</Link></li>
+                <li><Link href="#" className="hover:text-primary transition-colors">Integrações</Link></li>
+                <li><Link href="#" className="hover:text-primary transition-colors">Changelog</Link></li>
+                <li><Link href="#" className="hover:text-primary transition-colors">Download App</Link></li>
               </ul>
             </div>
 
@@ -58,10 +58,10 @@ export default function LandingFooter() {
             <div className="space-y-4">
               <h4 className="text-sm font-bold text-foreground">Recursos</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link href="#" className="hover:text-indigo-400 transition-colors">Documentação</Link></li>
-                <li><Link href="#" className="hover:text-indigo-400 transition-colors">API Reference</Link></li>
-                <li><Link href="#" className="hover:text-indigo-400 transition-colors">Comunidade</Link></li>
-                <li><Link href="#" className="hover:text-indigo-400 transition-colors">Blog</Link></li>
+                <li><Link href="#" className="hover:text-primary transition-colors">Documentação</Link></li>
+                <li><Link href="#" className="hover:text-primary transition-colors">API Reference</Link></li>
+                <li><Link href="#" className="hover:text-primary transition-colors">Comunidade</Link></li>
+                <li><Link href="#" className="hover:text-primary transition-colors">Blog</Link></li>
               </ul>
             </div>
 
@@ -69,9 +69,9 @@ export default function LandingFooter() {
             <div className="space-y-4">
               <h4 className="text-sm font-bold text-foreground">Sobre</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link href="#" className="hover:text-indigo-400 transition-colors">Privacidade</Link></li>
-                <li><Link href="#" className="hover:text-indigo-400 transition-colors">Termos de Uso</Link></li>
-                <li><Link href="#" className="hover:text-indigo-400 transition-colors">Contato</Link></li>
+                <li><Link href="#" className="hover:text-primary transition-colors">Privacidade</Link></li>
+                <li><Link href="#" className="hover:text-primary transition-colors">Termos de Uso</Link></li>
+                <li><Link href="#" className="hover:text-primary transition-colors">Contato</Link></li>
                 <li>
                     <a 
                         href="https://github.com/LuixzSouza" 

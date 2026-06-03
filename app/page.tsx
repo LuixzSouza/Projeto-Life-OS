@@ -10,6 +10,9 @@ import WorkflowSection from "@/components/landing/workflow-section";
 import TimelineSection from "@/components/landing/timeline-section";
 import MobileSection from "@/components/landing/mobile-section";
 import FAQSection from "@/components/landing/faq-section";
+import StatsSection from "@/components/landing/stats-section";
+import FinalCTASection from "@/components/landing/final-cta-section";
+import { Reveal } from "@/components/landing/reveal";
 
 // Força verificação a cada acesso para garantir status atualizado
 export const dynamic = 'force-dynamic';
@@ -42,13 +45,16 @@ export default async function LandingPage() {
             <LandingNavbar authState={authState} />
 
             <main>
+                {/* Hero já tem entrada própria; as demais seções revelam ao rolar. */}
                 <HeroSection authState={authState} />
-                <ModulesGrid />
-                <WorkflowSection/>
-                <TechnicalSection />
-                <TimelineSection/>
-                <MobileSection/>
-                <FAQSection/>
+                <Reveal><ModulesGrid /></Reveal>
+                <Reveal><StatsSection /></Reveal>
+                <Reveal><WorkflowSection/></Reveal>
+                <Reveal><TechnicalSection /></Reveal>
+                <Reveal><TimelineSection/></Reveal>
+                <Reveal><MobileSection/></Reveal>
+                <Reveal><FAQSection/></Reveal>
+                <Reveal><FinalCTASection authState={authState} /></Reveal>
             </main>
 
             <LandingFooter />
