@@ -77,8 +77,11 @@ function friendlyError(error: unknown, mode: "local" | "cloud"): string {
   const low = raw.toLowerCase();
 
   if (mode === "cloud") {
-    if (low.includes("401") || low.includes("unauthor") || low.includes("jwt") || low.includes("token")) {
-      return "Falha de autenticação no Turso. Verifique o TURSO_AUTH_TOKEN (deve começar com 'eyJ…', não é a URL) nas variáveis de ambiente do servidor.";
+    if (low.includes("401") || low.includes("unauthor")) {
+      return "Turso recusou o token (401). O formato está ok, mas este token NÃO vale para este banco. Gere um token NOVO abrindo o banco específico no dashboard (ou `turso db tokens create <nome-do-banco>`). Atenção: token de API da conta ≠ token do banco; e se o banco foi recriado, tokens antigos param de valer.";
+    }
+    if (low.includes("jwt") || low.includes("token")) {
+      return "Falha de autenticação no Turso. Verifique o TURSO_AUTH_TOKEN (deve ser o JWT que começa com 'eyJ…', gerado para ESTE banco — não a URL).";
     }
     // HTTP 400 / SERVER_ERROR do Turso quase sempre = token inválido (é comum
     // colar a URL no campo do token por engano). Aponta direto pra causa.
@@ -115,6 +118,13 @@ function assertValidCloudProfile(profile: DbProfile): void {
   if (/^(libsql|wss?|https?):\/\//i.test(token)) {
     throw new Error(
       "TURSO_AUTH_TOKEN contém uma URL, não um token. O token é um JWT que começa com 'eyJ…' — confira se você não colou a URL do banco (TURSO_DATABASE_URL) no campo do token."
+    );
+  }
+  // Um token Turso é um JWT: começa com 'eyJ' e tem 3 partes separadas por ponto.
+  // Pega segredos truncados / colados pela metade antes de gastar uma viagem ao Turso.
+  if (!/^eyJ[\w-]+\.[\w-]*\.[\w-]+$/.test(token)) {
+    throw new Error(
+      "TURSO_AUTH_TOKEN não parece um token válido. Deve ser o JWT completo (formato 'eyJ….….…', 3 partes) gerado para ESTE banco no dashboard do Turso."
     );
   }
 }

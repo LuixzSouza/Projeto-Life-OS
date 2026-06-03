@@ -13,6 +13,7 @@
     "postinstall": "prisma generate",
     "db:migrate": "npx prisma migrate dev",
     "db:baseline": "prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > prisma/baseline.sql",
+    "db:probe": "node scripts/turso-probe.mjs",
     "db:up": "echo 'Usando SQLite. O banco de dados é inicializado com npx prisma migrate dev.'"
   },
   "dependencies": {
