@@ -7,6 +7,7 @@ import {
   DB_PROVIDERS,
   type SetupFormData,
   type DbProviderId,
+  type DbProviderMeta,
 } from "../wizard-types";
 
 interface StepSystemProps {
@@ -38,6 +39,14 @@ export function StepSystem({ formData, setFormData, setDbProvider, dbFromEnv }: 
           </div>
         </div>
 
+        {/* Showcase: Turso ativo + demais provedores no roadmap ("Em breve"). */}
+        <div className="space-y-2.5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Provedores de banco
+          </p>
+          <ProviderGrid providers={DB_PROVIDERS} selectedId="turso" mode="showcase" />
+        </div>
+
         <WorkPreferences formData={formData} setFormData={setFormData} />
       </div>
     );
@@ -46,51 +55,12 @@ export function StepSystem({ formData, setFormData, setDbProvider, dbFromEnv }: 
   // --- Caso 2: escolha do provedor (desktop / local dev) ---
   return (
     <div className="space-y-6 animate-in slide-in-from-right-8 fade-in duration-300">
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {DB_PROVIDERS.map((p) => {
-          const selected = formData.dbProvider === p.id;
-          const disabled = !p.available;
-          return (
-            <button
-              key={p.id}
-              type="button"
-              disabled={disabled}
-              onClick={() => !disabled && setDbProvider(p.id)}
-              title={p.description}
-              className={cn(
-                "relative flex flex-col items-start gap-1.5 p-3.5 rounded-xl border text-left transition-all",
-                disabled
-                  ? "border-border bg-muted/10 opacity-60 cursor-not-allowed"
-                  : selected
-                    ? "border-primary bg-primary/10 shadow-sm"
-                    : "border-border bg-muted/20 hover:border-primary/40 hover:bg-muted/40"
-              )}
-            >
-              {/* Badge canto superior direito */}
-              {p.badge && (
-                <span
-                  className={cn(
-                    "absolute top-2 right-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full",
-                    disabled
-                      ? "bg-muted text-muted-foreground"
-                      : p.badge === "Recomendado"
-                        ? "bg-emerald-500/15 text-emerald-600"
-                        : "bg-sky-500/15 text-sky-600"
-                  )}
-                >
-                  {p.badge}
-                </span>
-              )}
-              <p.icon className={cn("h-5 w-5", disabled ? "text-muted-foreground" : selected ? "text-primary" : p.accent)} />
-              <span className="text-sm font-semibold text-foreground flex items-center gap-1">
-                {p.name}
-                {disabled && <Lock className="h-3 w-3 text-muted-foreground" />}
-              </span>
-              <span className="text-[10px] text-muted-foreground leading-tight">{p.tagline}</span>
-            </button>
-          );
-        })}
-      </div>
+      <ProviderGrid
+        providers={DB_PROVIDERS}
+        selectedId={formData.dbProvider}
+        onSelect={setDbProvider}
+        mode="interactive"
+      />
 
       {/* Descrição do provedor selecionado */}
       <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/30 rounded-lg p-3 border border-border">
@@ -173,6 +143,91 @@ export function StepSystem({ formData, setFormData, setDbProvider, dbFromEnv }: 
       )}
 
       <WorkPreferences formData={formData} setFormData={setFormData} />
+    </div>
+  );
+}
+
+// =========================================================
+// GRADE DE PROVEDORES (compartilhada pelos dois modos)
+// =========================================================
+// - "interactive" (desktop/dev): cards selecionáveis; indisponíveis = "Em breve".
+// - "showcase" (deploy web): destino já fixado pelo ambiente; o provedor ativo
+//   aparece como "Ativo" e todos os demais ficam travados em "Em breve".
+type GridMode = "interactive" | "showcase";
+
+function ProviderGrid({
+  providers,
+  selectedId,
+  onSelect,
+  mode,
+}: {
+  providers: DbProviderMeta[];
+  selectedId: DbProviderId;
+  onSelect?: (id: DbProviderId) => void;
+  mode: GridMode;
+}) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+      {providers.map((p) => {
+        const active = mode === "showcase" && p.id === selectedId;
+        const selected = mode === "interactive" && selectedId === p.id;
+        // Em showcase só o provedor ativo é interativo; o resto fica travado.
+        const disabled = mode === "showcase" ? !active : !p.available;
+        const badge = active ? "Ativo" : p.badge;
+
+        return (
+          <button
+            key={p.id}
+            type="button"
+            disabled={disabled}
+            onClick={() => mode === "interactive" && !disabled && onSelect?.(p.id)}
+            title={p.description}
+            className={cn(
+              "relative flex flex-col items-start gap-1.5 p-3.5 rounded-xl border text-left transition-all",
+              active
+                ? "border-emerald-500/50 bg-emerald-500/10 shadow-sm cursor-default"
+                : disabled
+                  ? "border-border bg-muted/10 opacity-60 cursor-not-allowed"
+                  : selected
+                    ? "border-primary bg-primary/10 shadow-sm"
+                    : "border-border bg-muted/20 hover:border-primary/40 hover:bg-muted/40"
+            )}
+          >
+            {/* Badge canto superior direito */}
+            {badge && (
+              <span
+                className={cn(
+                  "absolute top-2 right-2 text-[9px] font-bold px-1.5 py-0.5 rounded-full",
+                  active
+                    ? "bg-emerald-500/20 text-emerald-600"
+                    : disabled
+                      ? "bg-muted text-muted-foreground"
+                      : badge === "Recomendado"
+                        ? "bg-emerald-500/15 text-emerald-600"
+                        : "bg-sky-500/15 text-sky-600"
+                )}
+              >
+                {badge}
+              </span>
+            )}
+            <p.icon
+              className={cn(
+                "h-5 w-5",
+                active ? "text-emerald-500" : disabled ? "text-muted-foreground" : selected ? "text-primary" : p.accent
+              )}
+            />
+            <span className="text-sm font-semibold text-foreground flex items-center gap-1">
+              {p.name}
+              {active ? (
+                <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+              ) : (
+                disabled && <Lock className="h-3 w-3 text-muted-foreground" />
+              )}
+            </span>
+            <span className="text-[10px] text-muted-foreground leading-tight">{p.tagline}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
