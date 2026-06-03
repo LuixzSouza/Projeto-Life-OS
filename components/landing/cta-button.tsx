@@ -60,12 +60,6 @@ export function CtaButton({ href, children, className }: CtaButtonProps) {
       style={reduceMotion ? undefined : { x: pullX, y: pullY }}
       className={cn("relative w-full sm:w-auto group", className)}
     >
-      {/* Halo conic-gradient girando (eco do CORE) — revelado no hover */}
-      <span
-        aria-hidden
-        className="pointer-events-none absolute -inset-[2px] rounded-full opacity-0 blur-[1px] transition-opacity duration-300 group-hover:opacity-100 bg-[conic-gradient(from_0deg,transparent,var(--color-primary),transparent_55%)] animate-[spin_3s_linear_infinite]"
-      />
-
       <Link
         ref={ref}
         href={href}

@@ -437,14 +437,14 @@ body.privacy-mode-active .privacy-blur:hover {
     height: 42%;
     bottom: -10%;
     right: -8%;
-    background: oklch(0.62 0.2 300 / 0.18);
+    background: color-mix(in oklch, var(--primary) 16%, transparent);
     animation-delay: -6s;
   }
   .dark .landing-aurora::before {
     background: color-mix(in oklch, var(--primary) 30%, transparent);
   }
   .dark .landing-aurora::after {
-    background: oklch(0.55 0.24 300 / 0.28);
+    background: color-mix(in oklch, var(--primary) 24%, transparent);
   }
 
   /* Cartão de vidro da landing, themeable (substitui bg-[#111] fixos). */
