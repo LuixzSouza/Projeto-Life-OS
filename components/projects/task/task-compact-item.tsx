@@ -12,7 +12,7 @@ import { Reorder, motion } from 'framer-motion';
 type TaskPriority = "HIGH" | "MEDIUM" | "LOW";
 
 export function TaskCompactItem({
-  task, isOverdue, isStarred, onToggle, onToggleStar, onOpenModal,
+  task, isOverdue, isStarred, isDone, onToggle, onToggleStar, onOpenModal,
 }: TaskBaseProps) {
   
   const stopPropagation = (e: React.MouseEvent | React.PointerEvent) => e.stopPropagation();
@@ -29,7 +29,7 @@ export function TaskCompactItem({
         className={cn(
           'group relative flex items-center gap-3 py-1.5 px-3 transition-all duration-200 border-b border-border/40 rounded-lg',
           'bg-transparent hover:bg-muted/30 hover:border-transparent',
-          task.isDone && 'opacity-50'
+          isDone && 'opacity-50'
         )}
       >
         {/* DRAG HANDLE */}
@@ -42,7 +42,7 @@ export function TaskCompactItem({
 
         <div onClick={stopPropagation} className="ml-3 flex items-center" onPointerDown={stopPropagation}>
           <Checkbox
-            checked={task.isDone}
+            checked={isDone}
             onCheckedChange={onToggle}
             className="h-4 w-4 rounded-full border-muted-foreground/30 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500 transition-all cursor-pointer shadow-inner"
           />
@@ -53,7 +53,7 @@ export function TaskCompactItem({
             <PriorityBadge priority={(task.priority as TaskPriority) || "MEDIUM"} className="h-5 px-1 text-[8px] w-8 flex justify-center" />
             <span className={cn(
               'text-sm truncate font-medium transition-colors',
-              task.isDone ? 'line-through text-muted-foreground/60' : 'text-foreground/90 group-hover:text-foreground'
+              isDone ? 'line-through text-muted-foreground/60' : 'text-foreground/90 group-hover:text-foreground'
             )}>
               {task.title}
             </span>

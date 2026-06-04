@@ -71,29 +71,31 @@ export default async function TimelinePage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-5">
             {groups.map(([day, rows]) => (
               <section key={day}>
-                <h2 className="mb-3 text-xs font-bold uppercase tracking-widest text-muted-foreground/60">{day}</h2>
-                <ol className="relative ml-3 space-y-1 border-l border-border/50 pl-6">
+                <div className="mb-1 flex items-center gap-2">
+                  <h2 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/70">{day}</h2>
+                  <span className="rounded-full bg-muted/60 px-1.5 py-px text-[10px] font-bold tabular-nums text-muted-foreground/60">{rows.length}</span>
+                  <div className="h-px flex-1 bg-border/40" />
+                </div>
+                <ol className="relative ml-2 border-l border-border/40 pl-5">
                   {rows.map((a) => {
                     const meta = ACTION_META[a.action] ?? { icon: Activity, tone: "bg-muted text-muted-foreground", verb: a.action };
                     const ModuleIcon = MODULE_ICON[a.module] ?? Activity;
                     const ActionIcon = meta.icon;
                     return (
-                      <li key={a.id} className="relative py-1.5">
-                        <span className={cn("absolute -left-[31px] flex h-6 w-6 items-center justify-center rounded-full ring-4 ring-background", meta.tone)}>
-                          <ActionIcon className="h-3 w-3" />
+                      <li key={a.id} className="group relative flex items-center gap-3 rounded-lg py-1 pr-2 transition-colors hover:bg-muted/40">
+                        <span className={cn("absolute -left-[26px] flex h-5 w-5 items-center justify-center rounded-full ring-2 ring-background", meta.tone)}>
+                          <ActionIcon className="h-2.5 w-2.5" />
                         </span>
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="text-sm text-foreground">
-                            {a.summary ?? `${meta.verb} em ${a.module}`}
-                          </p>
-                          <span className="shrink-0 text-[11px] font-mono text-muted-foreground/60">{timeLabel(a.createdAt)}</span>
-                        </div>
-                        <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground/50">
+                        <p className="min-w-0 flex-1 truncate text-[13px] text-foreground/90">
+                          {a.summary ?? `${meta.verb} em ${a.module}`}
+                        </p>
+                        <span className="hidden shrink-0 items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/40 sm:inline-flex">
                           <ModuleIcon className="h-3 w-3" /> {a.module}
                         </span>
+                        <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground/50">{timeLabel(a.createdAt)}</span>
                       </li>
                     );
                   })}

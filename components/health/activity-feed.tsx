@@ -13,12 +13,14 @@ import type { ActivityFilter, ActivityStatsData } from "./activity/activity-type
 import { ActivityStats } from "./activity/activity-stats";
 import { ActivityFilters } from "./activity/activity-filters";
 import { ActivityCard } from "./activity/activity-card";
+import { EntityConnectionsDialog } from "@/components/connect/entity-connections-dialog";
 
 // --- COMPONENTE PRINCIPAL ---
 export function ActivityFeed({ initialWorkouts }: { initialWorkouts: Workout[] }) {
   const [filter, setFilter] = useState<ActivityFilter>('ALL');
   const [searchTerm, setSearchTerm] = useState("");
   const [visibleCount, setVisibleCount] = useState(10);
+  const [connWorkout, setConnWorkout] = useState<{ id: string; title: string } | null>(null);
 
   const filteredWorkouts = useMemo(() => {
     return initialWorkouts.filter(w => {
@@ -103,7 +105,7 @@ export function ActivityFeed({ initialWorkouts }: { initialWorkouts: Workout[] }
 
               <div className="space-y-4">
                 {items.map((w) => (
-                  <ActivityCard key={w.id} workout={w} onDelete={handleDelete} />
+                  <ActivityCard key={w.id} workout={w} onDelete={handleDelete} onConnections={(wk) => setConnWorkout({ id: wk.id, title: wk.title })} />
                 ))}
               </div>
             </div>
@@ -124,6 +126,12 @@ export function ActivityFeed({ initialWorkouts }: { initialWorkouts: Workout[] }
           </Button>
         </div>
       )}
+
+      <EntityConnectionsDialog
+        entityType="workout"
+        item={connWorkout}
+        onOpenChange={(o) => !o && setConnWorkout(null)}
+      />
     </div>
   );
 }

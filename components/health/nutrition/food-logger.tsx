@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import {
     Utensils, Trash2, Plus, Minus, Leaf, Pizza, Coffee,
-    Pencil, Search, Loader2, UtensilsCrossed, X
+    Pencil, Search, Loader2, UtensilsCrossed, X, Tags
 } from "lucide-react";
 import { logMeal, updateMeal, deleteMeal } from "@/app/(dashboard)/health/actions";
 import { toast } from "sonner";
@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 
 import { FoodSelector } from "./food-selector";
 import { FoodItem } from "@/lib/food-db";
+import { EntityConnectionsDialog } from "@/components/connect/entity-connections-dialog";
 
 // --- TIPAGEM ---
 type MealType = "HEALTHY" | "NEUTRAL" | "TRASH";
@@ -45,6 +46,7 @@ const fmtQty = (q: number) => (Number.isInteger(q) ? `${q}` : q.toFixed(2).repla
 export function FoodLogger({ meals }: { meals: Meal[] }) {
     const today = new Date().toDateString();
     const todayMeals = meals.filter(m => new Date(m.date).toDateString() === today);
+    const [connMeal, setConnMeal] = useState<{ id: string; title: string } | null>(null);
 
     const totalCals = todayMeals.reduce((acc, m) => acc + (m.calories || 0), 0);
     const dailyGoal = 2500;
@@ -87,16 +89,22 @@ export function FoodLogger({ meals }: { meals: Meal[] }) {
                             <p className="text-xs text-muted-foreground mt-1">Acompanhe seus macros clicando em Registrar.</p>
                         </div>
                     ) : (
-                        todayMeals.map(meal => <MealRow key={meal.id} meal={meal} />)
+                        todayMeals.map(meal => <MealRow key={meal.id} meal={meal} onConnections={(m) => setConnMeal({ id: m.id, title: m.title })} />)
                     )}
                 </div>
             </ScrollArea>
+
+            <EntityConnectionsDialog
+                entityType="meal"
+                item={connMeal}
+                onOpenChange={(o) => !o && setConnMeal(null)}
+            />
         </div>
     );
 }
 
 // --- LINHA DE REFEIÇÃO ---
-function MealRow({ meal }: { meal: Meal }) {
+function MealRow({ meal, onConnections }: { meal: Meal; onConnections: (meal: Meal) => void }) {
     const config = mealConfigs[meal.type as MealType] || mealConfigs.NEUTRAL;
     const Icon = config.icon;
 
@@ -124,6 +132,7 @@ function MealRow({ meal }: { meal: Meal }) {
                     <MealFormDialog meal={meal}>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary rounded-lg"><Pencil className="h-4 w-4" /></Button>
                     </MealFormDialog>
+                    <Button variant="ghost" size="icon" title="Tags & Anexos" onClick={() => onConnections(meal)} className="h-8 w-8 text-muted-foreground hover:text-primary rounded-lg"><Tags className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={handleDelete} className="h-8 w-8 text-muted-foreground hover:text-rose-500 rounded-lg"><Trash2 className="h-4 w-4" /></Button>
                 </div>
             </div>

@@ -49,18 +49,18 @@ export async function getAgendaItems(rangeStart: Date, rangeEnd: Date): Promise<
   const [
     events, meals, workouts, sessions, sleeps, bodies, media, wardrobe,
     friends, transactions, jobs, tasks, checkins, meetings, invoices,
-    followUps, recurringExpenses, flashcards,
+    followUps, recurringExpenses, flashcards, goals,
   ] = await Promise.all([
-    prisma.event.findMany({ where: { userId, startTime: range } }),
+    prisma.event.findMany({ where: { userId, startTime: range, deletedAt: null } }),
     prisma.meal.findMany({ where: { userId, date: range } }),
     prisma.workout.findMany({ where: { userId, date: range } }),
     prisma.studySession.findMany({ where: { userId, date: range }, include: { subject: { select: { title: true } } } }),
     prisma.healthMetric.findMany({ where: { userId, type: "SLEEP", date: range } }),
     prisma.bodyMeasurement.findMany({ where: { userId, date: range } }),
     prisma.mediaItem.findMany({ where: { userId, updatedAt: range, deletedAt: null } }),
-    prisma.wardrobeItem.findMany({ where: { userId, lastWorn: range } }),
-    prisma.friend.findMany({ where: { userId } }), // aniversários precisam de todos
-    prisma.transaction.findMany({ where: { userId, date: range } }),
+    prisma.wardrobeItem.findMany({ where: { userId, lastWorn: range, deletedAt: null } }),
+    prisma.friend.findMany({ where: { userId, deletedAt: null } }), // aniversários precisam de todos
+    prisma.transaction.findMany({ where: { userId, date: range, deletedAt: null } }),
     prisma.jobApplication.findMany({ where: { userId, appliedDate: range } }),
     prisma.task.findMany({ where: { userId, dueDate: range, deletedAt: null } }),
     prisma.challengeCheckin.findMany({ where: { userId, date: range }, include: { challenge: { select: { title: true } } } }),
@@ -69,6 +69,7 @@ export async function getAgendaItems(rangeStart: Date, rangeEnd: Date): Promise<
     prisma.jobApplication.findMany({ where: { userId, followUpDate: range } }),
     prisma.recurringExpense.findMany({ where: { userId, active: true } }),
     prisma.flashcard.findMany({ where: { userId, nextReview: range }, select: { id: true, nextReview: true } }),
+    prisma.learningGoal.findMany({ where: { userId, targetDate: range, deletedAt: null }, include: { subject: { select: { title: true } } } }),
   ]);
 
   const items: AgendaItem[] = [];
@@ -236,6 +237,17 @@ export async function getAgendaItems(rangeStart: Date, rangeEnd: Date): Promise<
     push(items, "review", key, occ, {
       title: `Revisar ${count} flashcard${count === 1 ? "" : "s"}`,
       subtitle: "Repetição espaçada",
+    });
+  }
+
+  // Metas de aprendizado: prazo (targetDate) cai no calendário como dia inteiro.
+  for (const g of goals) {
+    if (!g.targetDate) continue;
+    const isDone = g.status === "DONE";
+    push(items, "goal", g.id, g.targetDate, {
+      title: `Meta: ${g.title}`,
+      subtitle: [isDone ? "Concluída" : "Prazo", g.subject?.title].filter(Boolean).join(" · "),
+      color: isDone ? "#16a34a" : undefined,
     });
   }
 

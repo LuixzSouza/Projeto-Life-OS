@@ -16,6 +16,7 @@ import { getBirthdayInfo } from "./friend-helpers";
 import { FriendFilterBar } from "./friend-filter-bar";
 import { FriendCard } from "./friend-card";
 import { FriendDetailModal } from "./friend-detail-modal";
+import { EntityConnectionsDialog } from "@/components/connect/entity-connections-dialog";
 
 // --- COMPONENTE PRINCIPAL ---
 export function FriendList({ initialData }: { initialData: FriendData[] }) {
@@ -26,6 +27,7 @@ export function FriendList({ initialData }: { initialData: FriendData[] }) {
   const [selectedFriend, setSelectedFriend] = useState<FriendData | null>(null);
   const [editingFriend, setEditingFriend] = useState<FriendData | null>(null);
   const [friendToDelete, setFriendToDelete] = useState<{ id: string, name: string } | null>(null);
+  const [connFriend, setConnFriend] = useState<{ id: string; title: string } | null>(null);
 
   // Inteligência de Filtro e Ordenação
   const filteredAndSortedFriends = useMemo(() => {
@@ -91,6 +93,7 @@ export function FriendList({ initialData }: { initialData: FriendData[] }) {
                 onSelect={setSelectedFriend}
                 onEdit={setEditingFriend}
                 onDelete={setFriendToDelete}
+                onConnections={(t) => setConnFriend({ id: t.id, title: t.name })}
               />
             ))}
           </TooltipProvider>
@@ -127,6 +130,13 @@ export function FriendList({ initialData }: { initialData: FriendData[] }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* --- TAGS & ANEXOS (tecido conectivo cross-módulo) --- */}
+      <EntityConnectionsDialog
+        entityType="friend"
+        item={connFriend}
+        onOpenChange={(o) => !o && setConnFriend(null)}
+      />
 
     </div>
   );

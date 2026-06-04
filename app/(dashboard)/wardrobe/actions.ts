@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserId, requireUserId } from "@/lib/auth";
 import { getProductPreview, inlineImageAsBase64 } from "@/lib/product-preview";
+import { logActivity } from "@/lib/activity";
 
 // --- TIPOS ---
 type WardrobeStatus = "IN_CLOSET" | "LAUNDRY" | "REPAIR" | "DONATED" | "WISH_LIST";
@@ -58,24 +59,32 @@ export async function createWardrobeItem(formData: FormData) {
     const name = formData.get("name") as string;
     if (!name) return { success: false, message: "O nome da peça é obrigatório." };
 
-    await prisma.wardrobeItem.create({
+    const created = await prisma.wardrobeItem.create({
       data: {
         userId: userId,
         name: name,
         category: (formData.get("category") as string) || "OUTROS",
-        
+
         // Detalhes Opcionais
         brand: getValue(formData, "brand"),
         size: getValue(formData, "size"),
         color: getValue(formData, "color"),
         season: getValue(formData, "season"),
         imageUrl: getValue(formData, "imageUrl"),
-        
+
         // Numéricos, Booleanos e Enums
         price: parsePrice(formData.get("price")),
         status: parseStatus(formData.get("status")), // ✅ Validação segura, sem 'any'
         isFavorite: formData.get("isFavorite") === "true",
       }
+    });
+
+    await logActivity({
+      action: "CREATE",
+      module: "wardrobe",
+      entityType: "wardrobeItem",
+      entityId: created.id,
+      summary: `Adicionou "${created.name}" ao closet`,
     });
 
     revalidatePath("/wardrobe");
@@ -126,20 +135,31 @@ export async function updateWardrobeItem(formData: FormData) {
 }
 
 // --- 3. DELETE (REMOVER PEÇA) ---
+// Soft-delete: a peça vai para a Lixeira (deletedAt). Restaurar/excluir: ver /trash.
 export async function deleteWardrobeItem(id: string) {
   try {
     const userId = await getAuthenticatedUserId();
     if (!userId) return { success: false, message: "Erro de autenticação." };
 
-    await prisma.wardrobeItem.delete({
-      where: { 
+    const item = await prisma.wardrobeItem.findFirst({ where: { id, userId }, select: { name: true } });
+    await prisma.wardrobeItem.updateMany({
+      where: {
         id: id,
-        userId: userId 
-      }
+        userId: userId
+      },
+      data: { deletedAt: new Date() }
+    });
+
+    await logActivity({
+      action: "DELETE",
+      module: "wardrobe",
+      entityType: "wardrobeItem",
+      entityId: id,
+      summary: item ? `Moveu "${item.name}" para a lixeira` : "Removeu uma peça",
     });
 
     revalidatePath("/wardrobe");
-    return { success: true, message: "Peça removida do closet." };
+    return { success: true, message: "Peça movida para a lixeira." };
 
   } catch (error) {
     console.error("Erro ao excluir peça:", error);

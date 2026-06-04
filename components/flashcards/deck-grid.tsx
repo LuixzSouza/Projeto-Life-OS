@@ -9,11 +9,13 @@ import { CreateDeckDialog } from "./create-deck-dialog";
 import { DeckCard } from "./deck-card";
 import { StudyModeDialog } from "./study-mode-dialog";
 import { DeleteDeckAlert } from "./delete-deck-alert";
+import { EntityConnectionsDialog } from "@/components/connect/entity-connections-dialog";
 
 export function DeckGrid({ decks, subjects = [] }: DeckGridProps) {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [studyDeck, setStudyDeck] = useState<DeckWithCount | null>(null);
   const [deckToDelete, setDeckToDelete] = useState<string | null>(null);
+  const [connDeck, setConnDeck] = useState<{ id: string; title: string } | null>(null);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -59,6 +61,7 @@ export function DeckGrid({ decks, subjects = [] }: DeckGridProps) {
                 deck={deck}
                 onStudy={setStudyDeck}
                 onDelete={setDeckToDelete}
+                onConnections={(d) => setConnDeck({ id: d.id, title: d.title })}
               />
             ))}
             </div>
@@ -68,6 +71,12 @@ export function DeckGrid({ decks, subjects = [] }: DeckGridProps) {
       <StudyModeDialog deck={studyDeck} onClose={() => setStudyDeck(null)} />
 
       <DeleteDeckAlert deckId={deckToDelete} onClose={() => setDeckToDelete(null)} />
+
+      <EntityConnectionsDialog
+        entityType="flashcardDeck"
+        item={connDeck}
+        onOpenChange={(o) => !o && setConnDeck(null)}
+      />
 
     </div>
   );

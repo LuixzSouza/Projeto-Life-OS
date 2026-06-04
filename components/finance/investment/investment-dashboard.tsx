@@ -3,18 +3,24 @@
 import { useState, useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { InvestmentPlanner } from "./investment-planner";
-import { ProductComparator } from "./product-comparator";
+import { RealFixedIncome } from "./real-fixed-income";
 import { ProfileSelector, InvestorProfile } from "./profile-selector";
-import { MarketItem } from "@/lib/market-service"; 
+import { PortfolioTab } from "./portfolio-tab";
+import { MarketItem } from "@/lib/market-service";
+import type { Position, PortfolioTotals } from "@/lib/portfolio-compute";
+import type { TesouroBond } from "@/lib/tesouro-service";
 import { Card, CardContent } from "@/components/ui/card";
-import { Calculator, Target, TrendingUp, Scale } from "lucide-react";
+import { Calculator, Target, TrendingUp, Scale, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface InvestmentDashboardProps {
     initialMarketData: MarketItem[];
+    positions: Position[];
+    totals: PortfolioTotals;
+    tesouro: TesouroBond[];
 }
 
-export function InvestmentDashboard({ initialMarketData }: InvestmentDashboardProps) {
+export function InvestmentDashboard({ initialMarketData, positions, totals, tesouro }: InvestmentDashboardProps) {
     const [profile, setProfile] = useState<InvestorProfile>("MODERATE");
 
     // Extraímos apenas os dados necessários para CÁLCULOS
@@ -61,23 +67,34 @@ export function InvestmentDashboard({ initialMarketData }: InvestmentDashboardPr
             </div>
 
             {/* MAIN CONTENT TABS */}
-            <Tabs defaultValue="PLANNER" className="space-y-8">
+            <Tabs defaultValue="PORTFOLIO" className="space-y-8">
                 <div className="flex justify-center">
-                    <TabsList className="grid w-full max-w-[500px] grid-cols-2 bg-muted/30 p-1.5 rounded-2xl border border-border/50 shadow-inner h-auto gap-4">
-                        <TabsTrigger 
-                            value="PLANNER" 
+                    <TabsList className="grid w-full max-w-[640px] grid-cols-3 bg-muted/30 p-1.5 rounded-2xl border border-border/50 shadow-inner h-auto gap-3">
+                        <TabsTrigger
+                            value="PORTFOLIO"
+                            className="rounded-xl font-bold text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-md transition-all py-3"
+                        >
+                            <Wallet className="h-4 w-4 mr-2" /> Carteira
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="PLANNER"
                             className="rounded-xl font-bold text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-md transition-all py-3"
                         >
                             <Target className="h-4 w-4 mr-2" /> Planejador
                         </TabsTrigger>
-                        <TabsTrigger 
-                            value="PRODUCTS" 
+                        <TabsTrigger
+                            value="PRODUCTS"
                             className="rounded-xl font-bold text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-md transition-all py-3"
                         >
                             <Scale className="h-4 w-4 mr-2" /> Comparador
                         </TabsTrigger>
                     </TabsList>
                 </div>
+
+                {/* ABA 0: CARTEIRA */}
+                <TabsContent value="PORTFOLIO" className="focus-visible:outline-none animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <PortfolioTab positions={positions} totals={totals} />
+                </TabsContent>
 
                 {/* ABA 1: PLANEJADOR */}
                 <TabsContent value="PLANNER" className="space-y-8 focus-visible:outline-none animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -116,7 +133,7 @@ export function InvestmentDashboard({ initialMarketData }: InvestmentDashboardPr
                     </div>
                     
                     <div className="bg-card rounded-[2rem] border border-border/40 p-2 sm:p-6 shadow-sm">
-                        <ProductComparator cdi={cdiRate} />
+                        <RealFixedIncome cdi={cdiRate} ipca={ipcaRate} tesouro={tesouro} />
                     </div>
                 </TabsContent>
             </Tabs>

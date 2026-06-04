@@ -7,3 +7,6 @@ export * from "./wishlist";
 export * from "./recurring";
 export * from "./pluggy";
 export * from "./product";
+export * from "./investment-portfolio";
+export * from "./import-statement";
+export * from "./market";

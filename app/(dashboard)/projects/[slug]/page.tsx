@@ -1,8 +1,11 @@
 import { prisma } from "@/lib/prisma";
+import { parseMeetingImages } from "@/lib/meeting-images";
+import { parseStringList } from "@/lib/meeting-meta";
 import { TaskInput } from "@/components/projects/task-input";
 import { ProjectSettingsMenu } from "@/components/projects/project-settings-menu";
 import { TaskReorderList } from "@/components/projects/task-reorder-list";
 import { TaskKanbanBoard } from "@/components/projects/task-kanban-board";
+import { TasksByDay } from "@/components/projects/tasks-by-day";
 import { ProjectNotes } from "@/components/projects/project-notes";
 import { MeetingBoard } from "@/components/projects/meeting-board";
 import { Button } from "@/components/ui/button";
@@ -12,8 +15,11 @@ import { Input } from "@/components/ui/input";
 import {
   ArrowLeft, Search, SlidersHorizontal,
   FileText, ListTodo, LayoutGrid, List, AlignJustify, Columns3,
-  CalendarClock, Hash, Inbox,
+  CalendarClock, CalendarDays, Hash, Inbox, AlignLeft, Tag,
 } from "lucide-react";
+import { EntityTags } from "@/components/connect/entity-tags";
+import { EntityAttachments } from "@/components/connect/entity-attachments";
+import { EntityLinks } from "@/components/connect/entity-links";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -28,7 +34,7 @@ import React from "react";
 // --- TYPES ---
 type FilterType = "all" | "active" | "completed";
 type SortType = "priority" | "dueDate" | "createdAt" | "order";
-type ViewMode = "list" | "grid" | "compact" | "kanban";
+type ViewMode = "list" | "grid" | "compact" | "kanban" | "byday";
 
 interface ProjectDetailPageProps {
   params: Promise<{ slug: string }>;
@@ -62,7 +68,7 @@ export default async function ProjectDetailPage(props: ProjectDetailPageProps) {
   const userId = await getCurrentUserId();
 
   const project = !isInbox ? await prisma.project.findFirst({
-    where: { slug, userId },
+    where: { slug, userId, deletedAt: null },
     select: { id: true, title: true, description: true, color: true, createdAt: true },
   }) : null;
 
@@ -77,6 +83,7 @@ export default async function ProjectDetailPage(props: ProjectDetailPageProps) {
   const where: Prisma.TaskWhereInput = {
     projectId: dbProjectId,
     userId,
+    deletedAt: null,
     ...(searchQuery ? {
         OR: [
             { title: { contains: searchQuery } },
@@ -102,11 +109,21 @@ export default async function ProjectDetailPage(props: ProjectDetailPageProps) {
     prisma.meeting.findMany({
         where: { projectId: dbProjectId, userId },
         orderBy: { createdAt: 'desc' },
-        select: { id: true, title: true, rawNotes: true, summary: true, image: true, createdAt: true },
+        select: {
+          id: true, title: true, rawNotes: true, summary: true, image: true, images: true, createdAt: true,
+          participants: true, tags: true, decisions: true,
+        },
     })
   ]);
 
-  const meetings = rawMeetings.map(m => ({ ...m, createdAt: m.createdAt.toISOString() }));
+  const meetings = rawMeetings.map(({ image, images, createdAt, participants, tags, decisions, ...m }) => ({
+    ...m,
+    images: parseMeetingImages(images, image),
+    participants: parseStringList(participants),
+    tags: parseStringList(tags),
+    decisions: parseStringList(decisions),
+    createdAt: createdAt.toISOString(),
+  }));
 
   const doneCount = allStats.find(s => s.isDone)?._count.isDone ?? 0;
   const pendingCount = allStats.find(s => !s.isDone)?._count.isDone ?? 0;
@@ -170,11 +187,22 @@ export default async function ProjectDetailPage(props: ProjectDetailPageProps) {
 
       <main className="max-w-7xl mx-auto w-full px-6 md:px-8 py-8 space-y-8">
 
-        {/* OVERVIEW: descrição + progresso */}
+        {/* OVERVIEW: sobre + progresso */}
         <section className="space-y-4">
-          {projectDescription && (
+          {/* Sobre — a descrição que o usuário escreveu, legível e por extenso */}
+          {!isInbox && project?.description?.trim() ? (
+            <div className="rounded-2xl border border-border/40 bg-card shadow-sm p-5 space-y-2.5">
+              <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <AlignLeft className="h-3.5 w-3.5" /> Sobre
+              </h2>
+              <p className="text-[15px] text-foreground/90 leading-relaxed whitespace-pre-wrap break-words">
+                {project.description}
+              </p>
+            </div>
+          ) : isInbox ? (
             <p className="text-sm text-muted-foreground max-w-3xl leading-relaxed">{projectDescription}</p>
-          )}
+          ) : null}
+
           <div className="rounded-2xl border border-border/40 bg-card shadow-sm p-5">
             <div className="flex items-center justify-between mb-3">
               <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Progresso</span>
@@ -191,6 +219,18 @@ export default async function ProjectDetailPage(props: ProjectDetailPageProps) {
               <span><span className="font-bold text-amber-600">{pendingCount}</span> <span className="text-xs text-muted-foreground">pendentes</span></span>
             </div>
           </div>
+
+          {/* Tags, Anexos & Relações (antes só no modal, agora na página) */}
+          {!isInbox && dbProjectId && (
+            <div className="rounded-2xl border border-border/40 bg-card shadow-sm p-5 space-y-4">
+              <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <Tag className="h-3.5 w-3.5" /> Tags, anexos & relações
+              </h2>
+              <EntityTags entityType="project" entityId={dbProjectId} />
+              <EntityAttachments entityType="project" entityId={dbProjectId} />
+              <EntityLinks entityType="project" entityId={dbProjectId} />
+            </div>
+          )}
         </section>
 
         {/* WORKSPACE */}
@@ -235,6 +275,7 @@ export default async function ProjectDetailPage(props: ProjectDetailPageProps) {
                     { mode: 'list', icon: List },
                     { mode: 'grid', icon: LayoutGrid },
                     { mode: 'compact', icon: AlignJustify },
+                    { mode: 'byday', icon: CalendarDays },
                     { mode: 'kanban', icon: Columns3 }
                   ].map((item) => (
                     <Link
@@ -274,11 +315,13 @@ export default async function ProjectDetailPage(props: ProjectDetailPageProps) {
               <TaskInput projectId={isInbox ? "inbox" : dbProjectId!} />
             </div>
 
-            {/* Lista / Kanban */}
+            {/* Lista / Por dia / Kanban */}
             {isKanban ? (
               <TaskKanbanBoard initialTasks={tasks} />
             ) : tasks.length === 0 ? (
               <EmptyState search={!!searchQuery} />
+            ) : viewMode === "byday" ? (
+              <TasksByDay initialTasks={tasks} />
             ) : (
               <TaskReorderList initialTasks={tasks} viewMode={viewMode as "list" | "grid" | "compact"} />
             )}

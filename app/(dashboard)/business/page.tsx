@@ -16,7 +16,7 @@ export default async function BusinessPage() {
   // 1. Buscamos os dados brutos do banco
   const userId = await getCurrentUserId()
   const rawClients = await prisma.client.findMany({
-    where: { userId },
+    where: { userId, deletedAt: null },
     include: {
       friend: {
         select: { id: true, name: true, imageUrl: true, phone: true, company: true, jobTitle: true }
@@ -60,7 +60,7 @@ export default async function BusinessPage() {
 
   const friends = userId
     ? await prisma.friend.findMany({
-        where: { userId },
+        where: { userId, deletedAt: null },
         select: { id: true, name: true, imageUrl: true, company: true },
         orderBy: { name: 'asc' },
       })

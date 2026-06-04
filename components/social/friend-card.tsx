@@ -1,6 +1,6 @@
 "use client";
 
-import { Instagram, Linkedin, Briefcase, Cake, MoreVertical, Pencil, Trash2, MessageCircle } from "lucide-react";
+import { Instagram, Linkedin, Briefcase, Cake, MoreVertical, Pencil, Trash2, MessageCircle, Tag as TagIcon } from "lucide-react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,9 +16,10 @@ interface FriendCardProps {
   onSelect: (friend: FriendData) => void;
   onEdit: (friend: FriendData) => void;
   onDelete: (target: { id: string; name: string }) => void;
+  onConnections: (target: { id: string; name: string }) => void;
 }
 
-export function FriendCard({ friend, onSelect, onEdit, onDelete }: FriendCardProps) {
+export function FriendCard({ friend, onSelect, onEdit, onDelete, onConnections }: FriendCardProps) {
   const bdayInfo = getBirthdayInfo(friend.birthday);
   const initials = friend.name ? friend.name.substring(0, 2).toUpperCase() : "??";
   const tagList = friend.tags ? friend.tags.split(",").map(t => t.trim()).filter(Boolean) : [];
@@ -61,6 +62,9 @@ export function FriendCard({ friend, onSelect, onEdit, onDelete }: FriendCardPro
               <DropdownMenuContent align="end" className="w-40 rounded-xl shadow-xl">
                 <DropdownMenuItem className="text-xs font-medium cursor-pointer" onClick={() => onEdit(friend)}>
                   <Pencil className="h-3.5 w-3.5 mr-2" /> Editar Perfil
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-xs font-medium cursor-pointer" onClick={() => onConnections({ id: friend.id!, name: friend.name })}>
+                  <TagIcon className="h-3.5 w-3.5 mr-2" /> Tags & Anexos
                 </DropdownMenuItem>
                 <DropdownMenuItem className="text-destructive focus:bg-destructive/10 text-xs font-medium cursor-pointer" onClick={() => onDelete({ id: friend.id!, name: friend.name })}>
                   <Trash2 className="h-3.5 w-3.5 mr-2" /> Excluir Contato

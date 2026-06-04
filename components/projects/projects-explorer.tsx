@@ -165,6 +165,7 @@ export function ProjectsExplorer({ projects, inbox }: { projects: ProjectItem[];
                 color={project.color || undefined}
                 totalTasks={project.totalTasks}
                 completedTasks={project.completedTasks}
+                updatedAt={project.updatedAt}
               />
             ))}
           </div>

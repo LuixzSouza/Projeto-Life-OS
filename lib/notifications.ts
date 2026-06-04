@@ -4,7 +4,7 @@ import { getCurrentUserId } from "./auth";
 export type NotificationPriority = "LOW" | "NORMAL" | "HIGH";
 
 export interface NotifyInput {
-  type: string; // INVOICE_DUE | EVENT | BIRTHDAY | TASK_DUE | FLASHCARD_REVIEW | SYSTEM
+  type: string; // INVOICE_DUE | INVOICE_PAID | EVENT | BIRTHDAY | TASK_DUE | FLASHCARD_REVIEW | SYSTEM
   title: string;
   body?: string;
   entityType?: string;

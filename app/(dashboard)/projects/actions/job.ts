@@ -129,7 +129,7 @@ export async function createProjectFromJob(jobId: string): Promise<{ success: bo
 export async function linkJobToProject(jobId: string, projectId: string): Promise<{ success: boolean; error?: string }> {
   const userId = await requireUserId();
 
-  const project = await prisma.project.findFirst({ where: { id: projectId, userId }, select: { id: true } });
+  const project = await prisma.project.findFirst({ where: { id: projectId, userId, deletedAt: null }, select: { id: true } });
   if (!project) return { success: false, error: "Projeto não encontrado." };
 
   await prisma.jobApplication.updateMany({

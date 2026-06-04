@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AlertCircle, Camera, Upload, Trash2, Loader2 } from "lucide-react";
+import { AlertCircle, Camera, Upload, Trash2, Loader2, Tag, Building2, FileText, Receipt, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogBody, DialogFooter } from "@/components/ui/dialog";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -24,6 +24,9 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { useCurrencySymbol, useFormatCurrency } from "@/components/providers/currency-provider";
 import { clearMask, maskPhone, toInputDate } from "./business-helpers";
 import type { AccountOption, ActionResponse, BillingData, ClientData, DeleteTarget, FriendOption, InvoiceData } from "./business-types";
+import { EntityTags } from "@/components/connect/entity-tags";
+import { EntityAttachments } from "@/components/connect/entity-attachments";
+import { EntityLinks } from "@/components/connect/entity-links";
 
 // --- Modal Cliente (criar/editar) ---
 interface ClientModalProps {
@@ -88,11 +91,12 @@ export function ClientModal({ open, onOpenChange, editingClient, friends, phoneV
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl p-0 overflow-hidden rounded-[2rem] shadow-2xl gap-0">
-          <DialogHeader className="p-6 pb-4 border-b border-border/40 bg-muted/10 text-left space-y-1">
-              <DialogTitle className="text-xl font-bold">{editingClient ? "Editar Cliente" : "Novo Cliente"}</DialogTitle>
-              <DialogDescription>Dados da empresa, contato e vínculo com suas Conexões.</DialogDescription>
-          </DialogHeader>
+      <DialogContent size="lg">
+          <DialogHeader
+            icon={<Building2 className="h-5 w-5" />}
+            title={editingClient ? "Editar Cliente" : "Novo Cliente"}
+            description="Dados da empresa, contato e vínculo com suas Conexões."
+          />
           <form action={async (fd) => {
               fd.set("phone", clearMask(phoneValue))
               fd.set("imageUrl", imageUrl)
@@ -111,10 +115,10 @@ export function ClientModal({ open, onOpenChange, editingClient, friends, phoneV
               } else {
                   toast.error(res.message);
               }
-          }} className="flex flex-col">
+          }} className="flex flex-col flex-1 min-h-0">
               <input type="hidden" name="id" value={editingClient?.id || ""} />
 
-              <div className="p-6 max-h-[65vh] overflow-y-auto custom-scrollbar grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
+              <DialogBody className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
 
                 {/* COLUNA ESQUERDA: Identidade */}
                 <div className="space-y-5">
@@ -221,9 +225,9 @@ export function ClientModal({ open, onOpenChange, editingClient, friends, phoneV
                     <Label className={labelCls}>Anotações</Label>
                     <Textarea name="notes" defaultValue={editingClient?.notes || ""} placeholder="Detalhes do cliente, histórico, observações..." className="rounded-xl bg-muted/20 border-border/40 resize-none h-20 p-3 text-sm" />
                 </div>
-              </div>
+              </DialogBody>
 
-              <DialogFooter className="p-5 border-t border-border/40 bg-muted/5 flex-row justify-end gap-3">
+              <DialogFooter>
                   <Button type="button" variant="ghost" className="rounded-xl" onClick={() => onOpenChange(false)}>Cancelar</Button>
                   <SubmitButton className="rounded-xl px-8 font-bold shadow-lg shadow-primary/20">
                     {editingClient ? "Salvar Alterações" : "Cadastrar Cliente"}
@@ -245,11 +249,12 @@ export function BillingModal({ clientId, onClose }: BillingModalProps) {
   const symbol = useCurrencySymbol();
   return (
     <Dialog open={!!clientId} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[450px] rounded-[2rem] shadow-2xl">
-          <DialogHeader>
-              <DialogTitle className="text-xl font-bold">Novo Contrato</DialogTitle>
-              <DialogDescription>Defina o valor total e as parcelas.</DialogDescription>
-          </DialogHeader>
+      <DialogContent size="md">
+          <DialogHeader
+            icon={<FileText className="h-5 w-5" />}
+            title="Novo Contrato"
+            description="Defina o valor total e as parcelas."
+          />
           <form action={async (fd) => {
               const res = await createBilling(fd) as ActionResponse;
               if(res.success) {
@@ -258,8 +263,9 @@ export function BillingModal({ clientId, onClose }: BillingModalProps) {
               } else {
                   toast.error(res.message);
               }
-          }} className="space-y-5 pt-4">
+          }} className="flex flex-col flex-1 min-h-0">
               <input type="hidden" name="clientId" value={clientId || ""} />
+              <DialogBody className="space-y-5">
 
               <div className="space-y-1.5">
                   <Label className="text-[10px] uppercase font-black text-muted-foreground ml-1">Serviço ou Projeto</Label>
@@ -299,7 +305,9 @@ export function BillingModal({ clientId, onClose }: BillingModalProps) {
                   </div>
               </div>
 
-              <DialogFooter className="pt-2">
+              </DialogBody>
+
+              <DialogFooter>
                   <SubmitButton className="w-full h-12 rounded-xl font-bold shadow-lg shadow-primary/20">Gerar Faturas</SubmitButton>
               </DialogFooter>
           </form>
@@ -317,11 +325,12 @@ interface InvoiceModalProps {
 export function InvoiceModal({ invoice, onClose }: InvoiceModalProps) {
   return (
     <Dialog open={!!invoice} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[400px] rounded-[2rem] shadow-2xl">
-          <DialogHeader>
-              <DialogTitle className="font-bold">Ajustar Fatura</DialogTitle>
-              <DialogDescription>Modifique valores ou data desta parcela específica.</DialogDescription>
-          </DialogHeader>
+      <DialogContent size="md">
+          <DialogHeader
+            icon={<Receipt className="h-5 w-5" />}
+            title="Ajustar Fatura"
+            description="Modifique valores ou data desta parcela específica."
+          />
           <form action={async (fd) => {
               const res = await updateInvoice(fd) as ActionResponse;
               if(res.success){
@@ -330,8 +339,9 @@ export function InvoiceModal({ invoice, onClose }: InvoiceModalProps) {
               } else {
                   toast.error(res.message);
               }
-          }} className="space-y-5 pt-4">
+          }} className="flex flex-col flex-1 min-h-0">
               <input type="hidden" name="id" value={invoice?.id || ""} />
+              <DialogBody className="space-y-5">
 
               <div className="space-y-1.5">
                   <Label className="text-[10px] uppercase font-black text-muted-foreground ml-1">Descrição</Label>
@@ -369,7 +379,21 @@ export function InvoiceModal({ invoice, onClose }: InvoiceModalProps) {
                   </Select>
               </div>
 
-              <DialogFooter className="pt-4 flex flex-col gap-3">
+              {/* Tags, Anexos & Relações — ex.: anexar o comprovante/boleto desta fatura. */}
+              {invoice && (
+                <div className="space-y-3 border-t border-border/40 pt-4">
+                  <Label className="flex items-center gap-1.5 text-[10px] uppercase font-black text-muted-foreground ml-1">
+                    <Tag className="h-3.5 w-3.5" /> Tags, Anexos & Relações
+                  </Label>
+                  <EntityTags entityType="invoice" entityId={invoice.id} />
+                  <EntityAttachments entityType="invoice" entityId={invoice.id} />
+                  <EntityLinks entityType="invoice" entityId={invoice.id} />
+                </div>
+              )}
+
+              </DialogBody>
+
+              <DialogFooter className="flex flex-col gap-3">
                   <SubmitButton className="w-full h-12 rounded-xl font-bold">Salvar Ajuste</SubmitButton>
                   {invoice?.status === 'PAID' && invoice?.paidAt && (
                       <p className="text-[10px] text-center text-emerald-600 font-bold uppercase tracking-widest">
@@ -392,11 +416,12 @@ interface BillingEditModalProps {
 export function BillingEditModal({ billing, onClose }: BillingEditModalProps) {
   return (
     <Dialog open={!!billing} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[400px] rounded-[2rem] shadow-2xl">
-          <DialogHeader>
-              <DialogTitle className="font-bold">Editar Contrato</DialogTitle>
-              <DialogDescription>Mude o status geral deste projeto.</DialogDescription>
-          </DialogHeader>
+      <DialogContent size="md">
+          <DialogHeader
+            icon={<FileText className="h-5 w-5" />}
+            title="Editar Contrato"
+            description="Mude o status geral deste projeto."
+          />
           <form action={async (fd) => {
               const res = await updateBilling(fd) as ActionResponse;
               if(res.success){
@@ -405,8 +430,9 @@ export function BillingEditModal({ billing, onClose }: BillingEditModalProps) {
               } else {
                   toast.error(res.message);
               }
-          }} className="space-y-5 pt-4">
+          }} className="flex flex-col flex-1 min-h-0">
               <input type="hidden" name="id" value={billing?.id || ""} />
+              <DialogBody className="space-y-5">
 
               <div className="space-y-1.5">
                   <Label className="text-[10px] uppercase font-black text-muted-foreground ml-1">Título do Serviço</Label>
@@ -427,7 +453,9 @@ export function BillingEditModal({ billing, onClose }: BillingEditModalProps) {
                   </Select>
               </div>
 
-              <DialogFooter className="pt-2">
+              </DialogBody>
+
+              <DialogFooter>
                   <Button type="button" variant="ghost" className="rounded-xl" onClick={onClose}>Cancelar</Button>
                   <SubmitButton className="rounded-xl px-8 font-bold">Salvar</SubmitButton>
               </DialogFooter>
@@ -456,13 +484,13 @@ export function PaymentModal({ invoice, accounts, onClose }: PaymentModalProps) 
 
   return (
     <Dialog open={!!invoice} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[420px] rounded-[2rem] shadow-2xl">
-          <DialogHeader>
-              <DialogTitle className="font-bold">Registrar Recebimento</DialogTitle>
-              <DialogDescription>
-                A entrada de <strong className="text-emerald-600">{invoice ? formatCurrency(invoice.value) : ""}</strong> será lançada como receita na conta escolhida.
-              </DialogDescription>
-          </DialogHeader>
+      <DialogContent size="md">
+          <DialogHeader
+            icon={<Wallet className="h-5 w-5" />}
+            iconClassName="bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+            title="Registrar Recebimento"
+            description={<>A entrada de <strong className="text-emerald-600">{invoice ? formatCurrency(invoice.value) : ""}</strong> será lançada como receita na conta escolhida.</>}
+          />
 
           {hasAccounts ? (
             <form action={async (fd) => {
@@ -475,7 +503,8 @@ export function PaymentModal({ invoice, accounts, onClose }: PaymentModalProps) 
                 } else {
                     toast.error(res.message);
                 }
-            }} className="space-y-5 pt-4">
+            }} className="flex flex-col flex-1 min-h-0">
+                <DialogBody className="space-y-5">
                 <div className="space-y-1.5">
                     <Label className="text-[10px] uppercase font-black text-muted-foreground ml-1">Conta de Destino</Label>
                     <Select value={accountId} onValueChange={setAccountId}>
@@ -494,8 +523,9 @@ export function PaymentModal({ invoice, accounts, onClose }: PaymentModalProps) 
                         </SelectContent>
                     </Select>
                 </div>
+                </DialogBody>
 
-                <DialogFooter className="pt-2">
+                <DialogFooter>
                     <Button type="button" variant="ghost" className="rounded-xl" onClick={onClose}>Cancelar</Button>
                     <SubmitButton className="rounded-xl px-8 font-bold bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-600/20">
                       Confirmar Recebimento
@@ -503,14 +533,16 @@ export function PaymentModal({ invoice, accounts, onClose }: PaymentModalProps) 
                 </DialogFooter>
             </form>
           ) : (
-            <div className="pt-4 space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Você ainda não tem nenhuma conta cadastrada no Financeiro. Crie uma conta em <strong>/finance</strong> para registrar recebimentos.
-              </p>
+            <>
+              <DialogBody>
+                <p className="text-sm text-muted-foreground">
+                  Você ainda não tem nenhuma conta cadastrada no Financeiro. Crie uma conta em <strong>/finance</strong> para registrar recebimentos.
+                </p>
+              </DialogBody>
               <DialogFooter>
                 <Button type="button" variant="ghost" className="rounded-xl" onClick={onClose}>Fechar</Button>
               </DialogFooter>
-            </div>
+            </>
           )}
       </DialogContent>
     </Dialog>

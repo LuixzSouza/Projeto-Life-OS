@@ -3,11 +3,31 @@ import { ChevronLeft, LineChart, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { InvestmentDashboard } from "@/components/finance/investment/investment-dashboard";
 import { getMarketOverview } from "@/lib/market-service";
+import { getHoldings } from "@/app/(dashboard)/finance/actions";
+import { getQuotes } from "@/lib/portfolio-quotes";
+import { getTesouroBonds } from "@/lib/tesouro-service";
+import { buildPositions, computeTotals } from "@/lib/portfolio-compute";
+import { getBrapiToken } from "@/lib/brapi-token";
+import { requireUserId } from "@/lib/auth";
 import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
 
+export const dynamic = "force-dynamic";
+
 export default async function InvestmentsPage() {
+  const userId = await requireUserId();
+  const brapiToken = await getBrapiToken(userId);
+
   // 1. Busca dados reais no servidor (rápido e seguro)
-  const marketData = await getMarketOverview();
+  const [marketData, holdings, tesouro] = await Promise.all([
+    getMarketOverview(undefined, brapiToken),
+    getHoldings(),
+    getTesouroBonds(),
+  ]);
+
+  // 2. Cotações ao vivo dos ativos da carteira → posições enriquecidas
+  const quotes = await getQuotes(holdings.map((h) => h.ticker), brapiToken);
+  const positions = buildPositions(holdings, quotes);
+  const totals = computeTotals(positions);
 
   return (
     <PageShell className="relative overflow-hidden selection:bg-primary/20">
@@ -38,7 +58,7 @@ export default async function InvestmentsPage() {
       </PageHeader>
 
       <PageContainer className="space-y-10">
-        <InvestmentDashboard initialMarketData={marketData} />
+        <InvestmentDashboard initialMarketData={marketData} positions={positions} totals={totals} tesouro={tesouro} />
       </PageContainer>
     </PageShell>
   );

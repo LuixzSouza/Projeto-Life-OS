@@ -5,9 +5,9 @@ export const INFLATION_RATE = 3.81; // IPCA acumulado em 12 meses
 export const SAVINGS_RATE = 7.17;   // Poupança (6,17% a.a. + Taxa Referencial aproximada)
 
 export const GLOSSARY = {
-    CDI: "Certificado de Depósito Interbancário. É a taxa referência da renda fixa (ex: Caixinhas, CDBs). Acompanha de perto a Selic (atualmente em 14,90% a.a.).",
-    SELIC: "Taxa básica de juros da economia (15,00% a.a. hoje). Se ela sobe, a renda fixa paga mais; se cai, o crédito encarece.",
-    IPCA: "A inflação oficial do Brasil (3,81% no acumulado de 12 meses). Seu lucro real é apenas aquilo que rende acima desse valor.",
+    CDI: "Certificado de Depósito Interbancário. É a taxa de referência da renda fixa (ex.: Caixinhas, CDBs) e acompanha de perto a Selic. O valor atual ao vivo aparece nos indicadores acima.",
+    SELIC: "Taxa básica de juros da economia. Se ela sobe, a renda fixa paga mais; se cai, o crédito encarece. O valor atual ao vivo aparece nos indicadores acima.",
+    IPCA: "A inflação oficial do Brasil (acumulada em 12 meses). Seu lucro real é apenas o que rende acima dela. O valor atual ao vivo aparece nos indicadores acima.",
     LCI_LCA: "Letras de Crédito Imobiliário e do Agronegócio. São empréstimos feitos a bancos com isenção total de Imposto de Renda para pessoa física.",
     FGC: "Fundo Garantidor de Créditos. Protege seu dinheiro (limitado a R$ 250 mil por instituição) caso o banco em que você investiu venha a falir.",
     TESOURO: "Plataforma do governo federal. Você empresta dinheiro para o Estado. É considerado o investimento mais seguro do país (Risco Soberano).",

@@ -98,7 +98,7 @@ export async function getSubjectDetails(subjectId: string) {
         where: { subjectId: subjectId, userId },
         orderBy: { date: 'desc' },
         take: 20,
-        include: { notes: true }
+        include: { notes: { where: { deletedAt: null } } }
     });
 
     if (!subject) {

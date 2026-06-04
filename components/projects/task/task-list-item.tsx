@@ -15,7 +15,7 @@ type TaskPriority = "HIGH" | "MEDIUM" | "LOW";
 type TaskStatus = "TODO" | "IN_PROGRESS" | "DONE" | "REVIEW";
 
 export function TaskListItem({
-  task, isOverdue, isPinned, isStarred, progress, estimatedTime, onToggle, onToggleStar, onOpenModal,
+  task, isOverdue, isPinned, isStarred, isDone, progress, estimatedTime, onToggle, onToggleStar, onOpenModal,
 }: TaskBaseProps) {
   
   const stopPropagation = (e: React.MouseEvent | React.PointerEvent) => e.stopPropagation();
@@ -33,7 +33,7 @@ export function TaskListItem({
         className={cn(
           'group relative flex items-center gap-4 p-3 bg-card border border-border/40 rounded-2xl transition-all duration-300 mb-2 shadow-sm',
           'hover:border-primary/30 hover:bg-muted/5 hover:shadow-md',
-          task.isDone && 'opacity-60 bg-muted/20',
+          isDone && 'opacity-60 bg-muted/20',
           isPinned && 'border-l-4 border-l-amber-500'
         )}
       >
@@ -46,11 +46,11 @@ export function TaskListItem({
         </div>
 
         {/* CHECKBOX */}
-        <div onClick={stopPropagation}>
+        <div onClick={stopPropagation} onPointerDown={stopPropagation} className="shrink-0">
           <Checkbox
-            checked={task.isDone}
+            checked={isDone}
             onCheckedChange={onToggle}
-            className="h-5 w-5 rounded-full border-muted-foreground/30 data-[state=checked]:bg-emerald-500 transition-all shadow-inner cursor-pointer"
+            className="h-5 w-5 rounded-full border-muted-foreground/30 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500 transition-all shadow-inner cursor-pointer"
           />
         </div>
 
@@ -63,15 +63,17 @@ export function TaskListItem({
 
         {/* CONTEÚDO PRINCIPAL */}
         <div className="flex-1 min-w-0 cursor-pointer" onClick={onOpenModal}>
-          <div className="flex items-center gap-2 mb-0.5">
+          <div className="flex items-start gap-2 mb-0.5">
             <h3 className={cn(
-              'text-sm font-bold tracking-tight truncate transition-colors group-hover:text-primary',
-              task.isDone ? 'line-through text-muted-foreground/60' : 'text-foreground'
+              'min-w-0 flex-1 text-sm font-bold tracking-tight leading-snug break-words line-clamp-2 transition-colors group-hover:text-primary',
+              isDone ? 'line-through text-muted-foreground/60' : 'text-foreground'
             )}>
               {task.title}
             </h3>
-            {isPinned && <Pin size={10} className="text-amber-500 rotate-45 fill-current" />}
-            {isStarred && <Star size={10} className="text-yellow-500 fill-current" />}
+            <div className="flex items-center gap-1 shrink-0 pt-0.5">
+              {isPinned && <Pin size={10} className="text-amber-500 rotate-45 fill-current" />}
+              {isStarred && <Star size={10} className="text-yellow-500 fill-current" />}
+            </div>
           </div>
           <div className="flex items-center gap-3">
              <StatusBadge status={(task.status as TaskStatus) || "TODO"} className="h-4 px-1.5 text-[8px] uppercase font-black" />

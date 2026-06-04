@@ -3,7 +3,7 @@
 import {
   Phone, CheckCircle2, AlertCircle, Briefcase,
   Pencil, MoreHorizontal, Trash2, Circle,
-  CalendarDays, Copy, Check, Plus, Globe, MessageCircle,
+  CalendarDays, Copy, Check, Plus, Globe, MessageCircle, Tag as TagIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -25,6 +25,7 @@ interface ClientCardProps {
   onCopyPhone: (phone: string, id: string) => void;
   onEditClient: (client: ClientData) => void;
   onDeleteTarget: (target: DeleteTarget) => void;
+  onOpenConnections: (client: ClientData) => void;
   onNewBilling: (clientId: string) => void;
   onEditBilling: (billing: BillingData) => void;
   onEditInvoice: (invoice: InvoiceData) => void;
@@ -34,7 +35,7 @@ interface ClientCardProps {
 }
 
 export function ClientCard({
-  client, copiedId, onCopyPhone, onEditClient, onDeleteTarget,
+  client, copiedId, onCopyPhone, onEditClient, onDeleteTarget, onOpenConnections,
   onNewBilling, onEditBilling, onEditInvoice, onReceiveInvoice, onCopyCharge, onWhatsapp,
 }: ClientCardProps) {
   const formatCurrency = useFormatCurrency();
@@ -131,6 +132,9 @@ export function ClientCard({
           <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-xl">
             <DropdownMenuItem onClick={() => onEditClient(client)} className="cursor-pointer">
               <Pencil className="mr-2 h-4 w-4" /> Editar Cliente
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onOpenConnections(client)} className="cursor-pointer">
+              <TagIcon className="mr-2 h-4 w-4" /> Tags & Anexos
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

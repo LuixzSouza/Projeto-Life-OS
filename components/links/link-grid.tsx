@@ -5,6 +5,7 @@ import { SavedLink } from "@prisma/client";
 import { toast } from "sonner";
 import { deleteLink, checkLinksHealth, type LinkHealth } from "@/app/(dashboard)/links/actions";
 import { LinkForm } from "./link-form";
+import { EntityConnectionsDialog } from "@/components/connect/entity-connections-dialog";
 
 import {
   Dialog,
@@ -56,7 +57,8 @@ import {
   Loader2,
   Copy,
   WifiOff,
-  Check
+  Check,
+  Tag as TagIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -81,6 +83,7 @@ export function LinkGrid({ links }: { links: SavedLink[] }) {
   // States para Modais
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingLink, setEditingLink] = useState<SavedLink | null>(null);
+  const [taggingLink, setTaggingLink] = useState<SavedLink | null>(null);
 
   // Verificação de saúde dos links (detecção de quebrados/offline)
   const [health, setHealth] = useState<LinkHealth | null>(null);
@@ -307,6 +310,9 @@ export function LinkGrid({ links }: { links: SavedLink[] }) {
                             <DropdownMenuItem onClick={() => setEditingLink(link)}>
                                 <Pencil className="mr-2 h-4 w-4" /> Editar
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setTaggingLink(link)}>
+                                <TagIcon className="mr-2 h-4 w-4" /> Tags & Anexos
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => setDeletingId(link.id)}>
                                 <Trash2 className="mr-2 h-4 w-4" /> Remover
@@ -395,13 +401,20 @@ export function LinkGrid({ links }: { links: SavedLink[] }) {
             <DialogTitle>Editar Recurso</DialogTitle>
             </DialogHeader>
             {editingLink && (
-                <LinkForm 
-                    onClose={() => setEditingLink(null)} 
-                    initialData={editingLink} 
+                <LinkForm
+                    onClose={() => setEditingLink(null)}
+                    initialData={editingLink}
                 />
             )}
         </DialogContent>
       </Dialog>
+
+      {/* === MODAL DE TAGS & ANEXOS (tecido conectivo cross-módulo) === */}
+      <EntityConnectionsDialog
+        entityType="link"
+        item={taggingLink ? { id: taggingLink.id, title: taggingLink.title } : null}
+        onOpenChange={(o) => !o && setTaggingLink(null)}
+      />
 
       {/* Delete Modal */}
       <AlertDialog open={!!deletingId} onOpenChange={() => setDeletingId(null)}>

@@ -3,6 +3,8 @@
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { requireUserId } from "@/lib/auth"
+import { logActivity } from "@/lib/activity"
+import { notify } from "@/lib/notifications"
 
 // Lê um campo do FormData, normaliza vazio para null.
 function field(formData: FormData, key: string): string | null {
@@ -27,7 +29,7 @@ export async function createClient(formData: FormData) {
     const userId = await requireUserId()
     const friendId = await resolveFriendId(formData, userId)
 
-    await prisma.client.create({
+    const created = await prisma.client.create({
       data: {
         name,
         company: field(formData, "company"),
@@ -42,6 +44,14 @@ export async function createClient(formData: FormData) {
         status: "ACTIVE",
         userId
       }
+    })
+
+    await logActivity({
+      action: "CREATE",
+      module: "business",
+      entityType: "client",
+      entityId: created.id,
+      summary: `Cadastrou o cliente "${created.name}"`,
     })
 
     revalidatePath("/business")
@@ -87,19 +97,31 @@ export async function updateClient(formData: FormData) {
   }
 }
 
-// 3. Deletar Cliente
+// 3. Deletar Cliente (Soft-delete → Lixeira)
+// Os contratos/faturas vinculados permanecem no banco; ao restaurar o cliente,
+// voltam a aparecer. A exclusão definitiva (cascata) acontece na /trash.
 export async function deleteClient(clientId: string) {
   try {
     if (!clientId) return { success: false, message: "ID do cliente não fornecido." }
 
     const userId = await requireUserId()
 
-    await prisma.client.deleteMany({
-      where: { id: clientId, userId }
+    const client = await prisma.client.findFirst({ where: { id: clientId, userId }, select: { name: true } })
+    await prisma.client.updateMany({
+      where: { id: clientId, userId },
+      data: { deletedAt: new Date() }
+    })
+
+    await logActivity({
+      action: "DELETE",
+      module: "business",
+      entityType: "client",
+      entityId: clientId,
+      summary: client ? `Moveu o cliente "${client.name}" para a lixeira` : "Removeu um cliente",
     })
 
     revalidatePath("/business")
-    return { success: true, message: "Cliente excluído permanentemente." }
+    return { success: true, message: "Cliente movido para a lixeira." }
   } catch (error) {
     console.error("Erro ao deletar cliente:", error)
     return { success: false, message: "Falha ao deletar cliente. Verifique as dependências." }
@@ -239,6 +261,8 @@ export async function receiveInvoicePayment(formData: FormData) {
 
     const userId = await requireUserId()
 
+    let receipt: { title: string; value: number; client: string } | null = null
+
     await prisma.$transaction(async (tx) => {
       const invoice = await tx.invoice.findFirst({
         where: { id: invoiceId, userId },
@@ -277,7 +301,29 @@ export async function receiveInvoicePayment(formData: FormData) {
         where: { id: invoiceId, userId },
         data: { status: "PAID", paidAt: new Date(), transactionId: transaction.id },
       })
+
+      receipt = { title: invoice.title, value, client: clientName }
     })
+
+    if (receipt) {
+      const r = receipt as { title: string; value: number; client: string }
+      await logActivity({
+        action: "INCOME",
+        module: "business",
+        entityType: "invoice",
+        entityId: invoiceId,
+        summary: `Recebeu "${r.title}" de ${r.client}`,
+        meta: { value: r.value },
+      })
+      await notify({
+        type: "INVOICE_PAID",
+        title: `Recebimento de ${r.client}`,
+        body: `${r.title} — registrado no Financeiro`,
+        entityType: "invoice",
+        entityId: invoiceId,
+        actionUrl: "/business",
+      })
+    }
 
     revalidatePath("/business")
     revalidatePath("/finance")

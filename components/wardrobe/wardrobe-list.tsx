@@ -9,6 +9,7 @@ import type { WardrobeItem } from "./wardrobe-list-types";
 import { OutfitBuilderBar } from "./outfit-builder-bar";
 import { WardrobeListToolbar } from "./wardrobe-list-toolbar";
 import { WardrobeItemCard } from "./wardrobe-item-card";
+import { EntityConnectionsDialog } from "@/components/connect/entity-connections-dialog";
 
 // --- COMPONENTE PRINCIPAL ---
 export function WardrobeList({ initialData }: { initialData: WardrobeItem[] }) {
@@ -16,6 +17,7 @@ export function WardrobeList({ initialData }: { initialData: WardrobeItem[] }) {
     const [filterCategory, setFilterCategory] = useState("ALL");
     const [filterStatus, setFilterStatus] = useState<string | null>(null);
     const [editingItem, setEditingItem] = useState<WardrobeItemData | null>(null);
+    const [connItem, setConnItem] = useState<{ id: string; title: string } | null>(null);
 
     // Estado para o "Montador de Looks"
     const [outfitBuilder, setOutfitBuilder] = useState<WardrobeItem[]>([]);
@@ -147,6 +149,7 @@ export function WardrobeList({ initialData }: { initialData: WardrobeItem[] }) {
                             onEdit={handleEditClick}
                             onDelete={handleDelete}
                             onWear={handleWear}
+                            onConnections={(it) => setConnItem({ id: it.id, title: it.name })}
                         />
                     ))}
                 </div>
@@ -158,6 +161,13 @@ export function WardrobeList({ initialData }: { initialData: WardrobeItem[] }) {
                 open={!!editingItem}
                 onOpenChange={(open) => !open && setEditingItem(null)}
                 initialData={editingItem || undefined}
+            />
+
+            {/* Tags, Anexos & Relações */}
+            <EntityConnectionsDialog
+                entityType="wardrobeItem"
+                item={connItem}
+                onOpenChange={(o) => !o && setConnItem(null)}
             />
         </div>
     );

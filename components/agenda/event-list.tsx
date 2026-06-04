@@ -1,12 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle,
-  DialogDescription,
+  DialogBody,
   DialogTrigger
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -17,8 +16,10 @@ import {
   CalendarX2,
   Clock,
   MoreHorizontal,
-  CalendarPlus
+  CalendarPlus,
+  Tag as TagIcon
 } from "lucide-react";
+import { EntityConnectionsDialog } from "@/components/connect/entity-connections-dialog";
 import { format, differenceInMinutes, startOfDay } from "date-fns";
 import { EventForm } from "@/components/agenda/event-form";
 import { EventDeleteButton } from "@/components/agenda/event-delete-button";
@@ -47,7 +48,10 @@ const END_HOUR = 23; // Termina às 23:00
 const HOUR_HEIGHT = 80; // Cada hora ocupa 80 pixels de altura na tela
 
 export function EventList({ groupedEvents, sortedKeys }: EventListProps) {
-  
+
+  // Tags & Anexos: um único diálogo global controlado por estado (sem Dialog no .map()).
+  const [conn, setConn] = useState<{ id: string; title: string } | null>(null);
+
   // ✅ CORREÇÃO: O Hook useMemo agora está no topo, ANTES do 'if'
   const hours = useMemo(() => {
     const h = [];
@@ -103,6 +107,7 @@ export function EventList({ groupedEvents, sortedKeys }: EventListProps) {
   };
 
   return (
+    <>
     <div className="relative w-full h-[800px] overflow-y-auto custom-scrollbar pr-2 animate-in fade-in duration-500">
         
         {/* LINHA DO TEMPO (Régua Vertical) */}
@@ -200,6 +205,12 @@ export function EventList({ groupedEvents, sortedKeys }: EventListProps) {
                                                         <Pencil className="h-3.5 w-3.5" /> Editar
                                                     </DropdownMenuItem>
                                                 </DialogTrigger>
+                                                <DropdownMenuItem
+                                                    className="gap-2 cursor-pointer font-bold text-xs uppercase tracking-widest"
+                                                    onClick={() => setConn({ id: event.id, title: event.title })}
+                                                >
+                                                    <TagIcon className="h-3.5 w-3.5" /> Tags & Anexos
+                                                </DropdownMenuItem>
                                                 <div className="p-1">
                                                     <EventDeleteButton
                                                         eventId={event.id}
@@ -210,20 +221,14 @@ export function EventList({ groupedEvents, sortedKeys }: EventListProps) {
                                             </DropdownMenuContent>
                                         </DropdownMenu>
 
-                                        {/* Modal de Edição (HUD Style) */}
-                                        <DialogContent className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] max-w-[500px] p-0 bg-background border-border/40 shadow-2xl rounded-[2.5rem] z-[100] overflow-hidden">
-                                            <div className="p-6 border-b border-border/40 bg-muted/10">
-                                                <div className="flex items-center gap-3">
-                                                <div className="h-10 w-10 rounded-xl flex items-center justify-center shadow-inner border" style={{ backgroundColor: styles.backgroundColor, borderColor: styles.borderColor, color: styles.color }}>
-                                                    <CalendarPlus className="h-5 w-5" />
-                                                </div>
-                                                <div>
-                                                    <DialogTitle className="text-lg font-black uppercase tracking-tighter">Editar Evento</DialogTitle>
-                                                    <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">Atualizar linha do tempo</DialogDescription>
-                                                </div>
-                                                </div>
-                                            </div>
-                                            <div className="p-6">
+                                        {/* Modal de Edição */}
+                                        <DialogContent size="md">
+                                            <DialogHeader
+                                                icon={<CalendarPlus className="h-5 w-5" />}
+                                                title="Editar Evento"
+                                                description="Atualizar linha do tempo"
+                                            />
+                                            <DialogBody>
                                                 <EventForm
                                                     initialData={{
                                                         id: event.id,
@@ -236,7 +241,7 @@ export function EventList({ groupedEvents, sortedKeys }: EventListProps) {
                                                         projectId: event.projectId || "none",
                                                     }}
                                                 />
-                                            </div>
+                                            </DialogBody>
                                         </DialogContent>
                                     </Dialog>
                                 </div>
@@ -247,5 +252,12 @@ export function EventList({ groupedEvents, sortedKeys }: EventListProps) {
             </div>
         </div>
     </div>
+
+    <EntityConnectionsDialog
+      entityType="event"
+      item={conn}
+      onOpenChange={(o) => !o && setConn(null)}
+    />
+    </>
   );
 }

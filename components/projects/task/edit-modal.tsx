@@ -8,18 +8,20 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Separator } from '@/components/ui/separator';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import {
-  Star, Pin, ChevronRight, Zap, Info, ImageIcon, Link2, Trash2,
+  Star, Pin, ListChecks, Info, ImageIcon, Link2, Trash2, Tag as TagIcon, SlidersHorizontal,
 } from 'lucide-react';
 
 import type { EditModalProps } from './edit-modal-types';
 import { QuickAction } from './edit-modal-helpers';
-import { EditModalSidebar } from './edit-modal-sidebar';
+import { TaskProperties } from './edit-modal-sidebar';
 import { EditModalFooter } from './edit-modal-footer';
+import { EntityTags } from '@/components/connect/entity-tags';
+import { EntityAttachments } from '@/components/connect/entity-attachments';
+import { EntityLinks } from '@/components/connect/entity-links';
+import { Button } from '@/components/ui/button';
 
 export function EditModal(props: EditModalProps) {
   const { isOpen, onClose, task } = props;
@@ -27,12 +29,12 @@ export function EditModal(props: EditModalProps) {
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent
-        className="max-w-[95vw] w-full xl:max-w-7xl h-[92vh] p-0 gap-0 overflow-hidden bg-background border-border/40 shadow-2xl rounded-[2.5rem] flex flex-col outline-none"
+        className="max-w-2xl w-full max-h-[88vh] p-0 gap-0 overflow-hidden bg-background border-border/40 shadow-2xl rounded-2xl flex flex-col outline-none"
       >
         {/* ACESSIBILIDADE */}
         <DialogHeader className="sr-only">
           <DialogTitle>{task.title}</DialogTitle>
-          <DialogDescription>Painel de gerenciamento de missão</DialogDescription>
+          <DialogDescription>Editar tarefa</DialogDescription>
         </DialogHeader>
 
         {/* TOOLTIP E CONTEÚDO COM RESET POR ID */}
@@ -101,93 +103,106 @@ function EditModalContent({
 
   return (
     <>
-      {/* 1. TOP BAR (O X padrão da biblioteca aparecerá à direita deste header automaticamente) */}
-      <header className="h-14 border-b border-border/40 bg-muted/5 flex items-center justify-between px-6 shrink-0 pr-16">
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-sm">
-            <Zap size={14} className="fill-current" />
+      {/* TOP BAR (o X da biblioteca aparece à direita automaticamente) */}
+      <header className="h-14 border-b border-border/40 bg-muted/10 flex items-center justify-between px-5 shrink-0 pr-14">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
+            <ListChecks size={15} />
           </div>
-          <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/40">
-            <span>Control Panel</span>
-            <ChevronRight size={10} />
-            <span className="text-foreground/60">{task.id.slice(-8).toUpperCase()}</span>
+          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground min-w-0">
+            <span className="truncate">Editar tarefa</span>
+            <span className="hidden sm:inline rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground/70">
+              #{task.id.slice(-6).toUpperCase()}
+            </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          <QuickAction icon={Pin} active={isPinned} color="text-amber-400" onClick={onTogglePin} tooltip="Fixar" />
-          <QuickAction icon={Star} active={isStarred} color="text-yellow-400" onClick={onToggleStar} tooltip="Priorizar" />
-          <QuickAction icon={Link2} active={false} color="" onClick={onCopyLink} tooltip="Copiar Link" />
+        <div className="flex items-center gap-1">
+          <QuickAction icon={Pin} active={isPinned} color="text-amber-500" onClick={onTogglePin} tooltip="Fixar" />
+          <QuickAction icon={Star} active={isStarred} color="text-yellow-500" onClick={onToggleStar} tooltip="Destacar" />
+          <QuickAction icon={Link2} active={false} color="" onClick={onCopyLink} tooltip="Copiar link" />
         </div>
       </header>
 
-      {/* 2. ÁREA DE TRABALHO */}
-      <div className="flex flex-1 overflow-hidden flex-col lg:flex-row bg-background">
+      {/* CORPO — coluna única, rolável */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
 
-        {/* COLUNA ESQUERDA: EDITOR */}
-        <main className="flex-1 overflow-y-auto p-8 lg:p-16 space-y-12 custom-scrollbar">
-          <div className="space-y-6">
-            {/* AREA DE IMAGEM */}
-            <div className="relative group/image max-w-2xl">
-              {imageContent ? (
-                <div className="relative rounded-[2rem] overflow-hidden border border-border/40 shadow-2xl">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={imageContent} alt="Cover" className="w-full h-64 object-cover" />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/image:opacity-100 transition-all flex items-center justify-center gap-3">
-                    <Button variant="secondary" size="sm" className="rounded-xl font-bold text-[10px] uppercase" onClick={() => fileInputRef.current?.click()}>Alterar</Button>
-                    <Button variant="destructive" size="icon" className="h-9 w-9 rounded-xl" onClick={() => setImageContent(null)}>
-                      <Trash2 size={16} />
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <Button variant="ghost" className="w-full h-32 border-2 border-dashed border-border/40 rounded-[2rem] hover:bg-primary/5 flex flex-col gap-2" onClick={() => fileInputRef.current?.click()}>
-                  <ImageIcon className="h-6 w-6 text-muted-foreground/40" />
-                  <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40">Inserir Mídia de Capa</span>
+        {/* Capa (opcional, compacta) */}
+        <div className="relative group/image">
+          {imageContent ? (
+            <div className="relative rounded-xl overflow-hidden border border-border/40 shadow-sm">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={imageContent} alt="Capa" className="w-full h-40 object-cover" />
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/image:opacity-100 transition-all flex items-center justify-center gap-3">
+                <Button variant="secondary" size="sm" className="rounded-xl font-semibold" onClick={() => fileInputRef.current?.click()}>Alterar</Button>
+                <Button variant="destructive" size="icon" className="h-9 w-9 rounded-xl" onClick={() => setImageContent(null)}>
+                  <Trash2 size={16} />
                 </Button>
-              )}
-            </div>
-
-            <div className="space-y-4">
-              <input
-                value={title}
-                onChange={e => setTitle(e.target.value)}
-                placeholder="Título da Missão..."
-                className="w-full bg-transparent text-4xl lg:text-6xl font-black tracking-tighter outline-none border-none p-0 focus:ring-0"
-              />
-              <Separator className="bg-border/40" />
-              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground/30">
-                <Info size={12} /> Briefing Técnico
               </div>
-              <Textarea
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                onPaste={onPaste}
-                variant="ghost"
-                placeholder="Detalhes operacionais..."
-                className="min-h-[400px] text-xl leading-relaxed px-0 placeholder:text-muted-foreground/10"
-              />
             </div>
-          </div>
-        </main>
+          ) : (
+            <Button variant="ghost" className="w-full h-20 border-2 border-dashed border-border/40 rounded-xl hover:bg-primary/5 hover:border-primary/30 flex items-center justify-center gap-2 transition-colors text-muted-foreground" onClick={() => fileInputRef.current?.click()}>
+              <ImageIcon className="h-5 w-5" />
+              <span className="text-xs font-semibold">Adicionar imagem de capa</span>
+            </Button>
+          )}
+        </div>
 
-        {/* COLUNA DIREITA: SIDEBAR */}
-        <EditModalSidebar
-          status={status}
-          setStatus={setStatus}
-          priority={priority}
-          setPriority={setPriority}
-          dueDate={dueDate}
-          setDueDate={setDueDate}
-          progress={progress}
-          setProgress={setProgress}
-          onProgressChange={onProgressChange}
-          estimatedTime={estimatedTime}
-          setEstimatedTime={setEstimatedTime}
+        {/* Título */}
+        <input
+          value={title}
+          onChange={e => setTitle(e.target.value)}
+          placeholder="Título da tarefa..."
+          className="w-full bg-transparent text-2xl font-bold tracking-tight outline-none border-none p-0 focus:ring-0 placeholder:text-muted-foreground/40"
         />
+
+        {/* Descrição */}
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <Info size={13} /> Descrição
+          </label>
+          <Textarea
+            value={description}
+            onChange={e => setDescription(e.target.value)}
+            onPaste={onPaste}
+            variant="default"
+            placeholder="Adicione detalhes, contexto e próximos passos..."
+            className="min-h-[140px] text-[15px] leading-relaxed text-foreground"
+          />
+        </div>
+
+        {/* Propriedades (em grade, no corpo) */}
+        <div className="space-y-3">
+          <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <SlidersHorizontal size={13} /> Propriedades
+          </label>
+          <TaskProperties
+            status={status}
+            setStatus={setStatus}
+            priority={priority}
+            setPriority={setPriority}
+            dueDate={dueDate}
+            setDueDate={setDueDate}
+            progress={progress}
+            setProgress={setProgress}
+            onProgressChange={onProgressChange}
+            estimatedTime={estimatedTime}
+            setEstimatedTime={setEstimatedTime}
+          />
+        </div>
+
+        {/* Tags, anexos & relações */}
+        <div className="space-y-4 pt-2 border-t border-border/40">
+          <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <TagIcon size={13} /> Tags, anexos & relações
+          </label>
+          <EntityTags entityType="task" entityId={task.id} />
+          <EntityAttachments entityType="task" entityId={task.id} />
+          <EntityLinks entityType="task" entityId={task.id} />
+        </div>
       </div>
 
-      {/* 3. RODAPÉ / DELETE CENTRALIZADO */}
+      {/* RODAPÉ */}
       <EditModalFooter onDelete={onDelete} isSaving={isSaving} onSave={handleFormSubmit} />
 
       <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={onImageUpload} />

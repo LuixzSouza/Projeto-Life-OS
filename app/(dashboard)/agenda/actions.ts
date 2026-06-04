@@ -3,6 +3,8 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireUserId, getCurrentUserId } from "@/lib/auth";
+import { logActivity } from "@/lib/activity";
+import { notify } from "@/lib/notifications";
 
 // --- EVENTOS (Agora com suporte a Timeblocking real) ---
 
@@ -34,7 +36,7 @@ export async function createEvent(formData: FormData) {
 
   const userId = await requireUserId();
 
-  await prisma.event.create({
+  const created = await prisma.event.create({
     data: {
       title,
       description: description || null,
@@ -46,6 +48,29 @@ export async function createEvent(formData: FormData) {
       userId,
     },
   });
+
+  await logActivity({
+    action: "CREATE",
+    module: "agenda",
+    entityType: "event",
+    entityId: created.id,
+    summary: `Criou o evento "${created.title}"`,
+  });
+
+  // Aviso pontual: evento marcado para as próximas 24h. Mesma chave (type/entity)
+  // do generateReminders, então não duplica quando os lembretes são gerados depois.
+  const msUntil = startTime.getTime() - Date.now();
+  if (msUntil > 0 && msUntil <= 24 * 3600 * 1000) {
+    await notify({
+      type: "EVENT",
+      title: `Em breve: ${created.title}`,
+      body: created.location ?? undefined,
+      entityType: "event",
+      entityId: created.id,
+      actionUrl: "/agenda",
+      dueAt: startTime,
+    });
+  }
 
   revalidatePath("/agenda");
 }
@@ -90,9 +115,21 @@ export async function updateEvent(formData: FormData) {
   revalidatePath("/agenda");
 }
 
+// Soft-delete: o evento vai para a Lixeira (deletedAt) e some das listagens.
+// Restaurar/excluir em definitivo: ver app/(dashboard)/trash.
 export async function deleteEvent(eventId: string) {
   const userId = await requireUserId();
-  await prisma.event.deleteMany({ where: { id: eventId, userId } });
+  const event = await prisma.event.findFirst({ where: { id: eventId, userId }, select: { title: true } });
+  await prisma.event.updateMany({ where: { id: eventId, userId }, data: { deletedAt: new Date() } });
+
+  await logActivity({
+    action: "DELETE",
+    module: "agenda",
+    entityType: "event",
+    entityId: eventId,
+    summary: event ? `Moveu "${event.title}" para a lixeira` : "Excluiu um evento",
+  });
+
   revalidatePath("/agenda");
 }
 

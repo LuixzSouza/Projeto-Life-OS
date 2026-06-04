@@ -31,15 +31,17 @@ export function TaskItem({ task, viewMode }: TaskItemProps) {
   const [imageContent, setImageContent] = useState<string | null>(task.image);
   const [isPinned, setIsPinned] = useState(task.isPinned || false);
   const [isStarred, setIsStarred] = useState(task.isStarred || false);
+  const [isDone, setIsDone] = useState(task.isDone || false);
   const [progress, setProgress] = useState(task.progress || 0);
   const [estimatedTime, setEstimatedTime] = useState(task.estimatedTime || 60);
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Sincronização de props
   useEffect(() => {
     setIsPinned(task.isPinned || false);
     setIsStarred(task.isStarred || false);
+    setIsDone(task.isDone || false);
     setProgress(task.progress || 0);
     setEstimatedTime(task.estimatedTime || 60);
     setImageContent(task.image);
@@ -48,8 +50,19 @@ export function TaskItem({ task, viewMode }: TaskItemProps) {
   // --- ACTIONS RÁPIDAS (TOOLTIPS/BADGES) ---
 
   const handleToggle = useCallback((checked: CheckedState) => {
+    const next = checked === true;
+    // Optimistic UI: reflete a marcação na hora; o servidor revalida em segundo plano.
+    setIsDone(next);
+    setProgress(next ? 100 : 0);
     startTransition(async () => {
-      await toggleTask(task.id, checked === true);
+      try {
+        await toggleTask(task.id, next);
+      } catch {
+        // Reverte se o servidor falhar.
+        setIsDone(!next);
+        setProgress(!next ? 100 : 0);
+        toast.error('Falha ao atualizar a tarefa.');
+      }
     });
   }, [task.id]);
 
@@ -173,13 +186,14 @@ export function TaskItem({ task, viewMode }: TaskItemProps) {
     toast.success('Link de acesso copiado');
   }, [task.id]);
 
-  const isOverdue = !!(task.dueDate && isPast(task.dueDate) && !isToday(task.dueDate) && !task.isDone);
+  const isOverdue = !!(task.dueDate && isPast(task.dueDate) && !isToday(task.dueDate) && !isDone);
 
   const commonProps = {
     task,
     isOverdue,
     isPinned,
     isStarred,
+    isDone,
     progress,
     estimatedTime,
     onToggle: handleToggle,

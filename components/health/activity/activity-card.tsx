@@ -5,7 +5,7 @@ import { Workout } from "@prisma/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dumbbell, Footprints, Clock, Trash2, Pencil, Zap, Timer, Target, type LucideIcon } from "lucide-react";
+import { Dumbbell, Footprints, Clock, Trash2, Zap, Timer, Target, Tags, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import {
@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { ExerciseItem } from "./activity-types";
 
-export function ActivityCard({ workout, onDelete }: { workout: Workout, onDelete: (id: string) => void }) {
+export function ActivityCard({ workout, onDelete, onConnections }: { workout: Workout, onDelete: (id: string) => void, onConnections: (workout: Workout) => void }) {
   const isRun = workout.type === 'RUN' || workout.type === 'RUNNING';
 
   const parsedExercises = useMemo<ExerciseItem[]>(() => {
@@ -58,8 +58,8 @@ export function ActivityCard({ workout, onDelete }: { workout: Workout, onDelete
 
               {/* AÇÕES */}
               <div className="flex gap-1.5 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg hover:bg-primary/10 hover:text-primary">
-                  <Pencil className="h-4 w-4" />
+                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg hover:bg-primary/10 hover:text-primary" title="Tags & Anexos" onClick={() => onConnections(workout)}>
+                  <Tags className="h-4 w-4" />
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>

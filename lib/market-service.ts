@@ -2,6 +2,11 @@
 
 export type MarketType = "INDEX" | "CURRENCY" | "STOCK" | "FII" | "CRYPTO" | "ETF";
 
+export interface HistoryPoint {
+  date: string; // ISO (YYYY-MM-DD)
+  close: number;
+}
+
 export interface MarketItem {
   ticker: string;
   name: string;
@@ -29,7 +34,6 @@ interface BrapiResult {
   logourl?: string; 
 }
 
-const BRAPI_TOKEN = process.env.BRAPI_TOKEN || "public"; 
 const DEFAULT_STOCKS = ["PETR4", "VALE3", "ITUB4", "WEGE3", "MXRF11", "HGLG11", "IVVB11", "BOVA11", "BBAS3", "RENT3"];
 
 // --- HELPERS ---
@@ -122,60 +126,76 @@ async function getMoedas(): Promise<MarketItem[]> {
   }
 }
 
-// --- 3. BRAPI (Ações) ---
-async function getAcoes(customTickers?: string[]): Promise<MarketItem[]> {
+// Mapeia um resultado bruto da brapi para o nosso MarketItem.
+function mapAcao(item: BrapiResult): MarketItem {
+  const isFII = item.symbol.endsWith("11") && !["IVVB11", "BOVA11", "XINA11", "SMAL11"].includes(item.symbol);
+  const isETF = ["IVVB11", "BOVA11", "SMAL11"].includes(item.symbol);
+  const type: MarketType = isFII ? "FII" : isETF ? "ETF" : "STOCK";
+  return {
+    ticker: item.symbol,
+    name: cleanName(item.longName || item.shortName || item.symbol, item.symbol),
+    value: item.regularMarketPrice,
+    variation: item.regularMarketChangePercent,
+    type,
+    displayValue: formatBRL(item.regularMarketPrice),
+    dayHigh: item.regularMarketDayHigh,
+    dayLow: item.regularMarketDayLow,
+    volume: formatCompact(item.regularMarketVolume),
+    marketCap: formatCompact(item.marketCap),
+    logoUrl: item.logourl || `https://ui-avatars.com/api/?name=${item.symbol}&background=random`,
+  };
+}
+
+// Busca um único ticker (funciona até com o token "public").
+async function fetchOneAcao(ticker: string, token: string): Promise<MarketItem | null> {
   try {
-    const tickersToFetch = customTickers?.length ? customTickers : DEFAULT_STOCKS;
-    
-    // Proteção contra chamadas vazias
-    if (tickersToFetch.length === 0) return [];
-
-    const res = await fetch(`https://brapi.dev/api/quote/${tickersToFetch.join(",")}?range=1d&interval=1d&token=${BRAPI_TOKEN}`, { next: { revalidate: 300 } });
-
-    // Tratamento de erro específico para não poluir o log do build
-    if (!res.ok) { 
-        // Se for erro de autenticação ou limite, apenas retorna array vazio
-        if (res.status === 401 || res.status === 429) return [];
-        return []; 
-    }
-
+    const res = await fetch(`https://brapi.dev/api/quote/${ticker}?token=${token}`, { next: { revalidate: 300 } });
+    if (!res.ok) return null;
     const data = await res.json();
-    if (!data.results) return [];
-
-    return data.results.map((item: BrapiResult) => {
-        const isFII = item.symbol.endsWith("11") && !["IVVB11", "BOVA11", "XINA11", "SMAL11"].includes(item.symbol);
-        const isETF = ["IVVB11", "BOVA11", "SMAL11"].includes(item.symbol);
-        
-        const type: MarketType = isFII ? "FII" : isETF ? "ETF" : "STOCK";
-
-        return {
-            ticker: item.symbol,
-            name: cleanName(item.longName || item.shortName || item.symbol, item.symbol),
-            value: item.regularMarketPrice,
-            variation: item.regularMarketChangePercent,
-            type,
-            displayValue: formatBRL(item.regularMarketPrice),
-            dayHigh: item.regularMarketDayHigh,
-            dayLow: item.regularMarketDayLow,
-            volume: formatCompact(item.regularMarketVolume),
-            marketCap: formatCompact(item.marketCap),
-            logoUrl: item.logourl || `https://ui-avatars.com/api/?name=${item.symbol}&background=random` 
-        };
-    });
-  } catch (e) {
-    // Silencia o erro no console durante o build, a menos que estejamos em DEV
-    if (process.env.NODE_ENV === 'development') console.warn("Brapi fetch warning");
-    return [];
+    const item: BrapiResult | undefined = data?.results?.[0];
+    if (!item || typeof item.regularMarketPrice !== "number") return null;
+    return mapAcao(item);
+  } catch {
+    return null;
   }
 }
 
+// --- 3. BRAPI (Ações) ---
+// Estratégia: tenta o lote (1 requisição, eficiente com token válido). Se falhar
+// (ex.: token "public" não aceita multi-ticker), faz fallback ticker-a-ticker —
+// que funciona em qualquer plano. Cada chamada tem cache de 5min (revalidate),
+// então o auto-refresh não estoura a cota.
+async function getAcoes(customTickers?: string[], token?: string): Promise<MarketItem[]> {
+  const tickersToFetch = customTickers?.length ? customTickers : DEFAULT_STOCKS;
+  if (tickersToFetch.length === 0) return [];
+
+  const BRAPI_TOKEN = token?.trim() || process.env.BRAPI_TOKEN?.trim() || "public";
+
+  // 1) Tenta o lote.
+  try {
+    const res = await fetch(`https://brapi.dev/api/quote/${tickersToFetch.join(",")}?token=${BRAPI_TOKEN}`, { next: { revalidate: 300 } });
+    if (res.ok) {
+      const data = await res.json();
+      if (!data?.error && Array.isArray(data?.results) && data.results.length > 0) {
+        return data.results.map(mapAcao);
+      }
+    }
+  } catch {
+    /* cai no fallback */
+  }
+
+  // 2) Fallback: busca individual (robusto em qualquer plano).
+  const results = await Promise.all(tickersToFetch.map((t) => fetchOneAcao(t, BRAPI_TOKEN)));
+  return results.filter((x): x is MarketItem => x !== null);
+}
+
 // --- MAIN FUNCTION ---
-export async function getMarketOverview(customTickers?: string[]): Promise<MarketItem[]> {
+export async function getMarketOverview(customTickers?: string[], token?: string): Promise<MarketItem[]> {
   // Promise.allSettled garante que se uma API falhar, as outras continuam e a página renderiza
   const [macro, moedas, bolsa] = await Promise.allSettled([
-      getIndicadoresMacro(), 
-      getMoedas(), 
-      getAcoes(customTickers)
+      getIndicadoresMacro(),
+      getMoedas(),
+      getAcoes(customTickers, token)
   ]);
 
   return [

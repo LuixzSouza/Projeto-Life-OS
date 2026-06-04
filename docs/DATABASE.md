@@ -275,3 +275,47 @@ verificado nas duas pontas. Hardening (userId NOT NULL / updatedAt p/ sync) fico
 _03/jun/2026 — Próximos passos (lote 11): **Central de Anotações** (`/notes`) criada do zero — deu UI à `StudyNote`
 (criar/editar/favoritar/buscar/vincular matéria), com soft-delete (11º tipo na lixeira) e tecido conectivo embutido
 (`note` agora plugado, 16/17 entityTypes). Detalhe da matéria passou a filtrar notas `deletedAt`. Só `goal` segue sem tela._
+
+
+Honestamente, as frentes claramente seguras e de alto valor estão praticamente esgotadas. O que resta são decisões maiores: @@unique([userId,title]) em StudySubject (precisa migration + checar
+  duplicatas) ou o hardening userId NOT NULL (~35 arquivos, você adiou 2×). Recomendo commitar os 7 lotes agora (sugiro: 1 commit de schema/migrations/baseline + 1 de otimizações de app) antes de
+  entrar em algo mais invasivo
+
+   Sua dúvida: como armazenar "no computador da própria pessoa" pelo site?
+
+  Essa é a pergunta-chave da arquitetura, e tem uma pegadinha técnica importante:
+
+  ▎ Um site hospedado (Vercel/serverless) fisicamente NÃO consegue gravar no disco do visitante. O servidor Next roda na nuvem, e o navegador é sandboxed — não escreve arquivos arbitrários na
+  ▎ máquina. Então "salvar no PC da pessoa pelo site" não acontece do jeito que parece.
+
+  O que o seu código já modela (lib/db-config.ts → DbProfile = local | cloud, e lib/prisma.ts → buildClient) é a mesma base rodando em dois canais diferentes:
+
+  1. Web hospedada (Vercel) → sempre nuvem (Turso)
+
+  O servidor está remoto → o life_os.db viveria no servidor, não no usuário. Por isso, na web, o armazenamento é Turso. Não dá pra ser "local" aqui — o servidor não está na máquina da pessoa.
+
+  2. App Desktop (seu launcher / Tauri) → aí sim, local no PC
+
+  O mesmo app Next roda NA máquina do usuário. Aí o SQLite (life_os.db) fica numa pasta que a pessoa escolhe (settings/actions/storage.ts → updateStoragePath copia o arquivo e reconecta o Prisma). É
+  esse o caminho "local-first no seu próprio computador" — não o site hospedado, e sim o build desktop.
+
+  ▎ Repare: updateStoragePath já avisa que falha em FS read-only (Vercel). Ou seja, o próprio código assume "mover pasta = só no desktop".
+
+  Se você quer MESMO o navegador guardando local (sem servidor)
+
+  Aí são outras tecnologias, e nenhuma usa Prisma (Prisma só roda no servidor):
+  - SQLite em WASM + OPFS/IndexedDB (ex.: libSQL WASM, wa-sqlite): o banco roda dentro da aba e persiste no armazenamento do navegador, no disco do usuário. Custo: reescrever a camada de dados pro
+  client (hoje tudo é Server Action).
+  - File System Access API: o usuário escolhe um .db real e o site lê/grava nele. Só Chromium, e também sem Prisma.
+
+  → Conclusão honesta: virar isso no site = reescrita grande da camada de dados. Não recomendo agora.
+
+  Recomendação prática (com o que já existe)
+
+  1. Site hospedado → Turso (nuvem), com export/backup do .db portátil (você já tem BackupLog + rota de backup) como "você é dono dos seus dados": a pessoa baixa o arquivo e leva embora.
+  2. Local-first de verdade → entrega pelo build desktop (Tauri/launcher): SQLite na pasta escolhida, offline, arquivo portátil que ela move/backupa pela UI.
+  3. Melhor dos dois (futuro) → embedded replica do libSQL/Turso no desktop: arquivo local + sync com a nuvem (offline-first com sincronização). É a evolução natural do DbProfile.
+
+  Resumindo numa frase: na web = Turso; "no computador da pessoa" = o build desktop rodando o mesmo app; o elo entre os dois é o arquivo .db portátil (export/import) que o usuário controla.
+
+  Quer que eu detalhe algum desses caminhos (ex.: esboçar o fluxo export→import entre web e desktop, ou avaliar a embedded replica do Turso)?

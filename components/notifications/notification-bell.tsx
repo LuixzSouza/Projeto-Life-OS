@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Bell, Check, CheckCheck, RefreshCw, Calendar, Cake, Receipt, ListTodo, Layers, Inbox } from "lucide-react";
+import { Bell, Check, CheckCheck, RefreshCw, Calendar, Cake, Receipt, ListTodo, Layers, Inbox, BadgeCheck } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -17,6 +17,7 @@ import type { ClientNotification, NotificationInbox } from "@/lib/notifications"
 
 const ICONS: Record<string, React.ElementType> = {
   INVOICE_DUE: Receipt,
+  INVOICE_PAID: BadgeCheck,
   EVENT: Calendar,
   BIRTHDAY: Cake,
   TASK_DUE: ListTodo,

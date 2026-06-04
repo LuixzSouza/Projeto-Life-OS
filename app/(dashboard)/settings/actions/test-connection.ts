@@ -119,6 +119,13 @@ export async function testApiConnection(input: TestConnectionInput): Promise<Tes
           ? { success: true, message: "Chave Google Books válida." }
           : { success: false, message: r.status === 400 || r.status === 403 ? "Chave Google Books inválida." : `Google Books respondeu ${r.status}.` };
       }
+      case "brapi": {
+        const r = await fetchWithTimeout(
+          `https://brapi.dev/api/quote/PETR4?token=${encodeURIComponent(key)}`
+        );
+        if (r.ok) return { success: true, message: "Token brapi válido — cotações da B3 liberadas." };
+        return { success: false, message: r.status === 401 ? "Token brapi inválido." : `brapi respondeu ${r.status}.` };
+      }
       case "pluggy": {
         if (!key || !secret) {
           return { success: false, message: "Pluggy exige Client ID e Client Secret." };

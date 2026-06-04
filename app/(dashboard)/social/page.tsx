@@ -11,7 +11,7 @@ export default async function SocialPage() {
   // 1. Data Fetching
   const userId = await getCurrentUserId();
   const friends = await prisma.friend.findMany({
-    where: { userId: userId ?? "" },
+    where: { userId: userId ?? "", deletedAt: null },
     include: {
       clients: { select: { id: true, name: true, company: true } }
     },

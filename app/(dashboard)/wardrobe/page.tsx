@@ -66,7 +66,7 @@ function HighlightCard({ label, value, subValue, icon: Icon, variant = "default"
 export default async function WardrobePage() {
   const userId = await getCurrentUserId();
   const items = await prisma.wardrobeItem.findMany({
-    where: { userId: userId ?? "" },
+    where: { userId: userId ?? "", deletedAt: null },
     orderBy: { createdAt: 'desc' }
   });
 

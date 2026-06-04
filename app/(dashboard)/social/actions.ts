@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserId } from "@/lib/auth";
+import { logActivity } from "@/lib/activity";
 
 // --- HELPERS DE FORMATAÇÃO ---
 
@@ -62,11 +63,19 @@ export async function createFriend(formData: FormData) {
     const data = extractFriendData(formData);
     if (!data.name) return { success: false, message: "O nome é obrigatório." };
 
-    await prisma.friend.create({
+    const created = await prisma.friend.create({
       data: {
         userId,
         ...data
       }
+    });
+
+    await logActivity({
+      action: "CREATE",
+      module: "social",
+      entityType: "friend",
+      entityId: created.id,
+      summary: `Adicionou a conexão "${created.name}"`,
     });
 
     revalidatePath("/social");
@@ -124,19 +133,30 @@ export async function deleteFriend(id: string) {
     if (!userId) return { success: false, message: "Sessão expirada. Autentique-se novamente." };
     if (!id) return { success: false, message: "ID inválido." };
 
-    const result = await prisma.friend.deleteMany({
-      where: { 
+    // Soft-delete: vai para a Lixeira (deletedAt). Restaurar/excluir: ver /trash.
+    const friend = await prisma.friend.findFirst({ where: { id, userId }, select: { name: true } });
+    const result = await prisma.friend.updateMany({
+      where: {
         id: id,
-        userId: userId 
-      }
+        userId: userId
+      },
+      data: { deletedAt: new Date() }
     });
 
     if (result.count === 0) {
         return { success: false, message: "Contato não encontrado ou permissão negada." };
     }
 
+    await logActivity({
+      action: "DELETE",
+      module: "social",
+      entityType: "friend",
+      entityId: id,
+      summary: friend ? `Moveu "${friend.name}" para a lixeira` : "Removeu uma conexão",
+    });
+
     revalidatePath("/social");
-    return { success: true, message: "Conexão removida do seu acervo." };
+    return { success: true, message: "Conexão movida para a lixeira." };
 
   } catch (error) {
     console.error("Erro ao deletar:", error);

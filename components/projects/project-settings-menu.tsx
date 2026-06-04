@@ -10,24 +10,21 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuLabel 
 } from "@/components/ui/dropdown-menu";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogDescription, 
-  DialogFooter 
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  MoreHorizontal, 
-  Pencil, 
-  Trash2, 
-  AlertTriangle, 
-  Link as LinkIcon,
+import {
+  MoreHorizontal,
+  Pencil,
+  Trash2,
   Check,
   Palette,
   Settings2,
@@ -35,7 +32,8 @@ import {
   Copy
 } from "lucide-react";
 import { toast } from "sonner";
-import { updateProject, deleteProject } from "@/app/(dashboard)/projects/actions";
+import { updateProject } from "@/app/(dashboard)/projects/actions";
+import { DeleteProjectDialog } from "./delete-project-dialog";
 import { cn } from "@/lib/utils";
 
 const PROJECT_COLORS = [
@@ -70,19 +68,6 @@ export function ProjectSettingsMenu({
   const [isLoading, setIsLoading] = useState(false);
   const [selectedColor, setSelectedColor] = useState(projectColor);
 
-  const handleDelete = async () => {
-    setIsLoading(true);
-    try {
-      await deleteProject(projectId);
-      toast.success("Projeto excluído com sucesso.");
-      router.push("/projects"); 
-    } catch (error) {
-      toast.error("Erro ao excluir projeto.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleUpdate = async (formData: FormData) => {
     setIsLoading(true);
     try {
@@ -91,8 +76,8 @@ export function ProjectSettingsMenu({
       await updateProject(formData);
       toast.success("Propriedades atualizadas!");
       setIsEditOpen(false);
-      router.refresh(); 
-    } catch (error) {
+      router.refresh();
+    } catch {
       toast.error("Erro ao salvar alterações.");
     } finally {
       setIsLoading(false);
@@ -133,8 +118,8 @@ export function ProjectSettingsMenu({
             onSelect={() => setIsDeleteOpen(true)} 
             className="rounded-xl px-3 py-2.5 gap-3 text-rose-500 focus:text-rose-500 focus:bg-rose-500/10 cursor-pointer"
           >
-            <Trash2 className="h-4 w-4" /> 
-            <span className="font-bold text-sm">Arquivar projeto</span>
+            <Trash2 className="h-4 w-4" />
+            <span className="font-bold text-sm">Mover para a lixeira</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -199,43 +184,14 @@ export function ProjectSettingsMenu({
         </DialogContent>
       </Dialog>
 
-      {/* --- MODAL DE EXCLUSÃO (DANGER ZONE) --- */}
-      <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-        <DialogContent className="fixed left-[50%] top-[50%] z-50 grid w-[95vw] sm:max-w-[420px] translate-x-[-50%] translate-y-[-50%] p-0 overflow-hidden bg-zinc-950 border-rose-500/20 shadow-2xl rounded-[2.5rem]">
-          <div className="p-8 space-y-6">
-            <div className="flex flex-col items-center text-center space-y-4">
-                <div className="h-16 w-16 rounded-3xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-500 animate-pulse">
-                    <AlertTriangle className="h-8 w-8" />
-                </div>
-                <div className="space-y-1.5">
-                    <DialogTitle className="text-2xl font-black uppercase tracking-tighter text-zinc-100">Cuidado Crítico</DialogTitle>
-                    <DialogDescription className="text-zinc-400 font-medium leading-relaxed">
-                        Você está prestes a excluir o projeto <strong className="text-zinc-100">{projectTitle}</strong>. Esta ação não pode ser desfeita.
-                    </DialogDescription>
-                </div>
-            </div>
-
-            <div className="bg-rose-500/5 rounded-2xl p-4 border border-rose-500/10">
-                <p className="text-[10px] font-black uppercase tracking-[0.15em] text-rose-500 mb-1">Impacto</p>
-                <p className="text-xs text-rose-200/60 font-medium">Todas as tarefas, quadros e histórico associados serão removidos permanentemente do banco de dados.</p>
-            </div>
-            
-            <div className="flex flex-col gap-3">
-                <Button 
-                    variant="destructive" 
-                    onClick={handleDelete} 
-                    disabled={isLoading}
-                    className="h-14 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl transition-all active:scale-95"
-                >
-                    {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Confirmar Exclusão"}
-                </Button>
-                <Button variant="ghost" onClick={() => setIsDeleteOpen(false)} className="h-12 text-zinc-400 hover:text-zinc-100 font-bold text-xs uppercase tracking-widest rounded-xl">
-                    Manter Projeto
-                </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* --- MODAL DE EXCLUSÃO (themeable, com Desfazer) --- */}
+      <DeleteProjectDialog
+        open={isDeleteOpen}
+        onOpenChange={setIsDeleteOpen}
+        projectId={projectId}
+        title={projectTitle}
+        onDeleted={() => router.push("/projects")}
+      />
     </>
   );
 }

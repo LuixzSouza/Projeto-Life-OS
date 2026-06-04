@@ -26,7 +26,7 @@ export default async function FinancePage() {
       userId ? prisma.user.findUnique({ where: { id: userId } }) : null,
       prisma.account.findMany({ where: { userId }, orderBy: { balance: "desc" } }),
       prisma.transaction.findMany({
-        where: { userId },
+        where: { userId, deletedAt: null },
         orderBy: { date: "desc" },
         take: 50,
         include: { account: true },
@@ -38,7 +38,7 @@ export default async function FinancePage() {
       }),
       // Transações da janela de 6 meses só para o gráfico de fluxo de caixa
       prisma.transaction.findMany({
-        where: { userId, date: { gte: flowWindowStart } },
+        where: { userId, deletedAt: null, date: { gte: flowWindowStart } },
         select: { amount: true, type: true, date: true },
       }),
     ]);

@@ -33,7 +33,7 @@ export function FriendDetailModal({ friend, onOpenChange, onEdit }: FriendDetail
 
   return (
     <Dialog open={!!friend} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl p-0 overflow-hidden bg-background border-border/40 shadow-2xl rounded-[2rem]">
+      <DialogContent size="lg" className="p-0">
         {friend && (() => {
           const age = calculateAge(friend.birthday);
           const bdayInfo = getBirthdayInfo(friend.birthday);

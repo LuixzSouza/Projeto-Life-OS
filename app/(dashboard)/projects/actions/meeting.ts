@@ -4,13 +4,16 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireUserId } from "@/lib/auth";
 import { decryptKey } from "@/lib/settings-crypto";
+import { parseMeetingImages, serializeMeetingImages, type MeetingImage } from "@/lib/meeting-images";
+import { parseActionItems } from "@/lib/meeting-summary";
+import { parseStringList, serializeStringList } from "@/lib/meeting-meta";
 import { callAIProvider } from "@/app/(dashboard)/ai/actions/providers";
 import type { AIKeys } from "@/app/(dashboard)/ai/actions/types";
 
 // Resolve o projeto garantindo que pertence ao usuário (senão fica sem projeto = Inbox).
 async function resolveProjectId(projectId: string | null | undefined, userId: string): Promise<string | null> {
   if (!projectId || projectId === "inbox") return null;
-  const owned = await prisma.project.findFirst({ where: { id: projectId, userId }, select: { id: true } });
+  const owned = await prisma.project.findFirst({ where: { id: projectId, userId, deletedAt: null }, select: { id: true } });
   return owned ? projectId : null;
 }
 
@@ -34,7 +37,16 @@ export async function createMeeting(input: { title: string; rawNotes?: string; p
   }
 }
 
-export async function updateMeeting(input: { id: string; title?: string; rawNotes?: string; image?: string | null }) {
+export async function updateMeeting(input: {
+  id: string;
+  title?: string;
+  rawNotes?: string;
+  image?: string | null;
+  images?: MeetingImage[];
+  participants?: string[];
+  tags?: string[];
+  decisions?: string[];
+}) {
   try {
     if (!input.id) return { success: false, message: "ID inválido." };
     const userId = await requireUserId();
@@ -45,6 +57,13 @@ export async function updateMeeting(input: { id: string; title?: string; rawNote
         ...(input.title !== undefined ? { title: input.title.trim() } : {}),
         ...(input.rawNotes !== undefined ? { rawNotes: input.rawNotes } : {}),
         ...(input.image !== undefined ? { image: input.image || null } : {}),
+        // Galeria: grava o array em `images` e espelha a 1ª em `image` (compat).
+        ...(input.images !== undefined
+          ? { images: serializeMeetingImages(input.images), image: input.images[0]?.src ?? null }
+          : {}),
+        ...(input.participants !== undefined ? { participants: serializeStringList(input.participants) } : {}),
+        ...(input.tags !== undefined ? { tags: serializeStringList(input.tags) } : {}),
+        ...(input.decisions !== undefined ? { decisions: serializeStringList(input.decisions) } : {}),
       },
     });
 
@@ -91,10 +110,18 @@ export async function getMeetingNotes(id: string) {
     const userId = await requireUserId();
     const m = await prisma.meeting.findFirst({
       where: { id, userId },
-      select: { rawNotes: true, summary: true, image: true },
+      select: { rawNotes: true, summary: true, image: true, images: true, participants: true, tags: true, decisions: true },
     });
     if (!m) return { success: false as const };
-    return { success: true as const, rawNotes: m.rawNotes, summary: m.summary, image: m.image };
+    return {
+      success: true as const,
+      rawNotes: m.rawNotes,
+      summary: m.summary,
+      images: parseMeetingImages(m.images, m.image),
+      participants: parseStringList(m.participants),
+      tags: parseStringList(m.tags),
+      decisions: parseStringList(m.decisions),
+    };
   } catch (error) {
     console.error("Erro ao carregar reunião:", error);
     return { success: false as const };
@@ -126,11 +153,24 @@ Receba as anotações cruas e produza, em português:
 2. Uma seção "Itens de ação:" listando as próximas tarefas, UMA POR LINHA começando com "- " (verbo no infinitivo, objetivas e curtas).
 Não invente informações que não estejam nas notas. Não use ferramentas.`;
 
+    // Reuniões longas (horas de transcrição) podem estourar o limite de tokens do
+    // modelo. Se as notas forem muito grandes, mantemos início + fim (onde costumam
+    // estar contexto e conclusões/decisões) e omitimos o miolo.
+    const MAX_SUMMARY_CHARS = 24000;
+    let notesForAI = meeting.rawNotes;
+    let truncatedNote = "";
+    if (notesForAI.length > MAX_SUMMARY_CHARS) {
+      const head = notesForAI.slice(0, Math.floor(MAX_SUMMARY_CHARS * 0.4));
+      const tail = notesForAI.slice(notesForAI.length - Math.floor(MAX_SUMMARY_CHARS * 0.55));
+      notesForAI = `${head}\n\n[...trecho intermediário omitido por tamanho...]\n\n${tail}`;
+      truncatedNote = " (notas longas: resumo baseado no início e no fim da reunião)";
+    }
+
     const { text: summary } = await callAIProvider(
       provider,
       settings?.aiModel || "",
       systemPrompt,
-      `Notas da reunião "${meeting.title}":\n\n${meeting.rawNotes}`,
+      `Notas da reunião "${meeting.title}":\n\n${notesForAI}`,
       [],
       keys,
     );
@@ -138,7 +178,7 @@ Não invente informações que não estejam nas notas. Não use ferramentas.`;
     await prisma.meeting.updateMany({ where: { id, userId }, data: { summary } });
 
     revalidatePath("/projects");
-    return { success: true, message: "Resumo gerado!", summary };
+    return { success: true, message: `Resumo gerado!${truncatedNote}`, summary };
   } catch (error) {
     console.error("Erro ao resumir reunião:", error);
     const message = error instanceof Error ? error.message : "Falha ao resumir.";
@@ -155,13 +195,7 @@ export async function createTasksFromMeeting(id: string) {
     if (!meeting.summary) return { success: false, message: "Gere o resumo primeiro." };
 
     // Extrai linhas que parecem itens de ação (bullets ou numeradas).
-    const items = meeting.summary
-      .split("\n")
-      .map((l) => l.trim())
-      .filter((l) => /^([-*•]|\d+[.)])\s+/.test(l))
-      .map((l) => l.replace(/^([-*•]|\d+[.)])\s+/, "").replace(/\*\*/g, "").trim())
-      .filter((l) => l.length > 1)
-      .slice(0, 30);
+    const items = parseActionItems(meeting.summary);
 
     if (items.length === 0) return { success: false, message: "Nenhum item de ação encontrado no resumo." };
 

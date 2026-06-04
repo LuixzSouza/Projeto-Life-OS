@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Globe, Film, Gamepad2, Banknote, Loader2, Shield,
   ExternalLink, Eye, EyeOff, Copy, Check, Info,
-  Key, Database, Lock, TestTube2, Sparkles, Plug, BookOpen, Salad
+  Key, Database, Lock, TestTube2, Sparkles, Plug, BookOpen, Salad, LineChart
 } from "lucide-react";
 import { useFormStatus } from "react-dom";
 import { updateApiKeys, testApiConnection } from "@/app/(dashboard)/settings/actions";
@@ -213,6 +213,7 @@ export default function APIIntegrationsForm({ settings }: APIIntegrationsFormPro
     googleBooksApiKey: getSettingValue(settings, "googleBooksApiKey") || "",
     pluggyClientId: getSettingValue(settings, "pluggyClientId") || "",
     pluggySecret: getSettingValue(settings, "pluggySecret") || "",
+    brapiToken: getSettingValue(settings, "brapiToken") || "",
   });
 
   // Toggle da busca online de alimentos (Open Food Facts — gratuita, sem chave).
@@ -227,6 +228,7 @@ export default function APIIntegrationsForm({ settings }: APIIntegrationsFormPro
     if (id === "tmdbApiKey") return testApiConnection({ type: "tmdb", key: value });
     if (id === "rawgApiKey") return testApiConnection({ type: "rawg", key: value });
     if (id === "googleBooksApiKey") return testApiConnection({ type: "googlebooks", key: value });
+    if (id === "brapiToken") return testApiConnection({ type: "brapi", key: value });
     if (id === "pluggyClientId" || id === "pluggySecret") {
       return testApiConnection({
         type: "pluggy",
@@ -242,6 +244,7 @@ export default function APIIntegrationsForm({ settings }: APIIntegrationsFormPro
     { id: "tmdbApiKey", name: "tmdb", label: "TMDB API", icon: Film, description: "Cine OS - Filmes e Séries", category: "content", link: { url: "https://www.themoviedb.org/settings/api", label: "Dashboard" } },
     { id: "rawgApiKey", name: "rawg", label: "RAWG API", icon: Gamepad2, description: "Game OS - Catálogo de Jogos", category: "content", link: { url: "https://rawg.io/apidocs", label: "Dashboard" } },
     { id: "googleBooksApiKey", name: "googlebooks", label: "Google Books API", icon: BookOpen, description: "Livros - Gratuita (eleva a cota de buscas)", category: "content", link: { url: "https://console.cloud.google.com/apis/library/books.googleapis.com", label: "Google Cloud" } },
+    { id: "brapiToken", name: "brapi", label: "brapi.dev Token", icon: LineChart, description: "Mercado/Carteira - Cotações da B3 (grátis)", category: "finance", link: { url: "https://brapi.dev/dashboard", label: "brapi.dev" } },
     { id: "pluggyClientId", name: "pluggy-client", label: "Pluggy Client ID", icon: Banknote, description: "Open Finance - Identificador", category: "finance", link: { url: "https://dashboard.pluggy.ai/", label: "Pluggy" } },
     { id: "pluggySecret", name: "pluggy-secret", label: "Pluggy Client Secret", icon: Shield, description: "Open Finance - Chave Secreta", category: "finance", link: { url: "https://dashboard.pluggy.ai/", label: "Pluggy" }, secret: true },
   ];

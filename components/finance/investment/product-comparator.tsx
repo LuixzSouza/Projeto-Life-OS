@@ -51,9 +51,9 @@ export function ProductComparator({ cdi }: ComparatorProps) {
                     <Info className="h-5 w-5" />
                 </div>
                 <div>
-                    <h4 className="font-extrabold text-foreground text-sm uppercase tracking-wider mb-1.5">Regra da Simulação</h4>
+                    <h4 className="font-extrabold text-foreground text-sm uppercase tracking-wider mb-1.5">Como ler esta simulação</h4>
                     <p className="text-sm text-muted-foreground font-medium leading-relaxed">
-                        Comparativo padronizado: Aporte único de <strong>R$ 1.000</strong> com resgate em <strong>5 anos</strong>, considerando a manutenção do CDI atual de <strong>{cdi}% a.a.</strong>
+                        Aporte único de <strong>R$ 1.000</strong> com resgate em <strong>5 anos</strong>, calculado com o <strong>CDI ao vivo de {cdi}% a.a.</strong> (Banco Central). As taxas de cada produto abaixo são <strong>exemplos ilustrativos</strong> de mercado — use para comparar o efeito de isenção de IR e do % do CDI. Sua carteira real fica na aba <strong>Carteira</strong>.
                     </p>
                 </div>
             </div>

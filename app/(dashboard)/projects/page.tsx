@@ -13,7 +13,7 @@ export default async function ProjectsPage() {
 
   const [projects, inboxStats, inboxCompleted] = await Promise.all([
     prisma.project.findMany({
-      where: { userId },
+      where: { userId, deletedAt: null },
       orderBy: { updatedAt: "desc" },
       select: {
         id: true, slug: true, title: true, description: true, status: true, color: true, updatedAt: true,

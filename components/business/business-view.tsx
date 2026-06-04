@@ -12,6 +12,7 @@ import { clearMask, generateChargeMessage, maskPhone } from "./business-helpers"
 import { ClientCard } from "./business-client-card"
 import { BillingReminders } from "./billing-reminders"
 import { ClientModal, BillingModal, InvoiceModal, BillingEditModal, DeleteAlert, PaymentModal } from "./business-modals"
+import { EntityConnectionsDialog } from "@/components/connect/entity-connections-dialog"
 
 // --- COMPONENTE PRINCIPAL ---
 export function BusinessView({ initialClients, accounts, friends, pixKey, businessName }: { initialClients: ClientData[]; accounts: AccountOption[]; friends: FriendOption[]; pixKey?: string; businessName?: string }) {
@@ -29,6 +30,7 @@ export function BusinessView({ initialClients, accounts, friends, pixKey, busine
   const [editingInvoice, setEditingInvoice] = useState<InvoiceData | null>(null)
   const [payingInvoice, setPayingInvoice] = useState<InvoiceData | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
+  const [connClient, setConnClient] = useState<{ id: string; title: string } | null>(null)
 
   const handleOpenNewClientModal = () => {
     setEditingClient(null)
@@ -141,6 +143,7 @@ export function BusinessView({ initialClients, accounts, friends, pixKey, busine
             onCopyPhone={handleCopyPhone}
             onEditClient={handleOpenEditClientModal}
             onDeleteTarget={setDeleteTarget}
+            onOpenConnections={(c) => setConnClient({ id: c.id, title: c.name })}
             onNewBilling={setSelectedClientForBilling}
             onEditBilling={setEditingBilling}
             onEditInvoice={setEditingInvoice}
@@ -188,6 +191,12 @@ export function BusinessView({ initialClients, accounts, friends, pixKey, busine
         target={deleteTarget}
         onClose={() => setDeleteTarget(null)}
         onConfirm={executeDelete}
+      />
+
+      <EntityConnectionsDialog
+        entityType="client"
+        item={connClient}
+        onOpenChange={(o) => !o && setConnClient(null)}
       />
 
     </div>

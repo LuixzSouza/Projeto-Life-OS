@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Plus, Layers, Trash2, PlayCircle, Edit3, Link as LinkIcon,
-  MoreVertical, FolderTree, Zap, CheckCircle2,
+  MoreVertical, FolderTree, Zap, CheckCircle2, Tags,
 } from "lucide-react";
 import { countDue, type DeckWithCount } from "./deck-grid-types";
 
@@ -17,9 +17,10 @@ interface DeckCardProps {
   deck: DeckWithCount;
   onStudy: (deck: DeckWithCount) => void;
   onDelete: (deckId: string) => void;
+  onConnections: (deck: DeckWithCount) => void;
 }
 
-export function DeckCard({ deck, onStudy, onDelete }: DeckCardProps) {
+export function DeckCard({ deck, onStudy, onDelete, onConnections }: DeckCardProps) {
   const total = deck.cards.length;
   const hasCards = total > 0;
   const due = countDue(deck.cards);
@@ -74,6 +75,9 @@ export function DeckCard({ deck, onStudy, onDelete }: DeckCardProps) {
                     <Edit3 className="mr-2 h-4 w-4" /> Editar cartões
                   </DropdownMenuItem>
                 </Link>
+                <DropdownMenuItem className="cursor-pointer py-2 font-medium" onClick={() => onConnections(deck)}>
+                  <Tags className="mr-2 h-4 w-4" /> Tags & Anexos
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="cursor-pointer py-2 font-medium text-destructive focus:bg-destructive/10 focus:text-destructive"

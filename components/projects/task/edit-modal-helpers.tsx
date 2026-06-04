@@ -7,8 +7,8 @@ import type { LucideIcon } from 'lucide-react';
 
 export function PropertyRow({ icon: Icon, label, children }: { icon: LucideIcon; label: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-2.5 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/30">
+    <div className="space-y-2.5">
+      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
         <Icon size={14} /> {label}
       </div>
       {children}
@@ -33,7 +33,7 @@ export function QuickAction({ icon: Icon, active, color, onClick, tooltip }: { i
           <Icon size={20} className={cn(active && "fill-current")} />
         </Button>
       </TooltipTrigger>
-      <TooltipContent side="top" className="text-[10px] font-black uppercase tracking-widest bg-zinc-950 border-none text-white px-3 py-1.5 shadow-2xl">
+      <TooltipContent side="top" className="text-[11px] font-semibold bg-foreground text-background border-none px-2.5 py-1 shadow-lg">
         {tooltip}
       </TooltipContent>
     </Tooltip>

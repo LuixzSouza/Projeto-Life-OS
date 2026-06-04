@@ -11,6 +11,8 @@ export interface TaskBaseProps {
   isOverdue: boolean;
   isPinned: boolean;
   isStarred: boolean;
+  /** Estado de conclusão controlado localmente (optimistic UI). */
+  isDone: boolean;
   progress: number;
   estimatedTime?: number;
   onToggle: (checked: CheckedState) => void;

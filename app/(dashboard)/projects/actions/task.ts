@@ -32,7 +32,7 @@ export async function createTask(formData: FormData) {
   // Resolve o projeto: só aceita se pertencer ao usuário (senão cai no Inbox)
   let resolvedProjectId: string | null = null;
   if (projectId && projectId !== "inbox") {
-    const owned = await prisma.project.findFirst({ where: { id: projectId, userId }, select: { id: true } });
+    const owned = await prisma.project.findFirst({ where: { id: projectId, userId, deletedAt: null }, select: { id: true } });
     resolvedProjectId = owned ? projectId : null;
   }
 
@@ -103,23 +103,24 @@ export async function updateTask(formData: FormData) {
   revalidatePath("/projects");
 }
 
+// `isDone` é o estado DESEJADO (vindo do checkbox), aplicado diretamente.
 export async function toggleTask(taskId: string, isDone: boolean) {
   const userId = await requireUserId();
   await prisma.task.updateMany({
     where: { id: taskId, userId },
     data: {
-      isDone: !isDone,
-      status: !isDone ? "DONE" : "TODO",
-      progress: !isDone ? 100 : 0 // Sincroniza progresso com checkbox
+      isDone: isDone,
+      status: isDone ? "DONE" : "TODO",
+      progress: isDone ? 100 : 0 // Sincroniza progresso com checkbox
     },
   });
 
   await logActivity({
-    action: !isDone ? "COMPLETE" : "REOPEN",
+    action: isDone ? "COMPLETE" : "REOPEN",
     module: "tasks",
     entityType: "task",
     entityId: taskId,
-    summary: !isDone ? "Concluiu uma tarefa" : "Reabriu uma tarefa",
+    summary: isDone ? "Concluiu uma tarefa" : "Reabriu uma tarefa",
   });
 
   revalidatePath("/projects");

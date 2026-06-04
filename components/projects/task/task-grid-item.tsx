@@ -16,7 +16,7 @@ type TaskPriority = "HIGH" | "MEDIUM" | "LOW";
 type TaskStatus = "TODO" | "IN_PROGRESS" | "DONE" | "REVIEW";
 
 export function TaskGridItem({
-  task, isOverdue, isPinned, isStarred, progress, onToggle, onToggleStar, onOpenModal,
+  task, isOverdue, isPinned, isStarred, isDone, progress, onToggle, onToggleStar, onOpenModal,
 }: TaskBaseProps) {
   
   const stopPropagation = (e: React.MouseEvent | React.PointerEvent) => e.stopPropagation();
@@ -40,7 +40,7 @@ export function TaskGridItem({
       className={cn(
         'group relative flex flex-col h-full bg-card border border-border/40 rounded-[1.5rem] overflow-hidden transition-all duration-300',
         'hover:border-primary/40 hover:shadow-2xl',
-        task.isDone && 'opacity-60 grayscale-[0.5]'
+        isDone && 'opacity-60 grayscale-[0.5]'
       )}
     >
       {/* HEADER / VISUAL */}
@@ -78,7 +78,7 @@ export function TaskGridItem({
         <div className="flex items-start gap-3">
           <div onClick={stopPropagation} onPointerDown={stopPropagation} className="pt-0.5">
             <Checkbox
-              checked={task.isDone}
+              checked={isDone}
               onCheckedChange={onToggle}
               className="h-5 w-5 rounded-full border-muted-foreground/30 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500 transition-all shadow-inner cursor-pointer"
             />
@@ -87,7 +87,7 @@ export function TaskGridItem({
           <div className="flex-1 min-w-0 cursor-pointer" onClick={onOpenModal} onPointerDown={stopPropagation}>
             <h3 className={cn(
               'font-black text-sm tracking-tight leading-tight group-hover:text-primary transition-colors line-clamp-2',
-              task.isDone ? 'line-through text-muted-foreground/50' : 'text-foreground'
+              isDone ? 'line-through text-muted-foreground/50' : 'text-foreground'
             )}>
               {task.title}
             </h3>

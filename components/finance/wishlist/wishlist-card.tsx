@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2, ExternalLink, Target, Pencil, Wallet, Trophy, Check, AlertCircle, Loader2, Flame, Scale, Snowflake, Sparkles, type LucideIcon } from "lucide-react";
@@ -173,7 +174,9 @@ const PRIORITY_CFG: Record<string, PriorityConfig> = {
 };
 
 function WishlistCard({ item }: { item: WishlistData }) {
+    const router = useRouter();
     const [isEditOpen, setIsEditOpen] = useState(false);
+    const [isConfirmOpen, setIsConfirmOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const { smartView } = useSmartView();
     const formatMoney = useFormatCurrency();
@@ -188,12 +191,16 @@ function WishlistCard({ item }: { item: WishlistData }) {
     const accentGradient = isCompleted ? "from-emerald-500 to-emerald-400" : pr.accent;
 
     const handleDeleteConfirmed = async () => {
+        if (isDeleting) return;
         setIsDeleting(true);
         try {
             await deleteWishlist(item.id!);
             toast.success("Meta removida do seu cofre.");
-        } catch {
-            toast.error("Erro ao remover meta.");
+            setIsConfirmOpen(false);
+            router.refresh(); // garante que o card suma da lista na hora
+        } catch (e) {
+            console.error("Erro ao remover meta:", e);
+            toast.error(e instanceof Error ? e.message : "Erro ao remover meta.");
         } finally {
             setIsDeleting(false);
         }
@@ -255,25 +262,27 @@ function WishlistCard({ item }: { item: WishlistData }) {
                         </DialogContent>
                     </Dialog>
 
-                    <AlertDialog>
+                    <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
                         <AlertDialogTrigger asChild>
                             <Button size="icon" variant="secondary" className="h-9 w-9 rounded-xl bg-background/80 backdrop-blur-md shadow-sm border border-border/50 hover:text-rose-500 transition-all">
                                 <Trash2 className="h-4 w-4" />
                             </Button>
                         </AlertDialogTrigger>
-                        <AlertDialogContent className="fixed left-[50%] top-[50%] z-50 grid w-[90vw] max-w-[425px] translate-x-[-50%] translate-y-[-50%] p-6 rounded-[2rem] border-destructive/20 shadow-2xl bg-background">
+                        <AlertDialogContent className="border-destructive/20">
                             <AlertDialogHeader>
-                                <div className="flex items-center gap-3 text-destructive mb-2">
-                                    <div className="p-3 rounded-2xl bg-destructive/10"><AlertCircle className="h-6 w-6" /></div>
-                                    <AlertDialogTitle className="text-xl font-bold">Desistir do Sonho?</AlertDialogTitle>
-                                </div>
-                                <AlertDialogDescription className="text-base text-muted-foreground text-left">
-                                    Você já guardou <strong className="text-foreground">{formatMoney(item.saved)}</strong> para &quot;{item.name}&quot;. Se você excluir esta meta, o valor voltará para o seu saldo livre.
+                                <div className="p-3 rounded-2xl bg-destructive/10 text-destructive"><AlertCircle className="h-6 w-6" /></div>
+                                <AlertDialogTitle className="text-xl font-bold normal-case tracking-normal">Desistir do Sonho?</AlertDialogTitle>
+                                <AlertDialogDescription className="text-sm text-muted-foreground">
+                                    Você já guardou <strong className="text-foreground">{formatMoney(item.saved)}</strong> para &quot;{item.name}&quot;. Tem certeza que deseja excluir esta meta?
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
-                            <AlertDialogFooter className="mt-6">
-                                <AlertDialogCancel className="rounded-xl h-12 font-bold">Manter Sonho</AlertDialogCancel>
-                                <AlertDialogAction onClick={handleDeleteConfirmed} className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl h-12 font-bold px-8 shadow-lg shadow-rose-500/20">
+                            <AlertDialogFooter>
+                                <AlertDialogCancel disabled={isDeleting} className="rounded-xl h-12 font-bold">Manter Sonho</AlertDialogCancel>
+                                <AlertDialogAction
+                                    onClick={(e) => { e.preventDefault(); void handleDeleteConfirmed(); }}
+                                    disabled={isDeleting}
+                                    className="bg-rose-600 hover:bg-rose-700 text-white rounded-xl h-12 font-bold px-8 shadow-lg shadow-rose-500/20"
+                                >
                                     {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sim, Desistir"}
                                 </AlertDialogAction>
                             </AlertDialogFooter>

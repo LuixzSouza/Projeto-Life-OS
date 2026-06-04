@@ -21,7 +21,7 @@ export default async function JobsPage() {
     }),
     getPortfolio(),
     prisma.project.findMany({
-      where: { userId },
+      where: { userId, deletedAt: null },
       orderBy: { updatedAt: "desc" },
       select: { id: true, title: true, slug: true },
     }),

@@ -4,7 +4,7 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Heart, MoreVertical, Pencil, Trash2, CheckCircle2, Tag } from "lucide-react";
+import { Heart, MoreVertical, Pencil, Trash2, CheckCircle2, Tag, Tags } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFormatCurrency } from "@/components/providers/currency-provider";
 import { getCostPerWear, getCategoryIcon, StatusBadge } from "./wardrobe-list-helpers";
@@ -19,6 +19,7 @@ interface WardrobeItemCardProps {
   onEdit: (item: WardrobeItem) => void;
   onDelete: (id: string) => void;
   onWear: (id: string) => void;
+  onConnections: (item: WardrobeItem) => void;
 }
 
 export function WardrobeItemCard({
@@ -30,6 +31,7 @@ export function WardrobeItemCard({
   onEdit,
   onDelete,
   onWear,
+  onConnections,
 }: WardrobeItemCardProps) {
   const formatMoney = useFormatCurrency();
   const costPerWear = getCostPerWear(item.price, item.wearCount);
@@ -85,6 +87,9 @@ export function WardrobeItemCard({
               <DropdownMenuContent align="end" className="w-40 rounded-xl">
                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(item); }} className="cursor-pointer font-medium text-xs">
                   <Pencil className="h-3.5 w-3.5 mr-2" /> Editar
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onConnections(item); }} className="cursor-pointer font-medium text-xs">
+                  <Tags className="h-3.5 w-3.5 mr-2" /> Tags & Anexos
                 </DropdownMenuItem>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>

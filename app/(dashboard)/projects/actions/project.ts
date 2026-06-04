@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireUserId } from "@/lib/auth";
+import { logActivity } from "@/lib/activity";
 import { getString, generateUniqueSlug } from "./helpers";
 
 // =========================================================
@@ -70,21 +71,55 @@ export async function updateProject(formData: FormData) {
   revalidatePath(`/projects/${slug}`);
 }
 
+// Soft-delete: o projeto vai para a Lixeira (deletedAt) e some das listagens.
+// As tarefas NÃO são apagadas (relação SetNull) — continuam existindo e reaparecem
+// no board ao restaurar. Restaurar/excluir em definitivo: ver app/(dashboard)/trash.
 export async function deleteProject(projectId: string) {
   const userId = await requireUserId();
   const project = await prisma.project.findFirst({
-    where: { id: projectId, userId },
+    where: { id: projectId, userId, deletedAt: null },
+    select: { title: true },
   });
 
   if (!project) return;
 
-  // Deleta tarefas vinculadas primeiro (se não tiver Cascade no banco)
-  await prisma.task.deleteMany({
-    where: { projectId, userId },
+  await prisma.project.updateMany({
+    where: { id: projectId, userId },
+    data: { deletedAt: new Date() },
   });
 
-  await prisma.project.deleteMany({
+  await logActivity({
+    action: "DELETE",
+    module: "projects",
+    entityType: "project",
+    entityId: projectId,
+    summary: `Moveu o projeto "${project.title}" para a lixeira`,
+  });
+
+  revalidatePath("/projects");
+}
+
+// Restaura um projeto da lixeira (usado pelo "Desfazer" após mover para a lixeira).
+export async function restoreProject(projectId: string) {
+  const userId = await requireUserId();
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, userId, deletedAt: { not: null } },
+    select: { title: true },
+  });
+
+  if (!project) return;
+
+  await prisma.project.updateMany({
     where: { id: projectId, userId },
+    data: { deletedAt: null },
+  });
+
+  await logActivity({
+    action: "RESTORE",
+    module: "projects",
+    entityType: "project",
+    entityId: projectId,
+    summary: `Restaurou o projeto "${project.title}" da lixeira`,
   });
 
   revalidatePath("/projects");

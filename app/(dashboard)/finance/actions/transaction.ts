@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireUserId } from "@/lib/auth";
+import { logActivity } from "@/lib/activity";
 import { parseAmount } from "./helpers";
 
 // =========================================================
@@ -22,12 +23,12 @@ export async function createTransaction(formData: FormData) {
 
   const userId = await requireUserId();
 
-  await prisma.$transaction(async (tx) => {
+  const createdId = await prisma.$transaction(async (tx) => {
       // Garante que a conta pertence ao usuário
       const account = await tx.account.findFirst({ where: { id: accountId, userId } });
       if (!account) throw new Error("Conta não encontrada");
 
-      await tx.transaction.create({
+      const created = await tx.transaction.create({
         data: { description, amount, type, accountId, category, date, userId },
       });
 
@@ -42,6 +43,17 @@ export async function createTransaction(formData: FormData) {
               data: { balance: newBalance }
           });
       }
+
+      return created.id;
+  });
+
+  await logActivity({
+    action: type === "INCOME" ? "INCOME" : "EXPENSE",
+    module: "finance",
+    entityType: "transaction",
+    entityId: createdId,
+    summary: `${type === "INCOME" ? "Receita" : "Despesa"}: ${description || category}`,
+    meta: { amount, type, category },
   });
 
   revalidatePath("/finance");
@@ -60,7 +72,7 @@ export async function updateTransaction(formData: FormData) {
 
   // Transação atômica para garantir consistência do saldo
   await prisma.$transaction(async (tx) => {
-      const oldTx = await tx.transaction.findFirst({ where: { id, userId } });
+      const oldTx = await tx.transaction.findFirst({ where: { id, userId, deletedAt: null } });
       if (!oldTx) throw new Error("Transação não encontrada");
 
       const account = await tx.account.findFirst({ where: { id: oldTx.accountId, userId } });
@@ -91,15 +103,17 @@ export async function updateTransaction(formData: FormData) {
   revalidatePath("/finance");
 }
 
+// Soft-delete: o lançamento vai para a Lixeira (deletedAt) e o saldo é REVERTIDO
+// (um item na lixeira não conta no saldo). Restaurar reaplica; ver app/(dashboard)/trash.
 export async function deleteTransaction(id: string) {
     const userId = await requireUserId();
     await prisma.$transaction(async (tx) => {
-        const transaction = await tx.transaction.findFirst({ where: { id, userId } });
+        const transaction = await tx.transaction.findFirst({ where: { id, userId, deletedAt: null } });
         if(!transaction) return;
 
-        // Reverte saldo antes de apagar
+        // Reverte o impacto no saldo — só em contas NÃO automáticas (Pluggy sincroniza sozinho).
         const account = await tx.account.findFirst({ where: { id: transaction.accountId, userId } });
-        if(account) {
+        if(account && !account.isConnected) {
             const reversedBalance = transaction.type === 'INCOME'
                 ? Number(account.balance) - Number(transaction.amount)
                 : Number(account.balance) + Number(transaction.amount);
@@ -107,7 +121,15 @@ export async function deleteTransaction(id: string) {
             await tx.account.update({ where: { id: transaction.accountId }, data: { balance: reversedBalance } });
         }
 
-        await tx.transaction.delete({ where: { id } });
+        await tx.transaction.updateMany({ where: { id, userId }, data: { deletedAt: new Date() } });
+    });
+
+    await logActivity({
+      action: "DELETE",
+      module: "finance",
+      entityType: "transaction",
+      entityId: id,
+      summary: "Moveu um lançamento para a lixeira",
     });
 
     revalidatePath("/finance");

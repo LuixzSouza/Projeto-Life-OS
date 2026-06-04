@@ -1,5 +1,11 @@
 import { Metadata } from "next";
 import { getMarketOverview } from "@/lib/market-service";
+import { getWatchlist } from "@/app/(dashboard)/finance/actions";
+import { getBrapiToken } from "@/lib/brapi-token";
+import { MARKET_POOL, pickRandom } from "@/lib/market-pool";
+import { requireUserId } from "@/lib/auth";
+
+export const dynamic = "force-dynamic";
 import { MarketDashboard } from "@/components/finance/market/market-dashboard"; // Vamos criar esse componente
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -13,13 +19,16 @@ export const metadata: Metadata = {
 
 export default async function MarketPage() {
   // Vamos buscar uma lista mais completa de ativos para essa página dedicada
-  const extendedTickers = [
-    "PETR4", "VALE3", "ITUB4", "WEGE3", "PRIO3", "BBAS3", // Blue chips
-    "MXRF11", "HGLG11", "KNRI11", "VISC11", // FIIs
-    "IVVB11", "BOVA11", "SMAL11" // ETFs
-  ];
+  // Seleção aleatória do universo da B3 — "descoberta" para quem não conhece tickers.
+  // O usuário pode favoritar/buscar outras no cliente; "Descobrir outras" re-sorteia.
+  const extendedTickers = pickRandom(MARKET_POOL, 18);
 
-  const marketData = await getMarketOverview(extendedTickers);
+  const userId = await requireUserId();
+  const brapiToken = await getBrapiToken(userId);
+  const [marketData, watchlist] = await Promise.all([
+    getMarketOverview(extendedTickers, brapiToken),
+    getWatchlist(),
+  ]);
 
   return (
     <PageShell>
@@ -36,7 +45,7 @@ export default async function MarketPage() {
       </PageHeader>
 
       <PageContainer>
-        <MarketDashboard data={marketData} />
+        <MarketDashboard data={marketData} initialFavorites={watchlist} />
       </PageContainer>
     </PageShell>
   );
