@@ -891,10 +891,16 @@ CREATE INDEX "StudyNote_userId_idx" ON "StudyNote"("userId");
 CREATE INDEX "StudyNote_subjectId_idx" ON "StudyNote"("subjectId");
 
 -- CreateIndex
+CREATE INDEX "StudyNote_userId_deletedAt_idx" ON "StudyNote"("userId", "deletedAt");
+
+-- CreateIndex
 CREATE INDEX "LearningGoal_userId_idx" ON "LearningGoal"("userId");
 
 -- CreateIndex
 CREATE INDEX "LearningGoal_subjectId_idx" ON "LearningGoal"("subjectId");
+
+-- CreateIndex
+CREATE INDEX "LearningGoal_userId_deletedAt_idx" ON "LearningGoal"("userId", "deletedAt");
 
 -- CreateIndex
 CREATE INDEX "LearningTask_userId_idx" ON "LearningTask"("userId");
@@ -936,6 +942,9 @@ CREATE INDEX "Transaction_categoryId_idx" ON "Transaction"("categoryId");
 CREATE INDEX "Transaction_userId_date_idx" ON "Transaction"("userId", "date");
 
 -- CreateIndex
+CREATE INDEX "Transaction_userId_deletedAt_date_idx" ON "Transaction"("userId", "deletedAt", "date");
+
+-- CreateIndex
 CREATE INDEX "RecurringExpense_userId_idx" ON "RecurringExpense"("userId");
 
 -- CreateIndex
@@ -943,6 +952,9 @@ CREATE INDEX "RecurringExpense_categoryId_idx" ON "RecurringExpense"("categoryId
 
 -- CreateIndex
 CREATE INDEX "WishlistItem_userId_idx" ON "WishlistItem"("userId");
+
+-- CreateIndex
+CREATE INDEX "WishlistItem_userId_deletedAt_idx" ON "WishlistItem"("userId", "deletedAt");
 
 -- CreateIndex
 CREATE INDEX "Category_userId_idx" ON "Category"("userId");
@@ -963,6 +975,9 @@ CREATE INDEX "Project_userId_idx" ON "Project"("userId");
 CREATE INDEX "Project_clientId_idx" ON "Project"("clientId");
 
 -- CreateIndex
+CREATE INDEX "Project_userId_deletedAt_idx" ON "Project"("userId", "deletedAt");
+
+-- CreateIndex
 CREATE INDEX "Meeting_userId_idx" ON "Meeting"("userId");
 
 -- CreateIndex
@@ -976,6 +991,9 @@ CREATE INDEX "Task_projectId_idx" ON "Task"("projectId");
 
 -- CreateIndex
 CREATE INDEX "Task_userId_isDone_idx" ON "Task"("userId", "isDone");
+
+-- CreateIndex
+CREATE INDEX "Task_userId_deletedAt_idx" ON "Task"("userId", "deletedAt");
 
 -- CreateIndex
 CREATE INDEX "JobApplication_userId_idx" ON "JobApplication"("userId");
@@ -1035,6 +1053,9 @@ CREATE INDEX "Event_projectId_idx" ON "Event"("projectId");
 CREATE INDEX "Event_userId_startTime_idx" ON "Event"("userId", "startTime");
 
 -- CreateIndex
+CREATE INDEX "Event_userId_deletedAt_startTime_idx" ON "Event"("userId", "deletedAt", "startTime");
+
+-- CreateIndex
 CREATE INDEX "RoutineItem_userId_idx" ON "RoutineItem"("userId");
 
 -- CreateIndex
@@ -1068,22 +1089,37 @@ CREATE INDEX "AccessItem_userId_idx" ON "AccessItem"("userId");
 CREATE INDEX "SavedLink_userId_idx" ON "SavedLink"("userId");
 
 -- CreateIndex
+CREATE INDEX "SavedLink_userId_deletedAt_idx" ON "SavedLink"("userId", "deletedAt");
+
+-- CreateIndex
 CREATE INDEX "MediaItem_userId_idx" ON "MediaItem"("userId");
 
 -- CreateIndex
 CREATE INDEX "MediaItem_userId_status_idx" ON "MediaItem"("userId", "status");
 
 -- CreateIndex
+CREATE INDEX "MediaItem_userId_deletedAt_idx" ON "MediaItem"("userId", "deletedAt");
+
+-- CreateIndex
 CREATE INDEX "Friend_userId_idx" ON "Friend"("userId");
 
 -- CreateIndex
+CREATE INDEX "Friend_userId_deletedAt_idx" ON "Friend"("userId", "deletedAt");
+
+-- CreateIndex
 CREATE INDEX "WardrobeItem_userId_idx" ON "WardrobeItem"("userId");
+
+-- CreateIndex
+CREATE INDEX "WardrobeItem_userId_deletedAt_idx" ON "WardrobeItem"("userId", "deletedAt");
 
 -- CreateIndex
 CREATE INDEX "Client_userId_idx" ON "Client"("userId");
 
 -- CreateIndex
 CREATE INDEX "Client_friendId_idx" ON "Client"("friendId");
+
+-- CreateIndex
+CREATE INDEX "Client_userId_deletedAt_idx" ON "Client"("userId", "deletedAt");
 
 -- CreateIndex
 CREATE INDEX "Billing_userId_idx" ON "Billing"("userId");
@@ -1105,6 +1141,9 @@ CREATE INDEX "Invoice_status_idx" ON "Invoice"("status");
 
 -- CreateIndex
 CREATE INDEX "Invoice_dueDate_idx" ON "Invoice"("dueDate");
+
+-- CreateIndex
+CREATE INDEX "Invoice_userId_status_dueDate_idx" ON "Invoice"("userId", "status", "dueDate");
 
 -- CreateIndex
 CREATE INDEX "BackupLog_userId_idx" ON "BackupLog"("userId");

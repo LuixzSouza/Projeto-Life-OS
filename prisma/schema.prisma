@@ -247,6 +247,7 @@ model StudyNote {
 
   @@index([userId])
   @@index([subjectId])
+  @@index([userId, deletedAt])
 }
 
 // Objetivos de Aprendizado (Novo)
@@ -273,6 +274,7 @@ model LearningGoal {
 
   @@index([userId])
   @@index([subjectId])
+  @@index([userId, deletedAt])
 }
 
 model LearningTask {
@@ -405,6 +407,7 @@ model Transaction {
   @@index([accountId])
   @@index([categoryId])
   @@index([userId, date])
+  @@index([userId, deletedAt, date])
 }
 
 model RecurringExpense {
@@ -446,6 +449,7 @@ model WishlistItem {
   createdAt DateTime  @default(now())
 
   @@index([userId])
+  @@index([userId, deletedAt])
 }
 
 // =========================================================
@@ -510,6 +514,7 @@ model Project {
 
   @@index([userId])
   @@index([clientId])
+  @@index([userId, deletedAt])
 }
 
 // Reunião: notas rápidas + resumo gerado por IA (vira checklist/tarefas).
@@ -565,6 +570,7 @@ model Task {
   @@index([userId])
   @@index([projectId])
   @@index([userId, isDone])
+  @@index([userId, deletedAt])
 }
 
 // =========================================================
@@ -814,6 +820,7 @@ model Event {
   @@index([userId])
   @@index([projectId])
   @@index([userId, startTime])
+  @@index([userId, deletedAt, startTime])
 }
 
 model RoutineItem {
@@ -991,6 +998,7 @@ model SavedLink {
   updatedAt DateTime  @updatedAt
 
   @@index([userId])
+  @@index([userId, deletedAt])
 }
 
 model MediaItem {
@@ -1022,6 +1030,7 @@ model MediaItem {
 
   @@index([userId])
   @@index([userId, status])
+  @@index([userId, deletedAt])
 }
 
 model Friend {
@@ -1051,6 +1060,7 @@ model Friend {
   updatedAt DateTime  @updatedAt
 
   @@index([userId])
+  @@index([userId, deletedAt])
 }
 
 model WardrobeItem {
@@ -1074,6 +1084,7 @@ model WardrobeItem {
   updatedAt  DateTime  @updatedAt
 
   @@index([userId])
+  @@index([userId, deletedAt])
 }
 
 // =========================================================
@@ -1111,6 +1122,7 @@ model Client {
 
   @@index([userId])
   @@index([friendId])
+  @@index([userId, deletedAt])
 }
 
 // O "Contrato" ou "Acordo". Ex: "Criação de Site" ou "Manutenção Mensal"
@@ -1176,6 +1188,7 @@ model Invoice {
   @@index([billingId])
   @@index([status])
   @@index([dueDate])
+  @@index([userId, status, dueDate])
 }
 
 model BackupLog {
