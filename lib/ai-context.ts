@@ -26,15 +26,15 @@ export async function getUserContext(): Promise<string> {
     ] = await Promise.all([
         prisma.settings.findUnique({ where: { userId }, select: { currency: true } }),
         prisma.account.findMany({ where: { userId }, select: { balance: true } }),
-        prisma.task.count({ where: { userId, isDone: false } }),
+        prisma.task.count({ where: { userId, deletedAt: null, isDone: false } }),
         prisma.task.findMany({
-            where: { userId, isDone: false, OR: [{ priority: "HIGH" }, { dueDate: { lte: in7, gte: startOfToday } }] },
+            where: { userId, deletedAt: null, isDone: false, OR: [{ priority: "HIGH" }, { dueDate: { lte: in7, gte: startOfToday } }] },
             orderBy: { dueDate: "asc" },
             take: 3,
             select: { title: true, priority: true, dueDate: true },
         }),
-        prisma.event.findFirst({ where: { userId, startTime: { gte: now } }, orderBy: { startTime: "asc" }, select: { title: true, startTime: true } }),
-        prisma.event.count({ where: { userId, startTime: { gte: startOfToday, lte: endOfToday } } }),
+        prisma.event.findFirst({ where: { userId, deletedAt: null, startTime: { gte: now } }, orderBy: { startTime: "asc" }, select: { title: true, startTime: true } }),
+        prisma.event.count({ where: { userId, deletedAt: null, startTime: { gte: startOfToday, lte: endOfToday } } }),
     ]);
 
     const currency = settings?.currency || "R$";

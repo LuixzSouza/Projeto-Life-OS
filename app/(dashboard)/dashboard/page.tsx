@@ -34,44 +34,71 @@ export default async function DashboardPage() {
     recentTransactions,
     pendingTasksCount,
     completedTasksCount,
-    studyStats,
+    studyAgg,
     nextEvent,
     activeMedia,
     activeProjects,
     settings,
-    rawBusiness,
+    businessReceivable,
+    businessOverdue,
+    topInvoicesRaw,
     friends,
     waterStats,
     mealStats,
     aiMessagesCount,
     recentLinks,
-    favoriteClothes
+    favoriteClothes,
+    subjectsForChart
   ] = await Promise.all([
     userId ? prisma.user.findUnique({ where: { id: userId } }) : null,
     prisma.account.findMany({ where: { userId }, select: { balance: true } }),
-    prisma.transaction.aggregate({ where: { type: 'INCOME', userId }, _sum: { amount: true } }),
-    prisma.transaction.aggregate({ where: { type: 'EXPENSE', userId }, _sum: { amount: true } }),
-    prisma.transaction.findMany({ where: { userId }, take: 5, orderBy: { date: 'desc' }, include: { account: true } }),
+    prisma.transaction.aggregate({ where: { type: 'INCOME', userId, deletedAt: null }, _sum: { amount: true } }),
+    prisma.transaction.aggregate({ where: { type: 'EXPENSE', userId, deletedAt: null }, _sum: { amount: true } }),
+    prisma.transaction.findMany({ where: { userId, deletedAt: null }, take: 5, orderBy: { date: 'desc' }, include: { account: true } }),
     prisma.task.count({ where: { isDone: false, userId, deletedAt: null } }),
     prisma.task.count({ where: { isDone: true, userId, deletedAt: null } }),
-    prisma.studySession.findMany({ where: { userId }, include: { subject: true } }),
-    prisma.event.findFirst({ where: { startTime: { gte: new Date() }, userId }, orderBy: { startTime: 'asc' } }),
+    prisma.studySession.groupBy({ by: ['subjectId'], where: { userId }, _sum: { durationMinutes: true }, _count: true }),
+    prisma.event.findFirst({ where: { startTime: { gte: new Date() }, userId, deletedAt: null }, orderBy: { startTime: 'asc' } }),
     prisma.mediaItem.findMany({ where: { status: 'IN_PROGRESS', userId, deletedAt: null }, take: 3 }),
-    prisma.project.findMany({ where: { userId }, take: 3, orderBy: { updatedAt: 'desc' } }),
+    prisma.project.findMany({ where: { userId, deletedAt: null }, take: 3, orderBy: { updatedAt: 'desc' } }),
     userId ? prisma.settings.findUnique({ where: { userId } }) : null,
-    prisma.client.findMany({
-      where: { userId },
-      include: { billings: { include: { invoices: true } } }
+    // Negócios: recebíveis/atrasados agregados no banco (usa índice [userId, status, dueDate])
+    // em vez de carregar todos os clientes → billings → faturas na memória.
+    // Recebível = PENDING e a vencer (dueDate >= hoje).
+    prisma.invoice.aggregate({
+      where: { userId, status: 'PENDING', dueDate: { gte: today }, billing: { client: { deletedAt: null } } },
+      _sum: { value: true },
+    }),
+    // Atrasado = OVERDUE, ou PENDING já vencido (dueDate < hoje).
+    prisma.invoice.aggregate({
+      where: {
+        userId,
+        status: { in: ['PENDING', 'OVERDUE'] },
+        billing: { client: { deletedAt: null } },
+        OR: [{ dueDate: { lt: today } }, { status: 'OVERDUE' }],
+      },
+      _sum: { value: true },
+    }),
+    // As 5 faturas em aberto mais próximas do vencimento.
+    prisma.invoice.findMany({
+      where: { userId, status: { in: ['PENDING', 'OVERDUE'] }, billing: { client: { deletedAt: null } } },
+      orderBy: { dueDate: 'asc' },
+      take: 5,
+      select: {
+        id: true, title: true, value: true, dueDate: true, status: true,
+        billing: { select: { title: true, client: { select: { name: true } } } },
+      },
     }),
     prisma.friend.findMany({
-      where: { birthday: { not: null }, userId: userId ?? "" },
+      where: { birthday: { not: null }, userId: userId ?? "", deletedAt: null },
       select: { id: true, name: true, birthday: true, imageUrl: true, proximity: true }
     }),
     prisma.healthMetric.aggregate({ where: { type: "WATER", date: { gte: today }, userId }, _sum: { value: true } }),
     prisma.meal.aggregate({ where: { date: { gte: today }, userId }, _sum: { calories: true } }),
     prisma.aiMessage.count({ where: { createdAt: { gte: today }, userId } }),
     prisma.savedLink.findMany({ where: { userId, deletedAt: null }, take: 4, orderBy: { createdAt: 'desc' } }),
-    prisma.wardrobeItem.findMany({ where: { isFavorite: true, userId: userId ?? "" }, take: 3 })
+    prisma.wardrobeItem.findMany({ where: { isFavorite: true, userId: userId ?? "", deletedAt: null }, take: 3 }),
+    prisma.studySubject.findMany({ where: { userId }, select: { id: true, title: true } })
   ]);
 
   // --- LÓGICA DE APRESENTAÇÃO ---
@@ -91,39 +118,34 @@ export default async function DashboardPage() {
     { name: 'Saídas', total: expense, type: 'EXPENSE' as const },
   ];
 
-  // 3. Estudos
-  const studyMap = new Map<string, number>();
-  studyStats.forEach(s => {
-    const current = studyMap.get(s.subject.title) || 0;
-    studyMap.set(s.subject.title, current + s.durationMinutes);
-  });
-  const studyData = Array.from(studyMap, ([name, value]) => ({ name, value }));
-  const totalStudyMinutes = studyStats.reduce((acc, s) => acc + s.durationMinutes, 0);
+  // 3. Estudos — somatório por matéria agregado no banco (groupBy), em vez de
+  // carregar todas as sessões na memória (não escala com anos de histórico).
+  const subjectTitleById = new Map(subjectsForChart.map(s => [s.id, s.title]));
+  const studyData = studyAgg
+    .map(g => ({ name: subjectTitleById.get(g.subjectId) ?? "Sem matéria", value: g._sum.durationMinutes ?? 0 }))
+    .filter(d => d.value > 0);
+  const totalStudyMinutes = studyAgg.reduce((acc, g) => acc + (g._sum.durationMinutes ?? 0), 0);
+  const totalStudySessions = studyAgg.reduce((acc, g) => acc + g._count, 0);
 
   // 4. Score de Produtividade
   const rawScore = (completedTasksCount * 10) + Math.floor(totalStudyMinutes / 3);
   const productivityScore = Math.min(rawScore, 100);
 
-  // 5. Negócios (Freelance/Empresa)
-  const upcomingInvoices: DashboardInvoice[] = [];
-  const businessStats = rawBusiness.reduce((acc, client) => {
-    client.billings.forEach(billing => {
-      billing.invoices.forEach(inv => {
-        const val = Number(inv.value);
-        if (inv.status === 'PENDING' || inv.status === 'OVERDUE') {
-          const dueDate = new Date(inv.dueDate);
-          const isLate = dueDate < today || inv.status === 'OVERDUE';
-          if (isLate) acc.totalOverdue += val;
-          else acc.totalReceivable += val;
-          upcomingInvoices.push({ ...inv, value: val, dueDate, clientName: client.name, billingTitle: billing.title });
-        }
-      });
-    });
-    return acc;
-  }, { totalReceivable: 0, totalOverdue: 0 });
+  // 5. Negócios (Freelance/Empresa) — totais agregados no banco
+  const businessStats = {
+    totalReceivable: Number(businessReceivable._sum.value ?? 0),
+    totalOverdue: Number(businessOverdue._sum.value ?? 0),
+  };
 
-  upcomingInvoices.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
-  const topUpcomingInvoices = upcomingInvoices.slice(0, 5);
+  const topUpcomingInvoices: DashboardInvoice[] = topInvoicesRaw.map(inv => ({
+    id: inv.id,
+    title: inv.title,
+    value: Number(inv.value),
+    dueDate: inv.dueDate,
+    status: inv.status,
+    clientName: inv.billing.client?.name ?? '—',
+    billingTitle: inv.billing.title,
+  }));
 
   // 6. Aniversários Próximos
   const upcomingBirthdays: DashboardBirthday[] = friends.map(f => {
@@ -179,7 +201,7 @@ export default async function DashboardPage() {
         pendingTasksCount={pendingTasksCount}
         completedTasksCount={completedTasksCount}
         totalStudyMinutes={totalStudyMinutes}
-        studySessionsCount={studyStats.length}
+        studySessionsCount={totalStudySessions}
         nextEvent={nextEvent}
         formatCurrency={formatCurrency}
         currency={currency}

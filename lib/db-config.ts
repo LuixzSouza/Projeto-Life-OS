@@ -30,17 +30,32 @@ interface ConfigShape {
   secrets?: Record<string, string>;
 }
 
+// Cache em memória do config em arquivo. O Proxy do Prisma resolve o perfil a
+// CADA acesso de propriedade (`prisma.user`, `prisma.task`, ...); sem cache, o
+// modo local fazia uma leitura síncrona de disco por query (dezenas por página,
+// bloqueando o event loop). O único escritor em runtime é `writeConfig`, que
+// invalida o cache abaixo — então a leitura em memória nunca fica stale.
+let cachedConfig: ConfigShape | null = null;
+
 function readConfig(): ConfigShape {
-  if (!fs.existsSync(CONFIG_PATH)) return {};
+  if (cachedConfig) return cachedConfig;
+  if (!fs.existsSync(CONFIG_PATH)) {
+    cachedConfig = {};
+    return cachedConfig;
+  }
   try {
-    return JSON.parse(fs.readFileSync(CONFIG_PATH, "utf-8")) as ConfigShape;
+    cachedConfig = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf-8")) as ConfigShape;
   } catch (e) {
     console.error("⚠️ Erro ao ler config do banco:", e);
-    return {};
+    cachedConfig = {};
   }
+  return cachedConfig;
 }
 
 function writeConfig(config: ConfigShape) {
+  // Mantém o cache em sincronia com o que acabou de ser gravado (mesmo se o
+  // write falhar em FS read-only, o valor em memória reflete a intenção).
+  cachedConfig = config;
   try {
     const dir = path.dirname(CONFIG_PATH);
     if (!fs.existsSync(dir)) {

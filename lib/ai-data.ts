@@ -8,6 +8,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { encrypt } from "@/lib/crypto";
+import { asEnum, coerceEnum, TASK_STATUSES, TASK_PRIORITIES, CLIENT_STATUSES } from "@/lib/enums";
 import type { AIModule, ToolArgs, MutationResult } from "@/app/(dashboard)/ai/actions/types";
 
 /* ----------------------------------------------------------------------------
@@ -72,7 +73,7 @@ export async function queryModule(userId: string, args: ToolArgs): Promise<Recor
 
   switch (mod) {
     case "FINANCE": {
-      const where = { userId, ...(search ? { description: { contains: search } } : {}), ...(args.category ? { category: args.category } : {}) };
+      const where = { userId, deletedAt: null, ...(search ? { description: { contains: search } } : {}), ...(args.category ? { category: args.category } : {}) };
       const [rows, total] = await Promise.all([
         prisma.transaction.findMany({ where, orderBy: { date: "desc" }, take, skip, select: { id: true, description: true, amount: true, type: true, category: true, date: true } }),
         prisma.transaction.count({ where }),
@@ -83,7 +84,7 @@ export async function queryModule(userId: string, args: ToolArgs): Promise<Recor
       };
     }
     case "TASKS": {
-      const where = { userId, ...(search ? { title: { contains: search } } : {}), ...(args.status ? { status: args.status } : {}) };
+      const where = { userId, deletedAt: null, ...(search ? { title: { contains: search } } : {}), ...(args.status ? { status: args.status } : {}) };
       const [rows, total] = await Promise.all([
         prisma.task.findMany({ where, orderBy: [{ isDone: "asc" }, { dueDate: "asc" }], take, skip, select: { id: true, title: true, status: true, priority: true, isDone: true, dueDate: true } }),
         prisma.task.count({ where }),
@@ -94,7 +95,7 @@ export async function queryModule(userId: string, args: ToolArgs): Promise<Recor
       };
     }
     case "PROJECTS": {
-      const where = { userId, ...(search ? { title: { contains: search } } : {}), ...(args.status ? { status: args.status } : {}) };
+      const where = { userId, deletedAt: null, ...(search ? { title: { contains: search } } : {}), ...(args.status ? { status: args.status } : {}) };
       const [rows, total] = await Promise.all([
         prisma.project.findMany({ where, orderBy: { updatedAt: "desc" }, take, skip, select: { id: true, title: true, status: true, _count: { select: { tasks: true } } } }),
         prisma.project.count({ where }),
@@ -127,7 +128,7 @@ export async function queryModule(userId: string, args: ToolArgs): Promise<Recor
       };
     }
     case "ENTERTAINMENT": {
-      const where = { userId, ...(search ? { title: { contains: search } } : {}), ...(args.status ? { status: args.status } : {}) };
+      const where = { userId, deletedAt: null, ...(search ? { title: { contains: search } } : {}), ...(args.status ? { status: args.status } : {}) };
       const [rows, total] = await Promise.all([
         prisma.mediaItem.findMany({ where, orderBy: { updatedAt: "desc" }, take, skip, select: { id: true, title: true, type: true, status: true, rating: true } }),
         prisma.mediaItem.count({ where }),
@@ -138,7 +139,7 @@ export async function queryModule(userId: string, args: ToolArgs): Promise<Recor
       };
     }
     case "CRM": {
-      const where = { userId, ...(search ? { name: { contains: search } } : {}), ...(args.status ? { status: args.status } : {}) };
+      const where = { userId, deletedAt: null, ...(search ? { name: { contains: search } } : {}), ...(args.status ? { status: args.status } : {}) };
       const [rows, total] = await Promise.all([
         prisma.client.findMany({ where, orderBy: { updatedAt: "desc" }, take, skip, select: { id: true, name: true, company: true, status: true, phone: true } }),
         prisma.client.count({ where }),
@@ -149,7 +150,7 @@ export async function queryModule(userId: string, args: ToolArgs): Promise<Recor
       };
     }
     case "FRIENDS": {
-      const where = { userId, ...(search ? { name: { contains: search } } : {}) };
+      const where = { userId, deletedAt: null, ...(search ? { name: { contains: search } } : {}) };
       const [rows, total] = await Promise.all([
         prisma.friend.findMany({ where, orderBy: { name: "asc" }, take, skip, select: { id: true, name: true, phone: true, proximity: true, company: true } }),
         prisma.friend.count({ where }),
@@ -173,7 +174,7 @@ export async function queryModule(userId: string, args: ToolArgs): Promise<Recor
       };
     }
     case "WARDROBE": {
-      const where = { userId, ...(search ? { name: { contains: search } } : {}), ...(args.category ? { category: args.category } : {}) };
+      const where = { userId, deletedAt: null, ...(search ? { name: { contains: search } } : {}), ...(args.category ? { category: args.category } : {}) };
       const [rows, total] = await Promise.all([
         prisma.wardrobeItem.findMany({ where, orderBy: { updatedAt: "desc" }, take, skip, select: { id: true, name: true, category: true, brand: true, color: true, status: true } }),
         prisma.wardrobeItem.count({ where }),
@@ -184,7 +185,7 @@ export async function queryModule(userId: string, args: ToolArgs): Promise<Recor
       };
     }
     case "AGENDA": {
-      const where = { userId, startTime: { gte: new Date() }, ...(search ? { title: { contains: search } } : {}) };
+      const where = { userId, deletedAt: null, startTime: { gte: new Date() }, ...(search ? { title: { contains: search } } : {}) };
       const [rows, total] = await Promise.all([
         prisma.event.findMany({ where, orderBy: { startTime: "asc" }, take, skip, select: { id: true, title: true, startTime: true, location: true } }),
         prisma.event.count({ where }),
@@ -206,8 +207,8 @@ async function querySummary(userId: string, module: AIModule): Promise<Record<st
     case "FINANCE": {
       const [accounts, totals, byCat] = await Promise.all([
         prisma.account.findMany({ where: { userId }, select: { balance: true } }),
-        prisma.transaction.groupBy({ by: ["type"], where: { userId, date: { gte: monthStart } }, _sum: { amount: true } }),
-        prisma.transaction.groupBy({ by: ["category"], where: { userId, type: "EXPENSE", date: { gte: monthStart } }, _sum: { amount: true }, orderBy: { _sum: { amount: "desc" } }, take: 5 }),
+        prisma.transaction.groupBy({ by: ["type"], where: { userId, deletedAt: null, date: { gte: monthStart } }, _sum: { amount: true } }),
+        prisma.transaction.groupBy({ by: ["category"], where: { userId, deletedAt: null, type: "EXPENSE", date: { gte: monthStart } }, _sum: { amount: true }, orderBy: { _sum: { amount: "desc" } }, take: 5 }),
       ]);
       const saldo = accounts.reduce((acc, a) => acc + Number(a.balance), 0);
       const receita = Number(totals.find((t) => t.type === "INCOME")?._sum.amount ?? 0);
@@ -222,10 +223,10 @@ async function querySummary(userId: string, module: AIModule): Promise<Record<st
     case "TASKS": {
       const now = new Date();
       const [pendentes, vencidas, concluidas, byStatus] = await Promise.all([
-        prisma.task.count({ where: { userId, isDone: false } }),
-        prisma.task.count({ where: { userId, isDone: false, dueDate: { lt: now } } }),
-        prisma.task.count({ where: { userId, isDone: true } }),
-        prisma.task.groupBy({ by: ["status"], where: { userId, isDone: false }, _count: { _all: true } }),
+        prisma.task.count({ where: { userId, deletedAt: null, isDone: false } }),
+        prisma.task.count({ where: { userId, deletedAt: null, isDone: false, dueDate: { lt: now } } }),
+        prisma.task.count({ where: { userId, deletedAt: null, isDone: true } }),
+        prisma.task.groupBy({ by: ["status"], where: { userId, deletedAt: null, isDone: false }, _count: { _all: true } }),
       ]);
       return { pendentes, vencidas, concluidas, por_status: byStatus.map((s) => ({ status: s.status, total: s._count._all })) };
     }
@@ -242,22 +243,22 @@ async function querySummary(userId: string, module: AIModule): Promise<Record<st
       return { ultimos_7_dias: { sessoes: agg._count._all, minutos: agg._sum.durationMinutes ?? 0 } };
     }
     case "ENTERTAINMENT": {
-      const byStatus = await prisma.mediaItem.groupBy({ by: ["status"], where: { userId }, _count: { _all: true } });
+      const byStatus = await prisma.mediaItem.groupBy({ by: ["status"], where: { userId, deletedAt: null }, _count: { _all: true } });
       return { por_status: byStatus.map((s) => ({ status: s.status, total: s._count._all })) };
     }
     case "PROJECTS": {
-      const byStatus = await prisma.project.groupBy({ by: ["status"], where: { userId }, _count: { _all: true } });
+      const byStatus = await prisma.project.groupBy({ by: ["status"], where: { userId, deletedAt: null }, _count: { _all: true } });
       return { por_status: byStatus.map((s) => ({ status: s.status, total: s._count._all })) };
     }
     case "CRM": {
       const [clientes, byStatus] = await Promise.all([
-        prisma.client.count({ where: { userId } }),
-        prisma.client.groupBy({ by: ["status"], where: { userId }, _count: { _all: true } }),
+        prisma.client.count({ where: { userId, deletedAt: null } }),
+        prisma.client.groupBy({ by: ["status"], where: { userId, deletedAt: null }, _count: { _all: true } }),
       ]);
       return { clientes, por_status: byStatus.map((s) => ({ status: s.status, total: s._count._all })) };
     }
     case "FRIENDS": {
-      const total = await prisma.friend.count({ where: { userId } });
+      const total = await prisma.friend.count({ where: { userId, deletedAt: null } });
       return { contatos: total };
     }
     case "VAULT": {
@@ -266,15 +267,15 @@ async function querySummary(userId: string, module: AIModule): Promise<Record<st
     }
     case "WARDROBE": {
       const [total, byCat] = await Promise.all([
-        prisma.wardrobeItem.count({ where: { userId } }),
-        prisma.wardrobeItem.groupBy({ by: ["category"], where: { userId }, _count: { _all: true }, orderBy: { _count: { category: "desc" } }, take: 5 }),
+        prisma.wardrobeItem.count({ where: { userId, deletedAt: null } }),
+        prisma.wardrobeItem.groupBy({ by: ["category"], where: { userId, deletedAt: null }, _count: { _all: true }, orderBy: { _count: { category: "desc" } }, take: 5 }),
       ]);
       return { pecas: total, por_categoria: byCat.map((c) => ({ categoria: c.category, total: c._count._all })) };
     }
     case "AGENDA": {
       const now = new Date();
       const in7 = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-      const proximos = await prisma.event.count({ where: { userId, startTime: { gte: now, lte: in7 } } });
+      const proximos = await prisma.event.count({ where: { userId, deletedAt: null, startTime: { gte: now, lte: in7 } } });
       return { eventos_proximos_7_dias: proximos };
     }
     default:
@@ -343,16 +344,16 @@ async function recordLabel(userId: string, module: AIModule, id: string): Promis
 async function deleteRecord(userId: string, module: AIModule, id: string): Promise<void> {
   switch (module) {
     case "FINANCE": {
-      // Reverte o saldo da conta antes de excluir o lançamento.
-      const tx = await prisma.transaction.findFirst({ where: { id, userId }, select: { amount: true, type: true, accountId: true } });
-      await prisma.transaction.deleteMany({ where: { id, userId } });
-      if (tx) {
-        const account = await prisma.account.findFirst({ where: { id: tx.accountId, userId }, select: { id: true, balance: true } });
-        if (account) {
-          const delta = tx.type === "INCOME" ? -Number(tx.amount) : Number(tx.amount);
-          await prisma.account.updateMany({ where: { id: account.id, userId }, data: { balance: Number(account.balance) + delta } });
+      // Apaga o lançamento e reverte o saldo da conta de forma ATÔMICA: ou os dois
+      // passos acontecem, ou nenhum (evita saldo inconsistente se falhar no meio).
+      await prisma.$transaction(async (txc) => {
+        const t = await txc.transaction.findFirst({ where: { id, userId }, select: { amount: true, type: true, accountId: true } });
+        await txc.transaction.deleteMany({ where: { id, userId } });
+        if (t) {
+          const delta = t.type === "INCOME" ? -Number(t.amount) : Number(t.amount);
+          await txc.account.updateMany({ where: { id: t.accountId, userId }, data: { balance: { increment: delta } } });
         }
-      }
+      });
       return;
     }
     case "TASKS": await prisma.task.deleteMany({ where: { id, userId } }); return;
@@ -376,17 +377,21 @@ async function handleCreate(userId: string, args: ToolArgs): Promise<MutationRes
   switch (module) {
     case "TASKS": {
       if (!title) return { ok: false, summary: "Tarefa exige título." };
-      const t = await prisma.task.create({ data: { title, description: description ?? null, priority: category ?? "MEDIUM", status: status ?? "TODO", dueDate: due ?? null, userId } });
+      const t = await prisma.task.create({ data: { title, description: description ?? null, priority: coerceEnum(category, TASK_PRIORITIES, "MEDIUM"), status: coerceEnum(status, TASK_STATUSES, "TODO"), dueDate: due ?? null, userId } });
       return { ok: true, id: t.id, summary: `Tarefa criada: "${t.title}" (id ${t.id}).` };
     }
     case "FINANCE": {
       if (!title || value == null) return { ok: false, summary: "Lançamento exige descrição (title) e valor (value)." };
-      const account = await prisma.account.findFirst({ where: { userId }, select: { id: true, balance: true } });
+      const account = await prisma.account.findFirst({ where: { userId }, select: { id: true } });
       if (!account) return { ok: false, summary: "Nenhuma conta cadastrada. Crie uma conta antes de lançar." };
       const type = category === "INCOME" ? "INCOME" : "EXPENSE";
-      const tx = await prisma.transaction.create({ data: { description: title, amount: value, type, category: description ?? "Geral", date: due ?? new Date(), accountId: account.id, userId } });
       const delta = type === "INCOME" ? value : -value;
-      await prisma.account.updateMany({ where: { id: account.id, userId }, data: { balance: Number(account.balance) + delta } });
+      // Cria o lançamento e aplica o saldo de forma ATÔMICA (transação).
+      const tx = await prisma.$transaction(async (txc) => {
+        const created = await txc.transaction.create({ data: { description: title, amount: value, type, category: description ?? "Geral", date: due ?? new Date(), accountId: account.id, userId } });
+        await txc.account.updateMany({ where: { id: account.id, userId }, data: { balance: { increment: delta } } });
+        return created;
+      });
       return { ok: true, id: tx.id, summary: `Lançado ${type} de ${value} (id ${tx.id}).` };
     }
     case "HEALTH": {
@@ -423,7 +428,7 @@ async function handleCreate(userId: string, args: ToolArgs): Promise<MutationRes
     }
     case "CRM": {
       if (!title) return { ok: false, summary: "Cliente exige nome (title)." };
-      const c = await prisma.client.create({ data: { name: title, company: category ?? null, notes: description ?? null, status: status ?? "ACTIVE", userId } });
+      const c = await prisma.client.create({ data: { name: title, company: category ?? null, notes: description ?? null, status: coerceEnum(status, CLIENT_STATUSES, "ACTIVE"), userId } });
       return { ok: true, id: c.id, summary: `Cliente "${c.name}" salvo no CRM.` };
     }
     case "PROJECTS": {
@@ -465,8 +470,10 @@ async function handleUpdate(userId: string, args: ToolArgs): Promise<MutationRes
       const data: { title?: string; description?: string; priority?: string; status?: string; isDone?: boolean; dueDate?: Date } = {};
       if (title) data.title = title;
       if (description != null) data.description = description;
-      if (category) data.priority = category;
-      if (status) { data.status = status; data.isDone = status === "DONE"; }
+      const pr = asEnum(category, TASK_PRIORITIES);
+      if (pr) data.priority = pr;
+      const st = asEnum(status, TASK_STATUSES);
+      if (st) { data.status = st; data.isDone = st === "DONE"; }
       if (due) data.dueDate = due;
       const r = await prisma.task.updateMany({ where: { id, userId }, data });
       return r.count > 0 ? { ok: true, id, summary: `Tarefa ${id} atualizada.` } : { ok: false, summary: `Tarefa ${id} não encontrada.` };
@@ -501,7 +508,8 @@ async function handleUpdate(userId: string, args: ToolArgs): Promise<MutationRes
       const data: { name?: string; company?: string; status?: string; notes?: string } = {};
       if (title) data.name = title;
       if (category) data.company = category;
-      if (status) data.status = status;
+      const cs = asEnum(status, CLIENT_STATUSES);
+      if (cs) data.status = cs;
       if (description != null) data.notes = description;
       const r = await prisma.client.updateMany({ where: { id, userId }, data });
       return r.count > 0 ? { ok: true, id, summary: `Cliente ${id} atualizado.` } : { ok: false, summary: `Cliente ${id} não encontrado.` };
