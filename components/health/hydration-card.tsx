@@ -6,9 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
-    Droplets, Plus, GlassWater, Loader2, 
-    CheckCircle2, AlertTriangle, Zap, Waves,
-    TrendingUp, Coffee, Beer, CupSoda
+    Droplets, Plus, Loader2, 
+    CheckCircle2, AlertTriangle, Zap, Waves
 } from "lucide-react";
 import { logMetric } from "@/app/(dashboard)/health/actions";
 import { toast } from "sonner";

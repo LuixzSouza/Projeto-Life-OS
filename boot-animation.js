@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
-/* eslint-disable no-undef */
+ 
 
 // ==========================================
 //  LIFE OS - KERNEL BOOTLOADER v3.0 (CYBERPUNK)

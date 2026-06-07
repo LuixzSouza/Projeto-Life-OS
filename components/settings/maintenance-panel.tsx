@@ -16,10 +16,17 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
-export function MaintenancePanel() {
+type DbMode = "local" | "cloud" | "replica" | null;
+
+export function MaintenancePanel({ mode = "local" }: { mode?: DbMode }) {
     const [optimizing, setOptimizing] = useState(false);
     const [checking, setChecking] = useState(false);
     const [healthStatus, setHealthStatus] = useState<"unknown" | "healthy" | "error">("unknown");
+
+    // VACUUM só faz sentido no Local (arquivo real). No Híbrido/Nuvem o Turso cuida.
+    const canOptimize = mode === "local";
+    // Diagnóstico de arquivo: Local e Híbrido (lê o arquivo); na Nuvem não se aplica.
+    const canCheck = mode === "local" || mode === "replica";
 
     const handleOptimize = async () => {
         setOptimizing(true);
@@ -58,12 +65,12 @@ export function MaintenancePanel() {
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Button 
-                        variant="outline" 
-                        size="sm" 
+                    <Button
+                        variant="outline"
+                        size="sm"
                         className="w-full justify-between group hover:border-primary/50"
                         onClick={handleOptimize}
-                        disabled={optimizing}
+                        disabled={optimizing || !canOptimize}
                     >
                         <span className="flex items-center gap-2">
                             {optimizing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Hammer className="h-3.5 w-3.5" />}
@@ -73,6 +80,12 @@ export function MaintenancePanel() {
                             Recomendado mensalmente
                         </Badge>
                     </Button>
+                    {!canOptimize && (
+                        <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
+                            Indisponível no modo {mode === "replica" ? "Híbrido" : "Nuvem"} — o Turso
+                            otimiza o banco automaticamente.
+                        </p>
+                    )}
                 </CardContent>
             </Card>
 
@@ -89,12 +102,12 @@ export function MaintenancePanel() {
                 </CardHeader>
                 <CardContent>
                     <div className="flex gap-2">
-                        <Button 
-                            variant="outline" 
-                            size="sm" 
+                        <Button
+                            variant="outline"
+                            size="sm"
                             className="flex-1 justify-start gap-2"
                             onClick={handleCheck}
-                            disabled={checking}
+                            disabled={checking || !canCheck}
                         >
                             {checking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Activity className="h-3.5 w-3.5" />}
                             Rodar Diagnóstico
@@ -111,6 +124,11 @@ export function MaintenancePanel() {
                             </div>
                         )}
                     </div>
+                    {!canCheck && (
+                        <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
+                            Indisponível no modo Nuvem — a integridade é gerenciada pelo Turso.
+                        </p>
+                    )}
                 </CardContent>
             </Card>
         </div>

@@ -49,6 +49,8 @@ model User {
   // --- Multi-user: relações adicionadas na migração de isolamento ---
   transactions      Transaction[]
   recurringExpenses RecurringExpense[]
+  recurringCharges  RecurringCharge[]
+  recurringExpensePayments RecurringExpensePayment[]
   wishlistItems     WishlistItem[]
   tasks             Task[]
   workouts          Workout[]
@@ -60,6 +62,9 @@ model User {
   studySubjects     StudySubject[]
   studySessions     StudySession[]
   studyNotes        StudyNote[]
+  studyNoteVersions StudyNoteVersion[]
+  noteImages        NoteImage[]
+  notebooks         Notebook[]
   studyContents     StudyContent[]
   learningGoals     LearningGoal[]
   learningTasks     LearningTask[]
@@ -225,6 +230,14 @@ model StudyNote {
   tags       String?
   isFavorite Boolean @default(false)
 
+  // Caderno (organização principal das notas). Sem caderno = Entrada/Inbox.
+  notebookId String?
+  notebook   Notebook? @relation(fields: [notebookId], references: [id], onDelete: SetNull)
+
+  // Projeto vinculado (opcional): a nota aparece também na página do projeto.
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
   // Conexões
   subjectId String?
   subject   StudySubject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
@@ -238,6 +251,9 @@ model StudyNote {
   lastReviewed DateTime?
   reviewCount  Int       @default(0)
 
+  versions StudyNoteVersion[]
+  images   NoteImage[]
+
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -247,7 +263,67 @@ model StudyNote {
 
   @@index([userId])
   @@index([subjectId])
+  @@index([notebookId])
+  @@index([projectId])
   @@index([userId, deletedAt])
+}
+
+// Imagem incorporada numa nota: guarda o Base64 fora do texto (markdown limpo).
+// Servida por /api/note-image/[id]; o conteúdo referencia só a URL curta.
+model NoteImage {
+  id   String @id @default(uuid())
+  mime String
+  data String // Base64 puro (sem o prefixo data:)
+
+  noteId String?
+  note   StudyNote? @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([noteId])
+  @@index([userId])
+}
+
+// Caderno: agrupador livre de anotações (Trabalho, Pessoal, Ideias…).
+// O caderno com isInbox=true é a "Entrada" padrão para captura rápida.
+model Notebook {
+  id      String  @id @default(uuid())
+  name    String
+  color   String? @default("#6366f1")
+  icon    String?
+  isInbox Boolean @default(false)
+  position Int    @default(0)
+
+  notes StudyNote[]
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// Histórico de versões de uma anotação (snapshot antes de cada edição).
+model StudyNoteVersion {
+  id      String @id @default(uuid())
+  title   String
+  content String
+
+  noteId String
+  note   StudyNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([noteId, createdAt])
+  @@index([userId])
 }
 
 // Objetivos de Aprendizado (Novo)
@@ -397,6 +473,9 @@ model Transaction {
   // Fatura de Negócios que originou este lançamento (quando aplicável)
   invoice Invoice?
 
+  // Pagamento de custo fixo que originou este lançamento (quando aplicável)
+  recurringExpensePayment RecurringExpensePayment?
+
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -418,8 +497,22 @@ model RecurringExpense {
   category   String // rótulo legado
   active     Boolean @default(true)
 
+  // Recorrência dinâmica: WEEKLY | MONTHLY | QUARTERLY | SEMIANNUAL | ANNUAL.
+  // startDate = âncora da 1ª ocorrência (define o mês p/ frequências não-mensais).
+  // endDate   = quando a recorrência encerra (null = sem fim).
+  frequency String    @default("MONTHLY")
+  startDate DateTime?
+  endDate   DateTime?
+
+  // Parcelamento (opcional): compra finita em N parcelas. Com installments != null o
+  // endDate é calculado automaticamente. paidInstallments = parcelas já quitadas.
+  installments     Int?
+  paidInstallments Int  @default(0)
+
   categoryId  String?
   categoryRef Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  payments RecurringExpensePayment[] // pagamentos lançados (1 por ocorrência paga)
 
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -428,6 +521,76 @@ model RecurringExpense {
 
   @@index([userId])
   @@index([categoryId])
+}
+
+// Pagamento de UMA ocorrência de custo fixo (espelho da Invoice paga, lado despesa).
+// Marca o vencimento como pago e amarra o lançamento real no Financeiro (estornável).
+model RecurringExpensePayment {
+  id                 String           @id @default(uuid())
+  recurringExpenseId String
+  recurringExpense   RecurringExpense @relation(fields: [recurringExpenseId], references: [id], onDelete: Cascade)
+
+  dueDate DateTime // a ocorrência (vencimento) que foi paga
+  amount  Decimal
+  paidAt  DateTime @default(now())
+
+  // Lançamento financeiro gerado (permite estorno e evita duplicidade).
+  transactionId String?      @unique
+  transaction   Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([recurringExpenseId, dueDate]) // idempotência: uma ocorrência só é paga uma vez
+  @@index([userId])
+  @@index([recurringExpenseId])
+}
+
+// Cobranças recorrentes (receitas a RECEBER todo mês) — espelho de RecurringExpense
+// para o lado das entradas. Ex.: "cobrar R$ X do cliente Y no dia Z".
+// Separado de RecurringExpense para não corromper o total de custos fixos.
+model RecurringCharge {
+  id         String  @id @default(uuid())
+  title      String
+  amount     Decimal
+  dayOfMonth Int
+  category   String  @default("Cobrança")
+  clientName String? // nome cacheado do cliente (sobrevive se o cliente for removido)
+  active     Boolean @default(true)
+
+  // Recorrência dinâmica: WEEKLY | MONTHLY | QUARTERLY | SEMIANNUAL | ANNUAL.
+  // startDate = âncora da 1ª cobrança a acompanhar; endDate = quando encerra (null = sem fim).
+  frequency String    @default("MONTHLY")
+  startDate DateTime?
+  endDate   DateTime?
+
+  // Parcelamento (opcional): plano finito de N parcelas. Quando installments != null o
+  // endDate é calculado automaticamente (não precisa pensar no dia que encerra).
+  // paidInstallments = parcelas já quitadas antes de cadastrar (ex.: serviço já em andamento).
+  installments     Int?
+  paidInstallments Int  @default(0)
+
+  // Vínculo com o Cliente (Negócios) — conecta a cobrança à Finança e, via Client.friend,
+  // às Conexões. SetNull para não apagar a cobrança se o cliente for removido.
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  // Contrato RECURRING gerado/mantido para esta cobrança (origem das Invoices mensais).
+  billingId String?
+  billing   Billing? @relation(fields: [billingId], references: [id], onDelete: SetNull)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, active])
+  @@index([clientId])
+  @@index([billingId])
 }
 
 model WishlistItem {
@@ -492,7 +655,8 @@ model Project {
   id          String   @id @default(uuid())
   title       String
   slug        String   @unique
-  description String?
+  description String? // resumo curto ("Sobre")
+  notes       String? // documento rico (markdown) editado na aba Notas
   status      String   @default("ACTIVE")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
@@ -504,6 +668,8 @@ model Project {
   tasks    Task[]
   events   Event[]
   meetings Meeting[]
+
+  linkedNotes StudyNote[] // notas do módulo /notes vinculadas a este projeto
 
   jobApplications JobApplication[]
 
@@ -1115,6 +1281,7 @@ model Client {
 
   projects Project[] // Projetos vinculados a este cliente
   billings Billing[] // Contratos/Cobranças gerais
+  recurringCharges RecurringCharge[] // Cobranças recorrentes (Finanças) apontando para este cliente
 
   deletedAt DateTime?
   createdAt DateTime @default(now())
@@ -1148,6 +1315,7 @@ model Billing {
   client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   invoices Invoice[] // As faturas geradas (parcelas)
+  recurringCharges RecurringCharge[] // Cobranças recorrentes (Finanças) que alimentam este contrato
 
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)

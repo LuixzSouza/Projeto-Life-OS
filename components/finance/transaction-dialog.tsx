@@ -41,9 +41,7 @@ import {
 import type { TransactionDialogProps } from "./transaction-dialog-types";
 import { useAmountInput } from "./use-amount-input";
 import { DeleteTransactionAlert } from "./delete-transaction-alert";
-import { EntityTags } from "@/components/connect/entity-tags";
-import { EntityAttachments } from "@/components/connect/entity-attachments";
-import { EntityLinks } from "@/components/connect/entity-links";
+import { EntityConnections } from "@/components/connect/entity-connections";
 
 export function TransactionDialog({
   accounts = [],
@@ -274,15 +272,10 @@ export function TransactionDialog({
                 </div>
               </div>
 
-              {/* Tags, Anexos & Relações — só em edição (precisa do id). Componentes form-safe. */}
+              {/* Tags, Anexos & Conexões — só em edição (precisa do id). Card recolhível form-safe. */}
               {transaction && (
-                <div className="space-y-3 border-t border-border/40 pt-4">
-                  <Label className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">
-                    <Tag className="h-3.5 w-3.5" /> Tags, Anexos & Relações
-                  </Label>
-                  <EntityTags entityType="transaction" entityId={transaction.id} />
-                  <EntityAttachments entityType="transaction" entityId={transaction.id} />
-                  <EntityLinks entityType="transaction" entityId={transaction.id} />
+                <div className="pt-2">
+                  <EntityConnections entityType="transaction" entityId={transaction.id} />
                 </div>
               )}
 

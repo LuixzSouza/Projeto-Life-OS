@@ -1,11 +1,11 @@
 import { prisma } from "@/lib/prisma";
-import { getStorageStats } from "./actions";
+import { getStorageStats, getDbStatus } from "./actions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Database, Shield, BrainCircuit, User, Plug, Wrench } from "lucide-react";
 import path from "path";
 import { cn } from "@/lib/utils";
-import { getDatabasePath } from "@/lib/db-config";
+import { getDatabasePath, isRegistrationOpen } from "@/lib/db-config";
 import os from "os";
 import { getCurrentUserId } from "@/lib/auth";
 import { decryptSettings } from "@/lib/settings-crypto";
@@ -17,11 +17,14 @@ import { AIConfigForm } from "@/components/settings/ai-config-form";
 import { StorageAnalytics } from "@/components/settings/storage-analytics";
 import { SecurityForm } from "@/components/settings/security-form";
 import { StorageLocationForm } from "@/components/settings/storage-location-form";
+import { DbSyncCard } from "@/components/settings/db-sync-card";
+import { MigrateToReplicaCard } from "@/components/settings/migrate-to-replica-card";
 import APIIntegrationsForm from "@/components/settings/api-integrations-form";
 import { BackupManager } from "@/components/settings/backup-manager";
 import { SystemInfoCard } from "@/components/settings/system-info-card"; // ✅ Info do Sistema
 import { MaintenancePanel } from "@/components/settings/maintenance-panel"; // ✅ Manutenção (VACUUM)
 import { SelectiveExport } from "@/components/settings/selective-export"; // ✅ Exportação Seletiva
+import { SelectiveDelete } from "@/components/settings/selective-delete"; // ✅ Exclusão Seletiva
 
 export default async function SettingsPage() {
     // 1. Busca Dados do Usuário logado
@@ -34,8 +37,11 @@ export default async function SettingsPage() {
     
     // 2. Resolve Caminho do Banco
     const rawDbPath = getDatabasePath();
-    const dbFullPath = rawDbPath || path.join(process.cwd(), 'life_os.db'); 
+    const dbFullPath = rawDbPath || path.join(process.cwd(), 'life_os.db');
     const dbFolder = path.dirname(dbFullPath);
+
+    // 2b. Status do banco (modo réplica habilita o cartão de sincronização)
+    const dbStatus = await getDbStatus();
     
     // 3. Histórico de Backups
     const backupHistory = await prisma.backupLog.findMany({
@@ -120,10 +126,41 @@ export default async function SettingsPage() {
                         </div>
 
                         <div className="md:col-span-8 space-y-6">
+                            {dbStatus.isReplica && (
+                                <DbSyncCard
+                                    syncUrl={dbStatus.syncUrl}
+                                    databasePath={dbStatus.databasePath}
+                                />
+                            )}
+                            {dbStatus.mode === "local" && <MigrateToReplicaCard />}
+                            {dbStatus.mode === "cloud" && (
+                                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-5 flex items-start gap-4">
+                                    <div className="p-3 bg-background rounded-xl shadow-sm text-emerald-500 border border-emerald-500/20 shrink-0">
+                                        <Database className="h-6 w-6" />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <h4 className="font-semibold text-foreground flex items-center gap-2">
+                                            Conectado à Nuvem (Turso)
+                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600">
+                                                NUVEM
+                                            </span>
+                                        </h4>
+                                        <p className="text-xs text-muted-foreground leading-relaxed max-w-md">
+                                            Este ambiente lê o banco diretamente do Turso (via variáveis de
+                                            ambiente). Backups e otimização de arquivo local não se aplicam aqui —
+                                            o Turso cuida disso.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
                             <Card className="border-border shadow-sm bg-card">
                                 <CardContent className="p-6">
-                                    <StorageLocationForm currentPath={dbFolder} /> 
-                                    <div className="my-6 h-px bg-border" />
+                                    {dbStatus.mode !== "cloud" && (
+                                        <>
+                                            <StorageLocationForm currentPath={dbFolder} />
+                                            <div className="my-6 h-px bg-border" />
+                                        </>
+                                    )}
                                     <StorageAnalytics stats={stats} />
                                 </CardContent>
                             </Card>
@@ -141,7 +178,7 @@ export default async function SettingsPage() {
                             </p>
                         </div>
                         <div className="md:col-span-8">
-                            <MaintenancePanel />
+                            <MaintenancePanel mode={dbStatus.mode} />
                         </div>
                     </div>
 
@@ -154,7 +191,7 @@ export default async function SettingsPage() {
                             </p>
                         </div>
                         <div className="md:col-span-8">
-                            <BackupManager history={backupHistory} />
+                            <BackupManager history={backupHistory} mode={dbStatus.mode} />
                         </div>
                     </div>
 
@@ -185,8 +222,15 @@ export default async function SettingsPage() {
                     <div className="grid gap-6 md:grid-cols-12 pt-6 border-t border-border">
                         <div className="md:col-span-4">
                             <h3 className="text-lg font-medium text-destructive">Zona de Perigo</h3>
+                            <p className="text-sm text-muted-foreground">
+                                Apague conjuntos específicos de dados ou zere o sistema inteiro.
+                            </p>
                         </div>
-                        <div className="md:col-span-8">
+                        <div className="md:col-span-8 space-y-4">
+                            {/* Exclusão seletiva por módulo */}
+                            <SelectiveDelete />
+
+                            {/* Reset total */}
                             <Card className="border border-destructive/30 bg-destructive/5">
                                 <CardContent className="p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
                                     <div>
@@ -263,6 +307,7 @@ export default async function SettingsPage() {
                             <SecurityForm
                                 initialAutoLock={settings?.autoLockMinutes ?? 15}
                                 initialPrivacyMode={settings?.privacyMode ?? false}
+                                initialRegistrationOpen={isRegistrationOpen()}
                             />
                         </div>
                     </div>

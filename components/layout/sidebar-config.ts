@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Wallet, BookOpen, Dumbbell, Briefcase, Calendar,
   Globe, Settings, BrainCircuit, Lock, Bookmark, Film, Users, Shirt, Home,
-  BriefcaseBusiness, ClipboardList, History, Trash2, Network
+  BriefcaseBusiness, ClipboardList, History, Trash2, Network, NotebookPen
 } from "lucide-react";
 import type { SidebarGroup, SidebarItem } from "./sidebar-types";
 
@@ -56,7 +56,8 @@ export const groupedSidebarItems: SidebarGroup[] = [
           { label: "Corpo", href: "/health/body" },
         ]
       },
-      { label: "Estudos", icon: BookOpen, href: "/studies", subItems: [{ label: "Metas", href: "/goals" }, { label: "Flash Cards", href: "/flashcards" }, { label: "Anotações", href: "/notes" }] },
+      { label: "Notas", icon: NotebookPen, href: "/notes" },
+      { label: "Estudos", icon: BookOpen, href: "/studies", subItems: [{ label: "Metas", href: "/goals" }, { label: "Flash Cards", href: "/flashcards" }] },
       { label: "Entretenimento", icon: Film, href: "/entertainment" },
       { label: "Closet", icon: Shirt, href: "/wardrobe" },
       { label: "Conexões", icon: Users, href: "/social" },

@@ -7,15 +7,18 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 
-import type { AccountOption, ActionResponse, BillingData, ClientData, DeleteTarget, FriendOption, InvoiceData } from "./business-types"
+import type { ActionResponse, BillingData, ClientData, DeleteTarget, FriendOption } from "./business-types"
 import { clearMask, generateChargeMessage, maskPhone } from "./business-helpers"
 import { ClientCard } from "./business-client-card"
 import { BillingReminders } from "./billing-reminders"
-import { ClientModal, BillingModal, InvoiceModal, BillingEditModal, DeleteAlert, PaymentModal } from "./business-modals"
+import { ClientModal, DeleteAlert } from "./business-modals"
 import { EntityConnectionsDialog } from "@/components/connect/entity-connections-dialog"
 
 // --- COMPONENTE PRINCIPAL ---
-export function BusinessView({ initialClients, accounts, friends, pixKey, businessName }: { initialClients: ClientData[]; accounts: AccountOption[]; friends: FriendOption[]; pixKey?: string; businessName?: string }) {
+// A gestão completa (contratos, faturas, recebimentos) vive na página de detalhe
+// /business/[id]. Aqui ficam a lista resumida, a busca, a Central de Cobranças e
+// as ações de nível de cliente (criar/editar/excluir/conexões).
+export function BusinessView({ initialClients, friends, pixKey, businessName }: { initialClients: ClientData[]; friends: FriendOption[]; pixKey?: string; businessName?: string }) {
   const [searchTerm, setSearchTerm] = useState("")
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const chargeOpts = { pixKey, businessName }
@@ -25,10 +28,6 @@ export function BusinessView({ initialClients, accounts, friends, pixKey, busine
   const [editingClient, setEditingClient] = useState<ClientData | null>(null)
   const [phoneValue, setPhoneValue] = useState("")
 
-  const [selectedClientForBilling, setSelectedClientForBilling] = useState<string | null>(null)
-  const [editingBilling, setEditingBilling] = useState<BillingData | null>(null)
-  const [editingInvoice, setEditingInvoice] = useState<InvoiceData | null>(null)
-  const [payingInvoice, setPayingInvoice] = useState<InvoiceData | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
   const [connClient, setConnClient] = useState<{ id: string; title: string } | null>(null)
 
@@ -144,12 +143,6 @@ export function BusinessView({ initialClients, accounts, friends, pixKey, busine
             onEditClient={handleOpenEditClientModal}
             onDeleteTarget={setDeleteTarget}
             onOpenConnections={(c) => setConnClient({ id: c.id, title: c.name })}
-            onNewBilling={setSelectedClientForBilling}
-            onEditBilling={setEditingBilling}
-            onEditInvoice={setEditingInvoice}
-            onReceiveInvoice={setPayingInvoice}
-            onCopyCharge={handleCopyChargeMessage}
-            onWhatsapp={handleWhatsappCharge}
           />
         ))}
       </div>
@@ -163,28 +156,6 @@ export function BusinessView({ initialClients, accounts, friends, pixKey, busine
         phoneValue={phoneValue}
         setPhoneValue={setPhoneValue}
         onSuccess={() => { setIsClientModalOpen(false); setEditingClient(null); }}
-      />
-
-      <PaymentModal
-        key={payingInvoice?.id || "payment"}
-        invoice={payingInvoice}
-        accounts={accounts}
-        onClose={() => setPayingInvoice(null)}
-      />
-
-      <BillingModal
-        clientId={selectedClientForBilling}
-        onClose={() => setSelectedClientForBilling(null)}
-      />
-
-      <InvoiceModal
-        invoice={editingInvoice}
-        onClose={() => setEditingInvoice(null)}
-      />
-
-      <BillingEditModal
-        billing={editingBilling}
-        onClose={() => setEditingBilling(null)}
       />
 
       <DeleteAlert

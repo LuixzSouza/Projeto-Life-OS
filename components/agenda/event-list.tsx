@@ -14,7 +14,6 @@ import {
   MapPin,
   Pencil,
   CalendarX2,
-  Clock,
   MoreHorizontal,
   CalendarPlus,
   Tag as TagIcon

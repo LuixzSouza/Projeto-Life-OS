@@ -6,17 +6,18 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { RecurringCard, TransactionList } from "@/components/finance/finance-ui";
 import { RecurringDialog } from "@/components/finance/recurring-dialog";
-import type { DashboardTransaction, DashboardRecurring } from "./types";
+import type { DashboardTransaction, DashboardRecurring, DashboardAccount } from "./types";
 
 interface StatementSectionProps {
   transactions: DashboardTransaction[];
   recurring: DashboardRecurring[];
   totalRecurring: number;
+  accounts: DashboardAccount[];
 }
 
-export function StatementSection({ transactions, recurring, totalRecurring }: StatementSectionProps) {
+export function StatementSection({ transactions, recurring, totalRecurring, accounts }: StatementSectionProps) {
   return (
-    <section className="px-6 md:px-8 py-10 max-w-[1600px] mx-auto">
+    <section className="px-6 md:px-8 py-10 max-w-7xl mx-auto">
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
 
         {/* EXTRATO DE TRANSAÇÕES */}
@@ -35,7 +36,7 @@ export function StatementSection({ transactions, recurring, totalRecurring }: St
 
           {transactions.length > 0 ? (
             <div className="h-[500px] rounded-[2rem] border border-border/40 bg-card shadow-sm overflow-hidden flex flex-col">
-              <TransactionList transactions={transactions} />
+              <TransactionList transactions={transactions} accounts={accounts} />
             </div>
           ) : (
             <div className="h-[500px] rounded-[2rem] border border-dashed border-border/60 bg-muted/10 flex flex-col transition-colors hover:bg-muted/20">
@@ -64,7 +65,7 @@ export function StatementSection({ transactions, recurring, totalRecurring }: St
           </div>
 
           {recurring.length > 0 ? (
-            <RecurringCard total={totalRecurring} items={recurring} />
+            <RecurringCard total={totalRecurring} items={recurring} accounts={accounts} />
           ) : (
             <div className="h-[500px] rounded-[2rem] border border-dashed border-border/60 bg-muted/10 flex flex-col transition-colors hover:bg-muted/20">
               <EmptyState

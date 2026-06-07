@@ -9,6 +9,7 @@ import { decrypt } from "@/lib/auth";
 const publicRoutes = [
   "/",
   "/login",
+  "/register",
   "/setup",
   "/privacy",
   "/terms",
@@ -38,8 +39,8 @@ export async function proxy(request: NextRequest) {
   // CENÁRIO A: Usuário Logado
   // ============================================================
   if (session) {
-    // Se logado, não faz sentido ver a tela de login ou setup inicial
-    if (path === "/login" || path === "/setup") {
+    // Se logado, não faz sentido ver login, cadastro ou setup inicial
+    if (path === "/login" || path === "/register" || path === "/setup") {
       return NextResponse.redirect(new URL("/dashboard", request.nextUrl));
     }
     return NextResponse.next();

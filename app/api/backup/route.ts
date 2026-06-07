@@ -2,12 +2,20 @@ import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 import { getCurrentUserId } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const userId = await getCurrentUserId();
     if (!userId) {
       return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
     }
+
+    // Seleção de módulos (Exportação Avançada). Sem o parâmetro = exporta tudo.
+    const modulesParam = new URL(request.url).searchParams.get("modules");
+    const selected = modulesParam
+      ? new Set(modulesParam.split(",").map((s) => s.trim()).filter(Boolean))
+      : null;
+    const include = (id: string) => !selected || selected.has(id);
+
     // 1. Busca TUDO do banco de dados em paralelo
     const [
       user,
@@ -59,30 +67,29 @@ export async function GET() {
       prisma.challenge.findMany({ where: { userId }, include: { checkins: true } })
     ]);
 
-    // 2. Monta o objeto de Backup com estrutura compatível com a importação
+    // 2. Monta o objeto de Backup com estrutura compatível com a importação.
+    // Inclui só os módulos selecionados (mapa idêntico ao da Exportação Avançada).
+    // `meta` e `user` sempre vão (necessários para a importação reconstruir).
     const backupData = {
       meta: {
         system: "Life OS",
-        version: "2.0", // Atualizado para refletir novas features
+        version: "2.0",
         date: new Date().toISOString(),
+        modules: selected ? Array.from(selected) : "all",
       },
       user,
-      settings,
-      accounts,
-      projects,
-      tasksWithoutProject,
-      jobApplications,
-      studySubjects,
-      flashcardDecks,
-      workouts,
-      healthMetrics,
-      events,
-      sites,
-      accessItems,
-      savedLinks, // ✅ Exportando os links
-      aiMessages: aiMessages.reverse(), // Reordena para cronológico (Antigo -> Novo)
-      portfolio, // ✅ Currículo / Portfólio
-      challenges // ✅ Desafios de treino
+      ...(include("tasks") && { projects, tasksWithoutProject, jobApplications, events }),
+      ...(include("finance") && { accounts }),
+      ...(include("notes") && { studySubjects, flashcardDecks }),
+      ...(include("health") && { workouts, healthMetrics, challenges }),
+      ...(include("system") && {
+        settings,
+        sites,
+        accessItems,
+        savedLinks,
+        aiMessages: aiMessages.reverse(), // cronológico (antigo -> novo)
+        portfolio,
+      }),
     };
 
     // 3. Gera o JSON

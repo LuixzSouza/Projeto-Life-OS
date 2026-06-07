@@ -12,13 +12,15 @@ import {
   Zap,
   Sparkles,
   BrainCircuit,
+  RefreshCw,
 } from "lucide-react";
 
-export type StorageMode = "local" | "cloud";
+export type StorageMode = "local" | "cloud" | "replica";
 
 /** Identificadores dos provedores de banco exibidos no wizard. */
 export type DbProviderId =
   | "turso"
+  | "replica"
   | "local"
   | "postgres"
   | "supabase"
@@ -86,6 +88,18 @@ export const DB_PROVIDERS: DbProviderMeta[] = [
     available: true,
     badge: "Recomendado",
     accent: "text-emerald-500",
+  },
+  {
+    id: "replica",
+    name: "Híbrido (Réplica)",
+    tagline: "Local no PC + espelho no Turso",
+    description:
+      "O melhor dos dois mundos: um arquivo local rápido no seu PC que sincroniza com um banco Turso na nuvem. Você trabalha offline e o celular acessa os MESMOS dados em qualquer lugar (via instância na nuvem). Disponível no app desktop.",
+    icon: RefreshCw,
+    available: true,
+    desktopOnly: true,
+    badge: "Híbrido",
+    accent: "text-cyan-500",
   },
   {
     id: "local",

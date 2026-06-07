@@ -16,12 +16,19 @@ export const metadata: Metadata = {
 
 // --- Interfaces & Tipos ---
 
+interface GymSet {
+  reps: string;
+  weight: string;
+  done: boolean;
+}
+
 interface GymExercise {
   name: string;
   weight: string;
   sets: string;
   reps: string;
   isCompleted?: boolean;
+  setLog?: GymSet[];
 }
 
 interface SerializedWorkout {
@@ -50,13 +57,22 @@ function parseGymExercises(jsonString: string | null): GymExercise[] {
       }
 
       const record = item as Record<string, unknown>;
-      
+
+      // Séries detalhadas (sessão ao vivo), quando presentes.
+      const setLog = Array.isArray(record.setLog)
+        ? (record.setLog as unknown[]).map((s) => {
+            const sr = (typeof s === "object" && s !== null ? s : {}) as Record<string, unknown>;
+            return { reps: String(sr.reps ?? "0"), weight: String(sr.weight ?? "0"), done: Boolean(sr.done) };
+          })
+        : undefined;
+
       return {
         name: String(record.name || "Exercício"),
         weight: String(record.weight || "0"),
         sets: String(record.sets || "0"),
         reps: String(record.reps || "0"),
-        isCompleted: Boolean(record.isCompleted)
+        isCompleted: Boolean(record.isCompleted),
+        ...(setLog ? { setLog } : {}),
       };
     });
   } catch (e) {

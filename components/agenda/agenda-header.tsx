@@ -1,9 +1,9 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { 
-  Plus, Calendar as CalendarIcon, ChevronLeft, ChevronRight, 
+  Plus, ChevronLeft, ChevronRight, 
   Clock, CalendarPlus
 } from "lucide-react";
 import { format, addDays, subDays, isSameDay } from "date-fns";
@@ -17,7 +17,7 @@ interface AgendaHeaderProps {
   date: Date;
 }
 
-export function AgendaHeader({ isSpecificDate, date }: AgendaHeaderProps) {
+export function AgendaHeader({ date }: AgendaHeaderProps) {
   const router = useRouter();
 
   // --- NAVEGAÇÃO DE DATAS ---

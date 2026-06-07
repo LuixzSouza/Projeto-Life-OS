@@ -12,7 +12,6 @@ import {
 import { ChartContainer } from "@/components/ui/chart-container";
 import { ValueType, NameType } from "recharts/types/component/DefaultTooltipContent";
 import { BookOpen, Activity } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 /* -------------------------------------------------------------------------------------------------
  * 1. INTERFACES

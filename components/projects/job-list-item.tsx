@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Briefcase, ExternalLink, DollarSign, Calendar, Pencil, CalendarClock, MapPin, Sparkles, Link2, Folder } from "lucide-react";
@@ -57,13 +57,16 @@ export function JobListItem({ job, mode, onAiClick, onLinkClick }: JobItemProps)
         toast.success("Vaga removida com sucesso.");
     };
 
-    const Logo = () => (
+    // Estes são JSX/closures memorizados por render — NÃO componentes aninhados.
+    // Montar <Logo/>, <EditDialog/> etc. recriaria o tipo a cada render e remontaria
+    // a subárvore; no EditDialog isso zerava o formulário enquanto o usuário digitava.
+    const logoNode = (
         logo
             ? <img src={logo} alt={job.company} className="w-full h-full object-contain" />
             : <Briefcase className="w-5 h-5 text-muted-foreground/40" />
     );
 
-    const ProjectLink = () => job.project ? (
+    const projectLinkNode = job.project ? (
         <Link
             href={`/projects/${job.project.slug}`}
             onClick={(e) => e.stopPropagation()}
@@ -75,7 +78,7 @@ export function JobListItem({ job, mode, onAiClick, onLinkClick }: JobItemProps)
     ) : null;
 
     // Botões de ação compartilhados (ghost icons).
-    const Actions = ({ revealOnHover = true }: { revealOnHover?: boolean }) => (
+    const renderActions = (revealOnHover = true) => (
         <div className={cn("flex items-center gap-1", revealOnHover && "opacity-0 group-hover:opacity-100 transition-opacity")}>
             {onAiClick && (
                 <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-violet-600 hover:bg-violet-500/10" onClick={(e) => { e.stopPropagation(); onAiClick(job); }} title="Assistente de IA">
@@ -99,7 +102,7 @@ export function JobListItem({ job, mode, onAiClick, onLinkClick }: JobItemProps)
         </div>
     );
 
-    const EditDialog = () => (
+    const editDialogNode = (
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
             <DialogContent className="sm:max-w-2xl p-0 overflow-hidden rounded-[2rem] shadow-2xl gap-0">
                 <DialogHeader className="p-6 pb-5 border-b border-border/40 bg-muted/10 text-left">
@@ -121,7 +124,7 @@ export function JobListItem({ job, mode, onAiClick, onLinkClick }: JobItemProps)
                 <CardContent className="p-0 space-y-4">
                     <div className="flex items-start justify-between gap-3">
                         <div className="h-11 w-11 rounded-xl bg-background border border-border/40 flex items-center justify-center shadow-sm overflow-hidden p-2 shrink-0">
-                            <Logo />
+                            {logoNode}
                         </div>
                         <Badge variant="secondary" className={cn("text-[10px] font-semibold border-none gap-1", getThemeClasses(statusInfo.theme))}>
                             <StatusIcon className="h-3 w-3" /> {statusInfo.label}
@@ -140,7 +143,7 @@ export function JobListItem({ job, mode, onAiClick, onLinkClick }: JobItemProps)
                         {followUp && (
                             <span className={cn("inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md", followUp.cls)}><CalendarClock className="h-3 w-3" /> {followUp.label}</span>
                         )}
-                        <ProjectLink />
+                        {projectLinkNode}
                     </div>
 
                     <div className="space-y-2 pt-1">
@@ -153,10 +156,10 @@ export function JobListItem({ job, mode, onAiClick, onLinkClick }: JobItemProps)
                 </CardContent>
 
                 <div className="mt-4 pt-3 flex items-center justify-end border-t border-border/40">
-                    <Actions revealOnHover={false} />
+                    {renderActions(false)}
                 </div>
 
-                <EditDialog />
+                {editDialogNode}
             </Card>
         );
     }
@@ -166,7 +169,7 @@ export function JobListItem({ job, mode, onAiClick, onLinkClick }: JobItemProps)
         <div className="group flex flex-col sm:flex-row sm:items-center gap-4 p-4 bg-card border border-border/40 rounded-2xl hover:shadow-md hover:border-primary/30 transition-all">
             <div className="flex items-center gap-4 flex-1 min-w-0">
                 <div className="h-11 w-11 rounded-xl bg-background flex items-center justify-center border border-border/40 shrink-0 shadow-sm overflow-hidden p-2">
-                    <Logo />
+                    {logoNode}
                 </div>
                 <div className="min-w-0 space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -181,7 +184,7 @@ export function JobListItem({ job, mode, onAiClick, onLinkClick }: JobItemProps)
                         {job.location && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{job.location}</span>}
                         {job.salary && <span className="flex items-center gap-1 font-semibold text-emerald-600"><DollarSign className="h-3 w-3" />{job.salary}</span>}
                         {followUp && <span className={cn("inline-flex items-center gap-1 font-semibold px-1.5 py-0.5 rounded-md", followUp.cls)}><CalendarClock className="h-3 w-3" />{followUp.label}</span>}
-                        <ProjectLink />
+                        {projectLinkNode}
                     </div>
                 </div>
             </div>
@@ -194,10 +197,10 @@ export function JobListItem({ job, mode, onAiClick, onLinkClick }: JobItemProps)
             </div>
 
             <div className="flex items-center justify-end border-t sm:border-0 pt-3 sm:pt-0">
-                <Actions />
+                {renderActions()}
             </div>
 
-            <EditDialog />
+            {editDialogNode}
         </div>
     );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -81,6 +81,20 @@ export function AccountDialog({
   const setIsOpen: (open: boolean) => void =
     controlledOnOpenChange ?? ((open: boolean) => setInternalOpen(open));
 
+  // O Dialog é único e global (montado uma vez). Os initializers lazy de `digits`
+  // e `selectedColor` só rodam na 1ª montagem (com account=null), então ao abrir
+  // em modo edição os estados ficavam defasados — o saldo aparecia vazio e era
+  // salvo como 0. Ressincronizamos sempre que o dialog abre ou a conta muda.
+  useEffect(() => {
+    if (!isOpen) return;
+    if (account?.balance !== undefined && account?.balance !== null && account?.balance !== "") {
+      setDigits(String(Math.round(Number(account.balance) * 100)));
+    } else {
+      setDigits("");
+    }
+    setSelectedColor(account?.color || "#820ad1");
+  }, [account, isOpen]);
+
   /** valor matemático real enviado ao backend (string com ponto decimal) */
   const rawBalance: string = digits ? (Number(digits) / 100).toFixed(2) : "";
 
@@ -147,7 +161,6 @@ export function AccountDialog({
       setIsOpen(false);
     } catch (err) {
       // log para debugar (mantemos a tipagem natural do erro)
-      // eslint-disable-next-line no-console
       console.error(err);
       toast.error("Erro ao salvar conta.");
     } finally {

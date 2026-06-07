@@ -93,7 +93,7 @@ export function WishlistForm({ item, onClose }: { item?: WishlistData, onClose: 
                 }
             } catch (err) {
                 // silenciosamente ignoramos qualquer erro — não queremos quebrar a UI por aqui
-                // eslint-disable-next-line no-console
+                 
                 console.debug("Não foi possível ajustar cursor do price input:", err);
             }
         }, 0);
@@ -111,7 +111,7 @@ export function WishlistForm({ item, onClose }: { item?: WishlistData, onClose: 
                     el.setSelectionRange(len, len);
                 }
             } catch (err) {
-                // eslint-disable-next-line no-console
+                 
                 console.debug("Não foi possível ajustar cursor do saved input:", err);
             }
         }, 0);

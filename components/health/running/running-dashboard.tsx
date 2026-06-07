@@ -4,10 +4,10 @@ import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { 
-    Footprints, Timer, Calendar, TrendingUp, 
-    MapPin, Plus, Zap, Trophy, Gauge, Activity, Clock 
+    Footprints, Calendar, TrendingUp, 
+    MapPin, Plus, Trophy, Gauge, Activity 
 } from "lucide-react";
 import { AreaChart, Area, XAxis, Tooltip, CartesianGrid, YAxis } from "recharts";
 import { ChartContainer } from "@/components/ui/chart-container";
@@ -15,7 +15,6 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { RunForm } from "./run-form";
 import { ImportRunsDialog } from "./import-runs-dialog";
-import { cn } from "@/lib/utils";
 
 // --- Tipagem Estrita ---
 interface RunWorkout {

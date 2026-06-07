@@ -5,6 +5,7 @@ import { Paperclip, Upload, Link2, Trash2, Loader2, FileText, Image as ImageIcon
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { ConnectSectionHeader } from "./connect-section-header";
 import {
   getEntityAttachments,
   addEntityAttachment,
@@ -127,6 +128,11 @@ export function EntityAttachments({ entityType, entityId }: { entityType: string
 
   return (
     <div className="space-y-3">
+      <ConnectSectionHeader
+        icon={Paperclip}
+        title="Anexos"
+        hint="Guarde um arquivo (até 4MB) ou um link junto deste item. Ex: contrato, print, página."
+      />
       <div className="flex items-center gap-2">
         <input ref={fileRef} type="file" className="hidden" onChange={onPickFile} />
         <Button type="button" variant="outline" size="sm" className="gap-2" disabled={pending} onClick={() => fileRef.current?.click()}>

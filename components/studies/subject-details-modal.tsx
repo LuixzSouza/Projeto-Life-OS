@@ -23,9 +23,7 @@ import {
 
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { EntityTags } from "@/components/connect/entity-tags";
-import { EntityAttachments } from "@/components/connect/entity-attachments";
-import { EntityLinks } from "@/components/connect/entity-links";
+import { EntityConnections } from "@/components/connect/entity-connections";
 
 /* -------------------------------------------------------------------------- */
 /* TYPES                                                                      */
@@ -355,15 +353,10 @@ export function SubjectDetailsModal({ subjectId, open, onClose }: SubjectDetails
                 )}
               </div>
 
-              {/* TAGS, ANEXOS & RELAÇÕES (tecido conectivo cross-módulo) */}
+              {/* TAGS, ANEXOS & CONEXÕES (card recolhível cross-módulo) */}
               {subjectId && (
-                <div className="space-y-3 border-t border-border/40 pt-4">
-                  <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                    <BookOpen className="h-3.5 w-3.5" /> Tags, Anexos & Relações
-                  </p>
-                  <EntityTags entityType="studySubject" entityId={subjectId} />
-                  <EntityAttachments entityType="studySubject" entityId={subjectId} />
-                  <EntityLinks entityType="studySubject" entityId={subjectId} />
+                <div className="pt-2">
+                  <EntityConnections entityType="studySubject" entityId={subjectId} />
                 </div>
               )}
             </>

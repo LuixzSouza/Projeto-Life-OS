@@ -31,7 +31,8 @@ export function EntityConnectionsDialog({
     <Dialog open={!!item} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[460px]">
         <DialogHeader>
-          <DialogTitle className="line-clamp-1">{item?.title ?? "Conexões"}</DialogTitle>
+          {/* pr-10 reserva espaço para o X de fechar (right-4, 32px) — evita o título por baixo. */}
+          <DialogTitle className="line-clamp-1 pr-10">{item?.title ?? "Conexões"}</DialogTitle>
         </DialogHeader>
         {item && (
           <Tabs defaultValue="tags" className="mt-1">
@@ -43,7 +44,7 @@ export function EntityConnectionsDialog({
                 <Paperclip className="h-4 w-4" /> Anexos
               </TabsTrigger>
               <TabsTrigger value="links" className="flex-1 gap-1.5">
-                <GitBranch className="h-4 w-4" /> Relações
+                <GitBranch className="h-4 w-4" /> Conexões
               </TabsTrigger>
             </TabsList>
             <TabsContent value="tags" className="pt-2">

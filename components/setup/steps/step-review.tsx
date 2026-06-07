@@ -13,8 +13,12 @@ export function StepReview({ formData, dbFromEnv }: StepReviewProps) {
   const dbLabel = dbFromEnv
     ? "Turso (nuvem) — via ambiente"
     : formData.dbProvider === "local"
-      ? `${formData.storagePath}\\life_os.db`
-      : formData.tursoUrl || db?.name || "Turso";
+      ? (formData.storagePath.toLowerCase().endsWith(".db")
+          ? formData.storagePath
+          : `${formData.storagePath}\\life_os.db`)
+      : formData.dbProvider === "replica"
+        ? `Híbrido • ${formData.storagePath}\\life_os.db ⇄ ${formData.tursoUrl || "Turso"}`
+        : formData.tursoUrl || db?.name || "Turso";
 
   return (
     <div className="space-y-6 animate-in slide-in-from-right-8 fade-in duration-300">

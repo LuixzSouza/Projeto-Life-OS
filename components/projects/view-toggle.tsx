@@ -3,7 +3,6 @@
 
 import { Button } from "@/components/ui/button";
 import { List, AlignJustify, Grid3x3 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import Link from "next/link";
 
 type ViewType = "list" | "compact" | "grid";

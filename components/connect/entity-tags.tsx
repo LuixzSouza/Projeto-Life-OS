@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { X, Plus, Tag as TagIcon, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { ConnectSectionHeader } from "./connect-section-header";
 import {
   getEntityTagsAction,
   listUserTags,
@@ -96,11 +97,16 @@ export function EntityTags({ entityType, entityId }: { entityType: string; entit
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
+      <ConnectSectionHeader
+        icon={TagIcon}
+        title="Tags"
+        hint="Rótulos pra achar e agrupar itens depois. Ex: urgente, ideia, cliente-x."
+      />
       <div className="flex flex-wrap items-center gap-1.5">
         {tags.length === 0 && (
           <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-            <TagIcon className="h-3.5 w-3.5" /> Sem tags ainda
+            <TagIcon className="h-3.5 w-3.5" /> Nenhuma tag ainda — digite abaixo e Enter.
           </span>
         )}
         {tags.map((t) => (

@@ -5,8 +5,9 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { login, hashPassword } from "@/lib/auth";
 import { setDbProfile, getEnvProfile, type DbProfile } from "@/lib/db-config";
-import { reconnectPrisma, buildClient } from "@/lib/prisma";
+import { reconnectPrisma, buildAdapterClient } from "@/lib/prisma";
 import { ensureSchema } from "@/lib/db-bootstrap";
+import { mergeSqliteIntoTurso } from "@/lib/db-migrate";
 import { validatePasswordStrength } from "@/lib/password-policy";
 import fs from "fs";
 import path from "path";
@@ -55,11 +56,38 @@ function resolveProfileFromForm(formData: FormData): {
     return { profile: { mode: "cloud", provider: "turso", url, authToken }, storagePath: "" };
   }
 
+  // Réplica embarcada: precisa de pasta local (arquivo) + Turso espelho (url/token).
+  if (mode === "replica") {
+    const storagePath = formData.get("storagePath") as string;
+    const url = ((formData.get("tursoUrl") as string) || "").trim();
+    const authToken = ((formData.get("tursoToken") as string) || "").trim() || undefined;
+    if (!storagePath) throw new Error("A pasta local da réplica é obrigatória.");
+    if (!url) throw new Error("A URL do banco espelho (Turso) é obrigatória.");
+    if (!/^(libsql|https?):\/\//.test(url)) {
+      throw new Error("URL inválida. Use o formato libsql://... ou https://...");
+    }
+    // Aceita pasta ou arquivo .db (usa a pasta dele). O cache da réplica usa um
+    // nome PRÓPRIO (life_os.replica.db) para nunca confundir/sobrescrever um
+    // life_os.db "local" que já exista na pasta — esse arquivo antigo é, na
+    // verdade, a ORIGEM da migração para o Turso.
+    const folder = storagePath.toLowerCase().endsWith(".db") ? path.dirname(storagePath) : storagePath;
+    ensureWritableFolder(folder);
+    const dbFilePath = path.join(folder, "life_os.replica.db");
+    return {
+      profile: { mode: "replica", databasePath: dbFilePath, syncUrl: url, authToken },
+      storagePath: folder,
+    };
+  }
+
   const storagePath = formData.get("storagePath") as string;
   if (!storagePath) throw new Error("O caminho do banco de dados é obrigatório.");
-  ensureWritableFolder(storagePath);
-  const dbFilePath = path.join(storagePath, "life_os.db");
-  return { profile: { mode: "local", databasePath: dbFilePath }, storagePath };
+
+  // Aceita um arquivo .db existente (conecta a ele) OU uma pasta (cria life_os.db).
+  const isDbFile = storagePath.toLowerCase().endsWith(".db");
+  const folder = isDbFile ? path.dirname(storagePath) : storagePath;
+  ensureWritableFolder(folder);
+  const dbFilePath = isDbFile ? storagePath : path.join(folder, "life_os.db");
+  return { profile: { mode: "local", databasePath: dbFilePath }, storagePath: folder };
 }
 
 /** Estado retornado para o wizard (useActionState). */
@@ -72,11 +100,12 @@ export interface SetupState {
 /**
  * Traduz erros técnicos (Turso/libSQL/fs) em mensagens acionáveis em pt-BR.
  */
-function friendlyError(error: unknown, mode: "local" | "cloud"): string {
+function friendlyError(error: unknown, mode: DbProfile["mode"]): string {
   const raw = error instanceof Error ? error.message : String(error);
   const low = raw.toLowerCase();
 
-  if (mode === "cloud") {
+  // Réplica também fala com o Turso (espelho), então herda o mapeamento da nuvem.
+  if (mode === "cloud" || mode === "replica") {
     if (low.includes("401") || low.includes("unauthor")) {
       return "Turso recusou o token (401). O formato está ok, mas este token NÃO vale para este banco. Gere um token NOVO abrindo o banco específico no dashboard (ou `turso db tokens create <nome-do-banco>`). Atenção: token de API da conta ≠ token do banco; e se o banco foi recriado, tokens antigos param de valer.";
     }
@@ -107,7 +136,8 @@ function friendlyError(error: unknown, mode: "local" | "cloud"): string {
  * "HTTP 400" críptico lá na frente.
  */
 function assertValidCloudProfile(profile: DbProfile): void {
-  if (profile.mode !== "cloud") return;
+  // Vale para nuvem pura E réplica (ambas autenticam no Turso com um JWT).
+  if (profile.mode !== "cloud" && profile.mode !== "replica") return;
   const token = profile.authToken?.trim();
   if (!token) {
     throw new Error(
@@ -134,8 +164,10 @@ export async function setupSystem(
   formData: FormData
 ): Promise<SetupState> {
   let tempPrisma: PrismaClient | null = null;
+  // Cliente libSQL bruto (só no modo réplica) — guardado p/ fechar no finally.
+  let tempLibsql: { close(): void } | null = null;
   // Default usado nas mensagens de erro antes de o perfil ser resolvido.
-  let mode: "local" | "cloud" = "local";
+  let mode: DbProfile["mode"] = "local";
 
   try {
     console.log("🚀 Iniciando Setup Completo...");
@@ -156,10 +188,49 @@ export async function setupSystem(
     // --- PARTE 2: CONEXÃO DIRETA + CRIAÇÃO DE SCHEMA ---
     // Cliente NOVO para o destino escolhido (ignora cache antigo). As tabelas
     // são criadas via SQL baseline em runtime — SEM `npx prisma db push`.
-    tempPrisma = buildClient(profile);
+    const built = buildAdapterClient(profile);
+    tempPrisma = built.client;
+    tempLibsql = built.libsql;
+
+    // Réplica: puxa o estado atual do Turso espelho ANTES de checar/instalar.
+    // Assim, se o espelho já tiver dados (instalação anterior), detectamos pelo
+    // count de usuários e não recriamos schema à toa. Best-effort no 1º uso.
+    if (built.libsql) {
+      console.log("🔄 Sincronizando réplica com o Turso espelho...");
+      try {
+        await built.libsql.sync();
+      } catch (e) {
+        console.warn("⚠️ Primeiro sync da réplica falhou (seguindo p/ criar schema):", e);
+      }
+    }
 
     console.log(`📦 Garantindo schema (${profile.mode})...`);
     await ensureSchema(tempPrisma);
+
+    // --- PARTE 2b: MIGRAÇÃO AUTOMÁTICA (modo réplica) ---
+    // Se a pasta escolhida já tiver um life_os.db "local" com dados (instalação
+    // anterior), mesclamos tudo para o Turso ANTES de checar usuários — assim o
+    // count abaixo já reflete os dados importados e o usuário cai no login da
+    // própria conta, sem recriar admin nem perder nada.
+    if (profile.mode === "replica" && storagePath) {
+      const legacyLocal = path.join(storagePath, "life_os.db");
+      if (fs.existsSync(legacyLocal)) {
+        try {
+          console.log("📤 Migrando dados locais existentes para o Turso (mesclar)...");
+          const r = await mergeSqliteIntoTurso(legacyLocal, {
+            url: profile.syncUrl,
+            authToken: profile.authToken,
+          });
+          console.log(
+            `✅ Migração: ${r.inserted} inseridas / ${r.skipped} já existiam (${r.tables} tabelas).`
+          );
+          // Re-sincroniza para a réplica local enxergar o que acabou de subir.
+          if (built.libsql) await built.libsql.sync().catch(() => {});
+        } catch (e) {
+          console.warn("⚠️ Migração local→Turso falhou (seguindo sem importar):", e);
+        }
+      }
+    }
 
     // Proteção de dados: se já existe usuário, o banco é de uma instalação
     // anterior. Não sobrescrevemos — conectamos e orientamos a fazer login.
@@ -251,6 +322,14 @@ export async function setupSystem(
   } finally {
     if (tempPrisma) {
       await tempPrisma.$disconnect();
+    }
+    // Para o timer de syncInterval do cliente temporário da réplica.
+    if (tempLibsql) {
+      try {
+        tempLibsql.close();
+      } catch {
+        /* noop */
+      }
     }
   }
 

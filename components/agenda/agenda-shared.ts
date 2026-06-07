@@ -19,13 +19,15 @@ export type AgendaSource =
   | "meeting"
   | "invoice"
   | "recurring"
+  | "charge"
   | "review"
-  | "goal";
+  | "goal"
+  | "holiday";
 
 export type AgendaIconKey =
   | "calendar" | "utensils" | "dumbbell" | "book" | "moon" | "scale"
   | "film" | "shirt" | "userplus" | "cake" | "wallet" | "briefcase"
-  | "check" | "flame" | "users" | "receipt" | "repeat" | "layers" | "target";
+  | "check" | "flame" | "users" | "receipt" | "repeat" | "layers" | "target" | "party" | "handcoins";
 
 export interface CategoryMeta {
   label: string;
@@ -52,8 +54,10 @@ export const CATEGORY_META: Record<AgendaSource, CategoryMeta> = {
   meeting:   { label: "Reuniões",       color: "#818cf8", icon: "users" },
   invoice:   { label: "Cobranças",      color: "#0d9488", icon: "receipt" },
   recurring: { label: "Contas fixas",   color: "#d97706", icon: "repeat" },
+  charge:    { label: "Cobranças fixas", color: "#059669", icon: "handcoins" },
   review:    { label: "Revisões",        color: "#4338ca", icon: "layers" },
   goal:      { label: "Metas",           color: "#0891b2", icon: "target" },
+  holiday:   { label: "Feriados",        color: "#db2777", icon: "party" },
 };
 
 export interface AgendaItem {
@@ -69,6 +73,6 @@ export interface AgendaItem {
 
 // A ordem define a exibição dos chips de filtro.
 export const SOURCE_ORDER: AgendaSource[] = [
-  "event", "task", "meal", "workout", "study", "review", "sleep", "body",
-  "finance", "invoice", "recurring", "job", "media", "wardrobe", "friend", "birthday", "challenge", "meeting", "goal",
+  "event", "holiday", "task", "meal", "workout", "study", "review", "sleep", "body",
+  "finance", "invoice", "recurring", "charge", "job", "media", "wardrobe", "friend", "birthday", "challenge", "meeting", "goal",
 ];

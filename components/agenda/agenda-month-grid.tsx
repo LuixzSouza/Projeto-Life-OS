@@ -2,7 +2,6 @@
 
 import { useMemo } from "react";
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { Prisma } from "@prisma/client";
 import { cn } from "@/lib/utils";
 
@@ -42,7 +41,7 @@ export function AgendaMonthGrid({ events, selectedDate }: AgendaMonthGridProps) 
 
       {/* CORPO DO MÊS */}
       <div className="flex-1 grid grid-cols-7 grid-rows-5 overflow-hidden">
-        {days.map((day, idx) => {
+        {days.map((day) => {
           const isCurrentMonth = isSameMonth(day, selectedDate);
           const isToday = isSameDay(day, new Date());
           const dailyEvents = events.filter(e => isSameDay(new Date(e.startTime), day));

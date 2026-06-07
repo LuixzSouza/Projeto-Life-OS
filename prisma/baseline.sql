@@ -219,11 +219,55 @@ CREATE TABLE "RecurringExpense" (
     "dayOfMonth" INTEGER NOT NULL,
     "category" TEXT NOT NULL,
     "active" BOOLEAN NOT NULL DEFAULT true,
+    "frequency" TEXT NOT NULL DEFAULT 'MONTHLY',
+    "startDate" DATETIME,
+    "endDate" DATETIME,
+    "installments" INTEGER,
+    "paidInstallments" INTEGER NOT NULL DEFAULT 0,
     "categoryId" TEXT,
     "userId" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "RecurringExpense_categoryId_fkey" FOREIGN KEY ("categoryId") REFERENCES "Category" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT "RecurringExpense_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "RecurringExpensePayment" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "recurringExpenseId" TEXT NOT NULL,
+    "dueDate" DATETIME NOT NULL,
+    "amount" DECIMAL NOT NULL,
+    "paidAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "transactionId" TEXT,
+    "userId" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "RecurringExpensePayment_recurringExpenseId_fkey" FOREIGN KEY ("recurringExpenseId") REFERENCES "RecurringExpense" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "RecurringExpensePayment_transactionId_fkey" FOREIGN KEY ("transactionId") REFERENCES "Transaction" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "RecurringExpensePayment_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "RecurringCharge" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "title" TEXT NOT NULL,
+    "amount" DECIMAL NOT NULL,
+    "dayOfMonth" INTEGER NOT NULL,
+    "category" TEXT NOT NULL DEFAULT 'Cobrança',
+    "clientName" TEXT,
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "frequency" TEXT NOT NULL DEFAULT 'MONTHLY',
+    "startDate" DATETIME,
+    "endDate" DATETIME,
+    "installments" INTEGER,
+    "paidInstallments" INTEGER NOT NULL DEFAULT 0,
+    "clientId" TEXT,
+    "billingId" TEXT,
+    "userId" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "RecurringCharge_clientId_fkey" FOREIGN KEY ("clientId") REFERENCES "Client" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "RecurringCharge_billingId_fkey" FOREIGN KEY ("billingId") REFERENCES "Billing" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "RecurringCharge_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -264,6 +308,7 @@ CREATE TABLE "Project" (
     "title" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "description" TEXT,
+    "notes" TEXT,
     "status" TEXT NOT NULL DEFAULT 'ACTIVE',
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -949,6 +994,30 @@ CREATE INDEX "RecurringExpense_userId_idx" ON "RecurringExpense"("userId");
 
 -- CreateIndex
 CREATE INDEX "RecurringExpense_categoryId_idx" ON "RecurringExpense"("categoryId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "RecurringExpensePayment_transactionId_key" ON "RecurringExpensePayment"("transactionId");
+
+-- CreateIndex
+CREATE INDEX "RecurringExpensePayment_userId_idx" ON "RecurringExpensePayment"("userId");
+
+-- CreateIndex
+CREATE INDEX "RecurringExpensePayment_recurringExpenseId_idx" ON "RecurringExpensePayment"("recurringExpenseId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "RecurringExpensePayment_recurringExpenseId_dueDate_key" ON "RecurringExpensePayment"("recurringExpenseId", "dueDate");
+
+-- CreateIndex
+CREATE INDEX "RecurringCharge_userId_idx" ON "RecurringCharge"("userId");
+
+-- CreateIndex
+CREATE INDEX "RecurringCharge_userId_active_idx" ON "RecurringCharge"("userId", "active");
+
+-- CreateIndex
+CREATE INDEX "RecurringCharge_clientId_idx" ON "RecurringCharge"("clientId");
+
+-- CreateIndex
+CREATE INDEX "RecurringCharge_billingId_idx" ON "RecurringCharge"("billingId");
 
 -- CreateIndex
 CREATE INDEX "WishlistItem_userId_idx" ON "WishlistItem"("userId");

@@ -5,6 +5,8 @@ export * from "./account";
 export * from "./transaction";
 export * from "./wishlist";
 export * from "./recurring";
+export * from "./recurring-charge";
+export * from "./recurring-payment";
 export * from "./pluggy";
 export * from "./product";
 export * from "./investment-portfolio";

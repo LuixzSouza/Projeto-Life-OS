@@ -18,7 +18,7 @@ export function AccountsSection({ accounts }: AccountsSectionProps) {
   const [isImportOpen, setIsImportOpen] = useState(false);
 
   return (
-    <section className="px-6 md:px-8 py-10 max-w-[1600px] mx-auto">
+    <section className="px-6 md:px-8 py-10 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6 gap-3">
         <h3 className="text-xl font-extrabold text-foreground flex items-center gap-3">
           <div className="p-2 bg-primary/10 rounded-xl"><Wallet className="h-5 w-5 text-primary" /></div>

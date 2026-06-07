@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { MapPin, Cake, Link as LinkIcon, Copy, Gift, Hash, Pencil, MessageCircle, Mail, Instagram, Linkedin, Phone, Briefcase } from "lucide-react";
+import { MapPin, Cake, Link as LinkIcon, Copy, Gift, Hash, Pencil, MessageCircle, Mail, Instagram, Linkedin, Phone, Briefcase, ArrowUpRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -52,13 +53,14 @@ export function FriendDetailModal({ friend, onOpenChange, onEdit }: FriendDetail
 
               {/* Topo: Avatar e Nome */}
               <div className={cn("relative p-8 pt-10 border-b border-border/40 flex flex-col items-center text-center bg-gradient-to-b to-background", proximityBar(friend.proximity))}>
-                {/* Botão Editar */}
+                {/* Botão Editar — posicionado à esquerda do X de fechar (que o
+                    DialogContent renderiza em right-4/right-5) para não colidir. */}
                 {onEdit && (
                   <Button
                     variant="secondary"
                     size="sm"
                     onClick={() => onEdit(friend)}
-                    className="absolute top-4 right-4 h-8 gap-1.5 rounded-lg text-xs font-medium bg-background/80 backdrop-blur shadow-sm hover:bg-background"
+                    className="absolute top-4 right-14 sm:top-5 sm:right-16 h-8 gap-1.5 rounded-lg text-xs font-medium bg-background/80 backdrop-blur shadow-sm hover:bg-background"
                   >
                     <Pencil className="h-3.5 w-3.5" /> Editar
                   </Button>
@@ -132,15 +134,21 @@ export function FriendDetailModal({ friend, onOpenChange, onEdit }: FriendDetail
                     </div>
                   )}
 
-                  {/* Vínculo com Negócios */}
+                  {/* Vínculo com Negócios — badges clicáveis abrem o cliente em /business/[id] */}
                   {friend.clients && friend.clients.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-[10px] text-muted-foreground font-bold uppercase flex items-center gap-1.5"><Briefcase className="h-3 w-3 text-blue-500" /> É seu cliente em Negócios</p>
                       <div className="flex flex-wrap gap-2">
                         {friend.clients.map(c => (
-                          <Badge key={c.id} variant="secondary" className="px-2.5 py-1 bg-blue-500/5 text-blue-600 border-blue-500/10 font-semibold">
+                          <Link
+                            key={c.id}
+                            href={`/business/${c.id}`}
+                            className="group/cli inline-flex items-center gap-1 rounded-md px-2.5 py-1 bg-blue-500/5 text-blue-600 border border-blue-500/10 text-xs font-semibold hover:bg-blue-500/10 hover:border-blue-500/30 transition-colors"
+                            title="Abrir cliente em Negócios"
+                          >
                             {c.name}{c.company ? ` · ${c.company}` : ""}
-                          </Badge>
+                            <ArrowUpRight className="h-3 w-3 opacity-50 group-hover/cli:opacity-100 transition-opacity" />
+                          </Link>
                         ))}
                       </div>
                     </div>

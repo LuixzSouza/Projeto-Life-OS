@@ -5,6 +5,8 @@ export interface Exercise {
   sets: string;
   reps: string;
   weight: string;
+  /** Séries detalhadas (sessão ao vivo). Quando presente, o volume usa a soma real. */
+  setLog?: { reps: string; weight: string; done: boolean }[];
 }
 
 export interface GymWorkout {

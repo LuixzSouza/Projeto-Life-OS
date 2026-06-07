@@ -5,15 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 
     Dialog, DialogContent, DialogHeader, DialogTitle, 
-    DialogTrigger, DialogDescription, DialogFooter 
+    DialogTrigger, DialogDescription 
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
-    Scale, Pencil, ArrowRight, User, Loader2, Ruler, 
-    Target, Info, TrendingDown, TrendingUp, CheckCircle2, 
-    Zap, Activity, ShieldAlert 
+    Scale, Pencil, ArrowRight, Loader2, Info, TrendingDown, TrendingUp, CheckCircle2, 
+    Zap, Activity 
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -57,20 +56,17 @@ export function BodySummaryCard({
     const maxIdealWeight = 24.9 * (heightInMeters * heightInMeters);
     
     let goalDiff = 0;
-    let goalLabel = "Manter";
     let GoalIcon = CheckCircle2;
     let goalColor = "text-emerald-500";
     let goalBg = "bg-emerald-500/10";
 
     if (weight < minIdealWeight) {
         goalDiff = minIdealWeight - weight;
-        goalLabel = "Ganhar";
         GoalIcon = TrendingUp;
         goalColor = "text-blue-500";
         goalBg = "bg-blue-500/10";
     } else if (weight > maxIdealWeight) {
         goalDiff = weight - maxIdealWeight;
-        goalLabel = "Perder";
         GoalIcon = TrendingDown;
         goalColor = "text-rose-500";
         goalBg = "bg-rose-500/10";

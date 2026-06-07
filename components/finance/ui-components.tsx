@@ -22,10 +22,10 @@ export const PrivacyText: FC<PrivacyTextProps> = ({ value, isSmartView, classNam
   
   return (
     <div className={cn("relative overflow-hidden inline-flex items-center align-baseline h-[1.2em]", className)}>
-      {/* Valor Real */}
-      <span 
+      {/* Valor Real (privacy-blur: borra quando o Modo Discreto global está ativo) */}
+      <span
         className={cn(
-          "absolute inset-0 transition-all duration-500 ease-spring",
+          "privacy-blur absolute inset-0 transition-all duration-500 ease-spring",
           isSmartView ? "translate-y-[120%] opacity-0 blur-sm" : "translate-y-0 opacity-100 blur-0"
         )}
       >

@@ -38,7 +38,7 @@ export function SyncButton({ accounts }: { accounts: AccountProp[] }) {
                     totalNew++; 
                 }
             }
-            toast.success("Sincronização concluída!", { id: toastId });
+            toast.success(`Sincronização concluída! ${totalNew} conta(s) atualizada(s).`, { id: toastId });
         } catch (error) {
             toast.error("Erro ao sincronizar algumas contas.", { id: toastId });
         } finally {

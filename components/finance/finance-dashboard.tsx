@@ -7,6 +7,7 @@ import { DashboardHeader } from "@/components/finance/dashboard/dashboard-header
 import { MonthlySummary } from "@/components/finance/dashboard/monthly-summary";
 import { AccountsSection } from "@/components/finance/dashboard/accounts-section";
 import { StatementSection } from "@/components/finance/dashboard/statement-section";
+import { RecurringChargesSection } from "@/components/finance/dashboard/recurring-charges-section";
 import { WishlistSection } from "@/components/finance/dashboard/wishlist-section";
 
 // Re-export dos tipos (mantém compatibilidade com imports existentes)
@@ -15,6 +16,8 @@ export type {
   DashboardTransaction,
   DashboardWishlist,
   DashboardRecurring,
+  DashboardRecurringCharge,
+  DashboardClientOption,
 } from "@/components/finance/dashboard/types";
 
 import type {
@@ -22,6 +25,8 @@ import type {
   DashboardTransaction,
   DashboardWishlist,
   DashboardRecurring,
+  DashboardRecurringCharge,
+  DashboardClientOption,
 } from "@/components/finance/dashboard/types";
 
 interface FinanceDashboardProps {
@@ -29,8 +34,11 @@ interface FinanceDashboardProps {
   transactions: DashboardTransaction[];
   wishlist: DashboardWishlist[];
   recurring: DashboardRecurring[];
+  recurringCharges: DashboardRecurringCharge[];
+  clients: DashboardClientOption[];
   totalBalance: number;
   totalRecurring: number;
+  totalCharges: number;
   netSalary: number;
   grossSalary: number;
   hasSalarySet: boolean;
@@ -44,8 +52,11 @@ export function FinanceDashboard({
   transactions,
   wishlist,
   recurring,
+  recurringCharges,
+  clients,
   totalBalance,
   totalRecurring,
+  totalCharges,
   netSalary,
   grossSalary,
   hasSalarySet,
@@ -66,7 +77,7 @@ export function FinanceDashboard({
         <section className="space-y-8">
           <DashboardHeader accounts={accounts} />
 
-          <div className="px-6 md:px-8 max-w-[1600px] mx-auto pt-4">
+          <div className="px-6 md:px-8 max-w-7xl mx-auto pt-4">
             <FinanceOverview
               totalBalance={totalBalance}
               netSalary={netSalary}
@@ -91,7 +102,12 @@ export function FinanceDashboard({
         <div className="h-px w-full bg-border/50" />
 
         {/* SEÇÃO 3: EXTRATO & CUSTOS FIXOS */}
-        <StatementSection transactions={transactions} recurring={recurring} totalRecurring={totalRecurring} />
+        <StatementSection transactions={transactions} recurring={recurring} totalRecurring={totalRecurring} accounts={accounts} />
+
+        <div className="h-px w-full bg-border/50" />
+
+        {/* SEÇÃO 3.5: COBRANÇAS RECORRENTES (RECEITAS A RECEBER) */}
+        <RecurringChargesSection charges={recurringCharges} totalCharges={totalCharges} clients={clients} />
 
         <div className="h-px w-full bg-border/50" />
 

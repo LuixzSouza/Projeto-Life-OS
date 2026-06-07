@@ -4,7 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "@/app/auth-actions";
-import { PanelLeftClose, PanelLeftOpen, Menu } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, Menu, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -115,6 +115,27 @@ export function Sidebar({ user, inbox }: { user?: UserData | null; inbox: Notifi
             </Button>
           </div>
         )}
+
+        {/* Busca global (abre a command palette) */}
+        <div className="px-3 pt-2">
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new Event("open-command-palette"))}
+            title="Buscar (Ctrl/Cmd+K)"
+            className={cn(
+              "flex w-full items-center gap-2 rounded-lg border border-border/50 bg-muted/40 text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground",
+              isCollapsed ? "justify-center p-2" : "px-3 py-2",
+            )}
+          >
+            <Search className="h-4 w-4 shrink-0" />
+            {!isCollapsed && (
+              <>
+                <span className="text-sm">Buscar…</span>
+                <kbd className="ml-auto rounded border border-border/60 bg-background px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">⌘K</kbd>
+              </>
+            )}
+          </button>
+        </div>
 
         <ScrollArea className="flex-1 px-3">
           <div className="space-y-5 py-3 pb-10">

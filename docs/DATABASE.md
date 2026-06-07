@@ -8,6 +8,60 @@ Filosofia: **local-first, portável, multi-user e centralizado** — muitas tabe
 
 ---
 
+## Modos de banco (perfil de conexão)
+
+O destino do banco é resolvido por `getDbProfile()` (`lib/db-config.ts`) e o Prisma
+reconecta a quente quando o perfil muda (`lib/prisma.ts`, Proxy + `reconnectPrisma`).
+Prioridade: **env vars** (`TURSO_*`, p/ Vercel) > **config em arquivo** (`life-os-config.json`).
+
+| Modo | Onde os dados moram | Engine | Quando usar |
+|---|---|---|---|
+| **`local`** | Arquivo `.db` no PC | Prisma SQLite nativo | Desktop, privacidade total, sem nuvem |
+| **`cloud`** | Turso (libSQL remoto) | `@libsql/client/web` + adapter | Deploy web (Vercel), serverless |
+| **`replica`** | Arquivo `.db` local **espelhado no Turso** | `@libsql/client` (node) + adapter | **Híbrido**: PC rápido/offline + acesso pelo celular |
+
+### Réplica embarcada (`replica`) — como o celular acessa os dados do PC
+
+O ponto-chave: **quem fala com o banco é sempre o servidor Next.js**, nunca o navegador.
+O celular é só um navegador batendo HTTP num servidor. A topologia híbrida:
+
+```
+   PC (desktop)                      Turso (nuvem, mestre)            Celular
+ ┌──────────────┐   escreve→/←pull  ┌────────────────────┐  HTTP   ┌──────────┐
+ │ Next + Prisma │ ◄──────────────► │  banco libSQL único │ ◄────── │ navegador │
+ │ arquivo local │   sync()/syncInt  └────────────────────┘         └────┬─────┘
+ └──────────────┘                              ▲                         │
+                                               └── instância na nuvem ───┘
+                                                   (Vercel, modo `cloud`,
+                                                    mesmo TURSO_DATABASE_URL)
+```
+
+- **No PC**: perfil `replica` → arquivo local libSQL + `syncUrl` apontando para o Turso.
+  Leituras saem do arquivo (rápidas, offline); **escritas vão ao primário (Turso)** e
+  refletem localmente. `syncInterval` (default 60s, `DEFAULT_SYNC_INTERVAL`) puxa em
+  background o que mudou em outro dispositivo. `syncReplica()` força um pull imediato
+  (botão "Sincronizar agora" em Configurações → Dados & Sistema).
+- **No celular**: acessa uma instância na nuvem (Vercel) em modo `cloud` apontando para
+  o **mesmo** Turso. Funciona em qualquer lugar, mesmo com o PC desligado.
+- **Carregamento do driver**: o build node do `@libsql/client` importa um binário nativo
+  no topo (`import Database from "libsql"`), que NÃO pode ir para o bundle serverless.
+  Por isso ele é carregado via `__non_webpack_require__` em runtime, só no ramo `replica`
+  (PC). A nuvem usa `@libsql/client/web` e nunca executa esse caminho.
+- **Cache separado**: a réplica usa `life_os.replica.db` (NÃO o `life_os.db`), pois o
+  arquivo local de um install antigo é a ORIGEM da migração — não pode virar cache.
+- **Migração de dados (carga inicial)**: `lib/db-migrate.ts` → `mergeSqliteIntoTurso()`
+  copia um arquivo SQLite local para o Turso em modo MESCLAR (`INSERT OR IGNORE` por PK,
+  FKs off; não apaga/sobrescreve o que já estiver no Turso). É genérico (lê tabelas reais
+  via `sqlite_master`). Dispara em 2 lugares: **(a)** automático no setup do Híbrido se a
+  pasta já tiver um `life_os.db` com dados; **(b)** manual em Configurações via
+  `migrateToReplica` (card "Acessar pelo celular") — sobe o local atual, ativa a réplica e
+  reconecta, deixando o `life_os.db` original intacto como backup.
+- **Setup**: o wizard tem o card "Híbrido (Réplica)" (pasta local + URL/token do Turso).
+  Na instalação, faz um `sync()` inicial para detectar um Turso já populado antes de
+  criar schema (`ensureSchema` é idempotente e roda sobre o primário).
+
+---
+
 ## Convenções
 
 - **IDs**: `uuid()` (maioria) ou `cuid()` (Task, Friend, MealPlan). Não misturar em modelos novos — preferir `uuid()`.
@@ -276,46 +330,66 @@ _03/jun/2026 — Próximos passos (lote 11): **Central de Anotações** (`/notes
 (criar/editar/favoritar/buscar/vincular matéria), com soft-delete (11º tipo na lixeira) e tecido conectivo embutido
 (`note` agora plugado, 16/17 entityTypes). Detalhe da matéria passou a filtrar notas `deletedAt`. Só `goal` segue sem tela._
 
+_05/jun/2026 — Novo modelo **`RecurringCharge`** (cobranças recorrentes a receber): migration
+`add_recurring_charge` (15ª), back-relation em `User`, baseline regenerado. UI na Finanças + lembrete
+`CHARGE_DUE` (idempotente por mês) no `generateReminders` + ocorrência mensal no agregador (`source: "charge"`).
+Também: **feriados nacionais** no calendário via `lib/holidays.ts` (estático, local-first) → agregador
+(`source: "holiday"`), sem tabela nova. Migrations↔schema seguem drift-zero._
 
-Honestamente, as frentes claramente seguras e de alto valor estão praticamente esgotadas. O que resta são decisões maiores: @@unique([userId,title]) em StudySubject (precisa migration + checar
-  duplicatas) ou o hardening userId NOT NULL (~35 arquivos, você adiou 2×). Recomendo commitar os 7 lotes agora (sugiro: 1 commit de schema/migrations/baseline + 1 de otimizações de app) antes de
-  entrar em algo mais invasivo
+_05/jun/2026 — `RecurringCharge` **conectado ao Negócios**: migration `recurring_charge_client_billing`
+(16ª) adiciona `clientId → Client` (SetNull) e `billingId → Billing` (SetNull) + back-relations. Cobrança
+com cliente mantém um contrato `Billing` RECURRING e `generateReminders` gera a `Invoice` mensal idempotente
+(flui pelo recebimento do Negócios → Finança). Dialog ganhou seletor de Clientes. Baseline regenerado._
 
-   Sua dúvida: como armazenar "no computador da própria pessoa" pelo site?
+_05/jun/2026 — **Recorrência dinâmica** em `RecurringExpense` e `RecurringCharge`: migration
+`recurring_frequency_enddate` (17ª) adiciona `frequency` (WEEKLY|MONTHLY|QUARTERLY|SEMIANNUAL|ANNUAL,
+default MONTHLY), `startDate` e `endDate`. Lógica central em `lib/recurrence.ts` (ocorrências por frequência,
+equivalente mensal, próxima ocorrência) — usada pelo agregador (ocorrências reais no calendário),
+`generateReminders` (faturas por ocorrência, respeita `endDate`), totais do dashboard (normalizados p/ "por mês",
+um plano anual conta como 1/12) e pelos dialogs/cards (select de frequência + datas + badge "Encerrada").
+Itens antigos viraram MONTHLY (comportamento idêntico). Baseline regenerado._
 
-  Essa é a pergunta-chave da arquitetura, e tem uma pegadinha técnica importante:
+_05/jun/2026 — **Parcelamento** em `RecurringCharge`: migration `recurring_charge_installments` (18ª)
+adiciona `installments` (Int?, null = recorrente sem fim) e `paidInstallments` (default 0). No modo
+parcelado o usuário informa total + Nº de parcelas + já pagas + data da próxima; o `endDate` é **calculado**
+(`installmentEndDate` em `lib/recurrence.ts`) — sem precisar pensar no dia que encerra. O Billing vira
+`INSTALLMENT` (totalValue = parcela × N) e `generateReminders` numera as faturas ("Parcela X/N"). Totais
+"por mês" ignoram itens já encerrados (`hasEnded`). Baseline regenerado._
 
-  ▎ Um site hospedado (Vercel/serverless) fisicamente NÃO consegue gravar no disco do visitante. O servidor Next roda na nuvem, e o navegador é sandboxed — não escreve arquivos arbitrários na
-  ▎ máquina. Então "salvar no PC da pessoa pelo site" não acontece do jeito que parece.
+_05/jun/2026 — **Fecho do ciclo recorrente/parcelado**: migration `recurring_expense_installments` (19ª)
+leva `installments`/`paidInstallments` também ao `RecurringExpense` (compras em Nx). Conexão Finança↔Negócios
+reforçada: `syncRecurringChargeInvoices(userId)` (extraído de `generateReminders`) materializa as faturas das
+cobranças **ao abrir Negócios e Finanças** (best-effort, idempotente) — não depende mais do clique no sino. O
+card da cobrança mostra **progresso real** (pagas/total via `invoice.groupBy`). Novos lembretes: `BILL_DUE`
+(custo fixo vencendo) e ícones próprios p/ `CHARGE_DUE`/`BILL_DUE` no sino. Baseline regenerado._
 
-  O que o seu código já modela (lib/db-config.ts → DbProfile = local | cloud, e lib/prisma.ts → buildClient) é a mesma base rodando em dois canais diferentes:
 
-  1. Web hospedada (Vercel) → sempre nuvem (Turso)
+---
 
-  O servidor está remoto → o life_os.db viveria no servidor, não no usuário. Por isso, na web, o armazenamento é Turso. Não dá pra ser "local" aqui — o servidor não está na máquina da pessoa.
+## Ideias / Backlog
 
-  2. App Desktop (seu launcher / Tauri) → aí sim, local no PC
+> Notas de produto. Mantenha só o essencial aqui; detalhes de execução vão para issues/PRs.
 
-  O mesmo app Next roda NA máquina do usuário. Aí o SQLite (life_os.db) fica numa pasta que a pessoa escolhe (settings/actions/storage.ts → updateStoragePath copia o arquivo e reconecta o Prisma). É
-  esse o caminho "local-first no seu próprio computador" — não o site hospedado, e sim o build desktop.
+### 1. Feriados no calendário ✅ (implementado em 05/jun/2026)
+Feriados **nacionais** brasileiros aparecem na Agenda (`/agenda`) como itens read-only de dia inteiro.
+- **Fonte:** `lib/holidays.ts` — lista estática **local-first** (fixos + móveis derivados da Páscoa via
+  computus), sem API externa. Inclui pontos facultativos (Carnaval/Corpus Christi) e Consciência Negra
+  (nacional a partir de 2024, Lei 14.759/2023).
+- **Render:** entram no `lib/agenda-aggregator.ts` como `source: "holiday"` (categoria com cor/ícone
+  próprios em `agenda-shared.ts`), sem `userId` e sem tocar na tabela `Event`.
 
-  ▎ Repare: updateStoragePath já avisa que falha em FS read-only (Vercel). Ou seja, o próprio código assume "mover pasta = só no desktop".
-
-  Se você quer MESMO o navegador guardando local (sem servidor)
-
-  Aí são outras tecnologias, e nenhuma usa Prisma (Prisma só roda no servidor):
-  - SQLite em WASM + OPFS/IndexedDB (ex.: libSQL WASM, wa-sqlite): o banco roda dentro da aba e persiste no armazenamento do navegador, no disco do usuário. Custo: reescrever a camada de dados pro
-  client (hoje tudo é Server Action).
-  - File System Access API: o usuário escolhe um .db real e o site lê/grava nele. Só Chromium, e também sem Prisma.
-
-  → Conclusão honesta: virar isso no site = reescrita grande da camada de dados. Não recomendo agora.
-
-  Recomendação prática (com o que já existe)
-
-  1. Site hospedado → Turso (nuvem), com export/backup do .db portátil (você já tem BackupLog + rota de backup) como "você é dono dos seus dados": a pessoa baixa o arquivo e leva embora.
-  2. Local-first de verdade → entrega pelo build desktop (Tauri/launcher): SQLite na pasta escolhida, offline, arquivo portátil que ela move/backupa pela UI.
-  3. Melhor dos dois (futuro) → embedded replica do libSQL/Turso no desktop: arquivo local + sync com a nuvem (offline-first com sincronização). É a evolução natural do DbProfile.
-
-  Resumindo numa frase: na web = Turso; "no computador da pessoa" = o build desktop rodando o mesmo app; o elo entre os dois é o arquivo .db portátil (export/import) que o usuário controla.
-
-  Quer que eu detalhe algum desses caminhos (ex.: esboçar o fluxo export→import entre web e desktop, ou avaliar a embedded replica do Turso)?
+### 2. Cobranças recorrentes (lembrar de cobrar todo mês) ✅ (implementado em 05/jun/2026)
+Espelho de receita do `RecurringExpense`: **modelo `RecurringCharge`** (`amount`, `dayOfMonth`, `category`,
+`active`, `userId`). Separado para **não corromper** o total de custos fixos.
+- **Conectado a Negócios + Conexões:** FK `clientId → Client` (SetNull) — o Cliente já é a entidade de
+  cobrança da Finança e liga às Conexões via `Client.friend`. `clientName` guarda o nome cacheado
+  (sobrevive se o cliente sair). Cliente vinculado ganha um contrato `Billing` (type `RECURRING`,
+  `billingId` na cobrança) que é a origem das faturas.
+- **Gera fatura ao vencer:** `generateReminders` cria a `Invoice` do mês sob o `Billing` (idempotente por
+  contrato/mês); a fatura flui pelo recebimento normal do Negócios (`receiveInvoicePayment` → transação
+  INCOME na conta + saldo). A notificação de vencimento reusa o bloco `INVOICE_DUE` (sem duplicar).
+- **Avulsas (sem cliente):** sem fatura — só lembrete `CHARGE_DUE` de 3 dias antes até o dia.
+- **UI:** seção "Cobranças Recorrentes" no dashboard de Finanças + `RecurringChargeDialog` com **seletor de
+  Clientes**. Actions em `app/(dashboard)/finance/actions/recurring-charge.ts`.
+- **Calendário:** ocorrência mensal no agregador como `source: "charge"`.
+- **Futuro (não feito):** soft-delete/lixeira da cobrança; escolher Conexão (Friend) sem cliente.

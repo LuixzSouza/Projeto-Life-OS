@@ -135,6 +135,39 @@ export async function deleteEvent(eventId: string) {
 
 // --- TAREFAS ---
 
+const TASK_PRIORITIES = ["HIGH", "MEDIUM", "LOW"] as const;
+
+// Criação rápida a partir da Agenda: só título é obrigatório; prioridade e data são
+// opcionais. Sem projeto (vai para "soltas"); o usuário detalha depois em Projetos.
+export async function createQuickTask(formData: FormData) {
+  const title = (formData.get("title") as string)?.trim();
+  if (!title) return { success: false, message: "Informe um título." };
+
+  const priorityRaw = (formData.get("priority") as string) || "MEDIUM";
+  const priority = (TASK_PRIORITIES as readonly string[]).includes(priorityRaw) ? priorityRaw : "MEDIUM";
+
+  // <input type="date"> ao meio-dia UTC evita o bug do "dia anterior" por fuso.
+  const dueStr = (formData.get("dueDate") as string)?.split("T")[0];
+  const dueDate = dueStr ? new Date(`${dueStr}T12:00:00Z`) : null;
+
+  const userId = await requireUserId();
+
+  const created = await prisma.task.create({
+    data: { title, priority, dueDate, userId },
+  });
+
+  await logActivity({
+    action: "CREATE",
+    module: "projects",
+    entityType: "task",
+    entityId: created.id,
+    summary: `Criou a tarefa "${created.title}"`,
+  });
+
+  revalidatePath("/agenda");
+  return { success: true, message: "Tarefa criada!" };
+}
+
 export async function toggleTaskDone(taskId: string) {
   const userId = await requireUserId();
   const task = await prisma.task.findFirst({

@@ -10,7 +10,7 @@ import {
     DialogTrigger, DialogDescription 
 } from "@/components/ui/dialog";
 import { 
-    Moon, Plus, ArrowRight, BedDouble, Battery, 
+    Moon, Plus, ArrowRight, BedDouble, 
     Loader2, Sparkles, Zap, Brain, Coffee, LucideIcon 
 } from "lucide-react";
 import { logSleep } from "@/app/(dashboard)/health/actions";

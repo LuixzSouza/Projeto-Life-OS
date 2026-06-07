@@ -1,14 +1,19 @@
 "use client";
 
-import { 
-    ArrowDownRight, 
-    ArrowUpRight, 
-    CalendarDays, 
-    CreditCard, 
-    MoreHorizontal, 
-    Receipt, 
-    CalendarClock
+import { useState } from "react";
+import {
+    ArrowDownRight,
+    ArrowUpRight,
+    CalendarDays,
+    CreditCard,
+    MoreHorizontal,
+    Receipt,
+    CalendarClock,
+    Wallet,
+    Check,
+    Undo2
 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useFormatCurrency } from "@/components/providers/currency-provider";
 import { format, isToday, isYesterday } from "date-fns";
@@ -18,7 +23,16 @@ import { RecurringDialog, RecurringItemData } from "./recurring-dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogBody, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { useSmartView } from "@/components/finance/smart-view-context";
+import { asFrequency, nextOccurrence, FREQUENCY_LABEL } from "@/lib/recurrence";
+import { payRecurringExpense, undoRecurringExpensePayment } from "@/app/(dashboard)/finance/actions";
+
+// Conta de destino para lançar o pagamento de um custo fixo.
+export interface PayAccountOption { id: string; name: string; color: string | null; isConnected: boolean; }
 
 // --- INTERFACES PARA TRANSAÇÕES ---
 export interface AccountOption { 
@@ -191,9 +205,10 @@ function TransactionItemWrapper({ transaction, accounts }: { transaction: Transa
 
 // --- CARD DE CUSTOS FIXOS ---
 
-export function RecurringCard({ total, items }: { total: number, items: RecurringItemData[] }) {
+export function RecurringCard({ total, items, accounts = [] }: { total: number, items: RecurringItemData[], accounts?: PayAccountOption[] }) {
     const { smartView } = useSmartView();
     const moneyShort = useFormatCurrency();
+    const [payTarget, setPayTarget] = useState<RecurringItemData | null>(null);
     return (
         <div className="bg-card rounded-[1.5rem] border border-border/60 shadow-sm flex flex-col h-[500px] overflow-hidden transition-all hover:shadow-md">
             
@@ -231,36 +246,48 @@ export function RecurringCard({ total, items }: { total: number, items: Recurrin
             <ScrollArea className="flex-1 p-3">
                 <div className="space-y-1.5">
                     {items.map((item) => (
-                        <RecurringItemWrapper key={item.id} item={item} />
+                        <RecurringItemWrapper key={item.id} item={item} onPay={setPayTarget} />
                     ))}
                 </div>
             </ScrollArea>
+
+            {/* Modal único de pagamento (nunca dentro do .map) */}
+            <RecurringPayModal key={payTarget?.id ?? "none"} item={payTarget} accounts={accounts} onClose={() => setPayTarget(null)} />
         </div>
     );
 }
 
-function daysUntilCharge(dayOfMonth: number) {
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    let next = new Date(now.getFullYear(), now.getMonth(), dayOfMonth);
-    if (next < now) next = new Date(now.getFullYear(), now.getMonth() + 1, dayOfMonth);
-    return Math.round((next.getTime() - now.getTime()) / 86_400_000);
-}
-
-function RecurringItemWrapper({ item }: { item: RecurringItemData }) {
+function RecurringItemWrapper({ item, onPay }: { item: RecurringItemData, onPay: (item: RecurringItemData) => void }) {
     const { smartView } = useSmartView();
     const moneyShort = useFormatCurrency();
     const logo = getBrandIcon(item.title);
-    const days = daysUntilCharge(item.dayOfMonth);
-    const dueLabel = days === 0 ? "Hoje" : days === 1 ? "Amanhã" : `em ${days}d`;
-    const isSoon = days <= 3;
+
+    const freq = asFrequency(item.frequency);
+    const next = nextOccurrence(item);
+    const ended = next === null;
+    const todayMid = new Date(); todayMid.setHours(0, 0, 0, 0);
+    const days = next ? Math.floor((next.getTime() - todayMid.getTime()) / 86_400_000) : null;
+    const dueLabel = ended ? "Encerrada" : days === 0 ? "Hoje" : days === 1 ? "Amanhã" : `em ${days}d`;
+    const isSoon = !ended && days !== null && days <= 3;
+
+    const showPay = !ended && !!item.currentDueDate;
+    const isPaid = !!item.currentPaid;
+
+    async function handleUndo() {
+        const fd = new FormData();
+        fd.set("recurringExpenseId", item.id);
+        fd.set("dueDate", item.currentDueDate || "");
+        const res = await undoRecurringExpensePayment(fd);
+        if (res.success) toast.success(res.message); else toast.error(res.message);
+    }
 
     return (
-        <RecurringDialog 
-            item={item} 
+        <div className={cn("rounded-xl transition-all", ended && "opacity-60")}>
+        <RecurringDialog
+            item={item}
             trigger={
                 <div className="flex items-center justify-between p-3 hover:bg-muted/40 rounded-xl transition-all cursor-pointer group border border-transparent hover:border-border/50">
-                    
+
                     <div className="flex items-center gap-3.5 min-w-0">
                         {/* Ícone da Marca ou Ícone Genérico */}
                         <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-background border border-border/60 shadow-sm flex items-center justify-center text-muted-foreground group-hover:border-primary/30 transition-colors shrink-0 overflow-hidden p-2">
@@ -271,7 +298,7 @@ function RecurringItemWrapper({ item }: { item: RecurringItemData }) {
                                 <CreditCard className="h-5 w-5 opacity-50" />
                             )}
                         </div>
-                        
+
                         {/* Detalhes da Conta */}
                         <div className="min-w-0 space-y-0.5">
                             <p className="text-sm font-bold text-foreground truncate pr-2 group-hover:text-primary transition-colors">
@@ -279,15 +306,15 @@ function RecurringItemWrapper({ item }: { item: RecurringItemData }) {
                             </p>
                             <div className="flex items-center gap-2 text-[10px] sm:text-xs text-muted-foreground font-medium">
                                 <span className="flex items-center gap-1 text-orange-500/80">
-                                    <CalendarClock className="h-3 w-3" /> Dia {item.dayOfMonth.toString().padStart(2, '0')}
+                                    <CalendarClock className="h-3 w-3" /> {item.installments ? `${item.installments}x` : FREQUENCY_LABEL[freq]}
                                 </span>
                                 <span className="text-border">•</span>
                                 <span className="truncate">{item.category}</span>
                             </div>
                         </div>
                     </div>
-                    
-                    {/* Valor Mensal + próxima cobrança */}
+
+                    {/* Valor + próxima ocorrência */}
                     <div className="flex flex-col items-end shrink-0 pl-3 gap-1">
                         <span className={cn("text-sm sm:text-base font-bold font-mono tracking-tight text-foreground", smartView && "blur-sm select-none")}>
                             {moneyShort(item.amount)}
@@ -295,9 +322,11 @@ function RecurringItemWrapper({ item }: { item: RecurringItemData }) {
                         <span
                             className={cn(
                                 "text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md border",
-                                isSoon
-                                    ? "bg-orange-500/10 text-orange-600 border-orange-500/20"
-                                    : "bg-muted/50 text-muted-foreground border-border/50"
+                                ended
+                                    ? "bg-muted text-muted-foreground border-border/50"
+                                    : isSoon
+                                        ? "bg-orange-500/10 text-orange-600 border-orange-500/20"
+                                        : "bg-muted/50 text-muted-foreground border-border/50"
                             )}
                         >
                             {dueLabel}
@@ -306,5 +335,105 @@ function RecurringItemWrapper({ item }: { item: RecurringItemData }) {
                 </div>
             }
         />
+
+        {/* Ação de pagamento da ocorrência atual (espelho do "Recebi" das faturas) */}
+        {showPay && (
+            <div className="px-3 pb-2 -mt-0.5 flex justify-end">
+                {isPaid ? (
+                    <button
+                        type="button"
+                        onClick={handleUndo}
+                        className="group/undo inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 hover:bg-emerald-500/15 transition-colors"
+                    >
+                        <Check className="h-3 w-3 group-hover/undo:hidden" />
+                        <Undo2 className="h-3 w-3 hidden group-hover/undo:block" />
+                        <span className="group-hover/undo:hidden">Pago este mês</span>
+                        <span className="hidden group-hover/undo:block">Desfazer</span>
+                    </button>
+                ) : (
+                    <button
+                        type="button"
+                        onClick={() => onPay(item)}
+                        className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg bg-orange-500/10 text-orange-600 border border-orange-500/20 hover:bg-orange-500/15 active:scale-95 transition-all"
+                    >
+                        <Wallet className="h-3 w-3" /> Paguei
+                    </button>
+                )}
+            </div>
+        )}
+        </div>
+    );
+}
+
+// --- MODAL DE PAGAMENTO DE CUSTO FIXO (lança a despesa real na conta escolhida) ---
+
+function RecurringPayModal({ item, accounts, onClose }: { item: RecurringItemData | null; accounts: PayAccountOption[]; onClose: () => void }) {
+    const formatCurrency = useFormatCurrency();
+    // Pré-seleciona a primeira conta não automática (Pluggy sincroniza sozinho).
+    const [accountId, setAccountId] = useState<string>(
+        () => (accounts.find((a) => !a.isConnected) || accounts[0])?.id || ""
+    );
+    const hasAccounts = accounts.length > 0;
+
+    return (
+        <Dialog open={!!item} onOpenChange={(open) => { if (!open) onClose(); }}>
+            <DialogContent size="md">
+                <DialogHeader
+                    icon={<Wallet className="h-5 w-5" />}
+                    iconClassName="bg-orange-500/10 text-orange-600 border-orange-500/20"
+                    title="Registrar Pagamento"
+                    description={<>A saída de <strong className="text-orange-600">{item ? formatCurrency(item.amount) : ""}</strong> será lançada como despesa na conta escolhida.</>}
+                />
+
+                {hasAccounts ? (
+                    <form action={async (fd) => {
+                        fd.set("recurringExpenseId", item?.id || "");
+                        fd.set("accountId", accountId);
+                        fd.set("dueDate", item?.currentDueDate || "");
+                        const res = await payRecurringExpense(fd);
+                        if (res.success) { toast.success(res.message); onClose(); }
+                        else toast.error(res.message);
+                    }} className="flex flex-col flex-1 min-h-0">
+                        <DialogBody className="space-y-5">
+                            <div className="space-y-1.5">
+                                <Label className="text-[10px] uppercase font-black text-muted-foreground ml-1">Conta de Origem</Label>
+                                <Select value={accountId} onValueChange={setAccountId}>
+                                    <SelectTrigger className="rounded-xl h-12 bg-muted/20">
+                                        <SelectValue placeholder="Selecione a conta..." />
+                                    </SelectTrigger>
+                                    <SelectContent className="rounded-xl z-[100]">
+                                        {accounts.map((acc) => (
+                                            <SelectItem key={acc.id} value={acc.id}>
+                                                <span className="flex items-center gap-2">
+                                                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: acc.color || "#6366f1" }} />
+                                                    {acc.name}{acc.isConnected ? " (automática)" : ""}
+                                                </span>
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </DialogBody>
+                        <DialogFooter>
+                            <Button type="button" variant="ghost" className="rounded-xl" onClick={onClose}>Cancelar</Button>
+                            <SubmitButton className="rounded-xl px-8 font-bold bg-orange-600 hover:bg-orange-700 shadow-lg shadow-orange-600/20">
+                                Confirmar Pagamento
+                            </SubmitButton>
+                        </DialogFooter>
+                    </form>
+                ) : (
+                    <>
+                        <DialogBody>
+                            <p className="text-sm text-muted-foreground">
+                                Você ainda não tem nenhuma conta cadastrada. Crie uma conta no Financeiro para registrar pagamentos.
+                            </p>
+                        </DialogBody>
+                        <DialogFooter>
+                            <Button type="button" variant="ghost" className="rounded-xl" onClick={onClose}>Fechar</Button>
+                        </DialogFooter>
+                    </>
+                )}
+            </DialogContent>
+        </Dialog>
     );
 }

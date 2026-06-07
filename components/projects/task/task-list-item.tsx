@@ -4,14 +4,12 @@ import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ProgressBar } from './progress-bar';
 import { DateBadge } from './date-badge';
-import { PriorityBadge } from './priority-badge';
 import { StatusBadge } from './status-badge';
 import { QuickActionButton } from './quick-action-button';
 import { Star, MoreHorizontal, Pin, Timer, GripVertical } from 'lucide-react';
 import type { TaskBaseProps } from '@/types/task-types';
 import { Reorder, motion } from 'framer-motion';
 
-type TaskPriority = "HIGH" | "MEDIUM" | "LOW";
 type TaskStatus = "TODO" | "IN_PROGRESS" | "DONE" | "REVIEW";
 
 export function TaskListItem({

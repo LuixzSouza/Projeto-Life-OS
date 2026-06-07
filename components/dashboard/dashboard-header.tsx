@@ -4,7 +4,7 @@ import { QuickActions } from "@/components/dashboard/quick-actions";
 interface DashboardHeaderProps {
   greeting: string;
   userName: string;
-  productivityScore: number;
+  productivityScore?: number;
 }
 
 export function DashboardHeader({ greeting, userName, productivityScore }: DashboardHeaderProps) {
@@ -23,13 +23,17 @@ export function DashboardHeader({ greeting, userName, productivityScore }: Dashb
       </div>
 
       <div className="flex items-center gap-6">
-        <div className="hidden md:flex flex-col items-end">
-          <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-0.5">Score Diário</p>
-          <div className="flex items-center gap-2 text-primary font-bold text-2xl leading-none">
-            {productivityScore} <TrendingUp className="h-5 w-5 opacity-80" />
-          </div>
-        </div>
-        <div className="h-10 w-px bg-border/50 hidden md:block" />
+        {typeof productivityScore === "number" && (
+          <>
+            <div className="hidden md:flex flex-col items-end">
+              <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-0.5">Score Diário</p>
+              <div className="flex items-center gap-2 text-primary font-bold text-2xl leading-none">
+                {productivityScore} <TrendingUp className="h-5 w-5 opacity-80" />
+              </div>
+            </div>
+            <div className="h-10 w-px bg-border/50 hidden md:block" />
+          </>
+        )}
         <QuickActions />
       </div>
     </div>

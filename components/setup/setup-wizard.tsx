@@ -113,7 +113,7 @@ export function SetupWizard({ dbFromEnv = false }: SetupWizardProps) {
     setFormData((f) => ({
       ...f,
       dbProvider: id,
-      storageMode: id === "local" ? "local" : "cloud",
+      storageMode: id === "local" ? "local" : id === "replica" ? "replica" : "cloud",
     }));
 
   const nextStep = () => {
@@ -136,6 +136,20 @@ export function SetupWizard({ dbFromEnv = false }: SetupWizardProps) {
           toast.error("O caminho do banco de dados é obrigatório.");
           return;
         }
+      } else if (formData.dbProvider === "replica") {
+        // Réplica exige pasta local E o Turso espelho (url + validação).
+        if (!formData.storagePath) {
+          toast.error("Informe a pasta local da réplica.");
+          return;
+        }
+        if (!formData.tursoUrl.trim()) {
+          toast.error("Informe a URL do Turso espelho.");
+          return;
+        }
+        if (!/^(libsql|https?):\/\//.test(formData.tursoUrl.trim())) {
+          toast.error("URL inválida. Use libsql://... ou https://...");
+          return;
+        }
       } else if (formData.dbProvider === "turso") {
         if (!formData.tursoUrl.trim()) {
           toast.error("Informe a URL do banco na nuvem (Turso).");
@@ -156,7 +170,12 @@ export function SetupWizard({ dbFromEnv = false }: SetupWizardProps) {
   const progress = ((step - 1) / (STEPS.length - 1)) * 100;
 
   // storageMode efetivo que a Server Action consome.
-  const effectiveStorageMode = formData.dbProvider === "local" ? "local" : "cloud";
+  const effectiveStorageMode =
+    formData.dbProvider === "local"
+      ? "local"
+      : formData.dbProvider === "replica"
+        ? "replica"
+        : "cloud";
 
   return (
     <div className="w-full max-w-5xl bg-background rounded-2xl shadow-2xl overflow-hidden border border-border flex flex-col md:flex-row min-h-[600px] animate-in fade-in zoom-in-95 duration-500">

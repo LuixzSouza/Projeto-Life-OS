@@ -4,12 +4,14 @@ import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger, DialogHeader, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dumbbell, Plus, LayoutList, LineChart as LineChartIcon } from "lucide-react";
+import { Dumbbell, Plus, LayoutList, LineChart as LineChartIcon, Images } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
 import { GymForm } from "./gym-form";
+import { StartLiveButton } from "./session/start-live-button";
+import { GymGallery } from "./session/gallery-view";
 import { WorkoutPlanBuilder } from "./workout-plan-builder";
 import { VolumeChart } from "./volume-chart";
 import { MuscleFrequencyCard } from "./muscle-frequency-card";
@@ -29,10 +31,17 @@ export function GymDashboard({ workouts }: { workouts: GymWorkout[] }) {
     return workouts.slice(0, 10).reverse().map(w => {
       let totalLoad = 0;
       w.exercises.forEach(ex => {
-        const weight = parseFloat(ex.weight) || 0;
-        const sets = parseFloat(ex.sets) || 0;
-        const reps = parseFloat(ex.reps) || 0;
-        totalLoad += (weight * sets * reps);
+        // Sessão ao vivo: soma real das séries feitas. Senão, resumo legado.
+        if (ex.setLog && ex.setLog.length > 0) {
+          ex.setLog.forEach(s => {
+            if (s.done) totalLoad += (parseFloat(s.weight) || 0) * (parseFloat(s.reps) || 0);
+          });
+        } else {
+          const weight = parseFloat(ex.weight) || 0;
+          const sets = parseFloat(ex.sets) || 0;
+          const reps = parseFloat(ex.reps) || 0;
+          totalLoad += (weight * sets * reps);
+        }
       });
       return {
         date: format(new Date(w.date), "dd/MM"),
@@ -77,12 +86,18 @@ export function GymDashboard({ workouts }: { workouts: GymWorkout[] }) {
               <LayoutList className="h-4 w-4" />
               Fichas de Treino
             </TabsTrigger>
+            <TabsTrigger value="gallery" className="gap-2 px-4 py-2 text-xs font-medium rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
+              <Images className="h-4 w-4" />
+              Galeria
+            </TabsTrigger>
           </TabsList>
 
-          {/* Quick Add Button */}
+          {/* Ações: treinar ao vivo + registrar sessão manual */}
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+          <StartLiveButton />
           <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" className="h-9 gap-2 font-medium rounded-lg shadow-sm">
+              <Button size="sm" variant="outline" className="h-9 gap-2 font-medium rounded-lg shadow-sm">
                 <Plus className="h-4 w-4" /> Registrar Sessão
               </Button>
             </DialogTrigger>
@@ -98,6 +113,7 @@ export function GymDashboard({ workouts }: { workouts: GymWorkout[] }) {
               </div>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         {/* --- TAB: DASHBOARD --- */}
@@ -169,6 +185,11 @@ export function GymDashboard({ workouts }: { workouts: GymWorkout[] }) {
         {/* --- TAB: PLANNER --- */}
         <TabsContent value="planner" className="m-0 focus-visible:outline-none">
           <WorkoutPlanBuilder />
+        </TabsContent>
+
+        {/* --- TAB: GALERIA --- */}
+        <TabsContent value="gallery" className="m-0 focus-visible:outline-none">
+          <GymGallery />
         </TabsContent>
 
       </Tabs>

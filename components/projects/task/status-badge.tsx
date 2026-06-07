@@ -5,7 +5,6 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { 
   Circle, 
-  CircleDashed, 
   CheckCircle2, 
   HelpCircle, 
   Timer,

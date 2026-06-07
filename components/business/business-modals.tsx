@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AlertCircle, Camera, Upload, Trash2, Loader2, Tag, Building2, FileText, Receipt, Wallet } from "lucide-react";
+import { AlertCircle, Camera, Upload, Trash2, Loader2, Building2, FileText, Receipt, Wallet } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,9 +24,7 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { useCurrencySymbol, useFormatCurrency } from "@/components/providers/currency-provider";
 import { clearMask, maskPhone, toInputDate } from "./business-helpers";
 import type { AccountOption, ActionResponse, BillingData, ClientData, DeleteTarget, FriendOption, InvoiceData } from "./business-types";
-import { EntityTags } from "@/components/connect/entity-tags";
-import { EntityAttachments } from "@/components/connect/entity-attachments";
-import { EntityLinks } from "@/components/connect/entity-links";
+import { EntityConnections } from "@/components/connect/entity-connections";
 
 // --- Modal Cliente (criar/editar) ---
 interface ClientModalProps {
@@ -379,15 +377,10 @@ export function InvoiceModal({ invoice, onClose }: InvoiceModalProps) {
                   </Select>
               </div>
 
-              {/* Tags, Anexos & Relações — ex.: anexar o comprovante/boleto desta fatura. */}
+              {/* Tags, Anexos & Conexões — ex.: anexar o comprovante/boleto desta fatura. */}
               {invoice && (
-                <div className="space-y-3 border-t border-border/40 pt-4">
-                  <Label className="flex items-center gap-1.5 text-[10px] uppercase font-black text-muted-foreground ml-1">
-                    <Tag className="h-3.5 w-3.5" /> Tags, Anexos & Relações
-                  </Label>
-                  <EntityTags entityType="invoice" entityId={invoice.id} />
-                  <EntityAttachments entityType="invoice" entityId={invoice.id} />
-                  <EntityLinks entityType="invoice" entityId={invoice.id} />
+                <div className="pt-2">
+                  <EntityConnections entityType="invoice" entityId={invoice.id} />
                 </div>
               )}
 

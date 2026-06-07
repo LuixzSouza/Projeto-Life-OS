@@ -60,3 +60,6 @@ life-os-config.json
 # IDE (Visual Studio gera índices/cache pesados — nunca versionar)
 .vs/
 *.vsidx
+
+# log do dev server (artefato local)
+.next-dev.log

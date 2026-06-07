@@ -6,13 +6,12 @@ import { format, subDays, isSameDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-    TrendingUp, TrendingDown, Target, Zap, 
-    Calendar as CalendarIcon, ArrowRight, LayoutList, CalendarRange
+    TrendingUp, Target, 
+    Calendar as CalendarIcon, LayoutList, CalendarRange
 } from "lucide-react";
-import { Bar, BarChart, Tooltip, Cell, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, Tooltip, Cell, XAxis } from "recharts";
 import { ChartContainer } from "@/components/ui/chart-container";
 import { cn } from "@/lib/utils";
 import { FoodLogger } from "./food-logger";
@@ -81,14 +80,6 @@ export function NutritionDashboard({ initialDate, meals, weekData, mealPlan = []
     const dailyGoal = 2500; 
     const balance = dailyGoal - totalCalories;
     const isOver = balance < 0;
-
-    // --- CÁLCULOS DA SEMANA ---
-    const weeklyAverage = useMemo(() => {
-        const total = weekData.reduce((acc, d) => acc + (d.calories || 0), 0);
-        return Math.round(total / 7);
-    }, [weekData]);
-
-    const deviation = totalCalories - weeklyAverage;
 
     // --- DADOS DO GRÁFICO ---
     const chartData = useMemo(() => {

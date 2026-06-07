@@ -2,7 +2,7 @@
 
 import {
   Calendar, Utensils, Dumbbell, BookOpen, Moon, Scale, Film, Shirt,
-  UserPlus, Cake, Wallet, Briefcase, CheckSquare, Flame, Users, Receipt, Repeat, Layers, Target,
+  UserPlus, Cake, Wallet, Briefcase, CheckSquare, Flame, Users, Receipt, Repeat, Layers, Target, PartyPopper, HandCoins,
 } from "lucide-react";
 import type { AgendaIconKey } from "./agenda-shared";
 
@@ -26,6 +26,8 @@ const ICONS: Record<AgendaIconKey, React.ElementType> = {
   repeat: Repeat,
   layers: Layers,
   target: Target,
+  party: PartyPopper,
+  handcoins: HandCoins,
 };
 
 export function AgendaItemIcon({ icon, className }: { icon: AgendaIconKey; className?: string }) {

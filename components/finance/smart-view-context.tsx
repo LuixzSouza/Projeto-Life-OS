@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, useEffect, useMemo } from "react";
+import { createContext, useContext, useCallback, useMemo, useSyncExternalStore, type ReactNode } from "react";
 
 interface SmartViewContextValue {
   /** Quando true, valores monetários sensíveis ficam ocultos/borrados. */
@@ -22,38 +22,48 @@ export function useSmartView(): SmartViewContextValue {
   return useContext(SmartViewContext);
 }
 
-export function SmartViewProvider({ children }: { children: React.ReactNode }) {
-  const [smartView, setState] = useState(false);
+// --- Store externo (localStorage) lido via useSyncExternalStore ---------------
+// Ler de forma síncrona evita o flash de hidratação que o padrão useEffect+setState
+// causava (e o aviso react-hooks/set-state-in-effect). Bônus: sincroniza entre abas.
+const listeners = new Set<() => void>();
 
-  // Recupera a preferência da sessão (persiste entre navegações)
-  useEffect(() => {
-    try {
-      if (localStorage.getItem(STORAGE_KEY) === "true") setState(true);
-    } catch {
-      // localStorage indisponível — ignora
-    }
-  }, []);
+function readStore(): boolean {
+  try {
+    return localStorage.getItem(STORAGE_KEY) === "true";
+  } catch {
+    return false; // localStorage indisponível
+  }
+}
 
-  const persist = (value: boolean) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, String(value));
-    } catch {
-      // ignora
-    }
+function writeStore(value: boolean) {
+  try {
+    localStorage.setItem(STORAGE_KEY, String(value));
+  } catch {
+    // ignora
+  }
+  listeners.forEach((l) => l());
+}
+
+function subscribe(callback: () => void): () => void {
+  listeners.add(callback);
+  // Reflete mudanças feitas em OUTRAS abas (o evento "storage" não dispara na própria).
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === STORAGE_KEY) callback();
   };
+  window.addEventListener("storage", onStorage);
+  return () => {
+    listeners.delete(callback);
+    window.removeEventListener("storage", onStorage);
+  };
+}
 
-  const setSmartView = useCallback((value: boolean) => {
-    setState(value);
-    persist(value);
-  }, []);
+export function SmartViewProvider({ children }: { children: ReactNode }) {
+  // getServerSnapshot = false: no SSR/hidratação o valor é estável (sem mismatch);
+  // logo após a hidratação o React re-renderiza com a preferência real do cliente.
+  const smartView = useSyncExternalStore(subscribe, readStore, () => false);
 
-  const toggle = useCallback(() => {
-    setState((prev) => {
-      const next = !prev;
-      persist(next);
-      return next;
-    });
-  }, []);
+  const setSmartView = useCallback((value: boolean) => writeStore(value), []);
+  const toggle = useCallback(() => writeStore(!readStore()), []);
 
   const value = useMemo(
     () => ({ smartView, toggle, setSmartView }),

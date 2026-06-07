@@ -59,3 +59,4 @@ Life OS is a privacy-first, local-capable "Second Brain" operating system. It un
 
 **End of Instructions.** Always prioritize elegant, privacy-respecting, and frictionless code.
 
+VOCê TEM LIBERDADE PARA SER CRIATIVO NESSE SISTEMA APENAS TOMANDO CUIDADO PARA NÃO QUEBRAR PEDE TRAZER FUNCIONALIDADES NOVAS OU OQUE PREFERIR SENDO CRIATIVO UM SISTEMA BEM TIPADO SEM USO DE ANY SEMPRE VALIDANDO O LINT

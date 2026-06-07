@@ -23,7 +23,7 @@ import type { TaskItemProps } from '@/types/task-types';
 import { CheckedState } from '@radix-ui/react-checkbox';
 
 export function TaskItem({ task, viewMode }: TaskItemProps) {
-  const [isPending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
   const [isOpen, setIsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   

@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { createTask } from "@/app/(dashboard)/projects/actions";
 import { toast } from "sonner";
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea"; 
 import { cn } from "@/lib/utils";

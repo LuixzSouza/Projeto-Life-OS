@@ -4,8 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Terminal, Cpu, Box, Activity, Copy, Check, Clock } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
 
 interface SystemInfo {
     cwd: string;

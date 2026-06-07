@@ -2,7 +2,7 @@
 
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
-import { CheckCircle2, Zap } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 
 interface ProgressBarProps {
   value: number;

@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Globe, Film, Gamepad2, Banknote, Loader2, Shield,
   ExternalLink, Eye, EyeOff, Copy, Check, Info,
-  Key, Database, Lock, TestTube2, Sparkles, Plug, BookOpen, Salad, LineChart
+  Key, Database, Lock, TestTube2, Plug, BookOpen, Salad, LineChart
 } from "lucide-react";
 import { useFormStatus } from "react-dom";
 import { updateApiKeys, testApiConnection } from "@/app/(dashboard)/settings/actions";

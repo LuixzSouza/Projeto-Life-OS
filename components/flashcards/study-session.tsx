@@ -2,26 +2,18 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import {
-  RotateCw,
-  CheckCircle,
-  XCircle,
   Repeat,
-  Sparkles,
   X,
   Code2,
   BrainCircuit,
   Trophy,
-  Keyboard,
-  ArrowRight
+  Keyboard
 } from "lucide-react";
 import Link from "next/link";
 import { Flashcard, FlashcardDeck } from "@prisma/client";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
 import { reviewFlashcard } from "@/app/(dashboard)/flashcards/actions"; // O servidor que alimenta a IA de revisão
 
 /* -------------------------------------------------------------------------- */

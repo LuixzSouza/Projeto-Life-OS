@@ -269,7 +269,9 @@ export async function receiveInvoicePayment(formData: FormData) {
         include: { billing: { include: { client: { select: { name: true } } } } },
       })
       if (!invoice) throw new Error("Fatura não encontrada.")
-      if (invoice.transactionId) throw new Error("Esta fatura já foi recebida.")
+      // Idempotência: já recebida se tem transação vinculada OU já está PAID (contas
+      // conectadas marcam PAID sem transação — ver abaixo).
+      if (invoice.transactionId || invoice.status === "PAID") throw new Error("Esta fatura já foi recebida.")
 
       const account = await tx.account.findFirst({ where: { id: accountId, userId } })
       if (!account) throw new Error("Conta não encontrada.")
@@ -277,20 +279,23 @@ export async function receiveInvoicePayment(formData: FormData) {
       const value = Number(invoice.value)
       const clientName = invoice.billing.client?.name || "Cliente"
 
-      const transaction = await tx.transaction.create({
-        data: {
-          description: `${clientName} — ${invoice.title}`,
-          amount: value,
-          type: "INCOME",
-          category: "Recebimento",
-          accountId,
-          date: new Date(),
-          userId,
-        },
-      })
-
-      // Saldo só é ajustado manualmente em contas não automáticas (Pluggy sincroniza sozinho).
+      // Conta CONECTADA (Pluggy): NÃO criamos a transação manual — o Pluggy importa a
+      // entrada real do banco e duplicaria o lançamento (a descrição difere, então o
+      // dedup do sync não a reconhece). Em conta comum, lançamos a receita e somamos o saldo.
+      let transactionId: string | null = null
       if (!account.isConnected) {
+        const transaction = await tx.transaction.create({
+          data: {
+            description: `${clientName} — ${invoice.title}`,
+            amount: value,
+            type: "INCOME",
+            category: "Recebimento",
+            accountId,
+            date: new Date(),
+            userId,
+          },
+        })
+        transactionId = transaction.id
         await tx.account.update({
           where: { id: account.id },
           data: { balance: Number(account.balance) + value },
@@ -299,7 +304,7 @@ export async function receiveInvoicePayment(formData: FormData) {
 
       await tx.invoice.updateMany({
         where: { id: invoiceId, userId },
-        data: { status: "PAID", paidAt: new Date(), transactionId: transaction.id },
+        data: { status: "PAID", paidAt: new Date(), transactionId },
       })
 
       receipt = { title: invoice.title, value, client: clientName }

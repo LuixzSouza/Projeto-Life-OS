@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import {
   Plus, Search, Target, Pencil, Trash2, GraduationCap, Loader2, CheckCircle2,
-  Circle, CalendarDays, BookOpen, X, Flag,
+  Circle, CalendarDays, X, Flag,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -21,9 +21,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { EntityTags } from "@/components/connect/entity-tags";
-import { EntityAttachments } from "@/components/connect/entity-attachments";
-import { EntityLinks } from "@/components/connect/entity-links";
+import { EntityConnections } from "@/components/connect/entity-connections";
 import {
   getGoals, createGoal, updateGoal, deleteGoal,
   addGoalTask, toggleGoalTask, deleteGoalTask,
@@ -418,15 +416,10 @@ function GoalDialog({
             </div>
           )}
 
-          {/* Tecido conectivo — só em edição (precisa do id). Editores form-safe. */}
+          {/* Tecido conectivo (card recolhível) — só em edição (precisa do id). Form-safe. */}
           {goal && (
-            <div className="space-y-4 border-t border-border/40 pt-4">
-              <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                <BookOpen className="h-3.5 w-3.5" /> Tags, Anexos & Relações
-              </p>
-              <EntityTags entityType="goal" entityId={goal.id} />
-              <EntityAttachments entityType="goal" entityId={goal.id} />
-              <EntityLinks entityType="goal" entityId={goal.id} />
+            <div className="pt-2">
+              <EntityConnections entityType="goal" entityId={goal.id} />
             </div>
           )}
         </DialogBody>

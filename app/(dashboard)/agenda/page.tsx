@@ -37,14 +37,15 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
 
   const userId = await getCurrentUserId();
 
-  const [agendaItems, pendingTasks, routineItems] = await Promise.all([
+  const [agendaItems, pendingTasks, pendingTaskCount, routineItems] = await Promise.all([
     getAgendaItems(rangeStart, rangeEnd),
     prisma.task.findMany({
       where: { isDone: false, userId, deletedAt: null },
       orderBy: { dueDate: "asc" },
-      take: 10,
+      take: 50,
       include: { project: projectSelect },
     }),
+    prisma.task.count({ where: { isDone: false, userId, deletedAt: null } }),
     getRoutineItems(),
   ]);
 
@@ -87,7 +88,7 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
                   </div>
                   <div className="flex flex-col items-center rounded-xl border border-border/40 bg-background p-4 text-center shadow-sm">
                     <ListChecks className="mb-2 h-4 w-4 text-amber-500" />
-                    <span className="text-2xl font-black leading-none tabular-nums">{pendingTasks.length}</span>
+                    <span className="text-2xl font-black leading-none tabular-nums">{pendingTaskCount}</span>
                     <span className="mt-1 text-[9px] font-bold uppercase tracking-wider text-muted-foreground">Tarefas ativas</span>
                   </div>
                 </div>
@@ -143,7 +144,7 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
 
                 {/* TAREFAS */}
                 <TabsContent value="tasks" className="m-0 flex-1 overflow-y-auto bg-background/50 p-6 data-[state=active]:flex flex-col">
-                  <TaskList tasks={pendingTasks} />
+                  <TaskList tasks={pendingTasks} total={pendingTaskCount} />
                 </TabsContent>
 
                 {/* ROTINA */}

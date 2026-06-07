@@ -182,6 +182,7 @@ function SummaryStat({ label, value, blur, accent }: { label: string; value: str
             <p className={cn(
                 "font-mono font-black tracking-tight tabular-nums truncate",
                 accent ? "text-2xl text-foreground" : "text-xl text-foreground/80",
+                accent && "privacy-blur", // borra no Modo Discreto global
                 blur && accent && "blur-sm select-none",
             )}>
                 {value}
@@ -269,7 +270,7 @@ function BankCard({ account, onEdit, onDelete, onConnections }: { account: Accou
                         onClick={handleCopyBalance}
                         title="Clique para copiar"
                     >
-                        <h3 className={cn("text-3xl font-mono font-bold tracking-tighter text-white drop-shadow-md", smartView && "blur-md select-none")}>
+                        <h3 className={cn("privacy-blur text-3xl font-mono font-bold tracking-tighter text-white drop-shadow-md", smartView && "blur-md select-none")}>
                             {formattedBalance}
                         </h3>
                         {copied ? <Check className="h-5 w-5 text-emerald-400 animate-in zoom-in" /> : <Copy className="h-4 w-4 text-white/30 opacity-0 group-hover/balance:opacity-100 transition-opacity" />}

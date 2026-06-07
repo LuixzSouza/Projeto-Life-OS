@@ -1,5 +1,6 @@
 import { prisma } from "./prisma";
 import { getCurrentUserId } from "./auth";
+import { deriveAnchor, asFrequency, occurrencesInRange, periodsBetween } from "./recurrence";
 
 export type NotificationPriority = "LOW" | "NORMAL" | "HIGH";
 
@@ -201,5 +202,91 @@ export async function generateReminders(): Promise<number> {
     }));
   }
 
+  // 6. Cobranças recorrentes com cliente → materializa as faturas do mês (idempotente).
+  //    A notificação de vencimento fica por conta do bloco #1 (INVOICE_DUE), sem duplicar.
+  created += await syncRecurringChargeInvoices(userId);
+
+  // 7. Cobranças AVULSAS (sem cliente): lembrete CHARGE_DUE de 3 dias antes até o dia.
+  const avulsas = await prisma.recurringCharge.findMany({ where: { userId, active: true, clientId: null } });
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  for (const c of avulsas) {
+    const occs = occurrencesInRange({
+      anchor: deriveAnchor(c), frequency: asFrequency(c.frequency), endDate: c.endDate,
+      rangeStart: monthStart, rangeEnd: monthEnd,
+    });
+    if (occs.length === 0) continue;
+    const due = occs[0];
+    const diffDays = Math.round((due.getTime() - startToday.getTime()) / 864e5);
+    if (diffDays < 0 || diffDays > 3) continue;
+    const value = Number(c.amount).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    bump(await notifyOnce(userId, {
+      type: "CHARGE_DUE",
+      title: diffDays === 0 ? `Cobrar hoje: ${c.title}` : `Cobrança em ${diffDays} dia(s): ${c.title}`,
+      body: [c.clientName ? `Cliente: ${c.clientName}` : null, value].filter(Boolean).join(" · "),
+      entityType: "recurringCharge", entityId: `${c.id}:${due.toISOString().slice(0, 10)}`,
+      actionUrl: "/finance", priority: diffDays === 0 ? "HIGH" : "NORMAL", dueAt: due,
+    }));
+  }
+
+  // 8. Custos fixos vencendo nos próximos 3 dias: lembrete de PAGAR (BILL_DUE).
+  const expenses = await prisma.recurringExpense.findMany({ where: { userId, active: true } });
+  const in3d = new Date(startToday.getTime() + 3 * 864e5);
+  for (const e of expenses) {
+    const occs = occurrencesInRange({
+      anchor: deriveAnchor(e), frequency: asFrequency(e.frequency), endDate: e.endDate,
+      rangeStart: startToday, rangeEnd: in3d,
+    });
+    if (occs.length === 0) continue;
+    const due = occs[0];
+    const diffDays = Math.round((due.getTime() - startToday.getTime()) / 864e5);
+    const value = Number(e.amount).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    bump(await notifyOnce(userId, {
+      type: "BILL_DUE",
+      title: diffDays === 0 ? `Conta fixa vence hoje: ${e.title}` : `Conta fixa vence em ${diffDays} dia(s): ${e.title}`,
+      body: [value, e.category].filter(Boolean).join(" · "),
+      entityType: "recurringExpense", entityId: `${e.id}:${due.toISOString().slice(0, 10)}`,
+      actionUrl: "/finance", priority: diffDays === 0 ? "HIGH" : "NORMAL", dueAt: due,
+    }));
+  }
+
+  return created;
+}
+
+/**
+ * Materializa as faturas (Invoice) das cobranças recorrentes COM cliente para o mês atual.
+ * Idempotente (uma fatura por contrato/dia). Chamado pelo sino e ao abrir Negócios/Finanças,
+ * para as cobranças "simplesmente funcionarem" sem ação manual. Retorna quantas criou.
+ */
+export async function syncRecurringChargeInvoices(userId: string): Promise<number> {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const charges = await prisma.recurringCharge.findMany({
+    where: { userId, active: true, clientId: { not: null }, billingId: { not: null } },
+  });
+  let created = 0;
+  for (const c of charges) {
+    if (!c.billingId) continue;
+    const freq = asFrequency(c.frequency);
+    const anchor = deriveAnchor(c);
+    const occs = occurrencesInRange({ anchor, frequency: freq, endDate: c.endDate, rangeStart: monthStart, rangeEnd: monthEnd });
+    for (const occ of occs) {
+      const dayStart = new Date(occ.getFullYear(), occ.getMonth(), occ.getDate(), 0, 0, 0);
+      const dayEnd = new Date(occ.getFullYear(), occ.getMonth(), occ.getDate(), 23, 59, 59, 999);
+      const exists = await prisma.invoice.findFirst({
+        where: { userId, billingId: c.billingId, dueDate: { gte: dayStart, lte: dayEnd } },
+        select: { id: true },
+      });
+      if (exists) continue;
+      const title = c.installments
+        ? `${c.title} — Parcela ${(c.paidInstallments ?? 0) + 1 + periodsBetween(anchor, occ, freq)}/${c.installments}`
+        : `${c.title} — ${occ.toISOString().slice(0, 10)}`;
+      await prisma.invoice.create({
+        data: { billingId: c.billingId, title, value: Number(c.amount), dueDate: occ, status: "PENDING", userId },
+      });
+      created++;
+    }
+  }
   return created;
 }

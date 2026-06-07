@@ -16,8 +16,8 @@ export default async function ConnectPage() {
     <PageShell>
       <PageHeader
         icon={<Network className="h-5 w-5" />}
-        title="Tags, Anexos & Relações"
-        description="O tecido que liga seus módulos: filtre por tags entre áreas, veja todos os anexos e o grafo de relações num lugar só."
+        title="Tags, Anexos & Conexões"
+        description="O tecido que liga seus módulos: filtre por tags entre áreas, veja todos os anexos e o grafo de conexões num lugar só."
       />
       <PageContainer>
         <ConnectCenter initialTags={tags} initialAttachments={attachments} initialLinks={links} />

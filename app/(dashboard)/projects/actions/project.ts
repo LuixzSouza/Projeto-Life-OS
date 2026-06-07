@@ -130,7 +130,7 @@ export async function updateProjectNotes(projectId: string, notes: string) {
     const userId = await requireUserId();
     await prisma.project.updateMany({
       where: { id: projectId, userId },
-      data: { description: notes } // Aqui você pode usar 'description' ou um campo 'notes' se tiver criado
+      data: { notes } // documento rico da aba Notas (separado do "description"/Sobre)
     });
 
     // Revalida a página para atualizar o cache

@@ -11,16 +11,14 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import {
-  Star, Pin, ListChecks, Info, ImageIcon, Link2, Trash2, Tag as TagIcon, SlidersHorizontal,
+  Star, Pin, ListChecks, Info, ImageIcon, Link2, Trash2, SlidersHorizontal,
 } from 'lucide-react';
 
 import type { EditModalProps } from './edit-modal-types';
 import { QuickAction } from './edit-modal-helpers';
 import { TaskProperties } from './edit-modal-sidebar';
 import { EditModalFooter } from './edit-modal-footer';
-import { EntityTags } from '@/components/connect/entity-tags';
-import { EntityAttachments } from '@/components/connect/entity-attachments';
-import { EntityLinks } from '@/components/connect/entity-links';
+import { EntityConnections } from '@/components/connect/entity-connections';
 import { Button } from '@/components/ui/button';
 
 export function EditModal(props: EditModalProps) {
@@ -191,14 +189,9 @@ function EditModalContent({
           />
         </div>
 
-        {/* Tags, anexos & relações */}
-        <div className="space-y-4 pt-2 border-t border-border/40">
-          <label className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            <TagIcon size={13} /> Tags, anexos & relações
-          </label>
-          <EntityTags entityType="task" entityId={task.id} />
-          <EntityAttachments entityType="task" entityId={task.id} />
-          <EntityLinks entityType="task" entityId={task.id} />
+        {/* Tags, Anexos & Conexões (card recolhível) */}
+        <div className="pt-2">
+          <EntityConnections entityType="task" entityId={task.id} />
         </div>
       </div>
 

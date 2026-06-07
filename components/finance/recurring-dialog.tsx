@@ -10,24 +10,50 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, Plus, CalendarClock, Trash2, AlertCircle, DollarSign } from "lucide-react";
 import { createRecurring, updateRecurring, deleteRecurring } from "@/app/(dashboard)/finance/actions";
 import { toast } from "sonner";
-import { useCallback } from "react";
+import { FREQUENCIES, FREQUENCY_LABEL, asFrequency } from "@/lib/recurrence";
+import { cn } from "@/lib/utils";
 
-export interface RecurringItemData { id: string; title: string; amount: number; dayOfMonth: number; category: string; }
+export interface RecurringItemData {
+    id: string;
+    title: string;
+    amount: number;
+    dayOfMonth: number;
+    category: string;
+    frequency?: string;
+    startDate?: string | null;
+    endDate?: string | null;
+    createdAt?: string;
+    installments?: number | null;
+    paidInstallments?: number;
+    currentDueDate?: string | null;
+    currentPaid?: boolean;
+}
 interface RecurringDialogProps { trigger?: React.ReactNode; item?: RecurringItemData; }
+
+const toDateInput = (v: string | null | undefined): string => (v ? new Date(v).toISOString().slice(0, 10) : "");
+const fmtBRL = (n: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n);
 
 export function RecurringDialog({ trigger, item }: RecurringDialogProps) {
     const [open, setOpen] = useState<boolean>(false);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState<boolean>(false);
+    const [frequency, setFrequency] = useState<string>(asFrequency(item?.frequency));
 
-    // --- amount: armazenamos centavos como string ("100" => R$1,00)
+    // Modo: recorrente (sem fim) × parcelado (N parcelas, fim calculado).
+    const [installmentMode, setInstallmentMode] = useState<boolean>(!!item?.installments);
+    const [installments, setInstallments] = useState<string>(item?.installments ? String(item.installments) : "10");
+    const [paid, setPaid] = useState<string>(item?.paidInstallments ? String(item.paidInstallments) : "0");
+
+    // --- amount: centavos como string. No modo parcelado é o VALOR TOTAL.
     const [amountDigits, setAmountDigits] = useState<string>(() => {
         if (item?.amount === undefined || item?.amount === null) return "";
-        const cents = Math.round(Number(item.amount) * 100);
-        return String(cents);
+        const base = item.installments ? Number(item.amount) * item.installments : Number(item.amount);
+        return String(Math.round(base * 100));
     });
 
     const rawAmount: string = amountDigits ? (Number(amountDigits) / 100).toFixed(2) : "";
+    const installmentsNum = Math.max(1, parseInt(installments || "0", 10) || 0);
+    const perInstallment = installmentMode && installmentsNum > 0 ? Number(rawAmount) / installmentsNum : null;
     const formattedAmount: string = amountDigits
         ? new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(rawAmount))
         : "";
@@ -72,8 +98,16 @@ export function RecurringDialog({ trigger, item }: RecurringDialogProps) {
     const handleSubmit = async (formData: FormData) => {
         setIsLoading(true);
         try {
-            // setamos o amount transformado (ponto decimal) para o backend
-            formData.set("amount", rawAmount);
+            // No modo parcelado o usuário digita o TOTAL; gravamos o valor por parcela.
+            if (installmentMode && installmentsNum > 0) {
+                formData.set("amount", (Number(rawAmount) / installmentsNum).toFixed(2));
+                formData.set("installments", String(installmentsNum));
+                formData.set("paidInstallments", String(Math.max(0, parseInt(paid || "0", 10) || 0)));
+            } else {
+                formData.set("amount", rawAmount);
+                formData.delete("installments");
+                formData.delete("paidInstallments");
+            }
             if (item) {
                 formData.append("id", item.id);
                 await updateRecurring(formData);
@@ -133,9 +167,15 @@ export function RecurringDialog({ trigger, item }: RecurringDialogProps) {
                             <Input name="title" placeholder="Ex: Netflix, Internet, Aluguel..." defaultValue={item?.title} required className="h-12 rounded-xl bg-muted/20 font-medium" />
                         </div>
 
+                        {/* Modo: recorrente (sem fim) × parcelado (Nx, fim calculado) */}
+                        <div className="flex gap-1 p-1 bg-muted/40 rounded-xl border border-border/50">
+                            <button type="button" onClick={() => setInstallmentMode(false)} className={cn("flex-1 h-9 rounded-lg text-xs font-bold transition-all", !installmentMode ? "bg-background shadow-sm text-amber-600" : "text-muted-foreground hover:text-foreground")}>Recorrente</button>
+                            <button type="button" onClick={() => setInstallmentMode(true)} className={cn("flex-1 h-9 rounded-lg text-xs font-bold transition-all", installmentMode ? "bg-background shadow-sm text-amber-600" : "text-muted-foreground hover:text-foreground")}>Parcelado</button>
+                        </div>
+
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Valor Mensal</Label>
+                                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">{installmentMode ? "Valor total" : "Valor"}</Label>
                                 <div className="relative">
                                     <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground/50" />
                                     {/* Input VISÍVEL: formatado (pt-BR). */}
@@ -153,13 +193,64 @@ export function RecurringDialog({ trigger, item }: RecurringDialogProps) {
                                     {/* Hidden: valor real enviado ao servidor */}
                                     <input type="hidden" name="amount" value={rawAmount} />
                                 </div>
+                                {installmentMode && perInstallment !== null && installmentsNum > 0 && (
+                                    <p className="text-[11px] text-muted-foreground px-1">{installmentsNum}× de <span className="font-bold text-amber-600">{fmtBRL(perInstallment)}</span></p>
+                                )}
                             </div>
 
                             <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Dia do Vencimento</Label>
-                                <Input name="dayOfMonth" type="number" min="1" max="31" placeholder="Dia (1-31)" defaultValue={item?.dayOfMonth} required className="h-12 rounded-xl bg-muted/20 font-mono font-bold" />
+                                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Frequência</Label>
+                                <Select name="frequency" value={frequency} onValueChange={setFrequency}>
+                                    <SelectTrigger className="h-12 rounded-xl bg-muted/20 font-medium"><SelectValue /></SelectTrigger>
+                                    <SelectContent className="rounded-xl z-[9999]">
+                                        {FREQUENCIES.map((f) => <SelectItem key={f} value={f}>{FREQUENCY_LABEL[f]}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
+
+                        {installmentMode ? (
+                            <>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Nº de parcelas</Label>
+                                        <Input type="number" min="2" max="360" value={installments} onChange={(e) => setInstallments(e.target.value.replace(/\D/g, ""))} required className="h-12 rounded-xl bg-muted/20 font-mono font-bold" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Parcelas já pagas</Label>
+                                        <Input type="number" min="0" max={String(Math.max(0, installmentsNum - 1))} value={paid} onChange={(e) => setPaid(e.target.value.replace(/\D/g, ""))} className="h-12 rounded-xl bg-muted/20 font-mono font-bold" />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">
+                                        Próximo vencimento (parcela {Math.min((parseInt(paid || "0", 10) || 0) + 1, installmentsNum)}/{installmentsNum})
+                                    </Label>
+                                    <Input name="startDate" type="date" defaultValue={toDateInput(item?.startDate)} required className="h-12 rounded-xl bg-muted/20 font-medium" />
+                                    <p className="text-[11px] text-muted-foreground px-1">
+                                        O encerramento é calculado automaticamente — {Math.max(0, installmentsNum - (parseInt(paid || "0", 10) || 0))} parcela(s) restante(s).
+                                    </p>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="grid grid-cols-2 gap-4">
+                                {frequency === "MONTHLY" ? (
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Dia do Vencimento</Label>
+                                        <Input name="dayOfMonth" type="number" min="1" max="31" placeholder="Dia (1-31)" defaultValue={item?.dayOfMonth} required className="h-12 rounded-xl bg-muted/20 font-mono font-bold" />
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">1º Vencimento</Label>
+                                        <Input name="startDate" type="date" defaultValue={toDateInput(item?.startDate)} required className="h-12 rounded-xl bg-muted/20 font-medium" />
+                                    </div>
+                                )}
+
+                                <div className="space-y-2">
+                                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Encerra em (opcional)</Label>
+                                    <Input name="endDate" type="date" defaultValue={toDateInput(item?.endDate)} className="h-12 rounded-xl bg-muted/20 font-medium" />
+                                </div>
+                            </div>
+                        )}
 
                         <div className="space-y-2">
                             <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Categoria</Label>

@@ -2,10 +2,9 @@
 
 import { PortfolioData } from "@/types/portfolio";
 import { 
-  MapPin, Mail, Phone, Globe, Linkedin, Github, ExternalLink
+  MapPin, Mail, Phone, Globe, Github, ExternalLink
 } from "lucide-react";
 import { EditableText } from "./editable-text";
-import { cn } from "@/lib/utils";
 
 interface ResumePreviewProps {
   data: PortfolioData;

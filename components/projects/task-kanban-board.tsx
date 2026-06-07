@@ -92,6 +92,7 @@ export function TaskKanbanBoard({ initialTasks }: TaskKanbanBoardProps) {
                 colTasks.map(task => (
                   <div
                     key={task.id}
+                    id={`task-${task.id}`}
                     draggable
                     onDragStart={() => setDraggingId(task.id)}
                     onDragEnd={() => { setDraggingId(null); setOverColumn(null); }}

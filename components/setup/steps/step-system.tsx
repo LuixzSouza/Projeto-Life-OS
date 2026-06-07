@@ -1,7 +1,7 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { FolderInput, Cloud, CheckCircle2, Lock, Info } from "lucide-react";
+import { FolderInput, Cloud, CheckCircle2, Lock, Info, RefreshCw, HardDrive, Database, FilePlus2 } from "lucide-react";
 import { FolderPicker } from "@/components/settings/folder-picker";
 import {
   DB_PROVIDERS,
@@ -113,33 +113,87 @@ export function StepSystem({ formData, setFormData, setDbProvider, dbFromEnv }: 
         </div>
       )}
 
-      {formData.dbProvider === "local" && (
-        <div className="space-y-3 p-4 rounded-xl border border-border bg-muted/20">
+      {formData.dbProvider === "replica" && (
+        <div className="space-y-4 p-4 rounded-xl border border-cyan-500/30 bg-cyan-500/5">
           <Label className="text-foreground flex items-center gap-2 text-sm font-semibold">
-            <FolderInput className="h-4 w-4" /> Localização do Banco
+            <RefreshCw className="h-4 w-4 text-cyan-500" /> Réplica embarcada (Híbrido)
           </Label>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            O arquivo <code>life_os.db</code> será criado nesta pasta. (Disponível
-            apenas no app desktop — no deploy web use o Turso.)
+            Um arquivo <code>life_os.db</code> local (rápido e offline) que
+            sincroniza com um banco Turso na nuvem. Para o celular ver os mesmos
+            dados, hospede uma instância na nuvem apontando para este mesmo Turso.
           </p>
-          <div className="flex gap-2 pt-1">
-            <div className="relative flex-1">
-              <FolderInput className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                value={formData.storagePath}
-                onChange={(e) => setFormData({ ...formData, storagePath: e.target.value })}
-                placeholder="Ex: C:\LifeOS_Data"
-                className="pl-9 bg-background font-mono text-xs border-border h-10"
-              />
+
+          {/* Pasta local da réplica (cache) */}
+          <div className="grid gap-1.5">
+            <Label className="text-[11px] font-semibold uppercase text-muted-foreground flex items-center gap-1.5">
+              <FolderInput className="h-3.5 w-3.5" /> Pasta local (cache)
+            </Label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <FolderInput className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={formData.storagePath}
+                  onChange={(e) => setFormData({ ...formData, storagePath: e.target.value })}
+                  placeholder="Ex: C:\LifeOS_Data"
+                  className="pl-9 bg-background font-mono text-xs border-border h-10"
+                />
+              </div>
+              <div className="shrink-0">
+                <FolderPicker
+                  currentPath={formData.storagePath}
+                  onSelect={(newPath) => setFormData({ ...formData, storagePath: newPath })}
+                />
+              </div>
             </div>
-            <div className="shrink-0">
-              <FolderPicker
-                currentPath={formData.storagePath}
-                onSelect={(newPath) => setFormData({ ...formData, storagePath: newPath })}
-              />
-            </div>
+            {(() => {
+              const p = (formData.storagePath || "").trim();
+              if (!p || p === "Este Computador") return null;
+              const folder = p.toLowerCase().endsWith(".db") ? p.replace(/[\\/][^\\/]*\.db$/i, "") : p;
+              return (
+                <p className="flex items-start gap-1.5 text-[11px] text-muted-foreground pt-0.5">
+                  <Database className="h-3.5 w-3.5 text-cyan-500 shrink-0 mt-0.5" />
+                  <span>Cache em <code className="text-foreground break-all">{folder}\life_os.replica.db</code> (gerado e sincronizado com o Turso).</span>
+                </p>
+              );
+            })()}
+          </div>
+
+          {/* Turso espelho */}
+          <div className="grid gap-1.5">
+            <Label htmlFor="replicaUrl" className="text-[11px] font-semibold uppercase text-muted-foreground flex items-center gap-1.5">
+              <Cloud className="h-3.5 w-3.5" /> URL do Turso (espelho)
+            </Label>
+            <Input
+              id="replicaUrl"
+              value={formData.tursoUrl}
+              onChange={(e) => setFormData({ ...formData, tursoUrl: e.target.value })}
+              placeholder="libsql://seu-banco.turso.io"
+              className="bg-background font-mono text-xs border-border h-10"
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="replicaToken" className="text-[11px] font-semibold uppercase text-muted-foreground">
+              Token de Autenticação
+            </Label>
+            <Input
+              id="replicaToken"
+              type="password"
+              value={formData.tursoToken}
+              onChange={(e) => setFormData({ ...formData, tursoToken: e.target.value })}
+              placeholder="eyJhbGciOi..."
+              className="bg-background font-mono text-xs border-border h-10"
+            />
+            <p className="text-[10px] text-amber-600/90">
+              ⚠️ O token começa com <code>eyJ…</code> — gere com{" "}
+              <code>turso db tokens create &lt;nome&gt;</code>.
+            </p>
           </div>
         </div>
+      )}
+
+      {formData.dbProvider === "local" && (
+        <LocalDbPanel formData={formData} setFormData={setFormData} />
       )}
 
       <WorkPreferences formData={formData} setFormData={setFormData} />
@@ -228,6 +282,75 @@ function ProviderGrid({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+// =========================================================
+// PAINEL DO MODO LOCAL (pasta nova OU arquivo .db existente)
+// =========================================================
+function LocalDbPanel({
+  formData,
+  setFormData,
+}: {
+  formData: SetupFormData;
+  setFormData: React.Dispatch<React.SetStateAction<SetupFormData>>;
+}) {
+  const path = (formData.storagePath || "").trim();
+  const hasPath = path.length > 0 && path !== "Este Computador";
+  const isExistingDb = path.toLowerCase().endsWith(".db");
+
+  return (
+    <div className="space-y-3 p-4 rounded-xl border border-sky-500/30 bg-sky-500/5">
+      <Label className="text-foreground flex items-center gap-2 text-sm font-semibold">
+        <HardDrive className="h-4 w-4 text-sky-500" /> Onde guardar seus dados
+      </Label>
+      <p className="text-xs text-muted-foreground leading-relaxed">
+        Escolha uma <strong>pasta</strong> para criar um banco novo, ou selecione um
+        <strong> arquivo .db existente</strong> para conectar a ele. (Disponível apenas
+        no app desktop — no deploy web use o Turso.)
+      </p>
+
+      <div className="flex gap-2 pt-1">
+        <div className="relative flex-1">
+          <FolderInput className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={formData.storagePath}
+            onChange={(e) => setFormData({ ...formData, storagePath: e.target.value })}
+            placeholder="Ex: C:\LifeOS_Data  ou  C:\LifeOS_Data\life_os.db"
+            className="pl-9 bg-background font-mono text-xs border-border h-10"
+          />
+        </div>
+        <div className="shrink-0">
+          <FolderPicker
+            currentPath={formData.storagePath}
+            onSelect={(newPath) => setFormData({ ...formData, storagePath: newPath })}
+          />
+        </div>
+      </div>
+
+      {/* Feedback dinâmico: criar novo vs conectar a um banco existente */}
+      {hasPath && (
+        isExistingDb ? (
+          <div className="flex items-start gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2.5 text-xs">
+            <Database className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+            <span className="text-muted-foreground">
+              <span className="font-semibold text-emerald-600">Conectar a um banco existente.</span>{" "}
+              Vamos abrir <code className="break-all text-foreground">{path}</code>. Se já houver uma
+              conta nele, você será direcionado ao login.
+            </span>
+          </div>
+        ) : (
+          <div className="flex items-start gap-2 rounded-lg border border-sky-500/30 bg-sky-500/10 p-2.5 text-xs">
+            <FilePlus2 className="h-4 w-4 text-sky-500 shrink-0 mt-0.5" />
+            <span className="text-muted-foreground">
+              <span className="font-semibold text-sky-600">Criar um banco novo.</span>{" "}
+              O arquivo <code className="text-foreground">life_os.db</code> será criado em{" "}
+              <code className="break-all text-foreground">{path}</code>.
+            </span>
+          </div>
+        )
+      )}
     </div>
   );
 }

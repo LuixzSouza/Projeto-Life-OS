@@ -1,6 +1,9 @@
 "use client";
 
-import { Instagram, Linkedin, Briefcase, Cake, MoreVertical, Pencil, Trash2, MessageCircle, Tag as TagIcon } from "lucide-react";
+import Link from "next/link";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { Instagram, Linkedin, Briefcase, Cake, MoreVertical, Pencil, Trash2, MessageCircle, Tag as TagIcon, Mail, ArrowUpRight } from "lucide-react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { getBirthdayInfo, openWhatsApp } from "./friend-helpers";
+import { getBirthdayInfo, getProximityBadge, calculateAge, safelyParseDate, openWhatsApp } from "./friend-helpers";
 import type { FriendData } from "./add-friend-dialog";
 
 interface FriendCardProps {
@@ -21,8 +24,11 @@ interface FriendCardProps {
 
 export function FriendCard({ friend, onSelect, onEdit, onDelete, onConnections }: FriendCardProps) {
   const bdayInfo = getBirthdayInfo(friend.birthday);
+  const bdayDate = safelyParseDate(friend.birthday);
+  const age = calculateAge(friend.birthday);
   const initials = friend.name ? friend.name.substring(0, 2).toUpperCase() : "??";
   const tagList = friend.tags ? friend.tags.split(",").map(t => t.trim()).filter(Boolean) : [];
+  const linkedClient = friend.clients && friend.clients.length > 0 ? friend.clients[0] : null;
 
   // Cores da faixa de topo
   const barColor =
@@ -75,6 +81,22 @@ export function FriendCard({ friend, onSelect, onEdit, onDelete, onConnections }
         </div>
 
         <div className="flex-1">
+          {/* Linha de status: proximidade + vínculo com Negócios */}
+          <div className="flex items-center gap-1.5 flex-wrap mb-2">
+            {getProximityBadge(friend.proximity)}
+            {linkedClient && (
+              <Link
+                href={`/business/${linkedClient.id}`}
+                onClick={(e) => e.stopPropagation()}
+                title={`Abrir ${linkedClient.name} em Negócios`}
+                className="group/cli inline-flex items-center gap-1 rounded-md px-2 py-0.5 bg-blue-500/5 text-blue-600 border border-blue-500/15 text-[10px] font-bold hover:bg-blue-500/10 hover:border-blue-500/30 transition-colors"
+              >
+                <Briefcase className="h-2.5 w-2.5" /> Cliente{friend.clients!.length > 1 ? ` ·${friend.clients!.length}` : ""}
+                <ArrowUpRight className="h-2.5 w-2.5 opacity-50 group-hover/cli:opacity-100 transition-opacity" />
+              </Link>
+            )}
+          </div>
+
           <h3 className="font-bold text-base text-foreground leading-tight truncate pr-2">{friend.name}</h3>
           {friend.nickname && <p className="text-xs text-primary font-medium mt-0.5 truncate">&quot;{friend.nickname}&quot;</p>}
 
@@ -87,14 +109,19 @@ export function FriendCard({ friend, onSelect, onEdit, onDelete, onConnections }
             </p>
           )}
 
-          {/* ALERTA DE ANIVERSÁRIO */}
-          {bdayInfo.isSoon && (
+          {/* ANIVERSÁRIO: alerta forte quando perto; senão, linha sutil com data + idade */}
+          {bdayInfo.isSoon ? (
             <div className="mt-3">
               <Badge variant="secondary" className="bg-pink-500/10 text-pink-600 hover:bg-pink-500/20 border-none px-2 py-0.5 gap-1.5 text-[10px] font-bold shadow-none">
                 <Cake className="w-3 h-3 fill-pink-500/20" /> {bdayInfo.text}
               </Badge>
             </div>
-          )}
+          ) : bdayDate ? (
+            <p className="mt-2.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+              <Cake className="h-3 w-3 shrink-0 opacity-60" />
+              {format(bdayDate, "dd 'de' MMM", { locale: ptBR })}{age != null ? ` · ${age} anos` : ""}
+            </p>
+          ) : null}
 
           {/* TAGS */}
           {tagList.length > 0 && (
@@ -120,8 +147,12 @@ export function FriendCard({ friend, onSelect, onEdit, onDelete, onConnections }
           <Button size="sm" variant="ghost" className="h-8 flex-1 text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 text-xs font-bold" onClick={() => openWhatsApp(friend.phone)}>
             <MessageCircle className="h-3.5 w-3.5 mr-1.5" /> WhatsApp
           </Button>
+        ) : friend.email ? (
+          <Button size="sm" variant="ghost" className="h-8 flex-1 text-foreground/70 hover:bg-muted hover:text-foreground text-xs font-bold" onClick={() => window.open(`mailto:${friend.email}`, '_blank')}>
+            <Mail className="h-3.5 w-3.5 mr-1.5" /> E-mail
+          </Button>
         ) : (
-          <span className="text-[10px] text-muted-foreground/60 italic my-auto px-2 w-full text-center">Sem telefone</span>
+          <span className="text-[10px] text-muted-foreground/60 italic my-auto px-2 w-full text-center">Sem contato direto</span>
         )}
 
         {friend.instagram && (

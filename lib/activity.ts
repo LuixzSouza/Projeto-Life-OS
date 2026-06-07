@@ -42,6 +42,7 @@ export interface ClientActivity {
   summary: string | null;
   entityType: string | null;
   entityId: string | null;
+  meta: string | null; // JSON serializado (ex.: { value: 1200 } em lançamentos)
   createdAt: string;
 }
 
@@ -60,6 +61,7 @@ export async function getRecentActivity(limit = 30): Promise<ClientActivity[]> {
     summary: a.summary,
     entityType: a.entityType,
     entityId: a.entityId,
+    meta: a.meta,
     createdAt: a.createdAt.toISOString(),
   }));
 }

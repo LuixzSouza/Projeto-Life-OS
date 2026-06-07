@@ -5,20 +5,23 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
-import { 
-    Folder, 
-    FolderOpen, 
-    HardDrive, 
-    Check, 
-    ChevronRight, 
-    ArrowUp, 
-    Home, 
+import {
+    Folder,
+    FolderOpen,
+    HardDrive,
+    Check,
+    ChevronRight,
+    ArrowUp,
+    Home,
     Monitor,
-    AlertCircle
+    AlertCircle,
+    Database,
+    Plug
 } from "lucide-react";
-import { listDirectories } from "@/app/(dashboard)/settings/actions";
+import { listDirectories, checkPathAccess } from "@/app/(dashboard)/settings/actions";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+
+interface DirItem { name: string; path: string; type?: string; }
 
 interface FolderPickerProps {
     onSelect: (path: string) => void;
@@ -27,21 +30,24 @@ interface FolderPickerProps {
 
 export function FolderPicker({ onSelect, currentPath }: FolderPickerProps) {
     const [open, setOpen] = useState(false);
-    
+
     const [browsingPath, setBrowsingPath] = useState(currentPath);
-    const [folders, setFolders] = useState<{name: string, path: string, type?: string}[]>([]);
+    const [folders, setFolders] = useState<DirItem[]>([]);
+    const [dbFiles, setDbFiles] = useState<DirItem[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [verifying, setVerifying] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const loadFolders = useCallback(async (path: string) => {
         setIsLoading(true);
         setError(null);
-        
+
         try {
             const result = await listDirectories(path);
-            
+
             if (result.success) {
                 setFolders(result.directories);
+                setDbFiles(result.files);
                 if (result.path && !result.isRoot) {
                     setBrowsingPath(result.path);
                 } else if (result.isRoot) {
@@ -67,14 +73,32 @@ export function FolderPicker({ onSelect, currentPath }: FolderPickerProps) {
         }
     }, [open, loadFolders]);
 
-    const handleSelect = () => {
-        if (browsingPath === "Este Computador") {
+    // Verifica permissão/acesso do alvo (pasta ou arquivo) ANTES de confirmar.
+    const verifyAndSelect = async (target: string) => {
+        if (target === "Este Computador") {
             toast.error("Por favor, selecione uma pasta específica.");
             return;
         }
-        onSelect(browsingPath);
-        setOpen(false);
+        setVerifying(true);
+        try {
+            const res = await checkPathAccess(target);
+            if (!res.ok) {
+                toast.error(res.message);
+                return;
+            }
+            toast.success(res.message);
+            onSelect(target);
+            setOpen(false);
+        } catch {
+            toast.error("Não foi possível verificar o acesso a este local.");
+        } finally {
+            setVerifying(false);
+        }
     };
+
+    const handleSelect = () => verifyAndSelect(browsingPath);
+    // Seleciona um arquivo .db existente (conecta a ele em vez de criar um novo).
+    const handleSelectFile = (filePath: string) => verifyAndSelect(filePath);
 
     const handleGoUp = () => {
         if (browsingPath === "Este Computador") return;
@@ -164,6 +188,29 @@ export function FolderPicker({ onSelect, currentPath }: FolderPickerProps) {
                                     </div>
                                 )}
 
+                                {/* Bancos existentes (.db) — conectar em vez de criar */}
+                                {!error && dbFiles.length > 0 && (
+                                    <div className="mb-2">
+                                        <p className="px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-600/80">
+                                            Bancos encontrados aqui
+                                        </p>
+                                        {dbFiles.map((file) => (
+                                            <button
+                                                key={file.path}
+                                                onClick={() => handleSelectFile(file.path)}
+                                                className="w-full flex items-center gap-3 p-2.5 rounded-md text-left transition-all group border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 hover:border-emerald-500/40 mb-1"
+                                                title="Conectar a este banco existente"
+                                            >
+                                                <Database className="h-5 w-5 text-emerald-500 shrink-0" />
+                                                <span className="text-sm truncate flex-1 text-foreground font-medium">{file.name}</span>
+                                                <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <Plug className="h-3.5 w-3.5" /> Conectar
+                                                </span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+
                                 {!error && folders.map((folder) => (
                                     <button
                                         key={folder.path}
@@ -176,16 +223,16 @@ export function FolderPicker({ onSelect, currentPath }: FolderPickerProps) {
                                             // Ícone de pasta adaptável ao tema
                                             <Folder className="h-5 w-5 text-primary/40 fill-primary/10 group-hover:text-primary group-hover:fill-primary/20" />
                                         )}
-                                        
+
                                         <span className="text-sm truncate flex-1 text-foreground font-medium">
                                             {folder.name}
                                         </span>
-                                        
+
                                         <ChevronRight className="h-4 w-4 text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity" />
                                     </button>
                                 ))}
-                                
-                                {!error && !isLoading && folders.length === 0 && (
+
+                                {!error && !isLoading && folders.length === 0 && dbFiles.length === 0 && (
                                     <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                                         <FolderOpen className="h-10 w-10 mb-2 opacity-20" />
                                         <p className="text-xs">Pasta vazia</p>
@@ -196,13 +243,21 @@ export function FolderPicker({ onSelect, currentPath }: FolderPickerProps) {
                     </div>
 
                     <div className="flex justify-between items-center pt-2">
-                        <p className="text-[10px] text-muted-foreground">
-                            O sistema requer permissão de escrita.
+                        <p className="text-[10px] text-muted-foreground max-w-[260px]">
+                            Clique num <span className="text-emerald-600 font-medium">banco (.db)</span> para conectar,
+                            ou escolha uma pasta para criar um novo. Requer permissão de escrita.
                         </p>
                         <div className="flex gap-2">
-                            <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
-                            <Button onClick={handleSelect} className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-md">
-                                <Check className="h-4 w-4 mr-2" /> Selecionar
+                            <Button variant="ghost" onClick={() => setOpen(false)} disabled={verifying}>Cancelar</Button>
+                            <Button onClick={handleSelect} disabled={verifying} className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-md">
+                                {verifying ? (
+                                    <span className="flex items-center gap-2">
+                                        <span className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                        Verificando…
+                                    </span>
+                                ) : (
+                                    <><Check className="h-4 w-4 mr-2" /> Usar esta pasta</>
+                                )}
                             </Button>
                         </div>
                     </div>

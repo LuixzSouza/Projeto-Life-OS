@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { importJsonData, factoryReset } from "@/app/(dashboard)/settings/actions";
 import { toast } from "sonner";
-import { Upload, AlertTriangle, Loader2, Trash2, FileJson, Check } from "lucide-react";
+import { Upload, AlertTriangle, Loader2, Trash2, FileJson } from "lucide-react";
 import {
     AlertDialog,
     AlertDialogAction,

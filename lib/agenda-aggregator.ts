@@ -6,6 +6,8 @@
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserId } from "@/lib/auth";
 import { CATEGORY_META, type AgendaItem, type AgendaSource } from "@/components/agenda/agenda-shared";
+import { getHolidaysInRange } from "@/lib/holidays";
+import { deriveAnchor, asFrequency, occurrencesInRange, FREQUENCY_LABEL } from "@/lib/recurrence";
 
 const hhmm = (d: Date) =>
   `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -49,7 +51,7 @@ export async function getAgendaItems(rangeStart: Date, rangeEnd: Date): Promise<
   const [
     events, meals, workouts, sessions, sleeps, bodies, media, wardrobe,
     friends, transactions, jobs, tasks, checkins, meetings, invoices,
-    followUps, recurringExpenses, flashcards, goals,
+    followUps, recurringExpenses, recurringCharges, flashcards, goals,
   ] = await Promise.all([
     prisma.event.findMany({ where: { userId, startTime: range, deletedAt: null } }),
     prisma.meal.findMany({ where: { userId, date: range } }),
@@ -68,6 +70,7 @@ export async function getAgendaItems(rangeStart: Date, rangeEnd: Date): Promise<
     prisma.invoice.findMany({ where: { userId, dueDate: range } }),
     prisma.jobApplication.findMany({ where: { userId, followUpDate: range } }),
     prisma.recurringExpense.findMany({ where: { userId, active: true } }),
+    prisma.recurringCharge.findMany({ where: { userId, active: true } }),
     prisma.flashcard.findMany({ where: { userId, nextReview: range }, select: { id: true, nextReview: true } }),
     prisma.learningGoal.findMany({ where: { userId, targetDate: range, deletedAt: null }, include: { subject: { select: { title: true } } } }),
   ]);
@@ -194,30 +197,42 @@ export async function getAgendaItems(rangeStart: Date, rangeEnd: Date): Promise<
     });
   }
 
-  // Contas fixas (despesas recorrentes): geram uma ocorrência por mês no intervalo,
-  // no dia configurado (limitado ao último dia do mês para fev/30/31).
-  const monthsInRange: Array<{ y: number; m: number }> = [];
-  {
-    let y = rangeStart.getFullYear();
-    let m = rangeStart.getMonth();
-    const endY = rangeEnd.getFullYear();
-    const endM = rangeEnd.getMonth();
-    while (y < endY || (y === endY && m <= endM)) {
-      monthsInRange.push({ y, m });
-      m++;
-      if (m > 11) { m = 0; y++; }
+  // Contas fixas (despesas recorrentes): ocorrências conforme a frequência (semanal/mensal/
+  // trimestral/semestral/anual), a partir da âncora e respeitando o endDate.
+  for (const r of recurringExpenses) {
+    const freq = asFrequency(r.frequency);
+    const occs = occurrencesInRange({ anchor: deriveAnchor(r), frequency: freq, endDate: r.endDate, rangeStart, rangeEnd });
+    for (const occ of occs) {
+      const key = `${r.id}-${occ.getFullYear()}-${occ.getMonth()}-${occ.getDate()}`;
+      push(items, "recurring", key, occ, {
+        title: r.title,
+        subtitle: `Conta fixa · ${FREQUENCY_LABEL[freq]} · ${r.category}`,
+        meta: `- ${brl(Number(r.amount))}`,
+      });
     }
   }
-  for (const r of recurringExpenses) {
-    for (const { y, m } of monthsInRange) {
-      const lastDay = new Date(y, m + 1, 0).getDate();
-      const day = Math.min(r.dayOfMonth, lastDay);
-      const occ = new Date(y, m, day, 12, 0, 0);
-      if (occ < rangeStart || occ > rangeEnd) continue;
-      push(items, "recurring", `${r.id}-${y}-${m}`, occ, {
-        title: r.title,
-        subtitle: `Conta fixa · ${r.category}`,
-        meta: `- ${brl(Number(r.amount))}`,
+
+  // Cobranças recorrentes (receitas a receber): mesma lógica de frequência/encerramento.
+  // Dedup: cobranças COM cliente já viram Invoice ("Vencimento: …") quando o mês é
+  // materializado; nesses dias mostramos só a fatura. Meses futuros (sem fatura ainda)
+  // continuam aparecendo como "Cobrar: …" para dar visibilidade adiantada.
+  const invoiceDayByBilling = new Set<string>();
+  for (const inv of invoices) {
+    if (inv.billingId) {
+      const d = inv.dueDate;
+      invoiceDayByBilling.add(`${inv.billingId}:${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`);
+    }
+  }
+  for (const c of recurringCharges) {
+    const freq = asFrequency(c.frequency);
+    const occs = occurrencesInRange({ anchor: deriveAnchor(c), frequency: freq, endDate: c.endDate, rangeStart, rangeEnd });
+    for (const occ of occs) {
+      if (c.billingId && invoiceDayByBilling.has(`${c.billingId}:${occ.getFullYear()}-${occ.getMonth()}-${occ.getDate()}`)) continue;
+      const key = `${c.id}-${occ.getFullYear()}-${occ.getMonth()}-${occ.getDate()}`;
+      push(items, "charge", key, occ, {
+        title: `Cobrar: ${c.title}`,
+        subtitle: [c.clientName, c.category, FREQUENCY_LABEL[freq]].filter(Boolean).join(" · "),
+        meta: `+ ${brl(Number(c.amount))}`,
       });
     }
   }
@@ -248,6 +263,16 @@ export async function getAgendaItems(rangeStart: Date, rangeEnd: Date): Promise<
       title: `Meta: ${g.title}`,
       subtitle: [isDone ? "Concluída" : "Prazo", g.subject?.title].filter(Boolean).join(" · "),
       color: isDone ? "#16a34a" : undefined,
+    });
+  }
+
+  // Feriados nacionais: estáticos (local-first, não vêm do banco). Itens read-only
+  // de dia inteiro — não têm userId nem podem ser editados/excluídos.
+  for (const h of getHolidaysInRange(rangeStart, rangeEnd)) {
+    const key = `${h.date.getFullYear()}-${h.date.getMonth()}-${h.date.getDate()}`;
+    push(items, "holiday", key, h.date, {
+      title: h.name,
+      subtitle: h.type === "national" ? "Feriado nacional" : "Ponto facultativo",
     });
   }
 

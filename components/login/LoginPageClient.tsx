@@ -16,11 +16,35 @@ import {
     AlertCircle,
     ArrowUp,
     Brain,
+    Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+
+// Proteção anti força-bruta (client-side; o servidor é stateless).
+const MAX_ATTEMPTS = 5;
+const COOLDOWN_MS = 30_000;
+const COOLDOWN_KEY = "life-os-login-cooldown";
+const LAST_EMAIL_KEY = "life-os-last-email";
+
+/** Lê o último email usado (client-only; usado como estado inicial preguiçoso). */
+function readStoredEmail(): string {
+    if (typeof window === "undefined") return "";
+    try { return localStorage.getItem(LAST_EMAIL_KEY) ?? ""; } catch { return ""; }
+}
+
+/** Segundos restantes de um cooldown em andamento (sobrevive a reload). */
+function readCooldownLeft(): number {
+    if (typeof window === "undefined") return 0;
+    try {
+        const until = Number(localStorage.getItem(COOLDOWN_KEY) || 0);
+        return until > Date.now() ? Math.ceil((until - Date.now()) / 1000) : 0;
+    } catch {
+        return 0;
+    }
+}
 
 // Conteúdo rotativo (Showcase)
 const FEATURES = [
@@ -49,6 +73,11 @@ export default function LoginPageClient() {
     const [capsLockOn, setCapsLockOn] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // Email lembrado + tentativas/cooldown (init preguiçoso a partir do localStorage).
+    const [email, setEmail] = useState<string>(readStoredEmail);
+    const [attempts, setAttempts] = useState(0);
+    const [cooldownLeft, setCooldownLeft] = useState<number>(readCooldownLeft);
+
     // Rotação automática dos slides
     useEffect(() => {
         const timer = setInterval(() => {
@@ -56,6 +85,21 @@ export default function LoginPageClient() {
         }, 5000);
         return () => clearInterval(timer);
     }, []);
+
+    // Conta regressiva do cooldown.
+    useEffect(() => {
+        if (cooldownLeft <= 0) return;
+        const id = setInterval(() => {
+            setCooldownLeft((s) => {
+                if (s <= 1) {
+                    try { localStorage.removeItem(COOLDOWN_KEY); } catch { /* ignore */ }
+                    return 0;
+                }
+                return s - 1;
+            });
+        }, 1000);
+        return () => clearInterval(id);
+    }, [cooldownLeft]);
 
     // Detectar Caps Lock
     const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -66,7 +110,21 @@ export default function LoginPageClient() {
         if (error) setError(null);
     };
 
+    const startCooldown = () => {
+        const until = Date.now() + COOLDOWN_MS;
+        try { localStorage.setItem(COOLDOWN_KEY, String(until)); } catch { /* ignore */ }
+        setCooldownLeft(Math.ceil(COOLDOWN_MS / 1000));
+        setAttempts(0);
+    };
+
     const handleSubmit = async (formData: FormData) => {
+        if (cooldownLeft > 0) {
+            toast.error(`Aguarde ${cooldownLeft}s antes de tentar novamente.`);
+            return;
+        }
+        // Guarda o email para lembrar na próxima vez.
+        try { localStorage.setItem(LAST_EMAIL_KEY, (formData.get("email") as string) || ""); } catch { /* ignore */ }
+
         setIsLoading(true);
         setError(null);
 
@@ -80,6 +138,15 @@ export default function LoginPageClient() {
 
                 if (typeof navigator !== "undefined" && navigator.vibrate) {
                     navigator.vibrate(200);
+                }
+
+                // Conta a tentativa falha; ao atingir o limite, inicia o cooldown.
+                const next = attempts + 1;
+                if (next >= MAX_ATTEMPTS) {
+                    startCooldown();
+                    setError(`Muitas tentativas. Aguarde ${Math.ceil(COOLDOWN_MS / 1000)} segundos.`);
+                } else {
+                    setAttempts(next);
                 }
             }
         } catch (err: unknown) {
@@ -101,7 +168,7 @@ export default function LoginPageClient() {
     const ActiveIcon = FEATURES[currentFeature].icon;
 
     return (
-        <main className="min-h-screen grid lg:grid-cols-2 bg-background text-foreground overflow-hidden">
+        <main className="min-h-screen grid lg:grid-cols-2 bg-background text-foreground lg:overflow-hidden">
 
             {/* --- COLUNA ESQUERDA: FORMULÁRIO --- */}
             <div className="flex flex-col justify-center items-center p-8 lg:p-12 relative z-10">
@@ -148,7 +215,9 @@ export default function LoginPageClient() {
                                     autoFocus
                                     autoComplete="email"
                                     disabled={isLoading}
-                                    onChange={handleInputChange}
+                                    value={email}
+                                    onChange={(e) => { setEmail(e.target.value); handleInputChange(); }}
+                                    suppressHydrationWarning
                                     className="h-12 bg-muted/40 transition-all"
                                 />
                             </div>
@@ -209,6 +278,8 @@ export default function LoginPageClient() {
                                     animate={{ opacity: 1, height: "auto" }}
                                     exit={{ opacity: 0, height: 0 }}
                                     className="overflow-hidden"
+                                    role="alert"
+                                    aria-live="assertive"
                                 >
                                     <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 mt-2 flex items-start gap-3">
                                         <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
@@ -225,18 +296,36 @@ export default function LoginPageClient() {
                             type="submit"
                             size="lg"
                             className="w-full h-12 font-semibold shadow-lg shadow-primary/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-70 disabled:hover:scale-100"
-                            disabled={isLoading}
+                            disabled={isLoading || cooldownLeft > 0}
                         >
                             {isLoading ? (
                                 <span className="flex items-center gap-2"><Loader2 className="h-5 w-5 animate-spin" /> Autenticando…</span>
+                            ) : cooldownLeft > 0 ? (
+                                <span className="flex items-center gap-2"><Clock className="h-4 w-4" /> Aguarde {cooldownLeft}s</span>
                             ) : (
                                 <span className="flex items-center gap-2">Entrar <ArrowRight className="h-4 w-4" /></span>
                             )}
                         </Button>
+
+                        {/* Aviso de tentativas restantes antes do bloqueio temporário */}
+                        {attempts > 0 && cooldownLeft === 0 && (
+                            <p className="text-center text-[11px] text-amber-600">
+                                {MAX_ATTEMPTS - attempts} tentativa(s) antes de um bloqueio temporário.
+                            </p>
+                        )}
                     </form>
 
-                    {/* Link de Retorno */}
-                    <div className="pt-4 border-t border-border/60 mt-6">
+                    {/* Cadastro + Link de Retorno */}
+                    <div className="pt-4 border-t border-border/60 mt-6 space-y-3">
+                        <div className="text-center">
+                            <span className="text-xs text-muted-foreground">Não tem uma conta? </span>
+                            <Link
+                                href="/register"
+                                className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1"
+                            >
+                                Criar conta <ArrowRight className="h-3 w-3" />
+                            </Link>
+                        </div>
                         <div className="text-center">
                             <Link
                                 href="/"
@@ -247,9 +336,30 @@ export default function LoginPageClient() {
                             </Link>
                         </div>
                     </div>
+
+                    {/* Destaques (apenas mobile — o showcase desktop fica na coluna direita) */}
+                    <div className="lg:hidden space-y-2 pt-2">
+                        {FEATURES.map((f) => (
+                            <div
+                                key={f.title}
+                                className="flex items-start gap-3 rounded-xl border border-border/50 bg-muted/20 px-3 py-2.5"
+                            >
+                                <f.icon className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                                <span className="text-xs text-muted-foreground leading-snug">
+                                    <span className="font-semibold text-foreground">{f.title}.</span> {f.desc}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Rodapé em fluxo no mobile (evita sobreposição com o conteúdo) */}
+                    <p className="lg:hidden text-center text-[10px] text-muted-foreground/70 uppercase tracking-widest font-mono pt-2">
+                        Life OS • Conexão local segura
+                    </p>
                 </motion.div>
 
-                <div className="absolute bottom-8 text-[10px] text-muted-foreground/70 uppercase tracking-widest font-mono">
+                {/* Rodapé fixo só no desktop */}
+                <div className="hidden lg:block absolute bottom-8 text-[10px] text-muted-foreground/70 uppercase tracking-widest font-mono">
                     Life OS • Conexão local segura
                 </div>
             </div>
@@ -314,6 +424,15 @@ export default function LoginPageClient() {
                                 )}
                             />
                         ))}
+                    </div>
+
+                    {/* Selo de confiança */}
+                    <div className="mt-14 flex items-center gap-3 text-[11px] text-muted-foreground/70 font-mono uppercase tracking-wider">
+                        <span className="flex items-center gap-1.5"><ShieldCheck className="h-3.5 w-3.5 text-primary/70" /> Local-first</span>
+                        <span className="text-foreground/20">•</span>
+                        <span>Criptografado</span>
+                        <span className="text-foreground/20">•</span>
+                        <span>Offline</span>
                     </div>
 
                 </div>

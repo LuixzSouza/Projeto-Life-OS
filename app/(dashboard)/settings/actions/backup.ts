@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import fs from 'fs';
 import path from 'path';
-import { getDatabasePath } from "@/lib/db-config";
+import { getDatabasePath, getDbProfile } from "@/lib/db-config";
 import { requireUserId } from "@/lib/auth";
 import { formatBytes } from "./helpers";
 
@@ -16,6 +16,15 @@ import { formatBytes } from "./helpers";
 export async function createLocalBackup() {
   try {
     const userId = await requireUserId();
+
+    // Nuvem pura: não há arquivo local para snapshotar (dados vivem no Turso).
+    if (getDbProfile()?.mode === "cloud") {
+      return {
+        success: false,
+        message: "Snapshots locais não se aplicam no modo Nuvem — seus dados estão no Turso.",
+      };
+    }
+
     const dbPath = getDatabasePath();
 
     // ✅ Correção de segurança: garante que é string e existe
@@ -65,6 +74,19 @@ export async function createLocalBackup() {
 export async function restoreBackup(backupId: string) {
   try {
     const userId = await requireUserId();
+
+    // SEGURANÇA: restaurar = trocar o arquivo .db no disco. No modo Híbrido isso
+    // sobrescreveria o CACHE da réplica (quebra o estado de sync do libSQL e NÃO
+    // volta pro Turso); no modo Nuvem não há arquivo. Só permitimos no Local.
+    const mode = getDbProfile()?.mode;
+    if (mode !== "local") {
+      return {
+        success: false,
+        message:
+          "Restaurar snapshot só no modo Local. No Híbrido/Nuvem os dados vivem no Turso — sobrescrever o cache local quebraria a sincronização.",
+      };
+    }
+
     const backup = await prisma.backupLog.findFirst({ where: { id: backupId, userId } });
     if (!backup) throw new Error("Registro de backup não encontrado.");
 

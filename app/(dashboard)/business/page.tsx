@@ -6,6 +6,7 @@ import { cn, formatCurrency as formatCurrencyUtil } from "@/lib/utils"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Wallet, Users, AlertCircle, TrendingUp, Briefcase, Landmark } from "lucide-react"
 import { getCurrentUserId } from "@/lib/auth"
+import { syncRecurringChargeInvoices } from "@/lib/notifications"
 import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell"
 
 export const metadata: Metadata = {
@@ -15,6 +16,11 @@ export const metadata: Metadata = {
 export default async function BusinessPage() {
   // 1. Buscamos os dados brutos do banco
   const userId = await getCurrentUserId()
+
+  // Materializa as faturas das cobranças recorrentes vencidas/do mês ao abrir a página
+  // (best-effort, idempotente) — assim os contratos "simplesmente funcionam" sem clicar no sino.
+  if (userId) await syncRecurringChargeInvoices(userId).catch(() => {})
+
   const rawClients = await prisma.client.findMany({
     where: { userId, deletedAt: null },
     include: {
@@ -49,15 +55,8 @@ export default async function BusinessPage() {
     }))
   }))
 
-  // Contas (para o recebimento) e Conexões (para vincular um contato ao cliente).
-  const accounts = userId
-    ? await prisma.account.findMany({
-        where: { userId },
-        select: { id: true, name: true, color: true, isConnected: true },
-        orderBy: { createdAt: 'asc' },
-      })
-    : []
-
+  // Conexões (para vincular um contato ao cliente). As contas ficam na página
+  // de detalhe (/business/[id]), onde acontecem os recebimentos.
   const friends = userId
     ? await prisma.friend.findMany({
         where: { userId, deletedAt: null },
@@ -193,7 +192,6 @@ export default async function BusinessPage() {
         {/* ÁREA PRINCIPAL INTERATIVA */}
         <BusinessView
           initialClients={clients}
-          accounts={accounts}
           friends={friends}
           pixKey={userSettings?.pixKey || ""}
           businessName={userSettings?.businessName || ""}

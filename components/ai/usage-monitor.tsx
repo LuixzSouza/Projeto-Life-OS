@@ -1,6 +1,5 @@
 "use client";
 
-import { Progress } from "@/components/ui/progress";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Cloud, Zap, Sparkles, Activity, Cpu } from "lucide-react";
 import { Settings } from "@prisma/client";

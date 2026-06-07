@@ -30,12 +30,20 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-export function BackupManager({ history }: { history: BackupLog[] }) {
+type DbMode = "local" | "cloud" | "replica" | null;
+
+export function BackupManager({ history, mode = "local" }: { history: BackupLog[]; mode?: DbMode }) {
     const [isCreating, setIsCreating] = useState(false);
-    
+
     // Estados de Controle
     const [backupToRestore, setBackupToRestore] = useState<BackupLog | null>(null);
     const [backupToDelete, setBackupToDelete] = useState<BackupLog | null>(null);
+
+    // Criar snapshot: precisa de arquivo local (Local/Híbrido). Nuvem não tem.
+    const canCreate = mode !== "cloud";
+    // Restaurar troca o arquivo no disco — só seguro no Local. No Híbrido isso
+    // sobrescreveria o cache da réplica e quebraria o sync com o Turso.
+    const canRestore = mode === "local";
 
     // --- 1. CRIAR ---
     const handleCreate = async () => {
@@ -96,19 +104,30 @@ export function BackupManager({ history }: { history: BackupLog[] }) {
                                 Snapshots & Histórico
                             </CardTitle>
                             <CardDescription>
-                                Backups locais salvos em <code>/backups</code>.
+                                {mode === "replica"
+                                    ? "Cópia local do cache da réplica. A cópia-mestra está no Turso."
+                                    : "Backups locais salvos em "}
+                                {mode !== "replica" && <code>/backups</code>}
                             </CardDescription>
                         </div>
-                        <Button 
-                            onClick={handleCreate} 
-                            disabled={isCreating} 
-                            size="sm" 
+                        <Button
+                            onClick={handleCreate}
+                            disabled={isCreating || !canCreate}
+                            size="sm"
                             className="gap-2 bg-primary hover:bg-primary/90 shadow-sm"
                         >
                             {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <HardDriveDownload className="h-4 w-4" />}
                             Criar Snapshot
                         </Button>
                     </div>
+                    {!canRestore && (
+                        <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed flex items-start gap-1.5">
+                            <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-500" />
+                            {mode === "cloud"
+                                ? "Modo Nuvem: snapshots e restauração não se aplicam — seus dados vivem no Turso."
+                                : "Modo Híbrido: restaurar está desabilitado para não quebrar a sincronização. A cópia-mestra é o Turso."}
+                        </p>
+                    )}
                 </CardHeader>
                 
                 <CardContent className="p-0">
@@ -156,11 +175,13 @@ export function BackupManager({ history }: { history: BackupLog[] }) {
                                         </div>
 
                                         <div className="col-span-3 flex justify-end gap-1 pr-2">
-                                            <Button 
-                                                size="sm" 
-                                                variant="outline" 
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
                                                 className="h-8 w-8 p-0 text-primary border-primary/20 hover:bg-primary/10"
                                                 onClick={() => setBackupToRestore(backup)}
+                                                disabled={!canRestore}
+                                                title={canRestore ? "Restaurar este snapshot" : "Restauração indisponível neste modo"}
                                             >
                                                 <RotateCcw className="h-3.5 w-3.5" />
                                             </Button>

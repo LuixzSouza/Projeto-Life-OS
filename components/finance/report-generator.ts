@@ -24,10 +24,6 @@ interface ReportData {
   wishlist?: WishlistItem[];
 }
 
-const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
-};
-
 export const generateFinanceReport = async (data: ReportData) => {
   const {
     totalBalance,
@@ -40,8 +36,7 @@ export const generateFinanceReport = async (data: ReportData) => {
     wishlistSaved = 0, // Valor padrão caso não venha
     metrics,
     transactions = [],
-    recurringExpenses = [],
-    wishlist = []
+    recurringExpenses = []
   } = data;
 
   const workbook = new ExcelJS.Workbook();

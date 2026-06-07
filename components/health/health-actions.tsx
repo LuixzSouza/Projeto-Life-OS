@@ -10,7 +10,7 @@ import {
 import { 
     Moon, User, Dumbbell, Footprints, 
     Plus, LayoutDashboard, Timer, Utensils,
-    ChevronRight, X, Compass
+    ChevronRight, X
 } from "lucide-react";
 import Link from "next/link";
 import { GymForm } from "@/components/health/gym/gym-form";

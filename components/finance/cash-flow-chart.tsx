@@ -11,7 +11,7 @@ import {
   TooltipProps,
 } from "recharts";
 import { ChartContainer } from "@/components/ui/chart-container";
-import { TrendingUp, Activity } from "lucide-react";
+import { Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFormatCurrency } from "@/components/providers/currency-provider";
 

@@ -1,8 +1,15 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // libSQL build NODE (réplica embarcada) importa um binário NATIVO (`libsql`).
+  // Mantemos esses pacotes FORA do bundle do webpack: são resolvidos do
+  // node_modules em runtime (via require). Sem isto, o webpack tenta empacotar o
+  // nativo e o `require` em runtime falha com "dynamic usage of require".
+  // A nuvem (Vercel) usa só `@libsql/client/web` (JS puro) e nunca carrega o nativo.
+  serverExternalPackages: ["@libsql/client", "libsql"],
+
   // Configurações de imagem
-  images: { 
+  images: {
     unoptimized: true,
     remotePatterns: [
       { protocol: "https", hostname: "**" }

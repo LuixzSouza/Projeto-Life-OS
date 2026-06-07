@@ -15,9 +15,7 @@ import { deleteMediaItem, updateMediaStatus, updateMediaDetails } from "@/app/(d
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { TYPE_CONFIG, STATUS_CONFIG, type MediaItemData } from "./entertainment-config";
-import { EntityTags } from "@/components/connect/entity-tags";
-import { EntityAttachments } from "@/components/connect/entity-attachments";
-import { EntityLinks } from "@/components/connect/entity-links";
+import { EntityConnections } from "@/components/connect/entity-connections";
 
 const aspectByType = (type: string) =>
   type === "GAME" ? "aspect-video" :
@@ -255,14 +253,9 @@ export function MediaCard({ item }: { item: MediaItemData }) {
                 />
               </form>
 
-              {/* Tags, Anexos & Relações (tecido conectivo cross-módulo) */}
-              <div className="space-y-4 pt-4 border-t border-border/40">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                  <Tag className="h-3.5 w-3.5" /> Tags, Anexos & Relações
-                </h3>
-                <EntityTags entityType="media" entityId={item.id} />
-                <EntityAttachments entityType="media" entityId={item.id} />
-                <EntityLinks entityType="media" entityId={item.id} />
+              {/* Tags, Anexos & Conexões (card recolhível cross-módulo) */}
+              <div className="pt-2">
+                <EntityConnections entityType="media" entityId={item.id} />
               </div>
             </div>
           </ScrollArea>

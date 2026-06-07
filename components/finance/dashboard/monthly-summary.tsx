@@ -23,7 +23,7 @@ export function MonthlySummary({ totalBalance, monthIncome, monthExpense, monthl
   const flowData = monthlyFlow.slice(-flowMonths);
 
   return (
-    <section className="px-6 md:px-8 pt-4 pb-10 max-w-[1600px] mx-auto space-y-6">
+    <section className="px-6 md:px-8 pt-4 pb-10 max-w-7xl mx-auto space-y-6">
       {/* StatCards rápidos do mês */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <MetricCard

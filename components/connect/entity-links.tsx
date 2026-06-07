@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { GitBranch, Search, X, Loader2, ExternalLink, ArrowRight, ArrowLeft } from "lucide-react";
+import { GitBranch, Search, X, Loader2, ExternalLink, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ENTITY_ICON, ENTITY_LABEL, FALLBACK_ICON } from "./entity-meta";
+import { ConnectSectionHeader } from "./connect-section-header";
 import {
   getEntityLinks,
   searchLinkableEntities,
@@ -21,7 +22,22 @@ const KIND_LABEL: Record<string, string> = {
   DERIVED_FROM: "Derivado de",
   REFERENCES: "Referencia",
 };
-const KINDS = ["RELATED", "BLOCKS", "DERIVED_FROM", "REFERENCES"];
+
+// Tipos de vínculo com uma dica do que significam (mostrados só no modo avançado).
+const KIND_OPTIONS: { value: string; label: string; hint: string }[] = [
+  { value: "RELATED", label: "Relacionado", hint: "ligação simples" },
+  { value: "BLOCKS", label: "Bloqueia", hint: "trava o outro" },
+  { value: "DERIVED_FROM", label: "Derivado de", hint: "nasceu do outro" },
+  { value: "REFERENCES", label: "Referencia", hint: "só cita/aponta" },
+];
+
+// Frase do vínculo do ponto de vista DESTE item (substitui as setas ← →).
+const REL_PHRASE: Record<string, { out: string; in: string }> = {
+  RELATED: { out: "Relacionado", in: "Relacionado" },
+  BLOCKS: { out: "Bloqueia", in: "Bloqueado por" },
+  DERIVED_FROM: { out: "Derivado de", in: "Deu origem a" },
+  REFERENCES: { out: "Referencia", in: "Referenciado por" },
+};
 
 type Hit = { entityType: string; entityId: string; title: string };
 
@@ -37,6 +53,7 @@ export function EntityLinks({ entityType, entityId }: { entityType: string; enti
   const [results, setResults] = useState<Hit[]>([]);
   const [searching, setSearching] = useState(false);
   const [kind, setKind] = useState("RELATED");
+  const [showKind, setShowKind] = useState(false); // tipo do vínculo é avançado/opcional
   const [pending, startTransition] = useTransition();
   const seq = useRef(0);
 
@@ -51,25 +68,27 @@ export function EntityLinks({ entityType, entityId }: { entityType: string; enti
     };
   }, [entityType, entityId]);
 
-  // Busca conforme digita (sem lib de debounce; descarta respostas fora de ordem).
+  // Busca conforme digita, com debounce de 250ms (menos chamadas ao servidor) e
+  // descarte de respostas fora de ordem. Query curta (<2) não dispara busca; o render
+  // esconde resultados por tamanho da query. O setState ocorre no callback do timer/
+  // promise (assíncrono), não no corpo do efeito.
   useEffect(() => {
     const q = query.trim();
-    if (q.length < 2) {
-      setResults([]);
-      setSearching(false);
-      return;
-    }
-    const mySeq = ++seq.current;
-    setSearching(true);
-    searchLinkableEntities(q, entityType, entityId)
-      .then((hits) => {
-        if (mySeq !== seq.current) return; // resposta obsoleta
-        // Esconde entidades já vinculadas.
-        const linkedKeys = new Set(links.map((l) => `${l.entityType}:${l.entityId}`));
-        setResults(hits.filter((h) => !linkedKeys.has(`${h.entityType}:${h.entityId}`)));
-      })
-      .catch(() => mySeq === seq.current && setResults([]))
-      .finally(() => mySeq === seq.current && setSearching(false));
+    if (q.length < 2) return;
+    const handle = setTimeout(() => {
+      const mySeq = ++seq.current;
+      setSearching(true);
+      searchLinkableEntities(q, entityType, entityId)
+        .then((hits) => {
+          if (mySeq !== seq.current) return; // resposta obsoleta
+          // Esconde entidades já vinculadas.
+          const linkedKeys = new Set(links.map((l) => `${l.entityType}:${l.entityId}`));
+          setResults(hits.filter((h) => !linkedKeys.has(`${h.entityType}:${h.entityId}`)));
+        })
+        .catch(() => mySeq === seq.current && setResults([]))
+        .finally(() => mySeq === seq.current && setSearching(false));
+    }, 250);
+    return () => clearTimeout(handle);
   }, [query, entityType, entityId, links]);
 
   const add = (hit: Hit) => {
@@ -103,37 +122,71 @@ export function EntityLinks({ entityType, entityId }: { entityType: string; enti
     );
   }
 
+  // Resultados/spinner só valem para query >= 2 chars: gatear no render evita ter que
+  // zerar `results`/`searching` no efeito (e o aviso react-hooks/set-state-in-effect).
+  const trimmedLen = query.trim().length;
+  const visibleResults = trimmedLen >= 2 ? results : [];
+  const isSearching = trimmedLen >= 2 && searching;
+
   return (
     <div className="space-y-3">
-      {/* Buscador + tipo */}
+      <ConnectSectionHeader
+        icon={GitBranch}
+        title="Conexões"
+        hint="Ligue este item a outro do sistema (tarefa, nota, projeto, transação…). Busque abaixo e clique."
+      />
+
+      {/* Buscador (em primeiro plano) + tipo do vínculo (avançado/opcional) */}
       <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <select
-            value={kind}
-            onChange={(e) => setKind(e.target.value)}
-            className="h-8 shrink-0 rounded-md border border-border/60 bg-background px-2 text-xs"
-            aria-label="Tipo de relação"
-          >
-            {KINDS.map((k) => (
-              <option key={k} value={k}>{KIND_LABEL[k]}</option>
-            ))}
-          </select>
-          <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
-              placeholder="Buscar item p/ relacionar…"
-              className="h-8 pl-8 text-sm"
-            />
-            {searching && <Loader2 className="absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-muted-foreground" />}
-          </div>
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
+            placeholder="Conectar a outro item…"
+            className="h-9 pl-8 text-sm"
+          />
+          {isSearching && <Loader2 className="absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-muted-foreground" />}
         </div>
 
-        {results.length > 0 && (
+        {/* Tipo do vínculo: por padrão "Relacionado". Só aparece se o usuário quiser detalhar. */}
+        <div className="flex flex-col gap-1.5">
+          <button
+            type="button"
+            onClick={() => setShowKind((v) => !v)}
+            className="inline-flex w-fit items-center gap-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <SlidersHorizontal className="h-3 w-3" />
+            Tipo: <span className="text-foreground">{KIND_LABEL[kind]}</span>
+            {!showKind && <span className="text-muted-foreground/60">(alterar)</span>}
+          </button>
+          {showKind && (
+            <div className="flex flex-wrap gap-1.5">
+              {KIND_OPTIONS.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => setKind(o.value)}
+                  title={o.hint}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors",
+                    kind === o.value
+                      ? "border-primary/40 bg-primary/10 text-primary"
+                      : "border-border/60 text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                  )}
+                >
+                  {o.label}
+                  <span className="text-[10px] text-muted-foreground/60">· {o.hint}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {visibleResults.length > 0 && (
           <ul className="overflow-hidden rounded-lg border border-border/50 bg-card">
-            {results.map((h) => {
+            {visibleResults.map((h) => {
               const Icon = ENTITY_ICON[h.entityType] ?? FALLBACK_ICON;
               return (
                 <li key={`${h.entityType}:${h.entityId}`}>
@@ -154,34 +207,32 @@ export function EntityLinks({ entityType, entityId }: { entityType: string; enti
             })}
           </ul>
         )}
-        {query.trim().length >= 2 && !searching && results.length === 0 && (
+        {trimmedLen >= 2 && !isSearching && visibleResults.length === 0 && (
           <p className="px-1 text-xs text-muted-foreground">Nada encontrado para relacionar.</p>
         )}
       </div>
 
-      {/* Relações existentes */}
+      {/* Conexões existentes */}
       {links.length === 0 ? (
         <p className="flex items-center gap-1.5 py-1 text-xs text-muted-foreground">
-          <GitBranch className="h-3.5 w-3.5" /> Sem relações ainda.
+          <GitBranch className="h-3.5 w-3.5" /> Nenhuma conexão ainda — busque um item acima pra ligar.
         </p>
       ) : (
         <ul className="space-y-1.5">
           {links.map((l) => {
             const Icon = ENTITY_ICON[l.entityType] ?? FALLBACK_ICON;
-            const DirIcon = l.direction === "out" ? ArrowRight : ArrowLeft;
+            // Em vez de setas, uma frase clara do vínculo a partir deste item.
+            const phrase = (REL_PHRASE[l.kind] ?? REL_PHRASE.RELATED)[l.direction === "out" ? "out" : "in"];
             return (
               <li key={l.linkId} className="flex items-center gap-2 rounded-lg border border-border/40 bg-card px-2.5 py-1.5">
-                <DirIcon
-                  className={cn("h-3.5 w-3.5 shrink-0", l.direction === "out" ? "text-primary/70" : "text-muted-foreground/60")}
-                  aria-label={l.direction === "out" ? "aponta para" : "apontado por"}
-                />
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
                   <Icon className="h-3.5 w-3.5" />
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{l.title}</p>
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground/60">
-                    {ENTITY_LABEL[l.entityType] ?? l.entityType} · {KIND_LABEL[l.kind] ?? l.kind}
+                  <p className="truncate text-[11px] text-muted-foreground">
+                    <span className="text-muted-foreground/60">{ENTITY_LABEL[l.entityType] ?? l.entityType}</span>
+                    {" · "}{phrase}
                   </p>
                 </div>
                 {l.actionUrl && (

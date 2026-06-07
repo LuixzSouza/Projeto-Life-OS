@@ -20,6 +20,19 @@ export type DbProfile =
       provider: "turso" | "postgres";
       url: string;
       authToken?: string;
+    }
+  | {
+      // Réplica embarcada (libSQL): um arquivo SQLite local que SINCRONIZA com um
+      // banco Turso "espelho". Leituras saem do arquivo local (rápidas, offline);
+      // escritas vão para o primário (Turso) e refletem de volta no arquivo. É o
+      // modo híbrido — trabalha no PC com cópia local E o celular acessa o mesmo
+      // dado por uma instância na nuvem apontando para o mesmo Turso.
+      mode: "replica";
+      databasePath: string;
+      syncUrl: string;
+      authToken?: string;
+      /** Pull periódico em background (segundos). Default em lib/prisma.ts. */
+      syncInterval?: number;
     };
 
 interface ConfigShape {
@@ -28,6 +41,9 @@ interface ConfigShape {
   profile?: DbProfile;
   // Segredos auto-gerados para builds desktop (sem .env).
   secrets?: Record<string, string>;
+  // Política de instância: permite (ou não) o cadastro de novas contas em /register.
+  // undefined = aberto (compatível com instalações existentes).
+  registrationOpen?: boolean;
 }
 
 // Cache em memória do config em arquivo. O Proxy do Prisma resolve o perfil a
@@ -109,9 +125,12 @@ export function getDbProfile(): DbProfile | null {
 export function setDbProfile(profile: DbProfile) {
   const config = readConfig();
   config.profile = profile;
-  // Mantém o campo legado em sincronia para compatibilidade.
+  // Mantém o campo legado em sincronia para compatibilidade (local e réplica
+  // têm arquivo local; nuvem pura não).
   config.databasePath =
-    profile.mode === "local" ? profile.databasePath : undefined;
+    profile.mode === "local" || profile.mode === "replica"
+      ? profile.databasePath
+      : undefined;
   writeConfig(config);
   console.log(`✅ Perfil de banco salvo (${profile.mode}) em: ${CONFIG_PATH}`);
 }
@@ -123,7 +142,9 @@ export function setDbProfile(profile: DbProfile) {
 export function resolveDatabaseUrl(): string | null {
   const profile = getDbProfile();
   if (!profile) return null;
-  if (profile.mode === "local") return `file:${profile.databasePath}`;
+  if (profile.mode === "local" || profile.mode === "replica") {
+    return `file:${profile.databasePath}`;
+  }
   return profile.url;
 }
 
@@ -133,7 +154,10 @@ export function resolveDatabaseUrl(): string | null {
 
 export function getDatabasePath(): string | null {
   const profile = getDbProfile();
-  return profile?.mode === "local" ? profile.databasePath : null;
+  if (profile?.mode === "local" || profile?.mode === "replica") {
+    return profile.databasePath;
+  }
+  return null;
 }
 
 export function setDatabasePath(newPath: string) {
@@ -142,6 +166,30 @@ export function setDatabasePath(newPath: string) {
 
 export function isSystemInstalled(): boolean {
   return !!resolveDatabaseUrl();
+}
+
+// =========================================================
+// POLÍTICA DE CADASTRO (instância pessoal vs. compartilhada)
+// =========================================================
+
+/**
+ * Indica se o cadastro de novas contas (/register) está liberado nesta instância.
+ * Prioridade: variável de ambiente `LIFEOS_REGISTRATION` (útil em serverless de FS
+ * efêmero, onde o config não persiste) > flag no config em arquivo > default ABERTO
+ * (compatível com instalações existentes).
+ */
+export function isRegistrationOpen(): boolean {
+  const env = process.env.LIFEOS_REGISTRATION?.trim().toLowerCase();
+  if (env === "off" || env === "false" || env === "0") return false;
+  if (env === "on" || env === "true" || env === "1") return true;
+  return readConfig().registrationOpen !== false;
+}
+
+/** Liga/desliga o cadastro aberto (persiste no config local). */
+export function setRegistrationOpen(open: boolean) {
+  const config = readConfig();
+  config.registrationOpen = open;
+  writeConfig(config);
 }
 
 // =========================================================

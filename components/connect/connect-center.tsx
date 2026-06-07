@@ -13,8 +13,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { ENTITY_ICON, ENTITY_LABEL, FALLBACK_ICON } from "./entity-meta";
 import {
-  getTaggedEntities, createTagAction, updateTagAction, deleteTagAction,
-  getAttachmentsCenter, removeAttachmentAction,
+  getTaggedEntities, createTagAction, updateTagAction, deleteTagAction, removeAttachmentAction,
   removeLinkCenter,
   type TagOverview, type AttachmentRow, type LinkRow,
 } from "@/app/(dashboard)/connect/actions";
@@ -53,28 +52,49 @@ export function ConnectCenter({
       <TabsList>
         <TabsTrigger value="tags" className="gap-2">
           <TagIcon className="h-4 w-4" /> Tags
+          <CountBadge n={initialTags.length} />
         </TabsTrigger>
         <TabsTrigger value="attachments" className="gap-2">
           <Paperclip className="h-4 w-4" /> Anexos
+          <CountBadge n={initialAttachments.length} />
         </TabsTrigger>
         <TabsTrigger value="links" className="gap-2">
-          <GitBranch className="h-4 w-4" /> Relações
+          <GitBranch className="h-4 w-4" /> Conexões
+          <CountBadge n={initialLinks.length} />
         </TabsTrigger>
       </TabsList>
 
-      <TabsContent value="tags">
+      <TabsContent value="tags" className="space-y-4">
+        <TabHint>Suas etiquetas e tudo que cada uma conecta entre os módulos. Clique numa tag para ver os itens.</TabHint>
         <TagsTab initialTags={initialTags} />
       </TabsContent>
 
-      <TabsContent value="attachments">
+      <TabsContent value="attachments" className="space-y-4">
+        <TabHint>Todos os arquivos e links anexados a qualquer item, reunidos num lugar só.</TabHint>
         <AttachmentsTab initial={initialAttachments} />
       </TabsContent>
 
-      <TabsContent value="links">
+      <TabsContent value="links" className="space-y-4">
+        <TabHint>O grafo de conexões entre os módulos: o que aponta para o quê.</TabHint>
         <LinksTab initial={initialLinks} />
       </TabsContent>
     </Tabs>
   );
+}
+
+/** Badge de contagem ao lado do rótulo da aba (some quando 0). */
+function CountBadge({ n }: { n: number }) {
+  if (!n) return null;
+  return (
+    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-muted-foreground">
+      {n}
+    </span>
+  );
+}
+
+/** Linha curta de contexto no topo de cada aba. */
+function TabHint({ children }: { children: React.ReactNode }) {
+  return <p className="text-xs text-muted-foreground">{children}</p>;
 }
 
 // ------------------------------- TAGS --------------------------------------
@@ -387,8 +407,8 @@ function LinksTab({ initial }: { initial: LinkRow[] }) {
       <div className="rounded-xl border border-dashed border-border/60 py-20 text-center">
         <GitBranch className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" />
         <p className="text-sm text-muted-foreground">
-          Nenhuma relação ainda.<br />
-          Use a aba <strong>Relações</strong> no menu de qualquer item para ligar entidades entre módulos.
+          Nenhuma conexão ainda.<br />
+          Abra <strong>Tags, Anexos &amp; Conexões</strong> em qualquer item e use a busca para ligar entidades entre módulos.
         </p>
       </div>
     );

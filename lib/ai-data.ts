@@ -413,8 +413,11 @@ async function handleCreate(userId: string, args: ToolArgs): Promise<MutationRes
         return { ok: true, id: s.id, summary: `Sessão de ${value}min em "${subjectTitle}" registrada.` };
       }
       if (!title) return { ok: false, summary: "Estudo exige título (anotação) ou value (minutos da sessão)." };
-      const n = await prisma.studyNote.create({ data: { title, content: description ?? "", userId } });
-      return { ok: true, id: n.id, summary: `Anotação "${n.title}" salva.` };
+      // Notas criadas pela IA caem na Entrada (Inbox) para você organizar depois.
+      let inbox = await prisma.notebook.findFirst({ where: { userId, isInbox: true }, select: { id: true } });
+      if (!inbox) inbox = await prisma.notebook.create({ data: { userId, name: "Entrada", isInbox: true, color: "#64748b", icon: "inbox", position: -1 }, select: { id: true } });
+      const n = await prisma.studyNote.create({ data: { title, content: description ?? "", userId, notebookId: inbox.id } });
+      return { ok: true, id: n.id, summary: `Anotação "${n.title}" salva na Entrada.` };
     }
     case "ENTERTAINMENT": {
       if (!title) return { ok: false, summary: "Mídia exige título." };

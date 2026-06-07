@@ -13,6 +13,8 @@ const GROUP_ZONES: Record<string, Zone[]> = {
     Biceps: ["arms"],
     Triceps: ["arms"],
     Abdomen: ["abs"],
+    Gluteos: ["legs"],
+    Antebraco: ["arms"],
     Cardio: ["heart"],
 };
 

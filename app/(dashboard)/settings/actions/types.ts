@@ -4,13 +4,14 @@ import {
   Project, Account, Task, Transaction, StudySubject, StudySession,
   Workout, HealthMetric, Event, ManagedSite, SitePage, Flashcard,
   FlashcardDeck, AccessItem, AiMessage, User, Settings, JobApplication,
-  SavedLink
+  SavedLink, Portfolio, Challenge, ChallengeCheckin
 } from "@prisma/client";
 
 export type ProjectJSON = Partial<Project> & { tasks?: Partial<Task>[]; events?: Partial<Event>[]; };
 export type AccountJSON = Partial<Account> & { transactions?: Partial<Transaction>[]; };
 export type SubjectJSON = Partial<StudySubject> & { sessions?: Partial<StudySession>[]; };
 export type SiteJSON = Partial<ManagedSite> & { pages?: Partial<SitePage>[]; };
+export type ChallengeJSON = Partial<Challenge> & { checkins?: Partial<ChallengeCheckin>[]; };
 // A categoria existe no JSON antigo mas não no banco novo, então definimos aqui para ler sem erro
 export type DeckJSON = Partial<FlashcardDeck> & { cards?: Partial<Flashcard>[]; category?: string };
 
@@ -31,4 +32,6 @@ export interface BackupData {
   accessItems?: Partial<AccessItem>[];
   aiMessages?: Partial<AiMessage>[];
   savedLinks?: Partial<SavedLink>[];
+  portfolio?: Partial<Portfolio> | null;
+  challenges?: ChallengeJSON[];
 }

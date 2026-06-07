@@ -1,4 +1,5 @@
 import { Sidebar } from "@/components/layout/sidebar"; // ou o caminho correto
+import { CommandPalette } from "@/components/layout/command-palette";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserId } from "@/lib/auth";
 import { getNotificationInbox } from "@/lib/notifications";
@@ -31,7 +32,9 @@ export default async function DashboardLayout({
     <div className="flex h-screen overflow-hidden bg-zinc-50 dark:bg-black">
       {/* Passamos o objeto tratado/serializado */}
       <Sidebar user={serializedUser} inbox={inbox} />
-      
+
+      <CommandPalette />
+
       <main className="flex-1 overflow-y-auto">
         {children}
       </main>

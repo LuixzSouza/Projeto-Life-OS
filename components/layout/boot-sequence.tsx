@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Terminal, Cpu, ShieldCheck, Database, Lock, LucideIcon, Loader2 } from "lucide-react";
 import { toast } from "sonner"; // Import do Toast
@@ -28,7 +27,6 @@ interface StatusItemProps {
 }
 
 export function BootSequence({ dbStatus }: BootSequenceProps) {
-    const router = useRouter();
     const [visibleLogs, setVisibleLogs] = useState<string[]>([]);
     const [showButton, setShowButton] = useState(false);
     const [progress, setProgress] = useState(0);

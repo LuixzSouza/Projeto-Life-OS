@@ -32,6 +32,7 @@ import { toast } from "sonner";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 import { DAYS } from "./routine-config";
 import { RoutineGrid } from "./routine-grid";
 import { RoutineForm } from "./routine-form";
@@ -45,6 +46,8 @@ export function RoutineManager({ items }: { items: RoutineItem[] }) {
   const currentDayIndex = new Date().getDay();
   const jsDayToId = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
   const defaultTab = jsDayToId[currentDayIndex];
+
+  const countByDay = (id: string) => items.filter((i) => i.daysOfWeek.includes(id)).length;
 
   const handleSeed = async () => {
     setIsLoading(true);
@@ -134,15 +137,29 @@ export function RoutineManager({ items }: { items: RoutineItem[] }) {
           {/* TABS DE NAVEGAÇÃO DE DIAS */}
           <ScrollArea className="w-full shrink-0">
             <TabsList className="bg-transparent p-0 h-auto gap-2 w-full justify-start pb-2">
-              {DAYS.map((day) => (
-                <TabsTrigger
-                  key={day.id}
-                  value={day.id}
-                  className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md border border-border/40 rounded-xl px-5 h-11 text-[11px] font-black uppercase tracking-widest transition-all hover:bg-muted bg-background shadow-sm"
-                >
-                  {day.label}
-                </TabsTrigger>
-              ))}
+              {DAYS.map((day) => {
+                const count = countByDay(day.id);
+                const isToday = day.id === defaultTab;
+                return (
+                  <TabsTrigger
+                    key={day.id}
+                    value={day.id}
+                    className={cn(
+                      "group/tab relative flex items-center gap-1.5 border border-border/40 rounded-xl px-4 h-11 text-[11px] font-black uppercase tracking-widest transition-all hover:bg-muted bg-background shadow-sm",
+                      "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-md",
+                      isToday && "ring-1 ring-primary/50",
+                    )}
+                  >
+                    {isToday && <span className="h-1.5 w-1.5 rounded-full bg-primary group-data-[state=active]/tab:bg-primary-foreground" />}
+                    {day.label}
+                    {count > 0 && (
+                      <span className="rounded-md bg-foreground/10 px-1.5 text-[9px] tabular-nums leading-5 group-data-[state=active]/tab:bg-background/25">
+                        {count}
+                      </span>
+                    )}
+                  </TabsTrigger>
+                );
+              })}
             </TabsList>
           </ScrollArea>
 
@@ -150,7 +167,7 @@ export function RoutineManager({ items }: { items: RoutineItem[] }) {
           <div className="flex-1 bg-card border border-border/40 rounded-[2rem] shadow-sm relative overflow-hidden mt-4">
             {DAYS.map((day) => (
               <TabsContent key={day.id} value={day.id} className="h-full m-0 absolute inset-0 outline-none">
-                <RoutineGrid items={items.filter((i) => i.daysOfWeek.includes(day.id))} />
+                <RoutineGrid items={items.filter((i) => i.daysOfWeek.includes(day.id))} isToday={day.id === defaultTab} />
               </TabsContent>
             ))}
           </div>

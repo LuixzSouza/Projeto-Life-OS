@@ -7,6 +7,11 @@ import { TaskReorderList } from "@/components/projects/task-reorder-list";
 import { TaskKanbanBoard } from "@/components/projects/task-kanban-board";
 import { TasksByDay } from "@/components/projects/tasks-by-day";
 import { ProjectNotes } from "@/components/projects/project-notes";
+import { ProjectLinkedNotes } from "@/components/projects/project-linked-notes";
+import { TaskDeepLink } from "@/components/projects/task-deep-link";
+import { getNotesForProject, getProjectBacklinks, getNotes, getNoteProjects } from "@/app/(dashboard)/notes/actions";
+import { getPaletteTasks } from "@/app/(dashboard)/palette-actions";
+import type { Mentionables } from "@/components/notes/use-mention-menu";
 import { MeetingBoard } from "@/components/projects/meeting-board";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,11 +20,9 @@ import { Input } from "@/components/ui/input";
 import {
   ArrowLeft, Search, SlidersHorizontal,
   FileText, ListTodo, LayoutGrid, List, AlignJustify, Columns3,
-  CalendarClock, CalendarDays, Hash, Inbox, AlignLeft, Tag,
+  CalendarClock, CalendarDays, Hash, Inbox, AlignLeft,
 } from "lucide-react";
-import { EntityTags } from "@/components/connect/entity-tags";
-import { EntityAttachments } from "@/components/connect/entity-attachments";
-import { EntityLinks } from "@/components/connect/entity-links";
+import { EntityConnections } from "@/components/connect/entity-connections";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -69,7 +72,7 @@ export default async function ProjectDetailPage(props: ProjectDetailPageProps) {
 
   const project = !isInbox ? await prisma.project.findFirst({
     where: { slug, userId, deletedAt: null },
-    select: { id: true, title: true, description: true, color: true, createdAt: true },
+    select: { id: true, title: true, description: true, notes: true, color: true, createdAt: true },
   }) : null;
 
   if (!isInbox && !project) return notFound();
@@ -125,6 +128,25 @@ export default async function ProjectDetailPage(props: ProjectDetailPageProps) {
     createdAt: createdAt.toISOString(),
   }));
 
+  // Dados da aba Notas (só carregados quando ela está ativa, fora da Inbox):
+  // notas vinculadas, menções "@" (notas/projetos/tarefas) e backlinks do projeto.
+  const notesTabActive = !isInbox && !!dbProjectId && activeTab === "notes";
+  const [linkedNotes, mentionNotes, mentionProjects, mentionTasks, projectBacklinks] = notesTabActive
+    ? await Promise.all([
+        getNotesForProject(dbProjectId!),
+        getNotes(),
+        getNoteProjects(),
+        getPaletteTasks(),
+        getProjectBacklinks(slug),
+      ])
+    : [[], [], [], [], []];
+
+  const noteMentionables: Mentionables = {
+    notes: mentionNotes.map((n) => ({ id: n.id, title: n.title })),
+    projects: mentionProjects.map((p) => ({ id: p.id, title: p.title, slug: p.slug })),
+    tasks: mentionTasks,
+  };
+
   const doneCount = allStats.find(s => s.isDone)?._count.isDone ?? 0;
   const pendingCount = allStats.find(s => !s.isDone)?._count.isDone ?? 0;
   const totalCount = doneCount + pendingCount;
@@ -150,6 +172,8 @@ export default async function ProjectDetailPage(props: ProjectDetailPageProps) {
 
   return (
     <div className="min-h-screen bg-background w-full pb-12 animate-in fade-in duration-500">
+      <React.Suspense fallback={null}><TaskDeepLink /></React.Suspense>
+
 
       {/* HEADER (padrão do sistema) */}
       <header className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border/40 px-6 md:px-8 py-4">
@@ -220,16 +244,9 @@ export default async function ProjectDetailPage(props: ProjectDetailPageProps) {
             </div>
           </div>
 
-          {/* Tags, Anexos & Relações (antes só no modal, agora na página) */}
+          {/* Tags, Anexos & Conexões (card recolhível) */}
           {!isInbox && dbProjectId && (
-            <div className="rounded-2xl border border-border/40 bg-card shadow-sm p-5 space-y-4">
-              <h2 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <Tag className="h-3.5 w-3.5" /> Tags, anexos & relações
-              </h2>
-              <EntityTags entityType="project" entityId={dbProjectId} />
-              <EntityAttachments entityType="project" entityId={dbProjectId} />
-              <EntityLinks entityType="project" entityId={dbProjectId} />
-            </div>
+            <EntityConnections entityType="project" entityId={dbProjectId} />
           )}
         </section>
 
@@ -346,7 +363,34 @@ export default async function ProjectDetailPage(props: ProjectDetailPageProps) {
                   <p className="text-sm text-muted-foreground">As notas ficam disponíveis dentro de um projeto específico, não na Caixa de Entrada.</p>
                 </div>
               ) : (
-                <ProjectNotes projectId={dbProjectId!} initialNotes={projectDescription || ""} />
+                <div className="space-y-8">
+                  <ProjectNotes projectId={dbProjectId!} initialNotes={project?.notes ?? ""} mentionables={noteMentionables} />
+                  <div className="border-t border-border/40 pt-6">
+                    <ProjectLinkedNotes projectId={dbProjectId!} notes={linkedNotes} />
+                  </div>
+                  {projectBacklinks.length > 0 && (
+                    <div className="border-t border-border/40 pt-6">
+                      <div className="mb-3">
+                        <h3 className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                          <FileText className="h-3.5 w-3.5" /> Mencionado em ({projectBacklinks.length})
+                        </h3>
+                        <p className="text-xs text-muted-foreground">Notas do seu segundo cérebro que linkam este projeto.</p>
+                      </div>
+                      <div className="divide-y divide-border/40 overflow-hidden rounded-xl border border-border/40">
+                        {projectBacklinks.map((b) => (
+                          <Link
+                            key={b.id}
+                            href={`/notes/${b.id}`}
+                            className="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40"
+                          >
+                            <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            <span className="truncate text-sm font-medium text-foreground">{b.title}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           )}

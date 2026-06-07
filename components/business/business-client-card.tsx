@@ -1,13 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import {
-  Phone, CheckCircle2, AlertCircle, Briefcase,
-  Pencil, MoreHorizontal, Trash2, Circle,
-  CalendarDays, Copy, Check, Plus, Globe, MessageCircle, Tag as TagIcon,
+  Pencil, MoreHorizontal, Trash2,
+  Copy, Check, Globe, MessageCircle, Tag as TagIcon,
+  Briefcase, FileText, CalendarDays, ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -17,7 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 import { clearMask, maskPhone } from "./business-helpers";
 import { useFormatCurrency } from "@/components/providers/currency-provider";
-import type { BillingData, ClientData, DeleteTarget, InvoiceData } from "./business-types";
+import type { ClientData, DeleteTarget } from "./business-types";
 
 interface ClientCardProps {
   client: ClientData;
@@ -26,30 +25,25 @@ interface ClientCardProps {
   onEditClient: (client: ClientData) => void;
   onDeleteTarget: (target: DeleteTarget) => void;
   onOpenConnections: (client: ClientData) => void;
-  onNewBilling: (clientId: string) => void;
-  onEditBilling: (billing: BillingData) => void;
-  onEditInvoice: (invoice: InvoiceData) => void;
-  onReceiveInvoice: (invoice: InvoiceData) => void;
-  onCopyCharge: (clientName: string, billing: BillingData) => void;
-  onWhatsapp: (phone: string, clientName: string, billing: BillingData) => void;
 }
 
+// Card RESUMIDO do cliente: cabeçalho + resumo financeiro + contagem de
+// contratos/faturas + atalho para a página de detalhe (/business/[id]).
 export function ClientCard({
   client, copiedId, onCopyPhone, onEditClient, onDeleteTarget, onOpenConnections,
-  onNewBilling, onEditBilling, onEditInvoice, onReceiveInvoice, onCopyCharge, onWhatsapp,
 }: ClientCardProps) {
   const formatCurrency = useFormatCurrency();
 
-  // Resumo financeiro do cliente (visão rápida no topo do card).
   const now = new Date();
   const openInvoices = client.billings.flatMap(b => b.invoices)
     .filter(i => i.status !== 'PAID' && i.status !== 'CANCELED');
-  const clientOverdue = openInvoices
-    .filter(i => new Date(i.dueDate) < now)
-    .reduce((s, i) => s + i.value, 0);
-  const clientReceivable = openInvoices
-    .filter(i => new Date(i.dueDate) >= now)
-    .reduce((s, i) => s + i.value, 0);
+  const clientOverdue = openInvoices.filter(i => new Date(i.dueDate) < now).reduce((s, i) => s + i.value, 0);
+  const clientReceivable = openInvoices.filter(i => new Date(i.dueDate) >= now).reduce((s, i) => s + i.value, 0);
+
+  // Próxima fatura em aberto (a de vencimento mais cedo) para o "próximo passo".
+  const nextInvoice = openInvoices.length
+    ? [...openInvoices].sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())[0]
+    : null;
 
   return (
     <div className="flex flex-col rounded-[1.5rem] border border-border/40 bg-card/50 backdrop-blur-sm shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden">
@@ -68,15 +62,14 @@ export function ClientCard({
             </h3>
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               {client.company && (
-                  <Badge variant="secondary" className="px-1.5 py-0 text-[10px] bg-primary/5 text-primary border-none font-medium truncate max-w-[120px]">
-                    {client.company}
-                  </Badge>
+                <Badge variant="secondary" className="px-1.5 py-0 text-[10px] bg-primary/5 text-primary border-none font-medium truncate max-w-[120px]">
+                  {client.company}
+                </Badge>
               )}
               {client.website && (
                 <a
                   href={client.website.startsWith("http") ? client.website : `https://${client.website}`}
-                  target="_blank"
-                  rel="noreferrer"
+                  target="_blank" rel="noreferrer"
                   className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors"
                   title={client.website}
                 >
@@ -89,22 +82,18 @@ export function ClientCard({
                   className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors font-mono"
                 >
                   {maskPhone(client.phone)}
-                  {copiedId === client.id ? <Check size={10} className="text-emerald-500"/> : <Copy size={10}/>}
+                  {copiedId === client.id ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} />}
                 </button>
               )}
             </div>
 
-            {/* Conexão vinculada (pessoa de contato) */}
             {client.friend && (
               <div className="flex items-center gap-1.5 mt-1.5 text-[11px] text-muted-foreground" title={`Contato: ${client.friend.name}`}>
                 <Avatar className="h-4 w-4 border border-border/40">
                   <AvatarImage src={client.friend.imageUrl || undefined} className="object-cover" alt={client.friend.name} />
-                  <AvatarFallback className="bg-muted text-[8px] font-bold">
-                    {client.friend.name.charAt(0).toUpperCase()}
-                  </AvatarFallback>
+                  <AvatarFallback className="bg-muted text-[8px] font-bold">{client.friend.name.charAt(0).toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <span className="truncate font-medium text-foreground/80 min-w-0">{client.friend.name}</span>
-                {client.friend.jobTitle && <span className="truncate opacity-70 hidden sm:inline">· {client.friend.jobTitle}</span>}
                 {client.friend.phone && (
                   <button
                     type="button"
@@ -147,155 +136,47 @@ export function ClientCard({
         </DropdownMenu>
       </div>
 
-      {/* Resumo financeiro do cliente */}
-      {(clientReceivable > 0 || clientOverdue > 0) && (
-        <div className="flex items-stretch divide-x divide-border/30 border-b border-border/10 bg-muted/5">
-          <div className="flex-1 px-5 py-2.5">
-            <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">A Receber</p>
-            <p className="text-sm font-bold font-mono text-emerald-600 dark:text-emerald-400">{formatCurrency(clientReceivable)}</p>
-          </div>
-          <div className="flex-1 px-5 py-2.5">
-            <p className={cn("text-[9px] font-black uppercase tracking-widest", clientOverdue > 0 ? "text-rose-500" : "text-muted-foreground")}>Em Atraso</p>
-            <p className={cn("text-sm font-bold font-mono", clientOverdue > 0 ? "text-rose-600" : "text-muted-foreground/50")}>{formatCurrency(clientOverdue)}</p>
-          </div>
+      {/* Resumo financeiro */}
+      <div className="flex items-stretch divide-x divide-border/30 border-b border-border/10 bg-muted/5">
+        <div className="flex-1 px-5 py-3">
+          <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">A Receber</p>
+          <p className="text-sm font-bold font-mono text-emerald-600 dark:text-emerald-400">{formatCurrency(clientReceivable)}</p>
         </div>
-      )}
+        <div className="flex-1 px-5 py-3">
+          <p className={cn("text-[9px] font-black uppercase tracking-widest", clientOverdue > 0 ? "text-rose-500" : "text-muted-foreground")}>Em Atraso</p>
+          <p className={cn("text-sm font-bold font-mono", clientOverdue > 0 ? "text-rose-600" : "text-muted-foreground/50")}>{formatCurrency(clientOverdue)}</p>
+        </div>
+      </div>
 
-      <div className="p-5 flex-1">
-        <div className="flex justify-between items-center mb-4">
-          <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.1em] flex items-center gap-2">
-            <Briefcase size={12} className="text-primary/60"/> Contratos e Projetos
+      {/* Contagem + próximo passo + atalho de detalhe */}
+      <div className="p-5 flex-1 flex flex-col gap-4">
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1.5 font-semibold">
+            <Briefcase size={13} className="text-primary/60" />
+            {client.billings.length} {client.billings.length === 1 ? "contrato" : "contratos"}
           </span>
-          <Button variant="ghost" size="sm" className="h-7 px-2.5 text-[10px] font-bold uppercase tracking-wider hover:bg-primary/10 hover:text-primary rounded-lg" onClick={() => onNewBilling(client.id)}>
-            <Plus size={14} className="mr-1" /> Novo
-          </Button>
+          <span className="flex items-center gap-1.5 font-semibold">
+            <FileText size={13} className="text-primary/60" />
+            {openInvoices.length} {openInvoices.length === 1 ? "fatura aberta" : "faturas abertas"}
+          </span>
         </div>
 
-        <ScrollArea className="h-[280px] pr-3">
-          <div className="space-y-4">
-            {client.billings.length === 0 ? (
-              <div className="py-12 text-center border-2 border-dashed border-border/40 rounded-2xl bg-muted/10">
-                  <p className="text-xs font-medium text-muted-foreground">Nenhum contrato ativo.</p>
-              </div>
-            ) : (
-              client.billings.map((billing) => {
-                // Faturas canceladas não entram no cálculo de progresso (senão nunca chega a 100%).
-                const relevantInvoices = billing.invoices.filter(i => i.status !== 'CANCELED');
-                const paidInvoices = relevantInvoices.filter(i => i.status === 'PAID').length;
-                const totalInvoices = relevantInvoices.length;
-                const progress = totalInvoices > 0 ? (paidInvoices / totalInvoices) * 100 : 0;
-                const isCompleted = progress === 100;
-
-                return (
-                  <div key={billing.id} className="rounded-xl border border-border/50 bg-background/40 overflow-hidden shadow-sm group/billing">
-                    <div className="p-3 border-b border-border/30 bg-muted/20 flex flex-col gap-2">
-                        <div className="flex justify-between items-start">
-                            <div className="min-w-0 flex-1">
-                                <p className={cn("font-bold text-sm truncate", isCompleted && "text-muted-foreground line-through decoration-2")}>
-                                    {billing.title}
-                                </p>
-                                <p className="text-[11px] font-mono text-primary font-bold mt-0.5">
-                                    {formatCurrency(billing.totalValue)}
-                                </p>
-                            </div>
-                            <div className="flex gap-1 items-center">
-                                {/* 🟢 Copia a mensagem dinâmica do projeto */}
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 text-blue-500 hover:text-blue-600 hover:bg-blue-500/10 opacity-0 group-hover/billing:opacity-100 transition-opacity"
-                                    onClick={() => onCopyCharge(client.name, billing)}
-                                    title="Copiar Resumo da Cobrança"
-                                >
-                                    <Copy size={13} />
-                                </Button>
-
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover/billing:opacity-100 transition-opacity">
-                                            <MoreHorizontal size={14} />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="rounded-xl shadow-lg">
-                                        <DropdownMenuItem onClick={() => onEditBilling(billing)} className="cursor-pointer font-medium">Ajustar Título/Status</DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem className="text-destructive cursor-pointer font-medium" onClick={() => onDeleteTarget({ type: 'BILLING', id: billing.id, name: billing.title })}>Excluir Projeto</DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Progress value={progress} className="h-1.5 flex-1 bg-muted" indicatorClassName={isCompleted ? "bg-emerald-500" : "bg-primary"} />
-                            <span className={cn("text-[10px] font-black min-w-[28px] text-right", isCompleted ? "text-emerald-600" : "text-muted-foreground")}>
-                                {Math.round(progress)}%
-                            </span>
-                        </div>
-                    </div>
-
-                    <div className="flex flex-col">
-                      {billing.invoices.map((invoice) => {
-                        const isLate = new Date(invoice.dueDate) < new Date() && invoice.status !== 'PAID';
-                        const isPaid = invoice.status === 'PAID';
-
-                        return (
-                          <div
-                            key={invoice.id}
-                            className="flex items-center justify-between p-2.5 px-4 hover:bg-primary/5 transition-colors group/inv border-b border-border/20 last:border-0 cursor-pointer"
-                            onClick={(e) => { if (!(e.target as HTMLElement).closest('button')) onEditInvoice(invoice); }}
-                          >
-                              <div className="flex items-center gap-3 min-w-0 flex-1">
-                                  {isPaid ? <CheckCircle2 size={15} className="text-emerald-500 shrink-0" /> :
-                                   isLate ? <AlertCircle size={15} className="text-rose-500 shrink-0 animate-pulse" /> :
-                                   <Circle size={15} className="text-muted-foreground/40 shrink-0" />}
-
-                                  <div className="flex flex-col min-w-0">
-                                      <span className={cn("text-[11px] font-semibold truncate", isPaid ? "text-muted-foreground/60 line-through" : "text-foreground")}>
-                                          {invoice.title}
-                                      </span>
-                                      <span className={cn("text-[9px] font-bold flex items-center gap-1", isLate ? "text-rose-600" : "text-muted-foreground/70")}>
-                                          <CalendarDays size={10}/> {new Date(invoice.dueDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
-                                      </span>
-                                  </div>
-                              </div>
-
-                              <div className="flex items-center gap-3 shrink-0">
-                                  <span className={cn("text-xs font-bold font-mono", isPaid ? "text-muted-foreground/40" : isLate ? "text-rose-600" : "text-foreground/70")}>
-                                      {formatCurrency(invoice.value)}
-                                  </span>
-                                  {!isPaid && (
-                                      <div className="flex items-center gap-1 opacity-0 group-hover/inv:opacity-100 transition-opacity">
-                                          {client.phone && (
-                                              <Button
-                                                size="icon"
-                                                variant="ghost"
-                                                className="h-7 w-7 text-emerald-600 hover:bg-emerald-50"
-                                                title="Enviar no WhatsApp"
-                                                onClick={() => onWhatsapp(client.phone!, client.name, billing)}
-                                              >
-                                                  <Phone size={14} />
-                                              </Button>
-                                          )}
-                                          <Button
-                                              variant="ghost"
-                                              className="h-7 px-2 text-[10px] font-bold uppercase bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500 hover:text-white transition-all rounded-lg"
-                                              title="Registrar recebimento no Financeiro"
-                                              onClick={() => onReceiveInvoice(invoice)}
-                                          >
-                                              Receber
-                                          </Button>
-                                      </div>
-                                  )}
-                              </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )
-              })
-            )}
+        {nextInvoice && (
+          <div className="flex items-center gap-2 text-[11px] rounded-xl bg-muted/30 border border-border/30 px-3 py-2">
+            <CalendarDays size={13} className={cn("shrink-0", new Date(nextInvoice.dueDate) < now ? "text-rose-500" : "text-muted-foreground")} />
+            <span className="truncate min-w-0 flex-1 font-medium text-foreground/80">{nextInvoice.title}</span>
+            <span className={cn("font-bold font-mono shrink-0", new Date(nextInvoice.dueDate) < now ? "text-rose-600" : "text-muted-foreground")}>
+              {new Date(nextInvoice.dueDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
+            </span>
           </div>
-        </ScrollArea>
+        )}
+
+        <Link href={`/business/${client.id}`} className="mt-auto">
+          <Button variant="outline" className="w-full rounded-xl font-bold h-11 group/abrir border-border/50 hover:bg-primary/5 hover:text-primary hover:border-primary/30 transition-all">
+            Abrir detalhes
+            <ArrowRight size={16} className="ml-2 group-hover/abrir:translate-x-1 transition-transform" />
+          </Button>
+        </Link>
       </div>
     </div>
   );

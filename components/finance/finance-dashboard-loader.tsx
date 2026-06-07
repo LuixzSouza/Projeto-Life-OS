@@ -6,7 +6,9 @@ import type {
   DashboardAccount,
   DashboardTransaction,
   DashboardWishlist,
-  DashboardRecurring
+  DashboardRecurring,
+  DashboardRecurringCharge,
+  DashboardClientOption
 } from "@/components/finance/finance-dashboard";
 import type { CashFlowPoint } from "@/components/finance/cash-flow-chart";
 import { SmartViewProvider } from "@/components/finance/smart-view-context";
@@ -17,8 +19,11 @@ interface FinanceDashboardLoaderProps {
   transactions: DashboardTransaction[];
   wishlist: DashboardWishlist[];
   recurring: DashboardRecurring[];
+  recurringCharges: DashboardRecurringCharge[];
+  clients: DashboardClientOption[];
   totalBalance: number;
   totalRecurring: number;
+  totalCharges: number;
   netSalary: number;
   grossSalary: number; // ✅ Agora obrigatório e tipado
   hasSalarySet: boolean;

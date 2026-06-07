@@ -13,7 +13,7 @@ interface WishlistSectionProps {
 
 export function WishlistSection({ wishlist }: WishlistSectionProps) {
   return (
-    <section className="px-6 md:px-8 py-10 max-w-[1600px] mx-auto space-y-6">
+    <section className="px-6 md:px-8 py-10 max-w-7xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="p-3 bg-primary/10 rounded-2xl shadow-sm">
