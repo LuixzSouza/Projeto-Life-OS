@@ -35,7 +35,10 @@ export default async function DashboardLayout({
 
       <CommandPalette />
 
-      <main className="flex-1 overflow-y-auto">
+      {/* pb no mobile: o bottom-nav é fixo (h-16) e cobriria os últimos ~64px do
+          conteúdo. Reserva o espaço dele + a safe-area do iOS. No desktop (md+) o
+          nav some e o padding zera. */}
+      <main className="flex-1 overflow-y-auto pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
         {children}
       </main>
     </div>
