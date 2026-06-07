@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getCurrentUserId } from "@/lib/auth";
 import { createCard } from "../../actions"; // deleteCard não é mais necessário aqui diretamente
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,17 +37,21 @@ export default async function DeckEditPage({ params }: DeckEditPageProps) {
     );
   }
 
-  const deck = await prisma.flashcardDeck.findUnique({
-    where: { id: deckId },
-    include: {
-      cards: {
-        orderBy: { createdAt: "desc" },
-      },
-      studySubject: {
-        select: { title: true, color: true, icon: true },
-      },
-    },
-  });
+  // Escopa por usuário: só o dono enxerga/edita o baralho (evita IDOR pela URL).
+  const userId = await getCurrentUserId();
+  const deck = userId
+    ? await prisma.flashcardDeck.findFirst({
+        where: { id: deckId, userId },
+        include: {
+          cards: {
+            orderBy: { createdAt: "desc" },
+          },
+          studySubject: {
+            select: { title: true, color: true, icon: true },
+          },
+        },
+      })
+    : null;
 
   if (!deck) {
     return (

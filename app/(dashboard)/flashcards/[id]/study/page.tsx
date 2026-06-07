@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getCurrentUserId } from "@/lib/auth";
 import { StudySession } from "@/components/flashcards/study-session";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -70,8 +71,10 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
 
   /* ------------------------------ FETCH DECK ----------------------------- */
 
-  const deck = await prisma.flashcardDeck.findUnique({
-    where: { id: deckId },
+  // Escopa por usuário: só o dono estuda o próprio baralho (evita IDOR pela URL).
+  const userId = await getCurrentUserId();
+  const deck = !userId ? null : await prisma.flashcardDeck.findFirst({
+    where: { id: deckId, userId },
     include: {
       // Trazemos as cartas para o cliente gerenciar a sessão
       cards: true,

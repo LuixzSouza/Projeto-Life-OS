@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { requireUserId } from "@/lib/auth";
 import { z } from "zod";
 
 /* -------------------------------------------------------------------------- */
@@ -32,6 +33,7 @@ const UpdateCardSchema = z.object({
 
 export async function createDeck(formData: FormData) {
   try {
+    const userId = await requireUserId();
     const rawData = {
       title: String(formData.get("title") ?? "").trim(),
       description: String(formData.get("description") ?? "").trim(),
@@ -54,7 +56,8 @@ export async function createDeck(formData: FormData) {
       data: {
         title: parsed.data.title,
         description: parsed.data.description,
-        studySubjectId: parsed.data.subjectId || null, 
+        studySubjectId: parsed.data.subjectId || null,
+        userId,
       },
     });
 
@@ -68,11 +71,13 @@ export async function createDeck(formData: FormData) {
 
 export async function deleteDeck(deckId: string) {
   try {
+    const userId = await requireUserId();
     if (!deckId) return { success: false, message: "ID inválido." };
 
-    await prisma.flashcardDeck.delete({
-      where: { id: deckId },
+    const res = await prisma.flashcardDeck.deleteMany({
+      where: { id: deckId, userId },
     });
+    if (res.count === 0) return { success: false, message: "Baralho não encontrado." };
 
     revalidatePath("/flashcards");
     return { success: true, message: "Baralho removido com sucesso." };
@@ -88,6 +93,7 @@ export async function deleteDeck(deckId: string) {
 
 export async function createCard(deckId: string, formData: FormData) {
   try {
+    const userId = await requireUserId();
     const rawData = {
       deckId,
       term: String(formData.get("term") ?? "").trim(),
@@ -100,15 +106,23 @@ export async function createCard(deckId: string, formData: FormData) {
       return { success: false, message: parsed.error.issues[0]?.message ?? "Campos inválidos." };
     }
 
+    // Só permite adicionar cartão a um baralho do próprio usuário.
+    const deck = await prisma.flashcardDeck.findFirst({
+      where: { id: parsed.data.deckId, userId },
+      select: { id: true },
+    });
+    if (!deck) return { success: false, message: "Baralho não encontrado." };
+
     await prisma.flashcard.create({
       data: {
         deckId: parsed.data.deckId,
         term: parsed.data.term,
         definition: parsed.data.definition,
         box: 1, // Começa na caixa 1 (Novos cartões)
-        interval: 0, 
+        interval: 0,
         easeFactor: 2.5, // Padrão SM-2
-        nextReview: new Date(), 
+        nextReview: new Date(),
+        userId,
       },
     });
 
@@ -122,9 +136,11 @@ export async function createCard(deckId: string, formData: FormData) {
 
 export async function deleteCard(cardId: string, deckId: string) {
   try {
-    await prisma.flashcard.delete({
-      where: { id: cardId },
+    const userId = await requireUserId();
+    const res = await prisma.flashcard.deleteMany({
+      where: { id: cardId, userId },
     });
+    if (res.count === 0) return { success: false, message: "Cartão não encontrado." };
 
     revalidatePath(`/flashcards/${deckId}/edit`);
     return { success: true, message: "Cartão removido com sucesso." };
@@ -148,13 +164,15 @@ export async function updateCard(deckId: string, formData: FormData) {
       return { success: false, message: "Dados inválidos." };
     }
 
-    await prisma.flashcard.update({
-      where: { id: parsed.data.cardId },
+    const userId = await requireUserId();
+    const res = await prisma.flashcard.updateMany({
+      where: { id: parsed.data.cardId, userId },
       data: {
         term: parsed.data.term,
         definition: parsed.data.definition,
       },
     });
+    if (res.count === 0) return { success: false, message: "Cartão não encontrado." };
 
     revalidatePath(`/flashcards/${deckId}/edit`);
     return { success: true, message: "Cartão atualizado!" };
@@ -172,8 +190,9 @@ type ReviewRating = "AGAIN" | "HARD" | "GOOD" | "EASY";
 
 export async function reviewFlashcard(cardId: string, rating: ReviewRating) {
   try {
-    const card = await prisma.flashcard.findUnique({
-      where: { id: cardId }
+    const userId = await requireUserId();
+    const card = await prisma.flashcard.findFirst({
+      where: { id: cardId, userId }
     });
 
     if (!card) return { success: false, message: "Cartão não encontrado." };
@@ -210,15 +229,15 @@ export async function reviewFlashcard(cardId: string, rating: ReviewRating) {
     // Calcula a próxima data de revisão baseada no intervalo em dias
     nextReview.setDate(nextReview.getDate() + interval);
 
-    await prisma.flashcard.update({
-      where: { id: cardId },
+    await prisma.flashcard.updateMany({
+      where: { id: cardId, userId },
       data: {
         interval,
         easeFactor,
         box,
         nextReview,
         // Opcional: Se você tiver um campo lastReviewed no seu schema
-        // lastReviewed: new Date() 
+        // lastReviewed: new Date()
       }
     });
 
