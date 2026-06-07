@@ -96,6 +96,8 @@ CREATE TABLE "StudyNote" (
     "summary" TEXT,
     "tags" TEXT,
     "isFavorite" BOOLEAN NOT NULL DEFAULT false,
+    "notebookId" TEXT,
+    "projectId" TEXT,
     "subjectId" TEXT,
     "contentId" TEXT,
     "sessionId" TEXT,
@@ -105,10 +107,50 @@ CREATE TABLE "StudyNote" (
     "deletedAt" DATETIME,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "StudyNote_notebookId_fkey" FOREIGN KEY ("notebookId") REFERENCES "Notebook" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "StudyNote_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT "StudyNote_subjectId_fkey" FOREIGN KEY ("subjectId") REFERENCES "StudySubject" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT "StudyNote_contentId_fkey" FOREIGN KEY ("contentId") REFERENCES "StudyContent" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT "StudyNote_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "StudySession" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT "StudyNote_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "NoteImage" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "mime" TEXT NOT NULL,
+    "data" TEXT NOT NULL,
+    "noteId" TEXT,
+    "userId" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "NoteImage_noteId_fkey" FOREIGN KEY ("noteId") REFERENCES "StudyNote" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "NoteImage_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Notebook" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "color" TEXT DEFAULT '#6366f1',
+    "icon" TEXT,
+    "isInbox" BOOLEAN NOT NULL DEFAULT false,
+    "position" INTEGER NOT NULL DEFAULT 0,
+    "userId" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Notebook_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "StudyNoteVersion" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "title" TEXT NOT NULL,
+    "content" TEXT NOT NULL,
+    "noteId" TEXT NOT NULL,
+    "userId" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "StudyNoteVersion_noteId_fkey" FOREIGN KEY ("noteId") REFERENCES "StudyNote" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "StudyNoteVersion_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -936,7 +978,28 @@ CREATE INDEX "StudyNote_userId_idx" ON "StudyNote"("userId");
 CREATE INDEX "StudyNote_subjectId_idx" ON "StudyNote"("subjectId");
 
 -- CreateIndex
+CREATE INDEX "StudyNote_notebookId_idx" ON "StudyNote"("notebookId");
+
+-- CreateIndex
+CREATE INDEX "StudyNote_projectId_idx" ON "StudyNote"("projectId");
+
+-- CreateIndex
 CREATE INDEX "StudyNote_userId_deletedAt_idx" ON "StudyNote"("userId", "deletedAt");
+
+-- CreateIndex
+CREATE INDEX "NoteImage_noteId_idx" ON "NoteImage"("noteId");
+
+-- CreateIndex
+CREATE INDEX "NoteImage_userId_idx" ON "NoteImage"("userId");
+
+-- CreateIndex
+CREATE INDEX "Notebook_userId_idx" ON "Notebook"("userId");
+
+-- CreateIndex
+CREATE INDEX "StudyNoteVersion_noteId_createdAt_idx" ON "StudyNoteVersion"("noteId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "StudyNoteVersion_userId_idx" ON "StudyNoteVersion"("userId");
 
 -- CreateIndex
 CREATE INDEX "LearningGoal_userId_idx" ON "LearningGoal"("userId");

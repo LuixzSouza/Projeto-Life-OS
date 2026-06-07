@@ -226,7 +226,15 @@ Um vazamento expõe a infra de TODOS os usuários, não só a sua.
   passo de revisão do `/setup` (`step-review.tsx`) avisando que os dados vão para o banco
   DESTA instância (e, se compartilhada, para o do dono). Type/lint limpos.
 - **Fase 1 — guia self-hosting**: `docs/SELF_HOSTING.md` (Desktop `local` + Deploy próprio
-  Vercel/Turso, env vars, `LIFEOS_REGISTRATION`), linkado do `/register`.
+  Vercel/Turso, env vars, `LIFEOS_REGISTRATION`), linkado do `/register`. + `docs/DEPLOY_VERCEL.md`.
+- **Hardening de deploy (jun/2026)**:
+  - `prisma/baseline.sql` estava DESATUALIZADO (faltavam `Notebook`/`NoteImage`/
+    `StudyNoteVersion` + colunas `StudyNote.notebookId/projectId`) → instância nova na
+    nuvem nasceria sem o sistema de notas. Regenerado (`npm run db:baseline`): 56=56.
+  - Conta demo (`demo@lifeos.local`/`demo`) era criada SEMPRE no setup → backdoor em
+    deploy público. Agora só no desktop local (`isEphemeralServerless()` em
+    `app/actions/setup.ts`). Conta demo removida do Turso de produção.
+  - Migração dos dados locais → Turso concluída (56 tabelas; só sua conta no Turso).
 
 ### ⏳ Próximo (em ordem sugerida)
 1. **Dívida #3 (independe de fase)**: tirar o `ensureSchema` (DDL) do fluxo de request

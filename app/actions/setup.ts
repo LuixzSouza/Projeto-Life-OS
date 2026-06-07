@@ -4,7 +4,7 @@ import type { PrismaClient } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { login, hashPassword } from "@/lib/auth";
-import { setDbProfile, getEnvProfile, type DbProfile } from "@/lib/db-config";
+import { setDbProfile, getEnvProfile, isEphemeralServerless, type DbProfile } from "@/lib/db-config";
 import { reconnectPrisma, buildAdapterClient } from "@/lib/prisma";
 import { ensureSchema } from "@/lib/db-bootstrap";
 import { mergeSqliteIntoTurso } from "@/lib/db-migrate";
@@ -292,19 +292,23 @@ export async function setupSystem(
       },
     });
 
-    // Conta Demo
-    const demoEmail = "demo@lifeos.local";
-    const demoExists = await tempPrisma.user.findUnique({ where: { email: demoEmail } });
-    if (!demoExists) {
-      await tempPrisma.user.create({
-        data: {
-          name: "Usuário Demo",
-          email: demoEmail,
-          password: await hashPassword("demo"),
-          bio: "Conta de testes.",
-          avatarUrl: `https://ui-avatars.com/api/?name=Demo&background=333&color=fff`,
-        },
-      });
+    // Conta Demo — APENAS no desktop local. Em deploy hospedado (Vercel/Turso) a
+    // instância é pública: uma conta com senha conhecida ("demo") seria uma porta
+    // dos fundos. Por isso só semeamos a demo em ambiente local.
+    if (!isEphemeralServerless()) {
+      const demoEmail = "demo@lifeos.local";
+      const demoExists = await tempPrisma.user.findUnique({ where: { email: demoEmail } });
+      if (!demoExists) {
+        await tempPrisma.user.create({
+          data: {
+            name: "Usuário Demo",
+            email: demoEmail,
+            password: await hashPassword("demo"),
+            bio: "Conta de testes.",
+            avatarUrl: `https://ui-avatars.com/api/?name=Demo&background=333&color=fff`,
+          },
+        });
+      }
     }
 
     console.log("✅ Dados inseridos com sucesso!");
