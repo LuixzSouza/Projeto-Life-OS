@@ -87,7 +87,7 @@ export function ContractsList({
 
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover/billing:opacity-100 transition-opacity">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 opacity-100 md:opacity-0 md:group-hover/billing:opacity-100 transition-opacity">
                               <MoreHorizontal size={14} />
                             </Button>
                           </DropdownMenuTrigger>
@@ -138,7 +138,7 @@ export function ContractsList({
                               {formatCurrency(invoice.value)}
                             </span>
                             {!isPaid && (
-                              <div className="flex items-center gap-1 opacity-0 group-hover/inv:opacity-100 transition-opacity">
+                              <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover/inv:opacity-100 transition-opacity">
                                 {client.phone && (
                                   <Button
                                     size="icon"

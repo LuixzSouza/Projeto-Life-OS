@@ -103,7 +103,7 @@ export function MediaCard({ item }: { item: MediaItemData }) {
           )}
 
           {/* MENU DE OPÇÕES */}
-          <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10" onClick={(e) => e.stopPropagation()}>
+          <div className="absolute top-2 right-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10" onClick={(e) => e.stopPropagation()}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="icon" variant="ghost" className="h-7 w-7 bg-black/50 hover:bg-black/80 text-white rounded-md backdrop-blur-sm border border-white/10">

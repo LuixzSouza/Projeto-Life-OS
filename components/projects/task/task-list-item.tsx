@@ -93,7 +93,7 @@ export function TaskListItem({
         </div>
 
         {/* AÇÕES (HOVER) */}
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all" onPointerDown={stopPropagation}>
+        <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all" onPointerDown={stopPropagation}>
           <QuickActionButton
             icon={<Star className={cn("h-4 w-4", isStarred && "fill-current")} />}
             label="Priorizar"

@@ -155,7 +155,7 @@ export function RoutineGrid({ items, isToday = false }: { items: RoutineItem[]; 
                         )}
                       </div>
 
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-background/50 rounded-md p-1 backdrop-blur-sm">
+                      <div className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-background/50 rounded-md p-1 backdrop-blur-sm">
                         <Edit2 className="h-3 w-3 text-muted-foreground" />
                       </div>
                     </div>

@@ -27,7 +27,7 @@ export function CertificationsForm({ data, onChange }: { data: PortfolioData; on
       <div className="grid grid-cols-1 gap-6">
         {data.certifications.map((cert) => (
           <div key={cert.id} className="relative group bg-card border border-border/40 p-6 rounded-[2rem] shadow-lg hover:border-primary/30 transition-all">
-            <Button size="icon" variant="destructive" className="absolute -top-3 -right-3 h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg" onClick={() => remove(cert.id)}>
+            <Button size="icon" variant="destructive" className="absolute -top-3 -right-3 h-8 w-8 rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shadow-lg" onClick={() => remove(cert.id)}>
               <Trash2 className="h-4 w-4" />
             </Button>
 

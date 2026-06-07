@@ -177,7 +177,7 @@ export function GoalsClient({ initialGoals, subjects }: { initialGoals: GoalData
                   )}
                 </div>
 
-                <div className="mt-3 flex justify-end gap-1 border-t border-border/40 pt-2 opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="mt-3 flex justify-end gap-1 border-t border-border/40 pt-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditing(goal); }} title="Editar">
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>

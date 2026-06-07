@@ -36,7 +36,7 @@ export function ProjectCardMenu({ projectId, slug, title, taskCount }: ProjectCa
             onClick={stopNav}
             onPointerDown={stop}
             aria-label="Ações do projeto"
-            className="h-8 w-8 rounded-lg text-muted-foreground opacity-0 transition-all group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 hover:bg-muted hover:text-foreground"
+            className="h-8 w-8 rounded-lg text-muted-foreground opacity-100 transition-all md:opacity-0 md:group-hover:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100 hover:bg-muted hover:text-foreground"
           >
             <MoreHorizontal className="h-4 w-4" />
           </Button>

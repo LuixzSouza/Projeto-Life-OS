@@ -62,7 +62,7 @@ const SkillCategory = ({ title, category, data, onAdd, onRemove, onUpdate }: Ski
           <Button 
             size="icon" 
             variant="ghost" 
-            className="h-10 w-10 shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all rounded-xl"
+            className="h-10 w-10 shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all rounded-xl"
             onClick={() => onRemove(category, index)}
           >
             <X className="h-4 w-4" />

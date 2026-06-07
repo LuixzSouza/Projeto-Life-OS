@@ -190,7 +190,7 @@ export function EventList({ groupedEvents, sortedKeys }: EventListProps) {
                                 </div>
 
                                 {/* Menu de Ações (Aparece no Hover) */}
-                                <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-background/80 backdrop-blur-sm rounded-lg border border-border/40 shadow-sm shrink-0">
+                                <div className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity bg-background/80 backdrop-blur-sm rounded-lg border border-border/40 shadow-sm shrink-0">
                                     <Dialog>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>

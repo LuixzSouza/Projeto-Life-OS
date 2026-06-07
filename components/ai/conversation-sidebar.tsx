@@ -151,7 +151,7 @@ export function ConversationSidebar({ chats, activeId, activeTitle }: Props) {
                         type="button"
                         aria-label="Apagar conversa"
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDelete(c.id); }}
-                        className="shrink-0 rounded-md p-1 text-muted-foreground/40 opacity-0 transition group-hover:opacity-100 hover:bg-rose-500/10 hover:text-rose-500"
+                        className="shrink-0 rounded-md p-1 text-muted-foreground/40 opacity-100 transition md:opacity-0 md:group-hover:opacity-100 hover:bg-rose-500/10 hover:text-rose-500"
                       >
                         {deletingId === c.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                       </button>

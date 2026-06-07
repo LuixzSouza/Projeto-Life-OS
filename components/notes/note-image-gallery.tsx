@@ -142,7 +142,7 @@ export function NoteImageGallery({
                 type="button"
                 onClick={() => removeImage(img)}
                 title="Remover imagem da anotação"
-                className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white/15 text-white opacity-0 transition-opacity hover:bg-destructive group-hover:opacity-100"
+                className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-white/15 text-white opacity-100 transition-opacity hover:bg-destructive md:opacity-0 md:group-hover:opacity-100"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>

@@ -119,7 +119,7 @@ export function ImagePaster({ defaultValue, onImageChange }: ImagePasterProps) {
             className="max-h-[300px] w-full bg-muted object-contain"
           />
 
-          <div className="absolute right-2 top-2 flex gap-2 opacity-0 transition-opacity group-hover:opacity-100">
+          <div className="absolute right-2 top-2 flex gap-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
             <Button
               type="button"
               size="icon"
