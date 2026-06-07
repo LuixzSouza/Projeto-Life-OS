@@ -8,6 +8,7 @@ import { getCurrentUserId } from "@/lib/auth";
 import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
 import { BackLink } from "@/components/ui/back-link";
 import { ErrorState } from "@/components/ui/error-state";
+import { StartLiveButton } from "@/components/health/gym/session/start-live-button";
 
 export const metadata: Metadata = {
   title: "Treino de Força | Life OS",
@@ -162,6 +163,8 @@ export default async function GymPage() {
       </PageHeader>
 
       <PageContainer>
+        {/* CTA proeminente do treino ao vivo — visível em qualquer aba, ótimo no mobile. */}
+        <StartLiveButton variant="hero" className="mb-6" />
         <GymView workouts={serializedWorkouts} challenges={serializedChallenges} />
       </PageContainer>
     </PageShell>

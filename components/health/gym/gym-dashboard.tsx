@@ -10,7 +10,6 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
 import { GymForm } from "./gym-form";
-import { StartLiveButton } from "./session/start-live-button";
 import { GymGallery } from "./session/gallery-view";
 import { WorkoutPlanBuilder } from "./workout-plan-builder";
 import { VolumeChart } from "./volume-chart";
@@ -92,9 +91,8 @@ export function GymDashboard({ workouts }: { workouts: GymWorkout[] }) {
             </TabsTrigger>
           </TabsList>
 
-          {/* Ações: treinar ao vivo + registrar sessão manual */}
+          {/* Ação: registrar sessão manual (o "Treinar agora" agora é o hero no topo). */}
           <div className="flex items-center gap-2 self-start sm:self-auto">
-          <StartLiveButton />
           <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
             <DialogTrigger asChild>
               <Button size="sm" variant="outline" className="h-9 gap-2 font-medium rounded-lg shadow-sm">
