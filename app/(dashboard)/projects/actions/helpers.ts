@@ -40,7 +40,13 @@ export function getEnumValue<T extends readonly string[]>(
 }
 
 export function getDate(value: string | null): Date | null {
-  return value ? new Date(value) : null;
+  if (!value) return null;
+  // Datas de <input type="date"> chegam como "YYYY-MM-DD" (sem hora). O JS
+  // interpreta isso como meia-noite UTC → em fusos negativos (ex.: Brasil UTC-3)
+  // vira o DIA ANTERIOR. Ancorar ao meio-dia UTC mantém o mesmo dia do calendário
+  // em qualquer fuso (-12..+14). Strings com hora (datetime) passam intactas.
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+  return new Date(isDateOnly ? `${value}T12:00:00Z` : value);
 }
 
 // =========================================================
