@@ -320,7 +320,7 @@ export function WorkoutPlanBuilder() {
                                                     <p className="text-xs text-muted-foreground font-mono mt-0.5">{act.details}</p>
                                                 </div>
                                             </div>
-                                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="flex gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
                                                 <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-foreground">
                                                     <Pencil className="h-3.5 w-3.5" />
                                                 </Button>

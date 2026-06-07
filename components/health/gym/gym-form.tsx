@@ -289,7 +289,7 @@ export function GymForm({ onSuccess, initialData }: GymFormProps) {
                 </div>
                 <div className="col-span-2 relative flex items-center">
                   <Input placeholder="0" className="h-9 text-center bg-transparent border-transparent focus-visible:border-primary/30 focus-visible:bg-background rounded-lg font-mono text-sm" value={ex.weight} onChange={(e) => updateExercise(i, 'weight', e.target.value)} />
-                  <button type="button" onClick={() => removeExercise(i)} className="absolute -right-1 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all p-1">
+                  <button type="button" onClick={() => removeExercise(i)} className="absolute -right-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all p-1">
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
