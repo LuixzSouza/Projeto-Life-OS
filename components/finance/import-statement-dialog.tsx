@@ -126,7 +126,7 @@ export function ImportStatementDialog({ open, onOpenChange, accounts }: ImportSt
                 </span>
               </div>
 
-              <div className="max-h-[260px] overflow-y-auto rounded-xl border border-border/40 custom-scrollbar">
+              <div className="max-h-[260px] overflow-auto rounded-xl border border-border/40 custom-scrollbar">
                 <table className="w-full text-sm">
                   <tbody>
                     {parsed.map((t, i) => (
