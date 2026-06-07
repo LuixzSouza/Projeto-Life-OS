@@ -1,3 +1,4 @@
+import { Database } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { DB_PROVIDERS, AI_PROVIDERS, type SetupFormData } from "../wizard-types";
 
@@ -51,6 +52,17 @@ export function StepReview({ formData, dbFromEnv }: StepReviewProps) {
           </div>
         </div>
       </Card>
+      {/* Nota de instância: este é o banco DESTA instalação (Modelo A). */}
+      <div className="flex items-start gap-2.5 rounded-xl border border-border/60 bg-muted/30 px-3.5 py-3">
+        <Database className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+        <p className="text-[11px] text-muted-foreground leading-relaxed">
+          Este é o banco <span className="font-semibold text-foreground">desta instância</span>.
+          Todo mundo que usar esta instalação compartilha este mesmo banco (com os dados
+          isolados por usuário). Para que cada pessoa tenha o seu próprio banco, cada uma
+          deve rodar a sua própria instância e apontar o Turso dela aqui no setup.
+        </p>
+      </div>
+
       <div className="text-center">
         <p className="text-sm text-muted-foreground">
           Ao clicar abaixo, o sistema será configurado e iniciado.

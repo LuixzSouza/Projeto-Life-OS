@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
     Loader2, Eye, EyeOff, ArrowRight, ShieldCheck, Command, BrainCircuit,
-    AlertCircle, ArrowUp, Brain, User as UserIcon, UserPlus,
+    AlertCircle, ArrowUp, Brain, User as UserIcon, UserPlus, Database,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -114,6 +114,24 @@ export default function RegisterPageClient() {
                         <h1 className="text-3xl font-bold tracking-tight">Criar sua conta</h1>
                         <p className="text-muted-foreground text-sm">
                             Crie um acesso próprio — seus dados ficam isolados dos demais.
+                        </p>
+                    </div>
+
+                    {/* Nota de instância: deixa claro QUAL banco recebe os dados (Modelo A). */}
+                    <div className="flex items-start gap-2.5 rounded-xl border border-border/60 bg-muted/30 px-3.5 py-3 text-left">
+                        <Database className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                            Sua conta é isolada por usuário, mas é gravada no banco{" "}
+                            <span className="font-semibold text-foreground">desta instância</span>. Se
+                            ela for compartilhada, os dados ficam no banco do dono da instalação.{" "}
+                            <a
+                                href="https://github.com/LuixzSouza/Projeto-Life-OS/blob/main/docs/SELF_HOSTING.md"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-semibold text-primary hover:underline underline-offset-2"
+                            >
+                                Quer um banco só seu?
+                            </a>
                         </p>
                     </div>
 

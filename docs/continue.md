@@ -84,12 +84,13 @@ Objetivo: deixar "cada um com o seu" óbvio e funcional, sem rearquitetar.
       `LIFEOS_REGISTRATION=off|on` tem prioridade p/ serverless). `register` recusa
       quando fechado. Toggle "Permitir novos cadastros" em Configurações → Segurança
       (cartão "Acesso ao Sistema") via `setRegistrationPolicy`.
-- [ ] Texto no `/setup` e `/register` explicando: "este sistema usa o banco
-      configurado nesta instância". Se for compartilhado, avisar que os dados vão
-      para o banco do dono. (PARCIAL: /register já diz "dados isolados"; falta a nota
-      de instância/dono.)
-- [ ] Guia (README/docs) de "como rodar a sua própria instância" (desktop ou deploy
-      Vercel próprio) + configurar o Turso/banco no `/setup`.
+- [x] **Texto no `/setup` e `/register`** ✅ — nota de instância no `/register`
+      (`components/login/RegisterPageClient.tsx`, com link p/ o guia) e no passo de
+      revisão do `/setup` (`components/setup/steps/step-review.tsx`): deixa claro que os
+      dados vão para o banco DESTA instância e, se compartilhada, para o banco do dono.
+- [x] **Guia self-hosting** ✅ — `docs/SELF_HOSTING.md`: Desktop (banco `local`) e Deploy
+      próprio (Vercel + Turso do usuário), env vars, `LIFEOS_REGISTRATION`, e ponteiro
+      para `docs/DATABASE.md`.
 
 ### Fase 2 — Conexão por usuário numa instância (Modelo B) — MÉDIO/ALTO esforço
 Objetivo: cada usuário logado usa o próprio banco, numa instância só.
@@ -221,16 +222,17 @@ Um vazamento expõe a infra de TODOS os usuários, não só a sua.
 - **Fase 1 — Travar cadastro aberto** (política de instância): `registrationOpen` no
   config + env `LIFEOS_REGISTRATION`; `register` recusa quando fechado; toggle em
   Configurações → Segurança ("Acesso ao Sistema"). Type/lint limpos.
+- **Fase 1 — copy de instância**: nota no `/register` (`RegisterPageClient.tsx`) e no
+  passo de revisão do `/setup` (`step-review.tsx`) avisando que os dados vão para o banco
+  DESTA instância (e, se compartilhada, para o do dono). Type/lint limpos.
+- **Fase 1 — guia self-hosting**: `docs/SELF_HOSTING.md` (Desktop `local` + Deploy próprio
+  Vercel/Turso, env vars, `LIFEOS_REGISTRATION`), linkado do `/register`.
 
 ### ⏳ Próximo (em ordem sugerida)
-1. **Fase 1 — copy de instância**: nota em `/register` e `/setup` dizendo que os dados
-   vão para o banco DESTA instância (e, se compartilhada, para o banco do dono).
-2. **Fase 1 — guia self-hosting**: `docs/` curto de "rode a sua própria instância +
-   aponte seu Turso no /setup" (resolve "cada um com o seu" via Modelo A).
-3. **Dívida #3 (independe de fase)**: tirar o `ensureSchema` (DDL) do fluxo de request
+1. **Dívida #3 (independe de fase)**: tirar o `ensureSchema` (DDL) do fluxo de request
    em `setup`/`migrateToReplica` → provisionamento explícito no clique, com tela
    "Configurando…" e lock/flag de idempotência. Risco real de timeout na Vercel.
-4. **Portão de Decisão do ORM** (antes de Fase 2/3): decidir Prisma vs Drizzle/Kysely
+2. **Portão de Decisão do ORM** (antes de Fase 2/3): decidir Prisma vs Drizzle/Kysely
    se multi-provedor for compromisso firmado.
 
 ### 🧊 Depois (épicos)
