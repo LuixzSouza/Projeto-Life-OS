@@ -47,9 +47,19 @@ const PRESET_COLORS = [
 export function EventForm({
   onClose,
   initialData,
+  defaultStart,
+  defaultEnd,
+  taskId,
+  taskTitle,
 }: {
   onClose?: () => void;
   initialData?: EventFormData;
+  // Pré-preenchimento ao CRIAR (sem initialData): vindo do clique num slot da grade.
+  defaultStart?: Date;
+  defaultEnd?: Date;
+  // Ao CRIAR a partir de uma tarefa: vincula o bloco à tarefa (Projetos↔Agenda).
+  taskId?: string | null;
+  taskTitle?: string | null;
 }) {
   const router = useRouter();
   const [isPending, setIsPending] = useState(false);
@@ -62,17 +72,25 @@ export function EventForm({
   const urlDate = searchParams.get("date");
   const defaultDate = initialData
     ? format(new Date(initialData.startTime), "yyyy-MM-dd")
-    : urlDate || format(new Date(), "yyyy-MM-dd");
+    : defaultStart
+      ? format(defaultStart, "yyyy-MM-dd")
+      : urlDate || format(new Date(), "yyyy-MM-dd");
 
   const defaultStartTime = initialData
     ? format(new Date(initialData.startTime), "HH:mm")
-    : "09:00";
+    : defaultStart
+      ? format(defaultStart, "HH:mm")
+      : "09:00";
 
   const defaultEndTime = initialData?.endTime
     ? format(new Date(initialData.endTime), "HH:mm")
-    : initialData 
+    : initialData
         ? format(addHours(new Date(initialData.startTime), 1), "HH:mm")
-        : "10:00";
+        : defaultEnd
+          ? format(defaultEnd, "HH:mm")
+          : defaultStart
+            ? format(addHours(defaultStart, 1), "HH:mm")
+            : "10:00";
 
   const handleSubmit = async (formData: FormData) => {
     setIsPending(true);
@@ -102,10 +120,20 @@ export function EventForm({
     <form action={handleSubmit} className="flex flex-col w-full max-h-[75vh] sm:max-h-[80vh] overflow-hidden">
       
       {initialData && <input type="hidden" name="id" value={initialData.id} />}
+      {!initialData && taskId && <input type="hidden" name="taskId" value={taskId} />}
 
       {/* ÁREA ROLÁVEL (Inputs) - Agora vai rolar perfeitamente */}
       <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
-        
+
+          {!initialData && taskId && taskTitle && (
+            <div className="flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2.5">
+              <CheckCircle className="h-4 w-4 shrink-0 text-primary" />
+              <span className="text-xs font-semibold text-foreground">
+                Bloco vinculado à tarefa: <span className="text-primary">{taskTitle}</span>
+              </span>
+            </div>
+          )}
+
           {/* Título */}
           <div className="space-y-2">
             <Label htmlFor="title" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
@@ -114,7 +142,7 @@ export function EventForm({
             <Input
               id="title"
               name="title"
-              defaultValue={initialData?.title}
+              defaultValue={initialData?.title ?? (taskTitle || undefined)}
               placeholder="Ex: Sync de Projetos"
               className="h-12 text-base font-bold placeholder:text-muted-foreground/30 bg-muted/20 border-border/40 focus-visible:ring-primary/30 focus-visible:border-primary transition-all rounded-xl"
               required

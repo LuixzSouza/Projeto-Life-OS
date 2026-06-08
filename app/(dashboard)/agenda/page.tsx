@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Target, CalendarClock, ListChecks, Clock, ListTodo, Sun, CalendarRange } from "lucide-react";
+import { Target, CalendarClock, ListChecks, Clock, ListTodo, Sun, CalendarRange, Timer, Brain } from "lucide-react";
 import {
   parseISO, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameDay,
 } from "date-fns";
@@ -13,7 +13,12 @@ import { AgendaCalendar } from "@/components/agenda/agenda-calendar";
 import { UnifiedAgenda } from "@/components/agenda/unified-agenda";
 import { TaskList } from "@/components/agenda/task-list";
 import { RoutineManager } from "@/components/agenda/routine-manager";
+import { TimeBlockingDay } from "@/components/agenda/time-blocking-day";
 import { getRoutineItems } from "./actions";
+import { getThemedDays } from "./themed-days-actions";
+import { getFocusStats, getFocusDrivers } from "./focus-actions";
+import { FocusInsights } from "@/components/focus/focus-insights";
+import { FocusDrivers } from "@/components/focus/focus-drivers";
 import { getAgendaItems } from "@/lib/agenda-aggregator";
 import { getCurrentUserId } from "@/lib/auth";
 
@@ -37,7 +42,7 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
 
   const userId = await getCurrentUserId();
 
-  const [agendaItems, pendingTasks, pendingTaskCount, routineItems] = await Promise.all([
+  const [agendaItems, pendingTasks, pendingTaskCount, routineItems, blockEvents, themedDays, focusStats, focusDrivers] = await Promise.all([
     getAgendaItems(rangeStart, rangeEnd),
     prisma.task.findMany({
       where: { isDone: false, userId, deletedAt: null },
@@ -47,6 +52,16 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
     }),
     prisma.task.count({ where: { isDone: false, userId, deletedAt: null } }),
     getRoutineItems(),
+    // Eventos da janela do mês para a grade de Time-Blocking (criar/editar reais).
+    // Inclui a tarefa vinculada (isDone) p/ concluir direto do bloco.
+    prisma.event.findMany({
+      where: { userId, startTime: { gte: rangeStart, lte: rangeEnd }, deletedAt: null },
+      orderBy: { startTime: "asc" },
+      include: { project: projectSelect, task: { select: { isDone: true, title: true } } },
+    }),
+    getThemedDays(),
+    getFocusStats(),
+    getFocusDrivers(),
   ]);
 
   // Dias com qualquer registro (para marcar no calendário).
@@ -128,6 +143,12 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
                     <TabsTrigger value="calendar" className="gap-2 rounded-lg px-5 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm">
                       <CalendarRange className="h-4 w-4" /> Calendário
                     </TabsTrigger>
+                    <TabsTrigger value="blocks" className="gap-2 rounded-lg px-5 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm">
+                      <Timer className="h-4 w-4" /> Blocos
+                    </TabsTrigger>
+                    <TabsTrigger value="focus" className="gap-2 rounded-lg px-5 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm">
+                      <Brain className="h-4 w-4" /> Foco
+                    </TabsTrigger>
                     <TabsTrigger value="tasks" className="gap-2 rounded-lg px-5 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm">
                       <ListTodo className="h-4 w-4" /> Tarefas
                     </TabsTrigger>
@@ -139,7 +160,18 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
 
                 {/* CALENDÁRIO UNIFICADO */}
                 <TabsContent value="calendar" className="m-0 flex h-full flex-1 flex-col overflow-hidden p-0 data-[state=active]:flex">
-                  <UnifiedAgenda items={agendaItems} selectedDateISO={selectedDate.toISOString()} />
+                  <UnifiedAgenda items={agendaItems} selectedDateISO={selectedDate.toISOString()} themedDays={themedDays} />
+                </TabsContent>
+
+                {/* TIME-BLOCKING (grade de horas interativa) */}
+                <TabsContent value="blocks" className="m-0 flex h-full flex-1 flex-col overflow-hidden p-0 data-[state=active]:flex">
+                  <TimeBlockingDay events={blockEvents} tasks={pendingTasks} themedDays={themedDays} selectedDateISO={selectedDate.toISOString()} />
+                </TabsContent>
+
+                {/* FOCO (painel de produtividade — últimos 7 dias + padrões) */}
+                <TabsContent value="focus" className="m-0 flex-1 overflow-y-auto bg-background/50 data-[state=active]:flex flex-col">
+                  <FocusInsights stats={focusStats} />
+                  <FocusDrivers drivers={focusDrivers} />
                 </TabsContent>
 
                 {/* TAREFAS */}

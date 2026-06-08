@@ -14,9 +14,10 @@ export async function createEvent(formData: FormData) {
   const dateStr = formData.get("date") as string;
   const timeStr = formData.get("time") as string;
   const endTimeStr = formData.get("endTime") as string; // 🟢 NOVO: Hora de fim
-  const location = formData.get("location") as string; 
-  const color = formData.get("color") as string;       
-  const notification = formData.get("notification") === "on"; 
+  const location = formData.get("location") as string;
+  const color = formData.get("color") as string;
+  const notification = formData.get("notification") === "on";
+  const taskIdRaw = (formData.get("taskId") as string) || ""; // bloco agendado a partir de uma tarefa
 
   if (!title || !dateStr || !timeStr) {
     throw new Error("Preencha os campos obrigatórios (Título, Data e Hora).");
@@ -36,6 +37,13 @@ export async function createEvent(formData: FormData) {
 
   const userId = await requireUserId();
 
+  // Só vincula o bloco à tarefa se ela for do próprio usuário (evita FK inválida).
+  let taskId: string | null = null;
+  if (taskIdRaw) {
+    const task = await prisma.task.findFirst({ where: { id: taskIdRaw, userId }, select: { id: true } });
+    taskId = task?.id ?? null;
+  }
+
   const created = await prisma.event.create({
     data: {
       title,
@@ -45,6 +53,7 @@ export async function createEvent(formData: FormData) {
       location: location || null,
       color: color || "#3B82F6", // Default Blue (Google Calendar vibe)
       emailAlert: notification,
+      taskId,
       userId,
     },
   });
