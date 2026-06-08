@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Check, Plus, Flame, Trash2, Frown, X } from "lucide-react";
+import { Loader2, Check, Plus, Flame, Trash2, Frown, X, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogBody, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CHALLENGE_EMOJIS, CHALLENGE_COLORS } from "@/components/health/gym/challenge-templates";
+import { SkillTreeDialog } from "@/components/health/skill-tree-dialog";
 import {
   getHabits, createHabit, deleteHabit, setHabitLog,
   type SerializedHabit, type HabitLogStatus, type FrictionReason,
@@ -45,6 +46,7 @@ export function HabitsCard() {
   const [busy, setBusy] = useState(false);
   const [failFor, setFailFor] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [skillOpen, setSkillOpen] = useState(false);
   const today = localDay();
 
   useEffect(() => {
@@ -87,9 +89,16 @@ export function HabitsCard() {
             {habits.length > 0 ? `${doneToday}/${habits.length} concluídos` : "Crie hábitos pra construir consistência"}
           </p>
         </div>
-        <Button size="sm" variant="outline" className="h-8 gap-1.5 rounded-lg" onClick={() => setAddOpen(true)}>
-          <Plus className="h-3.5 w-3.5" /> Novo
-        </Button>
+        <div className="flex items-center gap-1.5">
+          {habits.length > 0 && (
+            <Button size="sm" variant="ghost" className="h-8 gap-1.5 rounded-lg px-2.5 text-muted-foreground hover:text-primary" onClick={() => setSkillOpen(true)} title="Ver evolução dos hábitos">
+              <Sparkles className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Evolução</span>
+            </Button>
+          )}
+          <Button size="sm" variant="outline" className="h-8 gap-1.5 rounded-lg" onClick={() => setAddOpen(true)}>
+            <Plus className="h-3.5 w-3.5" /> Novo
+          </Button>
+        </div>
       </div>
 
       {!loaded ? (
@@ -192,6 +201,7 @@ export function HabitsCard() {
       )}
 
       <AddHabitDialog open={addOpen} onOpenChange={setAddOpen} onCreated={() => { setAddOpen(false); reload(); }} />
+      <SkillTreeDialog open={skillOpen} onOpenChange={setSkillOpen} />
     </section>
   );
 }

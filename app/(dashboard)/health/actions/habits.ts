@@ -182,6 +182,140 @@ export async function getFrictionVector(): Promise<FrictionVector> {
   }
 }
 
+// =========================================================
+// SKILL TREES (#22) — hábitos viram habilidades que evoluem
+// =========================================================
+// XP = total de dias concluídos (consistência). Nível e título derivam do XP.
+// Motiva sem punir: nada some, só cresce.
+
+const SKILL_TIERS = [0, 3, 7, 14, 25, 40, 60, 90, 130, 180, 250, 340];
+const SKILL_TITLES: { emoji: string; title: string }[] = [
+  { emoji: "🌱", title: "Semente" },
+  { emoji: "🌿", title: "Broto" },
+  { emoji: "🌳", title: "Muda" },
+  { emoji: "🔥", title: "Em chamas" },
+  { emoji: "⭐", title: "Constante" },
+  { emoji: "💪", title: "Disciplinado" },
+  { emoji: "🏅", title: "Veterano" },
+  { emoji: "🚀", title: "Imparável" },
+  { emoji: "💎", title: "Diamante" },
+  { emoji: "👑", title: "Mestre" },
+  { emoji: "🌟", title: "Lendário" },
+  { emoji: "🏆", title: "Imortal" },
+];
+
+export interface SkillNode {
+  id: string;
+  name: string;
+  icon: string | null;
+  color: string | null;
+  xp: number;
+  level: number; // 1-based
+  emoji: string;
+  title: string;
+  intoLevel: number; // XP acumulado dentro do nível atual
+  levelSpan: number | null; // XP total do nível atual (null = nível máximo)
+  toNext: number | null; // XP faltando p/ o próximo (null = máximo)
+  streak: number;
+}
+export interface SkillTree {
+  hasHabits: boolean;
+  totalXp: number;
+  overallLevel: number;
+  overallEmoji: string;
+  overallTitle: string;
+  nodes: SkillNode[];
+}
+
+// Nível a partir do XP usando uma tabela de limiares (com escala opcional p/ o geral).
+function levelInfo(xp: number, scale = 1) {
+  const tiers = SKILL_TIERS.map((t) => t * scale);
+  let idx = 0;
+  for (let i = 0; i < tiers.length; i++) if (xp >= tiers[i]) idx = i;
+  const meta = SKILL_TITLES[Math.min(idx, SKILL_TITLES.length - 1)];
+  const base = tiers[idx];
+  const next = idx + 1 < tiers.length ? tiers[idx + 1] : null;
+  return {
+    level: idx + 1,
+    emoji: meta.emoji,
+    title: meta.title,
+    intoLevel: xp - base,
+    levelSpan: next != null ? next - base : null,
+    toNext: next != null ? next - xp : null,
+  };
+}
+
+const utcDayKey = (d: Date) => d.toISOString().slice(0, 10);
+function shiftUtcDay(key: string, delta: number): string {
+  const d = new Date(`${key}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
+
+export async function getSkillTree(): Promise<SkillTree> {
+  const empty: SkillTree = { hasHabits: false, totalXp: 0, overallLevel: 1, overallEmoji: "🌱", overallTitle: "Semente", nodes: [] };
+  try {
+    const userId = await requireUserId();
+
+    const since = new Date();
+    since.setDate(since.getDate() - 120);
+
+    const [habits, doneCounts, recentDone] = await Promise.all([
+      prisma.habit.findMany({ where: { userId, archived: false }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], select: { id: true, name: true, icon: true, color: true } }),
+      prisma.habitLog.groupBy({ by: ["habitId"], where: { userId, status: "DONE" }, _count: { _all: true } }),
+      prisma.habitLog.findMany({ where: { userId, status: "DONE", date: { gte: since } }, select: { habitId: true, date: true } }),
+    ]);
+
+    if (habits.length === 0) return empty;
+
+    const xpByHabit = new Map<string, number>();
+    for (const g of doneCounts) xpByHabit.set(g.habitId, g._count._all);
+
+    const datesByHabit = new Map<string, Set<string>>();
+    for (const l of recentDone) {
+      const set = datesByHabit.get(l.habitId) ?? new Set<string>();
+      set.add(utcDayKey(new Date(l.date)));
+      datesByHabit.set(l.habitId, set);
+    }
+    const todayKey = utcDayKey(new Date());
+    const streakOf = (id: string): number => {
+      const done = datesByHabit.get(id);
+      if (!done) return 0;
+      let cursor = done.has(todayKey) ? todayKey : shiftUtcDay(todayKey, -1);
+      let streak = 0;
+      while (done.has(cursor)) { streak++; cursor = shiftUtcDay(cursor, -1); }
+      return streak;
+    };
+
+    const nodes: SkillNode[] = habits.map((h) => {
+      const xp = xpByHabit.get(h.id) ?? 0;
+      const info = levelInfo(xp);
+      return {
+        id: h.id, name: h.name, icon: h.icon, color: h.color,
+        xp, level: info.level, emoji: info.emoji, title: info.title,
+        intoLevel: info.intoLevel, levelSpan: info.levelSpan, toNext: info.toNext,
+        streak: streakOf(h.id),
+      };
+    }).sort((a, b) => b.xp - a.xp);
+
+    const totalXp = [...xpByHabit.values()].reduce((a, b) => a + b, 0);
+    // Nível geral usa a mesma curva escalada pelo nº de hábitos (não estoura cedo).
+    const overall = levelInfo(totalXp, Math.max(1, habits.length));
+
+    return {
+      hasHabits: true,
+      totalXp,
+      overallLevel: overall.level,
+      overallEmoji: overall.emoji,
+      overallTitle: overall.title,
+      nodes,
+    };
+  } catch (error) {
+    console.error("Erro ao montar a árvore de habilidades:", error);
+    return empty;
+  }
+}
+
 /** Hábitos ativos + logs dos últimos ~35 dias (p/ streak e status de hoje). */
 export async function getHabits(): Promise<SerializedHabit[]> {
   try {
