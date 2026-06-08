@@ -97,6 +97,11 @@ export async function updateSettings(formData: FormData) {
         const workStart = workStartRaw && HHMM_RE.test(workStartRaw) ? workStartRaw : undefined;
         const workEnd = workEndRaw && HHMM_RE.test(workEndRaw) ? workEndRaw : undefined;
 
+        // Antecedência do lembrete de blocos (min). Só grava se enviado e válido (5–180).
+        const leadRaw = formData.get("reminderLeadMinutes") as string | null;
+        const leadNum = leadRaw != null ? parseInt(leadRaw, 10) : NaN;
+        const reminderLeadMinutes = Number.isFinite(leadNum) ? Math.min(180, Math.max(5, leadNum)) : undefined;
+
         const userId = await requireUserId();
 
         await prisma.user.update({
@@ -112,6 +117,7 @@ export async function updateSettings(formData: FormData) {
             ...(language ? { language } : {}),
             ...(workStart ? { workStart } : {}),
             ...(workEnd ? { workEnd } : {}),
+            ...(reminderLeadMinutes !== undefined ? { reminderLeadMinutes } : {}),
             ...(pixKey !== undefined ? { pixKey } : {}),
             ...(businessName !== undefined ? { businessName } : {}),
         };

@@ -26,6 +26,7 @@ interface AppearanceFormProps {
   initialLanguage?: string | null;
   initialWorkStart?: string | null;
   initialWorkEnd?: string | null;
+  initialReminderLead?: number | null;
   userName?: string | null;
   userEmail?: string | null;
   userAvatar?: string | null;
@@ -40,6 +41,7 @@ export default function AppearanceForm({
   initialLanguage,
   initialWorkStart,
   initialWorkEnd,
+  initialReminderLead,
   userName,
   userEmail,
   userAvatar,
@@ -210,6 +212,7 @@ export default function AppearanceForm({
         setWorkEnd={setWorkEnd}
         language={language}
         setLanguage={setLanguage}
+        reminderLead={initialReminderLead ?? 30}
       />
 
       <BillingCard

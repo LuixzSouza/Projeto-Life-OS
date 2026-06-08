@@ -1230,6 +1230,9 @@ model Settings {
   workStart String @default("09:00")
   workEnd   String @default("18:00")
 
+  // Antecedência (minutos) do lembrete de blocos da Agenda. Ver pollBlockReminders.
+  reminderLeadMinutes Int @default(30)
+
   // Cobrança / Negócios (usado nas mensagens de cobrança do módulo Business)
   pixKey       String?
   businessName String?

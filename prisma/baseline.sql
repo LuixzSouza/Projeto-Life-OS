@@ -735,6 +735,7 @@ CREATE TABLE "Settings" (
     "currency" TEXT NOT NULL DEFAULT 'BRL',
     "workStart" TEXT NOT NULL DEFAULT '09:00',
     "workEnd" TEXT NOT NULL DEFAULT '18:00',
+    "reminderLeadMinutes" INTEGER NOT NULL DEFAULT 30,
     "pixKey" TEXT,
     "businessName" TEXT,
     "aiProvider" TEXT NOT NULL DEFAULT 'ollama',

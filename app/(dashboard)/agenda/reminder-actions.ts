@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUserId } from "@/lib/auth";
 import { notifyOnce } from "@/lib/notifications";
 
-const LEAD_MINUTES = 30; // janela de antecedência do aviso
+const DEFAULT_LEAD_MINUTES = 30; // antecedência padrão (configurável em Settings)
 
 const hhmm = (d: Date) =>
   `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -26,8 +26,12 @@ export async function pollBlockReminders(): Promise<UpcomingBlock[]> {
   const userId = await getCurrentUserId();
   if (!userId) return [];
 
+  // Antecedência configurável pelo usuário (Settings → Rotina).
+  const settings = await prisma.settings.findUnique({ where: { userId }, select: { reminderLeadMinutes: true } });
+  const leadMinutes = settings?.reminderLeadMinutes ?? DEFAULT_LEAD_MINUTES;
+
   const now = new Date();
-  const leadEnd = new Date(now.getTime() + LEAD_MINUTES * 60_000);
+  const leadEnd = new Date(now.getTime() + leadMinutes * 60_000);
 
   // Blocos que AINDA não começaram e iniciam dentro da janela de antecedência.
   const events = await prisma.event.findMany({

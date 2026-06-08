@@ -254,6 +254,7 @@ export default async function SettingsPage() {
                         initialLanguage={settings?.language}
                         initialWorkStart={settings?.workStart}
                         initialWorkEnd={settings?.workEnd}
+                        initialReminderLead={settings?.reminderLeadMinutes}
                         userName={user?.name}
                         userEmail={user?.email} 
                         userAvatar={user?.avatarUrl} 
