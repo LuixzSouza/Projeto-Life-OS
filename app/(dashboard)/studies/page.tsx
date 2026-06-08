@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Metadata } from "next";
 import { prisma } from "@/lib/prisma";
-import { cn } from "@/lib/utils";
 import { getCurrentUserId } from "@/lib/auth";
 
 import { StudyTimer } from "@/components/studies/study-timer";
@@ -9,14 +8,14 @@ import { StudySessionList } from "@/components/studies/study-session-list";
 import { SubjectGrid } from "@/components/studies/subject-grid";
 import { GamificationHero } from "@/components/studies/gamification-hero";
 import { StudyAnalytics } from "@/components/studies/study-analytics";
-import { XP_PER_LEVEL, getLevelTheme, formatHours, safePercent } from "@/components/studies/studies-helpers";
+import { XP_PER_LEVEL, formatHours, safePercent } from "@/components/studies/studies-helpers";
 import { buildDailyActivity, computeStudyStats, type SessionLite, type DailyPoint, type StudyStats } from "@/lib/studies-math";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
 
-import { Trophy, History, Zap, AlertCircle, BookOpen } from "lucide-react";
+import { History, AlertCircle, BookOpen } from "lucide-react";
 
 // Tipos Prisma corretos
 import { StudySubject, Prisma } from "@prisma/client";
@@ -77,7 +76,7 @@ export default async function StudiesPage() {
     activityWindowStart.setHours(0, 0, 0, 0);
 
     // Carrega em paralelo: matérias, sessões recentes, estatísticas, tempo agrupado e atividade.
-    const [subjectsData, recentSessionsData, statsData, aggregatedTimeData, activitySessions] =
+    const [subjectsData, recentSessionsData, statsData, aggregatedTimeData, lastStudiedData, activitySessions] =
       await Promise.all([
         prisma.studySubject.findMany({
           where: { userId },
@@ -97,13 +96,24 @@ export default async function StudiesPage() {
           _count: { id: true },
         }),
 
-        // Agrupado por matéria: total de minutos, nº de sessões e último estudo.
+        // Agrupado por matéria: total de minutos e nº de sessões.
+        // OBS: NÃO usar `_max: { date }` aqui — o adapter libSQL (modo réplica/nuvem)
+        // não converte agregação de DateTime gravado como inteiro epoch e lança
+        // "Inconsistent column data". A última data por matéria vem da query abaixo.
         prisma.studySession.groupBy({
           by: ["subjectId"],
           where: { userId },
           _sum: { durationMinutes: true },
           _count: { id: true },
-          _max: { date: true },
+        }),
+
+        // Última data de estudo por matéria: 1 linha por subjectId (a mais recente).
+        // `findMany` decodifica DateTime corretamente (ao contrário do _max em groupBy).
+        prisma.studySession.findMany({
+          where: { userId },
+          distinct: ["subjectId"],
+          orderBy: { date: "desc" },
+          select: { subjectId: true, date: true },
         }),
 
         // Sessões recentes (30 dias) para analytics.
@@ -112,6 +122,11 @@ export default async function StudiesPage() {
           select: { date: true, durationMinutes: true, focusLevel: true },
         }),
       ]);
+
+    // Mapa subjectId → última data estudada (substitui o _max do groupBy).
+    const lastStudiedMap = new Map<string, Date>(
+      (lastStudiedData ?? []).map((s) => [s.subjectId, s.date])
+    );
 
     subjects = subjectsData ?? [];
     recentSessions = recentSessionsData ?? [];
@@ -134,7 +149,7 @@ export default async function StudiesPage() {
       statMap.set(subjectId, {
         minutes: g._sum?.durationMinutes ?? 0,
         count: g._count?.id ?? 0,
-        last: g._max?.date ?? null,
+        last: lastStudiedMap.get(subjectId) ?? null,
       });
     }
 
@@ -184,18 +199,16 @@ export default async function StudiesPage() {
     );
   }
 
-  const theme = getLevelTheme(currentLevel);
-
   return (
     <PageShell>
       <PageHeader
-        icon={<Trophy className="h-6 w-6" />}
+        icon={<BookOpen className="h-6 w-6" />}
         title="Estudos"
-        description="Controle seu foco, evolução e desempenho."
+        description="Entre no foco, registre suas sessões e acompanhe sua evolução."
       />
 
-      <PageContainer className="space-y-10">
-        {/* HERO / GAMIFICATION */}
+      <PageContainer className="space-y-8">
+        {/* PROGRESSO (enxuto) */}
         <GamificationHero
           currentLevel={currentLevel}
           totalXP={totalXP}
@@ -204,28 +217,24 @@ export default async function StudiesPage() {
           progressPercentage={progressPercentage}
           totalHours={totalHours}
           totalSessions={totalSessions}
-          streak={studyStats.streak}
-          weekHours={formatHours(studyStats.weekMinutes)}
-          theme={theme}
         />
 
-        {/* ANALYTICS: KPIs + GRÁFICO DE ATIVIDADE */}
-        {hasActivity && <StudyAnalytics daily={dailyActivity} stats={studyStats} />}
-
-        {/* GRID PRINCIPAL */}
-        <section className="grid lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-8">
-            {/* TIMER / CTA */}
+        {/* ÁREA PRINCIPAL: foco + matérias à esquerda · histórico à direita */}
+        <section className="grid gap-6 lg:grid-cols-3">
+          <div className="space-y-6 lg:col-span-2">
+            {/* PAINEL DE FOCO (protagonista) — ou onboarding */}
             {subjects.length === 0 ? (
-              <div className="border-2 border-dashed rounded-2xl p-12 text-center bg-secondary">
-                <BookOpen className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+              <div className="rounded-2xl border border-dashed border-border/70 bg-card p-12 text-center shadow-sm">
+                <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full bg-primary/10 text-primary">
+                  <BookOpen className="h-6 w-6" />
+                </div>
                 <h3 className="text-lg font-semibold">Comece sua jornada</h3>
-                <p className="text-muted-foreground mb-4">
-                  Cadastre sua primeira matéria para usar o timer.
+                <p className="mx-auto mt-1 max-w-xs text-sm text-muted-foreground">
+                  Cadastre sua primeira matéria para abrir o modo foco.
                 </p>
-                <div className="flex justify-center">
+                <div className="mt-5 flex justify-center">
                   <Link href="/studies/new">
-                    <Button variant="default">Criar Matéria</Button>
+                    <Button>Criar matéria</Button>
                   </Link>
                 </div>
               </div>
@@ -237,32 +246,23 @@ export default async function StudiesPage() {
             <SubjectGrid subjects={subjectsWithStats} />
           </div>
 
-          {/* SIDEBAR: Histórico */}
-          <Card className="sticky top-6 h-fit">
-            <CardHeader className="border-b pb-4">
-              <CardTitle className="flex items-center gap-2 text-sm font-bold uppercase">
-                <History className={cn("h-4 w-4", theme.text)} />
-                Histórico Recente
+          {/* SIDEBAR: Histórico recente */}
+          <Card className="h-fit border-border/50 bg-card shadow-sm lg:sticky lg:top-6">
+            <CardHeader className="border-b border-border/40 pb-4">
+              <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                <History className="h-4 w-4 text-primary" />
+                Histórico recente
               </CardTitle>
             </CardHeader>
 
-            <CardContent className="pt-4 px-2">
-              {hasActivity ? (
-                <StudySessionList sessions={recentSessions} />
-              ) : (
-                <div className="flex flex-col items-center py-10 text-center">
-                  <div className="bg-muted p-3 rounded-full mb-3">
-                    <Zap className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                  <p className="font-medium text-sm">Sem histórico</p>
-                  <p className="text-xs text-muted-foreground">
-                    Use o timer para começar suas sessões.
-                  </p>
-                </div>
-              )}
+            <CardContent className="px-2 pt-4">
+              <StudySessionList sessions={recentSessions} />
             </CardContent>
           </Card>
         </section>
+
+        {/* ANÁLISE: KPIs de cadência + gráfico (no fim, sem competir com o foco) */}
+        {hasActivity && <StudyAnalytics daily={dailyActivity} stats={studyStats} />}
       </PageContainer>
     </PageShell>
   );

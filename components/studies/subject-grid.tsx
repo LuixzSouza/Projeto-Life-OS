@@ -147,39 +147,36 @@ export function SubjectGrid({ subjects }: SubjectListProps) {
       {/* ----------------- HEADER & FLASHCARDS ----------------- */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-primary/10 rounded-xl text-primary shadow-sm border border-primary/20">
-            <GitFork className="h-6 w-6" />
+          <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary">
+            <GitFork className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-2xl font-extrabold tracking-tight leading-none text-foreground">Árvore de Matérias</h3>
-            <p className="text-sm text-muted-foreground mt-1">{subjects.length} tópicos cadastrados na base.</p>
+            <h3 className="text-lg font-semibold leading-none text-foreground">Minhas matérias</h3>
+            <p className="mt-1 text-sm text-muted-foreground">{subjects.length} tópicos cadastrados.</p>
           </div>
         </div>
 
-        <Button onClick={handleStartCreate} size="lg" className="gap-2 shadow-lg shadow-primary/20 bg-primary hover:bg-primary/90 transition-all rounded-xl font-bold">
-          <Plus className="h-5 w-5" /> Novo Tópico
+        <Button onClick={handleStartCreate} className="gap-2 font-medium">
+          <Plus className="h-4 w-4" /> Novo tópico
         </Button>
       </div>
 
       <Link href="/flashcards" className="block group">
-        <Card className="bg-gradient-to-r from-primary/10 via-primary/5 to-background border-primary/20 hover:border-primary/40 transition-all duration-300 relative overflow-hidden shadow-sm hover:shadow-md rounded-2xl">
-          <div className="absolute right-0 top-0 h-full w-32 bg-gradient-to-l from-primary/10 to-transparent pointer-events-none" />
-          <CardContent className="flex items-center justify-between p-6 relative z-10">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-background rounded-xl shadow-sm border border-border/50 group-hover:scale-110 transition-transform duration-300">
-                <BrainCircuit className="h-6 w-6 text-primary" />
+        <Card className="border-border/50 bg-card shadow-sm transition-all hover:border-primary/30 hover:shadow-md">
+          <CardContent className="flex items-center justify-between gap-4 p-4">
+            <div className="flex items-center gap-3">
+              <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary">
+                <BrainCircuit className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="font-bold text-lg text-foreground flex items-center gap-2">
-                  Sistema de Flashcards
-                  <Badge variant="secondary" className="text-[10px] h-5 bg-primary/10 text-primary hover:bg-primary/20 border-none font-bold px-2 uppercase">Novo</Badge>
+                <h3 className="flex items-center gap-2 font-semibold text-foreground">
+                  Flashcards
+                  <Badge variant="secondary" className="h-5 border-none bg-primary/10 px-2 text-[10px] font-semibold text-primary">Novo</Badge>
                 </h3>
-                <p className="text-sm text-muted-foreground mt-0.5">Treine sua memória ativa e repetição espaçada usando as matérias cadastradas.</p>
+                <p className="mt-0.5 text-sm text-muted-foreground">Memória ativa e repetição espaçada com suas matérias.</p>
               </div>
             </div>
-            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                <ChevronRight className="h-5 w-5 text-primary group-hover:text-current" />
-            </div>
+            <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
           </CardContent>
         </Card>
       </Link>

@@ -38,10 +38,10 @@ export function StudyAnalytics({ daily, stats }: StudyAnalyticsProps) {
       </div>
 
       {/* GRÁFICO DE ATIVIDADE */}
-      <Card className="lg:col-span-2 lg:order-1 border-border/60 bg-card shadow-sm">
-        <CardHeader className="pb-2 border-b border-border/40 bg-muted/20">
-          <CardTitle className="text-xs uppercase font-bold text-muted-foreground tracking-widest flex items-center gap-2 py-1">
-            <BarChart3 className="h-4 w-4 text-primary" /> Atividade (14 dias)
+      <Card className="lg:col-span-2 lg:order-1 border-border/50 bg-card shadow-sm">
+        <CardHeader className="pb-2 border-b border-border/40">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2 py-1">
+            <BarChart3 className="h-4 w-4 text-primary" /> Atividade dos últimos 14 dias
           </CardTitle>
         </CardHeader>
         <CardContent className="h-[240px] pt-6">
