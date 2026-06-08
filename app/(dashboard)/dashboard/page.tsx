@@ -16,6 +16,7 @@ import { QuickCaptureCard } from "@/components/dashboard/quick-capture-card";
 import { DailyInsightCard } from "@/components/dashboard/daily-insight-card";
 import { DailyRegulatorCard } from "@/components/dashboard/daily-regulator-card";
 import { FrictionVectorCard } from "@/components/health/friction-vector-card";
+import { WeeklyResetCard } from "@/components/dashboard/weekly-reset-card";
 
 // Componentes Server-side separados (seções)
 import { FinanceSection } from "./_components/finance-section";
@@ -66,6 +67,11 @@ export default async function DashboardPage() {
       {/* Vetor de Fricção (#15): por que os hábitos falham (some se não há dados). */}
       <Suspense fallback={null}>
         <FrictionVectorCard />
+      </Suspense>
+
+      {/* Reset Semanal: resumo dos últimos 7 dias + direção da próxima. */}
+      <Suspense fallback={null}>
+        <WeeklyResetCard />
       </Suspense>
 
       {/* Overview do Dia: unifica Treino + Nutrição numa olhada (topo da Home) */}
