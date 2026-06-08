@@ -1,17 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Check, Plus, Minus, Trash2, X, Timer, ChevronDown, ChevronUp, History, Flag, Trophy,
   List, Target, ChevronLeft, ChevronRight, CircleCheck, Replace, Volume2, VolumeX, AlertTriangle,
+  EyeOff, MoreVertical, Pause, Lock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useWakeLock } from "./use-wake-lock";
 import { sessionStats, estimatedOneRepMax, EQUIPMENT_META, SET_TYPE_META, isWorkingSet, type Equipment, type SetType, type LiveSession, type LastPerf, type ExerciseHistoryPoint, type LiveTarget } from "./session-types";
@@ -107,8 +112,12 @@ export interface SessionControls {
   setSetType: (exId: string, setId: string, type: SetType) => void;
 }
 
+// Descanso mínimo obrigatório (s) antes de liberar "pular" — induz a respeitar ao
+// menos um descanso curto entre as séries, sem travar o treino por completo.
+const MIN_REST_SECONDS = 15;
+
 export function SessionActive({
-  session, lastPerf, volumeHistory, controls, onFinish, onCancel,
+  session, lastPerf, volumeHistory, controls, onFinish, onCancel, onPause,
 }: {
   session: LiveSession;
   lastPerf: Record<string, LastPerf>;
@@ -116,6 +125,7 @@ export function SessionActive({
   controls: SessionControls;
   onFinish: () => void;
   onCancel: () => void;
+  onPause: () => void;
 }) {
   useWakeLock(true);
 
@@ -127,6 +137,13 @@ export function SessionActive({
 
   const [mode, setMode] = useState<"list" | "focus">("list");
   const [focusIdx, setFocusIdx] = useState(0);
+  // Direção da navegação no modo Foco (1 = avançar, -1 = voltar) — anima o slide.
+  const [dir, setDir] = useState(1);
+  // Tempo total visível? Toque no cronômetro esconde (modo foco: não ficar de olho
+  // no relógio). O descanso entre séries continua aparecendo normalmente.
+  const [showTime, setShowTime] = useState(true);
+  // Confirmação de descarte (AlertDialog único, controlado por estado).
+  const [discardOpen, setDiscardOpen] = useState(false);
   const [muted, setMuted] = useState(false);
   // Sincroniza a preferência de mudo (store externo) só na montagem — ler no
   // initializer causaria mismatch de hidratação no SSR.
@@ -235,7 +252,7 @@ export function SessionActive({
       const cur = exercises[focusIdx];
       if (cur && allDone(cur)) {
         const next = firstIncomplete(focusIdx + 1);
-        if (next !== -1) setFocusIdx(next);
+        if (next !== -1) { setDir(1); setFocusIdx(next); }
       }
     }
   };
@@ -283,10 +300,26 @@ export function SessionActive({
       {/* HEADER fixo */}
       <header className="sticky top-0 z-30 border-b border-border/40 bg-background/95 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4">
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <Timer className="h-5 w-5 text-primary" />
-            <span className="font-mono text-lg font-bold tabular-nums tracking-tight sm:text-xl">{clock(elapsed)}</span>
-          </div>
+          {/* Cronômetro total — toque para ocultar (modo foco, sem ficar de olho no relógio) */}
+          <button
+            type="button"
+            onClick={() => setShowTime((v) => !v)}
+            className="flex shrink-0 items-center gap-1.5 rounded-lg py-1 transition-colors hover:text-primary sm:gap-2"
+            aria-label={showTime ? "Ocultar o tempo" : "Mostrar o tempo"}
+            title={showTime ? "Ocultar o tempo" : "Mostrar o tempo"}
+          >
+            {showTime ? (
+              <>
+                <Timer className="h-5 w-5 text-primary" />
+                <span className="font-mono text-lg font-bold tabular-nums tracking-tight sm:text-xl">{clock(elapsed)}</span>
+              </>
+            ) : (
+              <>
+                <EyeOff className="h-5 w-5 text-muted-foreground" />
+                <span className="font-mono text-lg font-bold tabular-nums tracking-tight text-muted-foreground/50 sm:text-xl">--:--</span>
+              </>
+            )}
+          </button>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{session.title}</p>
             <p className="truncate text-[11px] text-muted-foreground">{stats.doneSets}/{stats.totalSets} séries · {stats.volume.toLocaleString("pt-BR")} kg</p>
@@ -297,23 +330,24 @@ export function SessionActive({
             {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
           </Button>
 
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="icon" className="shrink-0 text-muted-foreground hover:text-destructive" aria-label="Descartar">
-                <X className="h-5 w-5" />
+          {/* Menu: pausar (mantém o rascunho) ou descartar */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="shrink-0 text-muted-foreground" aria-label="Mais opções">
+                <MoreVertical className="h-5 w-5" />
               </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Descartar este treino?</AlertDialogTitle>
-                <AlertDialogDescription>Você perderá as séries registradas nesta sessão. Essa ação não pode ser desfeita.</AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Continuar treinando</AlertDialogCancel>
-                <AlertDialogAction onClick={onCancel} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Descartar</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onClick={onPause} className="gap-2">
+                <Pause className="h-4 w-4" /> Pausar e sair
+                <span className="ml-auto text-[10px] text-muted-foreground">salva o progresso</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setDiscardOpen(true)} className="gap-2 text-destructive focus:text-destructive">
+                <Trash2 className="h-4 w-4" /> Descartar treino
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <Button onClick={handleFinish} className="h-9 shrink-0 gap-1.5 px-3 font-semibold sm:px-4">
             <Flag className="h-4 w-4" /> Finalizar
@@ -365,6 +399,7 @@ export function SessionActive({
       ) : focusEx ? (
         <FocusView
           ex={focusEx}
+          dir={dir}
           index={idx}
           total={exercises.length}
           last={focusEx.name ? lastPerf[focusEx.name.toLowerCase()] : undefined}
@@ -374,28 +409,31 @@ export function SessionActive({
           onOpenDemo={() => focusEx.name.trim() && setDemoFor(focusEx.name)}
           hasPrev={idx > 0}
           hasNext={idx < exercises.length - 1}
-          onPrev={() => setFocusIdx(Math.max(0, idx - 1))}
-          onNext={() => setFocusIdx(Math.min(exercises.length - 1, idx + 1))}
+          onPrev={() => { setDir(-1); setFocusIdx(Math.max(0, idx - 1)); }}
+          onNext={() => { setDir(1); setFocusIdx(Math.min(exercises.length - 1, idx + 1)); }}
         />
       ) : null}
 
       {/* Mini atalho de música (recolhido; some durante o descanso em tela cheia) */}
       {!(restEndsAt !== null && !restMinimized) && <MusicButton />}
 
-      {/* Tela de descanso (100vh) */}
-      {restEndsAt !== null && !restMinimized && (
-        <RestOverlay
-          total={restTotal}
-          remaining={restRemaining}
-          next={nextInfo}
-          superset={partner ? { name: partner.name, group: partner.group } : null}
-          onAdjust={adjustRest}
-          onSetExact={setRestExact}
-          onDone={handleRestDone}
-          onSuperset={partner ? goSuperset : undefined}
-          onMinimize={() => setRestMinimized(true)}
-        />
-      )}
+      {/* Tela de descanso (100vh) — entra/sai com animação suave */}
+      <AnimatePresence>
+        {restEndsAt !== null && !restMinimized && (
+          <RestOverlay
+            total={restTotal}
+            remaining={restRemaining}
+            minRest={Math.min(restTotal, MIN_REST_SECONDS)}
+            next={nextInfo}
+            superset={partner ? { name: partner.name, group: partner.group } : null}
+            onAdjust={adjustRest}
+            onSetExact={setRestExact}
+            onDone={handleRestDone}
+            onSuperset={partner ? goSuperset : undefined}
+            onMinimize={() => setRestMinimized(true)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Pílula do descanso minimizado (bi-set): timer de A rodando em background */}
       {restEndsAt !== null && restMinimized && (
@@ -410,6 +448,22 @@ export function SessionActive({
       {demoFor && (
         <ExerciseDemoModal name={demoFor} youtubeId={demoId} onClose={() => setDemoFor(null)} onSave={(id) => saveVideo(demoFor, id)} />
       )}
+
+      {/* Confirmação de descarte (único, controlado por estado) */}
+      <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Descartar este treino?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Você perderá as séries registradas nesta sessão. Para guardar o progresso sem finalizar, use “Pausar e sair”. Essa ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Continuar treinando</AlertDialogCancel>
+            <AlertDialogAction onClick={onCancel} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Descartar</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -460,25 +514,27 @@ function RestMiniPill({ remaining, label, onExpand }: { remaining: number; label
 }
 
 // ---- Campo de carga com modificadores rápidos (−/+ 2,5 kg) ao lado do input ----
-function WeightStepper({ value, onChange, big, placeholder = "0" }: { value: string; onChange: (v: string) => void; big?: boolean; placeholder?: string }) {
+function WeightStepper({ value, onChange, big, placeholder = "0", disabled = false }: { value: string; onChange: (v: string) => void; big?: boolean; placeholder?: string; disabled?: boolean }) {
   const step = (delta: number) => {
+    if (disabled) return;
     const cur = parseFloat((value || "0").replace(",", ".")) || 0;
     const next = Math.max(0, Math.round((cur + delta) * 100) / 100);
     onChange(String(next));
   };
   return (
-    <div className={cn("flex items-stretch overflow-hidden rounded-lg border border-border/60 bg-background", big ? "h-12" : "h-10")}>
-      <button type="button" tabIndex={-1} onClick={() => step(-2.5)} className="flex items-center px-1.5 text-muted-foreground transition-colors hover:bg-muted/50 active:bg-muted" aria-label="Diminuir 2,5 kg">
+    <div className={cn("flex items-stretch overflow-hidden rounded-lg border border-border/60 bg-background", big ? "h-12" : "h-10", disabled && "opacity-50")}>
+      <button type="button" tabIndex={-1} disabled={disabled} onClick={() => step(-2.5)} className="flex items-center px-1.5 text-muted-foreground transition-colors hover:bg-muted/50 active:bg-muted disabled:pointer-events-none" aria-label="Diminuir 2,5 kg">
         <Minus className="h-3.5 w-3.5" />
       </button>
       <input
         inputMode="decimal"
         value={value}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className={cn("w-full min-w-0 border-0 bg-transparent text-center font-mono outline-none placeholder:text-muted-foreground/40", big ? "text-lg" : "text-base")}
+        className={cn("w-full min-w-0 border-0 bg-transparent text-center font-mono outline-none placeholder:text-muted-foreground/40 disabled:cursor-not-allowed", big ? "text-lg" : "text-base")}
       />
-      <button type="button" tabIndex={-1} onClick={() => step(2.5)} className="flex items-center px-1.5 text-muted-foreground transition-colors hover:bg-muted/50 active:bg-muted" aria-label="Aumentar 2,5 kg">
+      <button type="button" tabIndex={-1} disabled={disabled} onClick={() => step(2.5)} className="flex items-center px-1.5 text-muted-foreground transition-colors hover:bg-muted/50 active:bg-muted disabled:pointer-events-none" aria-label="Aumentar 2,5 kg">
         <Plus className="h-3.5 w-3.5" />
       </button>
     </div>
@@ -513,6 +569,10 @@ function SetRows({ ex, controls, onToggle, big = false, last }: {
   // Alvo-fantasma: última execução; sem histórico, cai pra meta da ficha.
   const ghostW = last?.weight && last.weight !== "0" ? last.weight : "0";
   const ghostR = last?.reps && last.reps !== "0" ? last.reps : targetReps ?? "0";
+  // Série ATUAL = primeira não-concluída. Só ela é editável (foco numa série por vez):
+  // as anteriores ficam travadas mas podem ser reabertas pelo "Ok"; as próximas ficam
+  // bloqueadas até chegar a vez. Evita preencher o treino todo de uma vez e quebrar o ritmo.
+  const activeIdx = ex.sets.findIndex((s) => !s.done);
   return (
     <>
       {target && (
@@ -532,28 +592,48 @@ function SetRows({ ex, controls, onToggle, big = false, last }: {
         {ex.sets.map((s, i) => {
           const type = s.type ?? "normal";
           const meta = SET_TYPE_META[type];
+          const isActive = i === activeIdx;
+          const isFuture = activeIdx !== -1 && i > activeIdx;
+          // Só a série atual edita carga/reps/tipo. Concluídas: travadas, mas o "Ok"
+          // reabre (corrigir erro). Futuras: tudo bloqueado até chegar a vez.
+          const inputsLocked = !isActive;
+          const checkDisabled = isFuture;
           return (
-            <div key={s.id} className={cn("grid grid-cols-[1.75rem_1.4fr_1fr_2.5rem_1.75rem] items-center gap-1.5 rounded-lg p-1 transition-colors", s.done && "bg-emerald-500/5")}>
+            <div
+              key={s.id}
+              className={cn(
+                "grid grid-cols-[1.75rem_1.4fr_1fr_2.5rem_1.75rem] items-center gap-1.5 rounded-lg p-1 transition-all",
+                s.done && "bg-emerald-500/5",
+                isActive && "bg-primary/5 ring-1 ring-primary/25",
+                isFuture && "opacity-45",
+              )}
+            >
               <button
                 type="button"
+                disabled={inputsLocked}
                 onClick={() => controls.setSetType(ex.id, s.id, nextSetType(type))}
-                className={cn("mx-auto flex h-7 w-7 items-center justify-center rounded-md border text-[11px] font-bold tabular-nums transition-colors", meta.tone)}
+                className={cn("mx-auto flex h-7 w-7 items-center justify-center rounded-md border text-[11px] font-bold tabular-nums transition-colors disabled:pointer-events-none", meta.tone)}
                 title={`Série: ${meta.label} — toque para alternar (A/N/F)`}
                 aria-label={`Tipo da série: ${meta.label}`}
               >
                 {type === "normal" ? i + 1 : meta.short}
               </button>
-              <WeightStepper value={s.weight} onChange={(v) => controls.updateSet(ex.id, s.id, "weight", v)} big={big} placeholder={ghostW} />
-              <Input inputMode="numeric" value={s.reps} onChange={(e) => controls.updateSet(ex.id, s.id, "reps", e.target.value)} placeholder={ghostR} className={cn("text-center font-mono font-semibold placeholder:font-normal placeholder:text-muted-foreground/40", repTone(s.reps, type, target), big ? "h-12 text-lg" : "h-10 text-base")} />
+              <WeightStepper value={s.weight} onChange={(v) => controls.updateSet(ex.id, s.id, "weight", v)} big={big} placeholder={ghostW} disabled={inputsLocked} />
+              <Input inputMode="numeric" value={s.reps} disabled={inputsLocked} onChange={(e) => controls.updateSet(ex.id, s.id, "reps", e.target.value)} placeholder={ghostR} className={cn("text-center font-mono font-semibold placeholder:font-normal placeholder:text-muted-foreground/40 disabled:opacity-50", repTone(s.reps, type, target), big ? "h-12 text-lg" : "h-10 text-base")} />
               <button
                 type="button"
+                disabled={checkDisabled}
                 onClick={() => onToggle(ex.id, s.id, s.done)}
-                className={cn("mx-auto flex items-center justify-center rounded-lg border transition-all", big ? "h-11 w-11" : "h-9 w-9", s.done ? "border-emerald-500 bg-emerald-500 text-white" : "border-border/60 text-muted-foreground hover:border-emerald-500/60")}
-                aria-label={s.done ? "Desmarcar série" : "Marcar série feita"}
+                className={cn(
+                  "mx-auto flex items-center justify-center rounded-lg border transition-all disabled:pointer-events-none",
+                  big ? "h-11 w-11" : "h-9 w-9",
+                  s.done ? "border-emerald-500 bg-emerald-500 text-white" : isActive ? "border-emerald-500/70 text-emerald-600 hover:border-emerald-500 hover:bg-emerald-500/10" : "border-border/60 text-muted-foreground",
+                )}
+                aria-label={s.done ? "Desmarcar série" : checkDisabled ? "Série bloqueada (conclua a anterior)" : "Marcar série feita"}
               >
-                <Check className={big ? "h-6 w-6" : "h-5 w-5"} />
+                {checkDisabled ? <Lock className={big ? "h-5 w-5" : "h-4 w-4"} /> : <Check className={big ? "h-6 w-6" : "h-5 w-5"} />}
               </button>
-              <button type="button" onClick={() => controls.removeSet(ex.id, s.id)} className="mx-auto text-muted-foreground/50 hover:text-destructive" aria-label="Remover série" disabled={ex.sets.length === 1}>
+              <button type="button" onClick={() => controls.removeSet(ex.id, s.id)} className="mx-auto text-muted-foreground/50 hover:text-destructive disabled:pointer-events-none disabled:opacity-30" aria-label="Remover série" disabled={ex.sets.length === 1}>
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -678,9 +758,17 @@ function ExerciseCard({ ex, last, youtubeId, controls, onToggle, onOpenDemo }: {
   );
 }
 
+// Slide do modo Foco: entra do lado para onde se navega, sai para o lado oposto.
+const focusVariants = {
+  enter: (d: number) => ({ x: d >= 0 ? 48 : -48, opacity: 0 }),
+  center: { x: 0, opacity: 1 },
+  exit: (d: number) => ({ x: d >= 0 ? -48 : 48, opacity: 0 }),
+};
+
 // ---- Modo Foco: um exercício por vez ----
-function FocusView({ ex, index, total, last, youtubeId, controls, onToggle, onOpenDemo, hasPrev, hasNext, onPrev, onNext }: {
+function FocusView({ ex, dir, index, total, last, youtubeId, controls, onToggle, onOpenDemo, hasPrev, hasNext, onPrev, onNext }: {
   ex: Ex;
+  dir: number;
   index: number;
   total: number;
   last?: LastPerf;
@@ -713,7 +801,17 @@ function FocusView({ ex, index, total, last, youtubeId, controls, onToggle, onOp
   useEffect(() => { setConfirmNext(false); }, [ex.id, done]);
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-4 pb-28">
+    <AnimatePresence mode="popLayout" custom={dir} initial={false}>
+    <motion.main
+      key={ex.id}
+      custom={dir}
+      variants={focusVariants}
+      initial="enter"
+      animate="center"
+      exit="exit"
+      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+      className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-4 pb-28"
+    >
       {/* Progresso */}
       <div className="mb-3 flex items-center justify-between">
         <span className="text-xs font-semibold text-muted-foreground">Exercício {index + 1} de {total}</span>
@@ -776,7 +874,8 @@ function FocusView({ ex, index, total, last, youtubeId, controls, onToggle, onOp
           </div>
         )}
       </div>
-    </main>
+    </motion.main>
+    </AnimatePresence>
   );
 }
 

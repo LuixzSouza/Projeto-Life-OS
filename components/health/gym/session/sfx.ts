@@ -74,12 +74,22 @@ export function playSuccess(): void {
   tone(880, 130, 0.09, "sine", 0.12);
 }
 
-/** Fim do descanso — tríade clara e chamativa (parecido com timer de academia). */
+/**
+ * Fim do descanso — alarme ALTO e chamativo (timer de academia). Volume bem acima
+ * dos outros efeitos (peaks ~0.6) pois compete com música/barulho da academia:
+ * três bipes curtos + um bipe final mais agudo e longo. `triangle`+`square`
+ * sobrepostos dão um timbre denso que "corta" melhor que uma senoide pura.
+ */
 export function playRestEnd(): void {
   if (isSfxMuted()) return;
-  tone(880, 140, 0, "square", 0.1);
-  tone(880, 140, 0.22, "square", 0.1);
-  tone(1175, 260, 0.44, "square", 0.12);
+  const beep = (offset: number, freq: number, dur: number, peak: number) => {
+    tone(freq, dur, offset, "square", peak);
+    tone(freq * 1.005, dur, offset, "triangle", peak * 0.55); // leve detune → mais "corpo"
+  };
+  beep(0.0, 988, 150, 0.5);
+  beep(0.24, 988, 150, 0.5);
+  beep(0.48, 988, 150, 0.5);
+  beep(0.74, 1319, 430, 0.55); // final mais agudo e longo (chama a atenção)
 }
 
 /** Som de conclusão do treino (fanfarra curta ascendente). */

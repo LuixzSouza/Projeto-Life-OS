@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Minus, Plus, Play, Timer, Repeat2, ChevronRight, Minimize2, History, TrendingUp, TrendingDown } from "lucide-react";
+import { motion } from "framer-motion";
+import { Minus, Plus, Play, Timer, Repeat2, ChevronRight, Minimize2, History, TrendingUp, TrendingDown, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { playClick } from "./sfx";
 import { ExerciseThumb } from "./exercise-thumb";
@@ -60,6 +61,7 @@ function Sparkline({ values }: { values: number[] }) {
 export function RestOverlay({
   total,
   remaining,
+  minRest = 0,
   next,
   superset,
   onAdjust,
@@ -70,6 +72,7 @@ export function RestOverlay({
 }: {
   total: number;        // segundos do descanso programado
   remaining: number;    // segundos restantes (negativo = excedente)
+  minRest?: number;     // descanso mínimo obrigatório antes de liberar "pular"
   next?: NextInfo | null;
   superset?: NextInfo | null;   // exercício de OUTRO grupo p/ intercalar no descanso
   onAdjust: (deltaSeconds: number) => void;
@@ -80,6 +83,11 @@ export function RestOverlay({
 }) {
   const over = remaining <= 0;
   const frac = over ? 1 : Math.min(1, Math.max(0, remaining / Math.max(1, total)));
+  // Descanso mínimo obrigatório: nos primeiros `minRest`s o botão de pular fica
+  // travado (induz o usuário a respeitar ao menos um descanso curto). Depois libera.
+  const elapsedRest = Math.max(0, total - remaining);
+  const waitLeft = Math.max(0, Math.ceil(minRest - elapsedRest));
+  const locked = !over && waitLeft > 0;
 
   const R = 130;
   const C = 2 * Math.PI * R;
@@ -96,7 +104,13 @@ export function RestOverlay({
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex flex-col overflow-hidden bg-background px-5 pb-safe pt-safe">
+    <motion.div
+      initial={{ opacity: 0, scale: 0.96 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.96 }}
+      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+      className="fixed inset-0 z-[70] flex flex-col overflow-hidden bg-background px-5 pb-safe pt-safe"
+    >
       {/* Glow decorativo (não reduz a opacidade do fundo — fica atrás do conteúdo). */}
       <div
         aria-hidden
@@ -256,18 +270,27 @@ export function RestOverlay({
         </div>
       )}
 
-      {/* Começar / pular */}
+      {/* Começar / pular — travado até cumprir o descanso mínimo obrigatório */}
       <button
         type="button"
-        onClick={() => { onDone(); playClick(); }}
+        disabled={locked}
+        onClick={() => { if (locked) return; onDone(); playClick(); }}
         className={cn(
-          "relative flex h-14 w-full max-w-sm items-center justify-center gap-2 rounded-2xl text-base font-bold text-white shadow-lg transition-transform active:scale-[0.98]",
-          over ? "bg-red-500 hover:bg-red-600" : "bg-primary hover:bg-primary/90",
+          "relative flex h-14 w-full max-w-sm items-center justify-center gap-2 rounded-2xl text-base font-bold shadow-lg transition-transform active:scale-[0.98]",
+          locked
+            ? "cursor-not-allowed bg-muted text-muted-foreground shadow-none"
+            : over
+              ? "bg-red-500 text-white hover:bg-red-600"
+              : "bg-primary text-white hover:bg-primary/90",
         )}
       >
-        <Play className="h-5 w-5" /> {over ? "Começar agora" : "Estou pronto"}
+        {locked ? (
+          <><Lock className="h-4 w-4" /> Descanse mais {waitLeft}s</>
+        ) : (
+          <><Play className="h-5 w-5" /> {over ? "Começar agora" : "Estou pronto"}</>
+        )}
       </button>
       </div>
-    </div>
+    </motion.div>
   );
 }

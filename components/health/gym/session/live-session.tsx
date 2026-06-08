@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { AlertTriangle, Play, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { saveGymSession } from "@/app/(dashboard)/health/actions";
+import { saveGymSession, saveWorkoutPhotos } from "@/app/(dashboard)/health/actions";
 import { SessionSetup } from "./session-setup";
 import { SessionActive, type SessionControls } from "./session-active";
 import { SessionSummary } from "./session-summary";
@@ -140,15 +140,24 @@ export function LiveSession({ lastPerf, volumeHistory = {} }: { lastPerf: LastPe
       notes,
       exercises: toStoredExercises(session.exercises),
     };
-    // Fotos vão SEMPRE pra galeria local (IndexedDB) — independem do servidor/rede.
+    // Fotos vão pro BANCO (sincronizam entre aparelhos via Turso). Se a rede falhar,
+    // caem no IndexedDB local e a galeria as sobe sozinha quando voltar a conexão.
     const persistPhotos = async () => {
       if (photos.length === 0) return;
       const stats = sessionStats(session.exercises);
       const dateISO = new Date(session.startedAt).toISOString();
-      await addGalleryPhotos(photos.map((dataUrl) => ({
-        id: uid("ph"), dataUrl, date: dateISO, title: session.title,
-        volume: stats.volume, durationMin, sets: stats.doneSets,
-      })));
+      try {
+        const res = await saveWorkoutPhotos(photos.map((dataUrl) => ({
+          dataUrl, title: session.title, date: dateISO,
+          volume: stats.volume, durationMin, sets: stats.doneSets,
+        })));
+        if (!res.success) throw new Error(res.message);
+      } catch {
+        await addGalleryPhotos(photos.map((dataUrl) => ({
+          id: uid("ph"), dataUrl, date: dateISO, title: session.title,
+          volume: stats.volume, durationMin, sets: stats.doneSets,
+        })));
+      }
     };
 
     startSave(async () => {
@@ -231,6 +240,7 @@ export function LiveSession({ lastPerf, volumeHistory = {} }: { lastPerf: LastPe
           controls={controls}
           onFinish={s.finish}
           onCancel={() => { s.cancel(); router.push("/health/gym"); }}
+          onPause={() => { s.touch(); router.push("/health/gym"); }}
         />
       )}
     </div>

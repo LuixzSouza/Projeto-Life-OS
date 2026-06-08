@@ -473,6 +473,7 @@ CREATE TABLE "Challenge" (
     "durationDays" INTEGER NOT NULL DEFAULT 30,
     "startDate" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "color" TEXT,
+    "icon" TEXT,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "userId" TEXT NOT NULL,
@@ -535,6 +536,21 @@ CREATE TABLE "WorkoutPlan" (
     "updatedAt" DATETIME NOT NULL,
     "userId" TEXT,
     CONSTRAINT "WorkoutPlan_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "WorkoutPhoto" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "workoutId" TEXT,
+    "dataUrl" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "date" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "volume" INTEGER,
+    "durationMin" INTEGER,
+    "sets" INTEGER,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "WorkoutPhoto_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -1213,6 +1229,12 @@ CREATE INDEX "WorkoutPlan_userId_idx" ON "WorkoutPlan"("userId");
 
 -- CreateIndex
 CREATE INDEX "WorkoutPlan_userId_updatedAt_idx" ON "WorkoutPlan"("userId", "updatedAt");
+
+-- CreateIndex
+CREATE INDEX "WorkoutPhoto_userId_idx" ON "WorkoutPhoto"("userId");
+
+-- CreateIndex
+CREATE INDEX "WorkoutPhoto_userId_date_idx" ON "WorkoutPhoto"("userId", "date");
 
 -- CreateIndex
 CREATE INDEX "HealthMetric_userId_idx" ON "HealthMetric"("userId");

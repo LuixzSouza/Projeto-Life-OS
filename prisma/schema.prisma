@@ -55,6 +55,7 @@ model User {
   tasks             Task[]
   workouts          Workout[]
   workoutPlans      WorkoutPlan[]
+  workoutPhotos     WorkoutPhoto[]
   healthMetrics     HealthMetric[]
   meals             Meal[]
   mealPlans         MealPlan[]
@@ -845,6 +846,7 @@ model Challenge {
   durationDays Int      @default(30)
   startDate    DateTime @default(now())
   color        String?
+  icon         String? // emoji de destaque do desafio (ex.: "💪", "💧")
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 
@@ -943,6 +945,26 @@ model WorkoutPlan {
 
   @@index([userId])
   @@index([userId, updatedAt])
+}
+
+// Foto de um treino (galeria). Guardada como base64 NO BANCO (não em IndexedDB local)
+// para SINCRONIZAR entre dispositivos via Turso — mesma filosofia de portabilidade dos
+// avatares/guarda-roupa. A imagem já vem comprimida (≤1280px JPEG) do cliente.
+model WorkoutPhoto {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workoutId   String? // liga ao Workout da sessão (opcional)
+  dataUrl     String // base64 JPEG comprimido
+  title       String
+  date        DateTime @default(now())
+  volume      Int? // kg (snapshot do treino, p/ o card de compartilhamento)
+  durationMin Int?
+  sets        Int?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, date])
 }
 
 model HealthMetric {

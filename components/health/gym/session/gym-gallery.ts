@@ -75,6 +75,21 @@ export async function addGalleryPhotos(photos: GalleryPhoto[]): Promise<GalleryP
   }
 }
 
+/** Apaga TODAS as fotos locais (usado após migrar p/ o banco — libera espaço). */
+export async function clearGallery(): Promise<void> {
+  try {
+    const db = await openDb();
+    await new Promise<void>((resolve) => {
+      const tx = db.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    });
+  } catch {
+    /* ignora */
+  }
+}
+
 export async function removeGalleryPhoto(id: string): Promise<GalleryPhoto[]> {
   try {
     const db = await openDb();
