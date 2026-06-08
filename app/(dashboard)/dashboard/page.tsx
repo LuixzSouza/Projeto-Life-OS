@@ -13,6 +13,8 @@ import { QuickActionsBar } from "@/components/dashboard/quick-actions-bar";
 import { EnergyCheckinCard } from "@/components/health/energy-checkin-card";
 import { HabitsCard } from "@/components/health/habits-card";
 import { QuickCaptureCard } from "@/components/dashboard/quick-capture-card";
+import { DailyInsightCard } from "@/components/dashboard/daily-insight-card";
+import { FrictionVectorCard } from "@/components/health/friction-vector-card";
 
 // Componentes Server-side separados (seções)
 import { FinanceSection } from "./_components/finance-section";
@@ -49,6 +51,16 @@ export default async function DashboardPage() {
         <HabitsCard />
       </div>
       <QuickCaptureCard />
+
+      {/* Insight do dia: o padrão mais forte (foco/energia) do Motor de Correlação (#8). */}
+      <Suspense fallback={<Skeleton className="h-[76px] w-full rounded-2xl" />}>
+        <DailyInsightCard />
+      </Suspense>
+
+      {/* Vetor de Fricção (#15): por que os hábitos falham (some se não há dados). */}
+      <Suspense fallback={null}>
+        <FrictionVectorCard />
+      </Suspense>
 
       {/* Overview do Dia: unifica Treino + Nutrição numa olhada (topo da Home) */}
       <Suspense fallback={<Skeleton className="h-[200px] w-full rounded-xl" />}>

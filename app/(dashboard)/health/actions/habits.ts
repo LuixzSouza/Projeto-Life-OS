@@ -93,6 +93,95 @@ export async function setHabitLog(
   }
 }
 
+// =========================================================
+// VETOR DE FRICÇÃO (#15) — por que os hábitos falham?
+// =========================================================
+// Agrega os logs de FALHA (com motivo) dos últimos 30 dias para revelar o
+// obstáculo dominante (TEMPO/ENERGIA/AMBIENTE/EMERGÊNCIA), no geral e por hábito.
+
+export interface FrictionReasonStat {
+  reason: FrictionReason;
+  count: number;
+  pct: number; // % sobre as falhas COM motivo
+}
+export interface FrictionHabitStat {
+  id: string;
+  name: string;
+  icon: string | null;
+  color: string | null;
+  failures: number;
+  topReason: FrictionReason | null;
+}
+export interface FrictionVector {
+  windowDays: number;
+  totalFailures: number; // falhas (com ou sem motivo)
+  reasonedFailures: number; // falhas com motivo
+  reasons: FrictionReasonStat[]; // só motivos com count > 0, desc
+  dominant: FrictionReason | null;
+  habits: FrictionHabitStat[]; // top por nº de falhas
+}
+
+const FRICTION_REASONS: FrictionReason[] = ["TIME", "ENERGY", "ENVIRONMENT", "EMERGENCY"];
+const isFrictionReason = (r: string | null): r is FrictionReason =>
+  r != null && (FRICTION_REASONS as string[]).includes(r);
+
+export async function getFrictionVector(): Promise<FrictionVector> {
+  const empty: FrictionVector = {
+    windowDays: 30, totalFailures: 0, reasonedFailures: 0, reasons: [], dominant: null, habits: [],
+  };
+  try {
+    const userId = await requireUserId();
+    const since = new Date();
+    since.setHours(0, 0, 0, 0);
+    since.setDate(since.getDate() - 29);
+
+    const logs = await prisma.habitLog.findMany({
+      where: { userId, status: "FAILED", date: { gte: since } },
+      select: { reason: true, habitId: true, habit: { select: { name: true, icon: true, color: true } } },
+    });
+
+    if (logs.length === 0) return empty;
+
+    const reasonCounts = new Map<FrictionReason, number>();
+    const perHabit = new Map<string, { name: string; icon: string | null; color: string | null; failures: number; reasons: Map<FrictionReason, number> }>();
+
+    for (const l of logs) {
+      const h = perHabit.get(l.habitId) ?? { name: l.habit.name, icon: l.habit.icon, color: l.habit.color, failures: 0, reasons: new Map() };
+      h.failures += 1;
+      if (isFrictionReason(l.reason)) {
+        reasonCounts.set(l.reason, (reasonCounts.get(l.reason) ?? 0) + 1);
+        h.reasons.set(l.reason, (h.reasons.get(l.reason) ?? 0) + 1);
+      }
+      perHabit.set(l.habitId, h);
+    }
+
+    const reasonedFailures = [...reasonCounts.values()].reduce((a, b) => a + b, 0);
+    const reasons: FrictionReasonStat[] = [...reasonCounts.entries()]
+      .map(([reason, count]) => ({ reason, count, pct: reasonedFailures ? Math.round((count / reasonedFailures) * 100) : 0 }))
+      .sort((a, b) => b.count - a.count);
+
+    const habits: FrictionHabitStat[] = [...perHabit.entries()]
+      .map(([id, v]) => {
+        const top = [...v.reasons.entries()].sort((a, b) => b[1] - a[1])[0];
+        return { id, name: v.name, icon: v.icon, color: v.color, failures: v.failures, topReason: top?.[0] ?? null };
+      })
+      .sort((a, b) => b.failures - a.failures)
+      .slice(0, 3);
+
+    return {
+      windowDays: 30,
+      totalFailures: logs.length,
+      reasonedFailures,
+      reasons,
+      dominant: reasons[0]?.reason ?? null,
+      habits,
+    };
+  } catch (error) {
+    console.error("Erro ao calcular vetor de fricção:", error);
+    return empty;
+  }
+}
+
 /** Hábitos ativos + logs dos últimos ~35 dias (p/ streak e status de hoje). */
 export async function getHabits(): Promise<SerializedHabit[]> {
   try {
