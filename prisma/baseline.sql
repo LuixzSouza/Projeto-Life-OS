@@ -394,6 +394,7 @@ CREATE TABLE "Task" (
     "projectId" TEXT,
     "isPinned" BOOLEAN NOT NULL DEFAULT false,
     "isStarred" BOOLEAN NOT NULL DEFAULT false,
+    "twoMin" BOOLEAN NOT NULL DEFAULT false,
     "progress" INTEGER NOT NULL DEFAULT 0,
     "estimatedTime" INTEGER,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

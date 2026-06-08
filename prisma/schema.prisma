@@ -729,6 +729,7 @@ model Task {
   project       Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
   isPinned      Boolean   @default(false)
   isStarred     Boolean   @default(false)
+  twoMin        Boolean   @default(false) // "faça agora (2 min)" — Regra dos 2 minutos (#1)
   progress      Int       @default(0)
   estimatedTime Int? // em minutos
   createdAt     DateTime  @default(now())

@@ -12,6 +12,7 @@ import { WelcomeTour } from "@/components/dashboard/welcome-tour";
 import { QuickActionsBar } from "@/components/dashboard/quick-actions-bar";
 import { EnergyCheckinCard } from "@/components/health/energy-checkin-card";
 import { HabitsCard } from "@/components/health/habits-card";
+import { QuickCaptureCard } from "@/components/dashboard/quick-capture-card";
 
 // Componentes Server-side separados (seções)
 import { FinanceSection } from "./_components/finance-section";
@@ -42,11 +43,12 @@ export default async function DashboardPage() {
       
       <QuickActionsBar />
 
-      {/* Fase 0 — captura diária: energia + hábitos (base dos insights futuros) */}
+      {/* Fase 0 — captura diária: energia + hábitos + caixa de entrada (base dos insights) */}
       <div className="grid gap-4 lg:grid-cols-2">
         <EnergyCheckinCard />
         <HabitsCard />
       </div>
+      <QuickCaptureCard />
 
       {/* Overview do Dia: unifica Treino + Nutrição numa olhada (topo da Home) */}
       <Suspense fallback={<Skeleton className="h-[200px] w-full rounded-xl" />}>

@@ -36,10 +36,12 @@
   *Módulo:* Saúde/Dashboard · *Base p/:* #8, #13, #15, #23 · `EnergyCheckin` (modelo) · `energy-checkin-card.tsx`
 - [x] 🟡 **Motor de Hábitos recorrentes** — hábitos diários com **streak**, check de hoje e **falha com motivo** (Sem tempo / Sem energia / Ambiente / Emergência) → captura a fricção do **#15**. Card na Home com criação (nome/emoji/cor). **(captura do #15, base do #3, #5, #11, #22)** ✅ *08/jun/2026*
   *Módulo:* Saúde · modelos `Habit` + `HabitLog` (dedicados — contínuos, ≠ Challenge finito) · `habits-card.tsx`
-- [ ] 🟢 **Captura rápida + Regra dos 2 min** — botão global de "jogar tarefa/ideia" numa Inbox, com flag **"faça agora (2 min)"** e um modo que junta as micro-tarefas. **(#1)**
-  *Módulo:* Agenda/Tarefas
+- [x] 🟢 **Captura rápida + Regra dos 2 min** — card "Caixa de entrada" na Home: capturar sem fricção, flag **"⚡ 2 min"** (seção "Faça agora") e concluir/descartar inline. Reaproveita o modelo `Task` (tarefa sem projeto = inbox) + coluna `twoMin`. **(#1)** ✅ *08/jun/2026*
+  *Módulo:* Tarefas · `quick-capture.ts` · `quick-capture-card.tsx`
 
 **Entregável da fase:** todo dia o sistema sabe sua energia, quais hábitos você cumpriu/falhou (e por quê) e tem uma caixa de entrada sem fricção.
+
+> ## 🎉 FASE 0 CONCLUÍDA *(08/jun/2026)* — a fundação de captura está no ar. A partir daqui, as Fases 3–4 (inteligência/autonomia) já têm de onde tirar dados.
 
 ---
 
@@ -161,4 +163,5 @@ A ordem que dá mais resultado com menos esforço, reaproveitando o que acabamos
 > Registre aqui o que foi concluído (data + item) conforme avançamos.
 
 - **08/jun/2026** — ✅ Fase 0 · **Check-in de Energia (#12)**: modelo `EnergyCheckin`, actions (`saveEnergyCheckin`/`getEnergyCheckins`), card 1–5 + mini-heatmap no topo da Home. Aplicado em local + Turso + réplica.
-- **08/jun/2026** — ✅ Fase 0 · **Motor de Hábitos (#15 captura)**: modelos `Habit`/`HabitLog`, actions (`createHabit`/`deleteHabit`/`setHabitLog`/`getHabits`), card de hábitos diários (streak + check + falha-com-motivo) na Home. Faltam só os 2 min p/ fechar a Fase 0.
+- **08/jun/2026** — ✅ Fase 0 · **Motor de Hábitos (#15 captura)**: modelos `Habit`/`HabitLog`, actions (`createHabit`/`deleteHabit`/`setHabitLog`/`getHabits`), card de hábitos diários (streak + check + falha-com-motivo) na Home.
+- **08/jun/2026** — ✅ Fase 0 · **Captura Rápida + 2 min (#1)**: coluna `Task.twoMin`, actions de inbox (`quickCaptureTask`/`getInboxTasks`/`completeInboxTask`/`deleteInboxTask`), card "Caixa de entrada" na Home. **🎉 FASE 0 COMPLETA** (energia + hábitos + inbox = fundação de dados pronta).
