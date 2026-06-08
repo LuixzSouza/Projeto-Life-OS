@@ -32,8 +32,8 @@
 
 > Objetivo: criar o **fluxo de dados diário** que alimenta as fases 3 e 4. Tudo aqui é UI pequena com impacto enorme depois.
 
-- [ ] 🟢 **Check-in de Energia (1–5)** — micro-form de energia/humor no início do dia e no Reset Semanal. **(#12)**
-  *Módulo:* Saúde/Dashboard · *Base p/:* #8, #13, #15, #23
+- [x] 🟢 **Check-in de Energia (1–5)** — micro-form de energia no topo da Home + mini-heatmap de 14 dias; 1 toque, upsert diário (data resolvida no cliente p/ não bugar fuso). **(#12)** ✅ *08/jun/2026*
+  *Módulo:* Saúde/Dashboard · *Base p/:* #8, #13, #15, #23 · `EnergyCheckin` (modelo) · `energy-checkin-card.tsx`
 - [ ] 🟡 **Motor de Hábitos recorrentes** — hábitos diários/semanais com streak (evolui o módulo de **Desafios**). Inclui marcar **falha ("X vermelho") com motivo** (Falta de tempo / Baixa energia / Ambiente / Emergência). **(captura do #15, base do #3, #5, #11, #22)**
   *Módulo:* Saúde/Desafios
 - [ ] 🟢 **Captura rápida + Regra dos 2 min** — botão global de "jogar tarefa/ideia" numa Inbox, com flag **"faça agora (2 min)"** e um modo que junta as micro-tarefas. **(#1)**
@@ -160,4 +160,4 @@ A ordem que dá mais resultado com menos esforço, reaproveitando o que acabamos
 ## 📝 Log de progresso
 > Registre aqui o que foi concluído (data + item) conforme avançamos.
 
-- _(vazio — a primeira entrega entra aqui)_
+- **08/jun/2026** — ✅ Fase 0 · **Check-in de Energia (#12)**: modelo `EnergyCheckin`, actions (`saveEnergyCheckin`/`getEnergyCheckins`), card 1–5 + mini-heatmap no topo da Home. Aplicado em local + Turso + réplica.

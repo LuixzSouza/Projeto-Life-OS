@@ -554,6 +554,19 @@ CREATE TABLE "WorkoutPhoto" (
 );
 
 -- CreateTable
+CREATE TABLE "EnergyCheckin" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "date" DATETIME NOT NULL,
+    "energy" INTEGER NOT NULL,
+    "mood" INTEGER,
+    "note" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "EnergyCheckin_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
 CREATE TABLE "HealthMetric" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "type" TEXT NOT NULL,
@@ -1235,6 +1248,12 @@ CREATE INDEX "WorkoutPhoto_userId_idx" ON "WorkoutPhoto"("userId");
 
 -- CreateIndex
 CREATE INDEX "WorkoutPhoto_userId_date_idx" ON "WorkoutPhoto"("userId", "date");
+
+-- CreateIndex
+CREATE INDEX "EnergyCheckin_userId_date_idx" ON "EnergyCheckin"("userId", "date");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "EnergyCheckin_userId_date_key" ON "EnergyCheckin"("userId", "date");
 
 -- CreateIndex
 CREATE INDEX "HealthMetric_userId_idx" ON "HealthMetric"("userId");

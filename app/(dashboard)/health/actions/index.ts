@@ -3,6 +3,7 @@
 // após o split do antigo actions.ts (383 linhas) em módulos por domínio.
 export * from "./workout";
 export * from "./workout-photos";
+export * from "./energy";
 export * from "./shoes";
 export * from "./gym-session";
 export * from "./workout-plan";

@@ -56,6 +56,7 @@ model User {
   workouts          Workout[]
   workoutPlans      WorkoutPlan[]
   workoutPhotos     WorkoutPhoto[]
+  energyCheckins    EnergyCheckin[]
   healthMetrics     HealthMetric[]
   meals             Meal[]
   mealPlans         MealPlan[]
@@ -964,6 +965,24 @@ model WorkoutPhoto {
   createdAt   DateTime @default(now())
 
   @@index([userId])
+  @@index([userId, date])
+}
+
+// Check-in de Energia/Metacognição (Fase 0 do roadmap — base do Motor de Correlação).
+// Um registro por dia (escala 1–5). Alimenta insights futuros (sono × treino × energia)
+// e o regulador adaptativo de carga. `date` é o dia normalizado (meia-noite local).
+model EnergyCheckin {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      DateTime // dia (00:00) — chave do upsert diário
+  energy    Int // 1–5 (energia mental)
+  mood      Int? // 1–5 (humor — opcional, p/ evolução)
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date])
   @@index([userId, date])
 }
 

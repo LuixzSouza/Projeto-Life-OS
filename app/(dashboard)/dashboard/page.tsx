@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { WelcomeTour } from "@/components/dashboard/welcome-tour";
 import { QuickActionsBar } from "@/components/dashboard/quick-actions-bar";
+import { EnergyCheckinCard } from "@/components/health/energy-checkin-card";
 
 // Componentes Server-side separados (seções)
 import { FinanceSection } from "./_components/finance-section";
@@ -39,6 +40,9 @@ export default async function DashboardPage() {
       />
       
       <QuickActionsBar />
+
+      {/* Check-in de Energia (Fase 0): prompt de início do dia + base de dados p/ insights */}
+      <EnergyCheckinCard />
 
       {/* Overview do Dia: unifica Treino + Nutrição numa olhada (topo da Home) */}
       <Suspense fallback={<Skeleton className="h-[200px] w-full rounded-xl" />}>
