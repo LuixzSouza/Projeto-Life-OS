@@ -419,6 +419,8 @@ CREATE TABLE "JobApplication" (
     "contactEmail" TEXT,
     "followUpDate" DATETIME,
     "priority" TEXT,
+    "coverLetter" TEXT,
+    "matchScore" INTEGER,
     "type" TEXT NOT NULL DEFAULT 'JOB',
     "appliedDate" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
@@ -426,6 +428,17 @@ CREATE TABLE "JobApplication" (
     "userId" TEXT,
     CONSTRAINT "JobApplication_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT "JobApplication_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "JobEvent" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "jobId" TEXT NOT NULL,
+    "status" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "userId" TEXT NOT NULL,
+    CONSTRAINT "JobEvent_jobId_fkey" FOREIGN KEY ("jobId") REFERENCES "JobApplication" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "JobEvent_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -489,6 +502,8 @@ CREATE TABLE "Workout" (
     "notes" TEXT,
     "distance" REAL,
     "pace" TEXT,
+    "terrain" TEXT,
+    "shoeName" TEXT,
     "muscleGroup" TEXT,
     "exercises" TEXT,
     "source" TEXT,
@@ -496,6 +511,30 @@ CREATE TABLE "Workout" (
     "date" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "userId" TEXT,
     CONSTRAINT "Workout_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Shoe" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "maxDistance" REAL,
+    "retired" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Shoe_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "WorkoutPlan" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "goal" TEXT NOT NULL DEFAULT 'general',
+    "content" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    "userId" TEXT,
+    CONSTRAINT "WorkoutPlan_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -540,6 +579,9 @@ CREATE TABLE "Meal" (
     "title" TEXT NOT NULL,
     "items" TEXT NOT NULL,
     "calories" INTEGER,
+    "protein" REAL,
+    "carbs" REAL,
+    "fat" REAL,
     "type" TEXT NOT NULL,
     "date" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "userId" TEXT,
@@ -1134,6 +1176,12 @@ CREATE INDEX "JobApplication_userId_idx" ON "JobApplication"("userId");
 CREATE INDEX "JobApplication_projectId_idx" ON "JobApplication"("projectId");
 
 -- CreateIndex
+CREATE INDEX "JobEvent_jobId_idx" ON "JobEvent"("jobId");
+
+-- CreateIndex
+CREATE INDEX "JobEvent_userId_idx" ON "JobEvent"("userId");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "Portfolio_userId_key" ON "Portfolio"("userId");
 
 -- CreateIndex
@@ -1153,6 +1201,18 @@ CREATE INDEX "Workout_userId_idx" ON "Workout"("userId");
 
 -- CreateIndex
 CREATE INDEX "Workout_userId_date_idx" ON "Workout"("userId", "date");
+
+-- CreateIndex
+CREATE INDEX "Shoe_userId_idx" ON "Shoe"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Shoe_userId_name_key" ON "Shoe"("userId", "name");
+
+-- CreateIndex
+CREATE INDEX "WorkoutPlan_userId_idx" ON "WorkoutPlan"("userId");
+
+-- CreateIndex
+CREATE INDEX "WorkoutPlan_userId_updatedAt_idx" ON "WorkoutPlan"("userId", "updatedAt");
 
 -- CreateIndex
 CREATE INDEX "HealthMetric_userId_idx" ON "HealthMetric"("userId");
