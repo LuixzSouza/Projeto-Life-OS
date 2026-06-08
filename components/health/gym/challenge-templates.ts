@@ -72,3 +72,17 @@ export const CATEGORY_LABELS: Record<string, string> = {
   MOBILITY: "Mobilidade",
   HABIT: "Hábito",
 };
+
+// Opções para o construtor de desafio personalizado.
+export const CHALLENGE_CATEGORIES = ["STRENGTH", "CARDIO", "MOBILITY", "HABIT"] as const;
+
+// Paleta enxuta (mesmos tons dos templates) — cor de destaque do desafio.
+export const CHALLENGE_COLORS = [
+  "#ef4444", "#f59e0b", "#10b981", "#3b82f6", "#6366f1", "#8b5cf6", "#ec4899", "#14b8a6",
+];
+
+// Emojis sugeridos para o desafio personalizado.
+export const CHALLENGE_EMOJIS = ["💪", "🔥", "🦵", "🏃", "🧘", "🏋️", "💧", "📵", "📚", "🥗", "🧠", "⏰"];
+
+// Durações comuns (dias) oferecidas como atalho no construtor.
+export const CHALLENGE_DURATIONS = [7, 14, 21, 30, 60, 90];

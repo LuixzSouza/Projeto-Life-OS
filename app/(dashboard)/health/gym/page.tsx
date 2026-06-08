@@ -118,6 +118,7 @@ export default async function GymPage() {
       category: c.category,
       durationDays: c.durationDays,
       color: c.color,
+      icon: c.icon ?? null,
       startDate: c.startDate.toISOString(),
       completedDays: c.checkins.map(ci => ci.dayIndex),
     }));
