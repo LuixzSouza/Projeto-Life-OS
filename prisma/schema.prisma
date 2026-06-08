@@ -57,6 +57,8 @@ model User {
   workoutPlans      WorkoutPlan[]
   workoutPhotos     WorkoutPhoto[]
   energyCheckins    EnergyCheckin[]
+  habits            Habit[]
+  habitLogs         HabitLog[]
   healthMetrics     HealthMetric[]
   meals             Meal[]
   mealPlans         MealPlan[]
@@ -984,6 +986,43 @@ model EnergyCheckin {
 
   @@unique([userId, date])
   @@index([userId, date])
+}
+
+// Hábito recorrente diário (Fase 0). Diferente de Challenge (que é finito/durationDays):
+// hábito é contínuo, com streak indefinido. O LOG de FALHA guarda o MOTIVO (fricção),
+// matéria-prima do Vetor de Fricção (#15) e do Reset Semanal.
+model Habit {
+  id        String     @id @default(uuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  icon      String? // emoji
+  color     String?
+  archived  Boolean    @default(false)
+  sortOrder Int        @default(0)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  logs      HabitLog[]
+
+  @@index([userId])
+}
+
+// Registro diário de um hábito. status: DONE | FAILED. `reason` (só p/ FAILED):
+// TIME | ENERGY | ENVIRONMENT | EMERGENCY. Sem log = pendente. `date` em T12:00:00Z.
+model HabitLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  habitId   String
+  habit     Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  date      DateTime
+  status    String
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@unique([habitId, date])
+  @@index([userId, date])
+  @@index([habitId])
 }
 
 model HealthMetric {

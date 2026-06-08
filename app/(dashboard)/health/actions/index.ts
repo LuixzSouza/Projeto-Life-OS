@@ -4,6 +4,7 @@
 export * from "./workout";
 export * from "./workout-photos";
 export * from "./energy";
+export * from "./habits";
 export * from "./shoes";
 export * from "./gym-session";
 export * from "./workout-plan";
