@@ -192,7 +192,7 @@ export function SessionSummary({
       </div>
 
       {/* Rodapé: salvar treino */}
-      <div className="sticky bottom-0 -mx-4 border-t border-border/40 bg-background/95 px-4 py-3 backdrop-blur">
+      <div className="sticky bottom-0 -mx-4 border-t border-border/40 bg-background/95 px-4 py-3 pb-safe backdrop-blur">
         <Button onClick={() => onSave(feeling, notes.trim() || null, photos)} disabled={saving || named === 0} className="h-12 w-full gap-2 text-base font-bold">
           {saving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
           Salvar treino

@@ -8,7 +8,7 @@ import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Timer, MapPin, Activity, Flame, Save, Gauge, Loader2, Navigation, Footprints } from "lucide-react";
-import { logWorkout } from "@/app/(dashboard)/health/actions";
+import { logWorkout, updateWorkout } from "@/app/(dashboard)/health/actions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -20,37 +20,45 @@ export interface RunFormData {
   notes?: string | null;
   pace?: string | null;
   feeling?: string | null;
+  terrain?: string | null;
+  shoeName?: string | null;
 }
 
 interface RunFormProps {
   onSuccess?: () => void;
   onClose?: () => void;
   initialData?: RunFormData;
+  /** Peso corporal (do BodyMeasurement mais recente) p/ estimar calorias. */
+  bodyWeight?: number | null;
+  /** Tênis cadastrados (nomes) para o seletor — vêm do registro "Meus Tênis". */
+  shoeOptions?: string[];
 }
 
-const SHOE_OPTIONS = [
-    { value: "NONE", label: "Nenhum específico" },
-    { value: "NIKE_PEGASUS", label: "Nike Pegasus" },
-    { value: "ADIDAS_ULTRABOOST", label: "Adidas Ultraboost" },
-    { value: "OLYMPIKUS", label: "Olympikus Corre" },
-];
-
-const SURFACE_OPTIONS = [
+export const SURFACE_OPTIONS = [
     { value: "ROAD", label: "Asfalto / Rua", icon: "🛣️" },
     { value: "TREADMILL", label: "Esteira", icon: "🏃‍♂️" },
     { value: "TRAIL", label: "Trilha / Terra", icon: "🌲" },
     { value: "TRACK", label: "Pista", icon: "🏟️" },
 ];
 
-export function RunForm({ onSuccess, onClose, initialData }: RunFormProps) {
+export function RunForm({ onSuccess, onClose, initialData, bodyWeight, shoeOptions = [] }: RunFormProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const isEditing = Boolean(initialData?.id);
+
+  // Lista do seletor: tênis cadastrados + (se editando) o tênis já salvo, mesmo que
+  // não esteja mais cadastrado — garante round-trip sem "sumir" o valor antigo.
+  const shoeChoices = useMemo(() => {
+    const set = new Set(shoeOptions);
+    if (initialData?.shoeName) set.add(initialData.shoeName);
+    return Array.from(set);
+  }, [shoeOptions, initialData?.shoeName]);
 
   // States
   const [distance, setDistance] = useState<string>(initialData?.distance ? String(initialData.distance) : "");
-  const [duration, setDuration] = useState<string>(initialData?.duration ? String(initialData.duration) : ""); 
-  const [intensity, setIntensity] = useState([5]); 
-  const [surface, setSurface] = useState("ROAD");
-  const [shoes, setShoes] = useState("NONE");
+  const [duration, setDuration] = useState<string>(initialData?.duration ? String(initialData.duration) : "");
+  const [intensity, setIntensity] = useState([5]);
+  const [surface, setSurface] = useState(initialData?.terrain || "ROAD");
+  const [shoes, setShoes] = useState(initialData?.shoeName || "NONE");
   const [notes, setNotes] = useState(initialData?.notes || "");
 
   // Derived Calculations
@@ -64,14 +72,15 @@ export function RunForm({ onSuccess, onClose, initialData }: RunFormProps) {
       const paceSec = Math.round((paceDecimal - paceMin) * 60);
       const formattedPace = `${paceMin}'${paceSec.toString().padStart(2, '0')}"`;
 
-      // Estimate: 8 METs * 75kg * hours (Simple formula)
+      // Estimativa MET: 8 METs × peso real (BodyMeasurement) × horas; 70kg de fallback.
+      const weight = bodyWeight && bodyWeight > 0 ? bodyWeight : 70;
       const hours = dur / 60;
-      const estimatedCals = Math.round(8 * 75 * hours); 
+      const estimatedCals = Math.round(8 * weight * hours);
 
       return { pace: formattedPace, calories: estimatedCals };
     }
     return { pace: "0'00\"", calories: 0 };
-  }, [distance, duration]);
+  }, [distance, duration, bodyWeight]);
 
   // Helpers
   const getIntensityColor = (val: number) => {
@@ -99,32 +108,44 @@ export function RunForm({ onSuccess, onClose, initialData }: RunFormProps) {
     }
 
     const formData = new FormData();
+    if (initialData?.id) formData.append("id", initialData.id);
     formData.append("title", `Corrida de ${distance}km`);
     formData.append("type", "RUNNING");
     formData.append("distance", distance);
     formData.append("duration", duration);
-    formData.append("pace", pace); 
-    
+    formData.append("pace", pace);
+
     const intensityMap = ["Muito Leve", "Leve", "Moderado", "Difícil", "Máximo"];
     const intensityLabel = intensityMap[Math.min(Math.floor((intensity[0] - 1) / 2), 4)] || "Moderado";
     formData.append("intensity", intensityLabel);
-    
-    const shoesText = shoes !== "NONE" ? ` | Tênis: ${shoes}` : "";
-    formData.append("notes", `Terreno: ${surface}${shoesText}. ${notes}`);
-    
+
+    // Campos estruturados (não mais enfiados na string de notas).
+    formData.append("terrain", surface);
+    formData.append("shoeName", shoes !== "NONE" ? shoes : "");
+    formData.append("notes", notes);
+
     formData.append("feeling", intensity[0] <= 3 ? "GOOD" : intensity[0] >= 8 ? "EXHAUSTED" : "TIRED");
 
     try {
-      await logWorkout(formData);
-      toast.success("Corrida registrada! 🏃‍♂️💨");
+      if (initialData?.id) {
+        await updateWorkout(formData);
+        toast.success("Corrida atualizada!");
+      } else {
+        await logWorkout(formData);
+        toast.success("Corrida registrada! 🏃‍♂️💨");
+      }
       onSuccess?.();
       onClose?.();
-      
-      // Reset if not closed
-      setDistance("");
-      setDuration("");
-      setNotes("");
-      setIntensity([5]);
+
+      // Reset só ao criar (na edição mantém os valores até fechar).
+      if (!initialData?.id) {
+        setDistance("");
+        setDuration("");
+        setNotes("");
+        setIntensity([5]);
+        setSurface("ROAD");
+        setShoes("NONE");
+      }
     } catch {
       toast.error("Erro ao salvar corrida.");
     } finally {
@@ -250,11 +271,15 @@ export function RunForm({ onSuccess, onClose, initialData }: RunFormProps) {
               <SelectValue placeholder="Selecione..." />
             </SelectTrigger>
             <SelectContent>
-                {SHOE_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                <SelectItem value="NONE">Nenhum específico</SelectItem>
+                {shoeChoices.map((shoeName) => (
+                    <SelectItem key={shoeName} value={shoeName}>{shoeName}</SelectItem>
                 ))}
             </SelectContent>
           </Select>
+          {shoeChoices.length === 0 && (
+            <p className="text-[10px] text-muted-foreground">Cadastre tênis no card &quot;Meus Tênis&quot; para rastrear o desgaste.</p>
+          )}
         </div>
       </div>
 
@@ -278,7 +303,7 @@ export function RunForm({ onSuccess, onClose, initialData }: RunFormProps) {
         {isLoading ? (
           <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Salvando...</>
         ) : (
-          <><Save className="mr-2 h-4 w-4" /> Salvar Corrida</>
+          <><Save className="mr-2 h-4 w-4" /> {isEditing ? "Atualizar Corrida" : "Salvar Corrida"}</>
         )}
       </Button>
     </form>

@@ -39,25 +39,25 @@ export function QuickActionsBar() {
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-4 md:flex md:flex-wrap md:gap-4">
+    <div className="grid grid-cols-2 gap-3 md:flex md:flex-wrap md:gap-4">
       {actions.map((action, index) => {
         const Icon = action.icon;
-        
+
         return (
-          <Link 
-            key={index} 
+          <Link
+            key={index}
             href={action.href}
-            className={`flex flex-1 items-center gap-3 rounded-xl border border-border/50 bg-card p-4 shadow-sm transition-all hover:shadow-md ${action.hover}`}
+            className={`flex flex-1 items-center gap-3 rounded-xl border border-border/50 bg-card p-3 shadow-sm transition-all hover:shadow-md sm:p-4 ${action.hover}`}
           >
             <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${action.bg}`}>
               <Icon className={`h-5 w-5 ${action.color}`} />
             </div>
-            <div>
-              <p className="text-sm font-semibold text-foreground">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-foreground">
                 {action.title}
               </p>
               <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                <PlusCircle className="h-3 w-3" /> Adicionar
+                <PlusCircle className="h-3 w-3 shrink-0" /> Adicionar
               </p>
             </div>
           </Link>

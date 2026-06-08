@@ -4,6 +4,7 @@ import { Footprints } from "lucide-react";
 import { Metadata } from "next";
 import { HealthActions } from "@/components/health/health-actions";
 import { getCurrentUserId } from "@/lib/auth";
+import { listShoesWithMileage, type ShoeWithMileage } from "@/app/(dashboard)/health/actions";
 import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
 import { BackLink } from "@/components/ui/back-link";
 import { ErrorState } from "@/components/ui/error-state";
@@ -25,23 +26,32 @@ interface SerializedRun {
   pace: string | null;
   feeling: string | null;
   notes: string | null;
+  terrain: string | null;
+  shoeName: string | null;
 }
 
 export default async function RunningPage() {
   let serializedRuns: SerializedRun[] = [];
+  let bodyWeight: number | null = null;
+  let shoes: ShoeWithMileage[] = [];
   let hasError = false;
 
   try {
     // Busca otimizada
     const userId = await getCurrentUserId();
-    const runningWorkouts = await prisma.workout.findMany({
-      where: {
-        type: { in: ["RUNNING", "RUN"] },
-        userId,
-      },
-      orderBy: { date: "desc" },
-      take: 50
-    });
+    const [runningWorkouts, latestBody] = await Promise.all([
+      prisma.workout.findMany({
+        where: { type: { in: ["RUNNING", "RUN"] }, userId },
+        orderBy: { date: "desc" },
+        take: 50,
+      }),
+      userId
+        ? prisma.bodyMeasurement.findFirst({ where: { userId }, orderBy: { date: "desc" }, select: { weight: true } })
+        : Promise.resolve(null),
+    ]);
+
+    bodyWeight = latestBody?.weight ?? null;
+    shoes = await listShoesWithMileage();
 
     // Serialização
     serializedRuns = runningWorkouts.map(w => ({
@@ -53,6 +63,8 @@ export default async function RunningPage() {
         pace: w.pace,
         feeling: w.feeling,
         notes: w.notes,
+        terrain: w.terrain,
+        shoeName: w.shoeName,
     }));
 
   } catch (error) {
@@ -85,7 +97,7 @@ export default async function RunningPage() {
       </PageHeader>
 
       <PageContainer>
-        <RunningDashboard runs={serializedRuns} />
+        <RunningDashboard runs={serializedRuns} bodyWeight={bodyWeight} shoes={shoes} />
       </PageContainer>
     </PageShell>
   );

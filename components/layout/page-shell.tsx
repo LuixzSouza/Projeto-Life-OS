@@ -53,27 +53,27 @@ export function PageHeader({
         className
       )}
     >
-      <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-5 sm:px-8">
+      <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-8 sm:py-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-2.5 min-w-0 sm:gap-3">
             {icon && (
-              <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary sm:size-11">
                 {icon}
               </div>
             )}
             <div className="min-w-0">
-              <h1 className="truncate text-2xl font-bold tracking-tight text-foreground">
+              <h1 className="truncate text-xl font-bold tracking-tight text-foreground sm:text-2xl">
                 {title}
               </h1>
               {description && (
-                <p className="mt-0.5 text-sm text-muted-foreground">
+                <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground sm:text-sm">
                   {description}
                 </p>
               )}
             </div>
           </div>
           {actions && (
-            <div className="flex shrink-0 items-center gap-2">{actions}</div>
+            <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
           )}
         </div>
         {children}
@@ -95,7 +95,7 @@ export function PageContainer({
   return (
     <main
       className={cn(
-        "mx-auto w-full max-w-7xl px-6 py-8 sm:px-8 animate-in fade-in duration-500",
+        "mx-auto w-full max-w-7xl px-4 py-6 sm:px-8 sm:py-8 animate-in fade-in duration-500",
         className
       )}
     >

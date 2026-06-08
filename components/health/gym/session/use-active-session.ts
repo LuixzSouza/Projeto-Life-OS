@@ -1,21 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { type LiveExercise, type LiveSession, type LiveSet, uid } from "./session-types";
+import { type Equipment, type LiveExercise, type LiveSession, type LiveSet, type SetType, type StartOptions, guessEquipment, uid } from "./session-types";
 import { clearActiveSession, loadActiveSession, saveActiveSession } from "./session-storage";
+
+export type { StartOptions } from "./session-types";
 
 const DEFAULT_REST = 90; // segundos
 
 function emptySet(prev?: LiveSet): LiveSet {
   // Pré-preenche carga/reps com a série anterior (acelera o registro repetitivo).
   return { id: uid("set"), reps: prev?.reps ?? "", weight: prev?.weight ?? "", done: false };
-}
-
-export interface StartOptions {
-  title: string;
-  muscleGroups: string[];
-  exercises: { name: string; group?: string; sets: number; reps?: string; weight?: string }[];
-  restSeconds?: number;
 }
 
 export function useActiveSession() {
@@ -45,6 +40,8 @@ export function useActiveSession() {
       id: uid("ex"),
       name: e.name,
       group: e.group,
+      equipment: e.equipment,
+      target: e.target,
       sets: Array.from({ length: Math.max(1, e.sets) }, () => ({
         id: uid("set"), reps: e.reps ?? "", weight: e.weight ?? "", done: false,
       })),
@@ -71,6 +68,12 @@ export function useActiveSession() {
     setSession((s) => (s ? { ...s, finishedAt: undefined } : s));
   }, []);
 
+  // Marca a sessão como "mexida agora" (zera a contagem de obsolescência ao retomar
+  // um treino antigo). A própria gravação carimba updatedAt.
+  const touch = useCallback(() => {
+    setSession((s) => (s ? { ...s, updatedAt: Date.now() } : s));
+  }, []);
+
   // Helper para mutar imutavelmente os exercícios.
   const mutate = useCallback((fn: (exs: LiveExercise[]) => LiveExercise[]) => {
     setSession((s) => (s ? { ...s, exercises: fn(s.exercises) } : s));
@@ -80,7 +83,7 @@ export function useActiveSession() {
   const setRestSeconds = useCallback((restSeconds: number) => setSession((s) => (s ? { ...s, restSeconds } : s)), []);
 
   const addExercise = useCallback((name: string, group?: string) => {
-    mutate((exs) => [...exs, { id: uid("ex"), name, group, sets: [emptySet()] }]);
+    mutate((exs) => [...exs, { id: uid("ex"), name, group, equipment: name ? guessEquipment(name) : undefined, sets: [emptySet()] }]);
   }, [mutate]);
 
   const removeExercise = useCallback((exId: string) => {
@@ -89,6 +92,26 @@ export function useActiveSession() {
 
   const renameExercise = useCallback((exId: string, name: string) => {
     mutate((exs) => exs.map((e) => (e.id === exId ? { ...e, name } : e)));
+  }, [mutate]);
+
+  // Troca o exercício (erro do usuário): mantém a quantidade de séries, mas zera
+  // cargas/reps/conclusão — é outro movimento, então os números antigos não valem.
+  const replaceExercise = useCallback((exId: string, name: string, group?: string, equipment?: Equipment) => {
+    mutate((exs) => exs.map((e) =>
+      e.id === exId
+        ? {
+            ...e,
+            name,
+            group: group ?? e.group,
+            equipment: equipment ?? e.equipment,
+            sets: e.sets.map(() => ({ id: uid("set"), reps: "", weight: "", done: false })),
+          }
+        : e,
+    ));
+  }, [mutate]);
+
+  const setExerciseEquipment = useCallback((exId: string, equipment: Equipment) => {
+    mutate((exs) => exs.map((e) => (e.id === exId ? { ...e, equipment } : e)));
   }, [mutate]);
 
   const setExerciseNote = useCallback((exId: string, note: string) => {
@@ -119,11 +142,17 @@ export function useActiveSession() {
     ));
   }, [mutate]);
 
+  const setSetType = useCallback((exId: string, setId: string, type: SetType) => {
+    mutate((exs) => exs.map((e) =>
+      e.id === exId ? { ...e, sets: e.sets.map((s) => (s.id === setId ? { ...s, type } : s)) } : e,
+    ));
+  }, [mutate]);
+
   return {
     session, hydrated,
-    start, cancel, finish, reopen,
+    start, cancel, finish, reopen, touch,
     setTitle, setRestSeconds,
-    addExercise, removeExercise, renameExercise, setExerciseNote,
-    addSet, removeSet, updateSet, toggleSetDone,
+    addExercise, removeExercise, renameExercise, replaceExercise, setExerciseEquipment, setExerciseNote,
+    addSet, removeSet, updateSet, toggleSetDone, setSetType,
   };
 }

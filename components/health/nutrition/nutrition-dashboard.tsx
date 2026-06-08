@@ -7,8 +7,8 @@ import { ptBR } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-    TrendingUp, Target, 
+import {
+    TrendingUp, Target, Flame,
     Calendar as CalendarIcon, LayoutList, CalendarRange
 } from "lucide-react";
 import { Bar, BarChart, Tooltip, Cell, XAxis } from "recharts";
@@ -37,7 +37,10 @@ interface SerializedMeal {
     items: string;
     calories: number | null;
     type: string;
-    date: string; 
+    date: string;
+    protein: number | null;
+    carbs: number | null;
+    fat: number | null;
 }
 
 interface SerializedWeekData {
@@ -54,31 +57,38 @@ interface NutritionDashboardProps {
     suggestedGoal?: number | null;   // Meta calórica sugerida pelo perfil (TDEE)
     tdee?: number | null;            // Gasto energético estimado
     calorieOverride?: number | null; // Override manual salvo no perfil (null = automático)
+    workoutBurn?: number;            // Gasto calórico estimado dos treinos do dia
     userName?: string;
 }
 
-export function NutritionDashboard({ initialDate, meals, weekData, mealPlan = [], suggestedGoal = null, tdee = null, calorieOverride = null, userName }: NutritionDashboardProps) {
+export function NutritionDashboard({ initialDate, meals, weekData, mealPlan = [], suggestedGoal = null, tdee = null, calorieOverride = null, workoutBurn = 0, userName }: NutritionDashboardProps) {
     const router = useRouter();
     const [date, setDate] = useState<Date | undefined>(new Date(initialDate));
     
-    // Converte SerializedMeal para Meal (Prisma) para o Logger
+    // Converte SerializedMeal para Meal (Prisma) para o Logger — macros REAIS do
+    // banco, sem forjar null no cliente.
     const prismaMeals = useMemo(() => meals.map(m => ({
         ...m,
         date: new Date(m.date),
         calories: m.calories || 0,
         items: m.items || "",
-        createdAt: new Date(), 
-        updatedAt: new Date(), 
-        userId: "user",        
-        protein: null, 
-        carbs: null, 
-        fat: null 
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        userId: "user",
+        protein: m.protein ?? null,
+        carbs: m.carbs ?? null,
+        fat: m.fat ?? null,
     } as unknown as Meal)), [meals]);
+
+    // --- META DINÂMICA: override manual > sugestão do perfil (TDEE) > padrão ---
+    // Mesma fonte que o WeeklyPlanner usa — elimina o número fantasma de 2.500.
+    const dailyGoal = calorieOverride ?? suggestedGoal ?? 2000;
+    // Orçamento do dia = meta + calorias queimadas no treino (ponte Treino → Nutrição).
+    const effectiveGoal = dailyGoal + workoutBurn;
 
     // --- CÁLCULOS DO DIA ---
     const totalCalories = meals.reduce((acc, m) => acc + (m.calories || 0), 0);
-    const dailyGoal = 2500; 
-    const balance = dailyGoal - totalCalories;
+    const balance = effectiveGoal - totalCalories;
     const isOver = balance < 0;
 
     // --- DADOS DO GRÁFICO ---
@@ -207,7 +217,7 @@ export function NutritionDashboard({ initialDate, meals, weekData, mealPlan = []
                                         </div>
                                     </div>
                                     
-                                    <div className="flex gap-8 text-right">
+                                    <div className="flex gap-6 sm:gap-8 text-right">
                                         <div>
                                             <p className="text-[10px] text-muted-foreground uppercase font-bold">Consumido</p>
                                             <p className="text-xl font-bold text-foreground">{totalCalories}</p>
@@ -216,12 +226,18 @@ export function NutritionDashboard({ initialDate, meals, weekData, mealPlan = []
                                             <p className="text-[10px] text-muted-foreground uppercase font-bold">Meta</p>
                                             <p className="text-xl font-bold text-muted-foreground">{dailyGoal}</p>
                                         </div>
+                                        {workoutBurn > 0 && (
+                                            <div title="Calorias estimadas do treino de hoje, somadas ao seu orçamento">
+                                                <p className="text-[10px] text-emerald-500 uppercase font-bold flex items-center justify-end gap-1"><Flame className="h-3 w-3" /> Treino</p>
+                                                <p className="text-xl font-bold text-emerald-500">+{workoutBurn}</p>
+                                            </div>
+                                        )}
                                     </div>
                                 </CardContent>
                             </Card>
 
                             <div className="flex-1 min-h-[500px]">
-                                <FoodLogger meals={prismaMeals} />
+                                <FoodLogger meals={prismaMeals} dailyGoal={dailyGoal} workoutBurn={workoutBurn} />
                             </div>
                         </div>
                     </div>

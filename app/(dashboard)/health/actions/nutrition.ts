@@ -9,6 +9,14 @@ import { ActionResponse } from "./types";
 // GERENCIAMENTO DE NUTRIÇÃO (MEALS)
 // =========================================================
 
+// Macro opcional (gramas): vazio/inválido → null (não força 0 falso no banco).
+function parseMacro(form: FormData, key: string): number | null {
+  const raw = form.get(key);
+  if (raw == null || raw.toString().trim() === "") return null;
+  const n = parseFloat(raw.toString().replace(",", "."));
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
 export async function logMeal(formData: FormData): Promise<ActionResponse> {
   try {
     const title = formData.get("title") as string;
@@ -29,6 +37,9 @@ export async function logMeal(formData: FormData): Promise<ActionResponse> {
         title,
         items: items || "",
         calories,
+        protein: parseMacro(formData, "protein"),
+        carbs: parseMacro(formData, "carbs"),
+        fat: parseMacro(formData, "fat"),
         type: type || "NEUTRAL",
         date: new Date(),
         userId,
@@ -65,6 +76,9 @@ export async function updateMeal(formData: FormData): Promise<ActionResponse> {
         title,
         items,
         calories,
+        protein: parseMacro(formData, "protein"),
+        carbs: parseMacro(formData, "carbs"),
+        fat: parseMacro(formData, "fat"),
         type
       }
     });
@@ -76,6 +90,55 @@ export async function updateMeal(formData: FormData): Promise<ActionResponse> {
   } catch (error) {
     console.error("Erro ao atualizar refeição:", error);
     return { success: false, message: "Erro ao editar refeição." };
+  }
+}
+
+// Copia todas as refeições de ONTEM para hoje (fast-logging: a base do café/lanche
+// costuma se repetir). Cria registros novos com a data de agora.
+export async function copyYesterdayMeals(): Promise<ActionResponse & { count?: number }> {
+  try {
+    const userId = await requireUserId();
+
+    const startToday = new Date();
+    startToday.setHours(0, 0, 0, 0);
+    const startYesterday = new Date(startToday);
+    startYesterday.setDate(startYesterday.getDate() - 1);
+    const endYesterday = new Date(startToday.getTime() - 1); // 23:59:59.999 de ontem
+
+    const yesterday = await prisma.meal.findMany({
+      where: { userId, date: { gte: startYesterday, lte: endYesterday } },
+      orderBy: { date: "asc" },
+    });
+
+    if (yesterday.length === 0) {
+      return { success: false, message: "Nenhuma refeição registrada ontem para copiar." };
+    }
+
+    const now = new Date();
+    await prisma.meal.createMany({
+      data: yesterday.map((m) => ({
+        title: m.title,
+        items: m.items,
+        calories: m.calories,
+        protein: m.protein,
+        carbs: m.carbs,
+        fat: m.fat,
+        type: m.type,
+        date: now,
+        userId,
+      })),
+    });
+
+    revalidatePath("/health");
+    revalidatePath("/health/nutrition");
+    return {
+      success: true,
+      message: `${yesterday.length} refeição${yesterday.length > 1 ? "ões" : ""} copiada${yesterday.length > 1 ? "s" : ""} de ontem! 🍽️`,
+      count: yesterday.length,
+    };
+  } catch (error) {
+    console.error("Erro ao copiar refeições de ontem:", error);
+    return { success: false, message: "Não foi possível copiar as refeições de ontem." };
   }
 }
 

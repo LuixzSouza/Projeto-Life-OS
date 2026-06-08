@@ -54,6 +54,7 @@ model User {
   wishlistItems     WishlistItem[]
   tasks             Task[]
   workouts          Workout[]
+  workoutPlans      WorkoutPlan[]
   healthMetrics     HealthMetric[]
   meals             Meal[]
   mealPlans         MealPlan[]
@@ -82,6 +83,8 @@ model User {
   challenges        Challenge[]
   challengeCheckins ChallengeCheckin[]
   investmentHoldings InvestmentHolding[]
+  shoes             Shoe[]
+  jobEvents         JobEvent[]
 
   // --- Tecido conectivo central (cross-módulo) ---
   tags          Tag[]
@@ -759,6 +762,10 @@ model JobApplication {
   followUpDate DateTime?
   priority     String?
 
+  // --- IA persistida (não regenerar sempre) ---
+  coverLetter String? // última carta de apresentação gerada
+  matchScore  Int? // % de compatibilidade da última análise (ordenação por fit)
+
   type String @default("JOB")
 
   appliedDate DateTime @default(now())
@@ -768,11 +775,29 @@ model JobApplication {
   projectId String?
   project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
+  // Histórico de estágios (timeline do funil)
+  events JobEvent[]
+
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([projectId])
+}
+
+// Evento de mudança de estágio de uma candidatura (timeline / tempo em cada fase).
+model JobEvent {
+  id        String         @id @default(cuid())
+  jobId     String
+  job       JobApplication @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  status    String
+  createdAt DateTime       @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([userId])
 }
 
 // =========================================================
@@ -863,6 +888,11 @@ model Workout {
   distance Float?
   pace     String?
 
+  // Corrida estruturada (String pois SQLite/Prisma não suporta enum nativo):
+  // terrain ∈ ROAD | TREADMILL | TRAIL | TRACK · shoeName = tênis (análise de desgaste)
+  terrain  String?
+  shoeName String?
+
   muscleGroup String?
   exercises   String?
 
@@ -877,6 +907,42 @@ model Workout {
 
   @@index([userId])
   @@index([userId, date])
+}
+
+// Registro de tênis de corrida (gestão de hardware / prevenção de lesão).
+// A quilometragem é SOMADA do histórico de Workout por shoeName (não duplicada aqui).
+model Shoe {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  maxDistance Float? // km — meta de troca (opcional). 80% = alerta âmbar, 100% = vermelho
+  retired     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+// Ficha de treino estruturada (Plano → Divisões A/B/C → Exercícios + Metas tipadas).
+// A hierarquia fica num JSON em `content` (mesmo padrão de Workout.exercises): a ficha
+// é sempre editada/carregada como um todo no cliente, então normalizar em 3 tabelas
+// só adicionaria complexidade de ordenação/upsert sem ganho. A tipagem estrita vive
+// nas interfaces TS (plan-types.ts) e é validada ao salvar.
+model WorkoutPlan {
+  id        String   @id @default(uuid())
+  name      String
+  goal      String   @default("general") // hypertrophy | strength | endurance | general
+  content   String   // JSON: { v, divisions: [{ label, muscleGroups, exercises: [{ name, target... }] }] }
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, updatedAt])
 }
 
 model HealthMetric {
@@ -930,6 +996,10 @@ model Meal {
   title    String
   items    String
   calories Int?
+  // Macros em gramas (opcionais — nem todo registro detalha proteína/carbo/gordura)
+  protein  Float?
+  carbs    Float?
+  fat      Float?
   type     String
   date     DateTime @default(now())
 

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { getRecentExercisePerformance } from "@/app/(dashboard)/health/actions";
+import { getRecentExercisePerformance, getExerciseVolumeHistory } from "@/app/(dashboard)/health/actions";
 import { LiveSession } from "@/components/health/gym/session/live-session";
+import type { ExerciseHistoryPoint, LastPerf } from "@/components/health/gym/session/session-types";
 
 export const metadata: Metadata = {
   title: "Treino ao vivo | Life OS",
@@ -10,9 +11,12 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function GymSessionPage() {
-  // Desempenho anterior por exercício (sobrecarga progressiva). Tolera falha.
-  let lastPerf = await getRecentExercisePerformance().catch(() => []);
-  if (!Array.isArray(lastPerf)) lastPerf = [];
+  // Desempenho anterior + histórico de volume por exercício (sobrecarga progressiva
+  // e mini-gráfico do descanso). Tolera falha individual.
+  const [lastPerf, volumeHistory] = await Promise.all([
+    getRecentExercisePerformance().catch((): LastPerf[] => []),
+    getExerciseVolumeHistory().catch((): Record<string, ExerciseHistoryPoint[]> => ({})),
+  ]);
 
-  return <LiveSession lastPerf={lastPerf} />;
+  return <LiveSession lastPerf={Array.isArray(lastPerf) ? lastPerf : []} volumeHistory={volumeHistory} />;
 }

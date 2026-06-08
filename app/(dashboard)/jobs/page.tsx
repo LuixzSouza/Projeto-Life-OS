@@ -17,7 +17,10 @@ export default async function JobsPage() {
     prisma.jobApplication.findMany({
       where: { userId },
       orderBy: { appliedDate: "desc" },
-      include: { project: { select: { id: true, slug: true, title: true } } },
+      include: {
+        project: { select: { id: true, slug: true, title: true } },
+        events: { orderBy: { createdAt: "asc" }, select: { status: true, createdAt: true } },
+      },
     }),
     getPortfolio(),
     prisma.project.findMany({

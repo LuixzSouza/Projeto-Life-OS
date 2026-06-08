@@ -1,11 +1,15 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { subDays, isSameDay, parseISO, eachDayOfInterval, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { deleteMetric } from "@/app/(dashboard)/health/actions";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Minus, Plus, Moon } from "lucide-react";
 
 import { type SleepEntry, type SleepChartPoint } from "./sleep-types";
@@ -20,6 +24,7 @@ import { BedtimeCalculator } from "./bedtime-calculator";
 
 export function SleepDashboard({ data, initialGoal }: { data: SleepEntry[]; initialGoal?: number | null }) {
   const [goal, setGoal] = useSleepGoal(initialGoal);
+  const [toDelete, setToDelete] = useState<string | null>(null);
 
   const insights = useMemo(() => computeSleepInsights(data, goal), [data, goal]);
 
@@ -40,11 +45,11 @@ export function SleepDashboard({ data, initialGoal }: { data: SleepEntry[]; init
     });
   }, [data, goal]);
 
-  const handleDelete = async (id: string) => {
-    if (confirm("Remover este registro de sono?")) {
-      await deleteMetric(id);
-      toast.success("Registro removido.");
-    }
+  const confirmDelete = async () => {
+    if (!toDelete) return;
+    await deleteMetric(toDelete);
+    toast.success("Registro removido.");
+    setToDelete(null);
   };
 
   return (
@@ -89,9 +94,23 @@ export function SleepDashboard({ data, initialGoal }: { data: SleepEntry[]; init
           <SleepInsightCard insights={insights} goal={goal} />
         </div>
         <div className="lg:col-span-2">
-          <SleepHistoryCard data={data} onDelete={handleDelete} />
+          <SleepHistoryCard data={data} onDelete={(id) => setToDelete(id)} />
         </div>
       </div>
+
+      {/* Exclusão de registro de sono — modal único padronizado (sem confirm() nativo) */}
+      <AlertDialog open={toDelete !== null} onOpenChange={(o) => !o && setToDelete(null)}>
+        <AlertDialogContent className="rounded-2xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover este registro de sono?</AlertDialogTitle>
+            <AlertDialogDescription>O registro será removido permanentemente do seu histórico.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90">Remover</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -6,7 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Briefcase, Plus, LayoutGrid, List, FileText, Trophy, Rocket, Target, Columns3, Search } from "lucide-react";
+import { Briefcase, Plus, LayoutGrid, List, FileText, Trophy, Rocket, Target, Columns3, Search, CalendarClock, ArrowUpDown } from "lucide-react";
+import {
+    Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { ResumeBuilder } from "./resume/resume-builder";
 import { JobListItem } from "./job-list-item";
@@ -18,6 +21,23 @@ import { STATUS_MAP, getThemeClasses } from "./job-tracker-status";
 import { JobWithProject, ProjectOption } from "./job-types";
 
 type ViewMode = 'list' | 'grid' | 'board';
+type SortMode = 'recent' | 'followup' | 'priority' | 'progress';
+
+const PRIORITY_RANK: Record<string, number> = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+
+// Estágio mais avançado já alcançado (usa a timeline; cai no status atual se não houver).
+// REJECTED tem progresso 0, então os eventos preservam o quão longe a candidatura foi.
+function maxProgress(j: JobWithProject): number {
+    const fromEvents = (j.events ?? []).map(e => STATUS_MAP[e.status]?.progress ?? 0);
+    return Math.max(STATUS_MAP[j.status]?.progress ?? 0, ...fromEvents, 0);
+}
+
+// Precisa de follow-up: tem data <= hoje e o processo ainda está aberto.
+function needsFollowUp(j: JobWithProject): boolean {
+    if (!j.followUpDate || j.status === 'REJECTED' || j.status === 'ACTIVE') return false;
+    const today = new Date(); today.setHours(23, 59, 59, 999);
+    return new Date(j.followUpDate) <= today;
+}
 
 const BOARD_COLUMNS = ["APPLIED", "SCREENING", "TEST", "INTERVIEW", "OFFER", "ACTIVE", "REJECTED"] as const;
 
@@ -30,31 +50,76 @@ interface JobTrackerProps {
 export function JobTracker({ jobs, portfolio, projects }: JobTrackerProps) {
     const [viewMode, setViewMode] = useState<ViewMode>('list');
     const [search, setSearch] = useState("");
+    const [sortBy, setSortBy] = useState<SortMode>('recent');
+    const [onlyFollowUp, setOnlyFollowUp] = useState(false);
     const [aiJob, setAiJob] = useState<JobWithProject | null>(null);
     const [projectJob, setProjectJob] = useState<JobWithProject | null>(null);
 
     const renderContent = (type: string) => {
         const typed = jobs.filter(j => (j.type || 'JOB') === type);
         const query = search.trim().toLowerCase();
-        const filtered = query
+        let filtered = query
             ? typed.filter(j =>
                 j.company.toLowerCase().includes(query) ||
                 j.role.toLowerCase().includes(query) ||
                 (j.location || "").toLowerCase().includes(query))
             : typed;
 
+        // Filtro "só follow-up pendente" (item 4)
+        if (onlyFollowUp) filtered = filtered.filter(needsFollowUp);
+
+        // Ordenação (item 3)
+        filtered = [...filtered].sort((a, b) => {
+            switch (sortBy) {
+                case 'followup': {
+                    const av = a.followUpDate ? new Date(a.followUpDate).getTime() : Infinity;
+                    const bv = b.followUpDate ? new Date(b.followUpDate).getTime() : Infinity;
+                    return av - bv;
+                }
+                case 'priority':
+                    return (PRIORITY_RANK[a.priority ?? 'MEDIUM'] ?? 1) - (PRIORITY_RANK[b.priority ?? 'MEDIUM'] ?? 1);
+                case 'progress':
+                    return (STATUS_MAP[b.status]?.progress ?? 0) - (STATUS_MAP[a.status]?.progress ?? 0);
+                default:
+                    return new Date(b.appliedDate).getTime() - new Date(a.appliedDate).getTime();
+            }
+        });
+
         const activeCount = typed.filter(j => j.status !== 'REJECTED' && j.status !== 'ACTIVE').length;
         const interviewCount = typed.filter(j => j.status === 'INTERVIEW').length;
         const offerCount = typed.filter(j => j.status === 'OFFER' || j.status === 'ACTIVE').length;
+        const followUpCount = typed.filter(needsFollowUp).length;
+
+        // Funil de conversão (item 6) — usa a timeline (maxProgress) p/ ser fiel.
+        const applied = typed.length;
+        const responded = typed.filter(j => maxProgress(j) >= 30).length;
+        const interviewed = typed.filter(j => maxProgress(j) >= 75).length;
+        const offered = typed.filter(j => maxProgress(j) >= 90).length;
+        const rate = (n: number) => (applied > 0 ? Math.round((n / applied) * 100) : 0);
 
         return (
             <div className="space-y-6 animate-in fade-in duration-300">
                 {/* KPIs */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     <StatsCard label="Em andamento" value={activeCount} icon={Rocket} theme="blue" hint="processos abertos" />
                     <StatsCard label="Entrevistas" value={interviewCount} icon={Target} theme="yellow" hint="fase de entrevista" />
                     <StatsCard label="Conquistas" value={offerCount} icon={Trophy} theme="emerald" hint="propostas e contratos" />
+                    <button type="button" onClick={() => setOnlyFollowUp(v => !v)} className="text-left rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30">
+                        <div className={cn("h-full", onlyFollowUp && "ring-2 ring-primary/40 rounded-xl")}>
+                            <StatsCard label="Follow-ups" value={followUpCount} icon={CalendarClock} theme="yellow" hint={onlyFollowUp ? "filtrando ✓" : "tocar p/ filtrar"} />
+                        </div>
+                    </button>
                 </div>
+
+                {/* Funil de conversão */}
+                {applied > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 rounded-2xl border border-border/40 bg-muted/10 p-4">
+                        <FunnelStep label="Candidaturas" value={applied} pct={100} tone="text-blue-600" />
+                        <FunnelStep label="Responderam" value={responded} pct={rate(responded)} tone="text-purple-600" />
+                        <FunnelStep label="Entrevistas" value={interviewed} pct={rate(interviewed)} tone="text-amber-600" />
+                        <FunnelStep label="Propostas" value={offered} pct={rate(offered)} tone="text-emerald-600" />
+                    </div>
+                )}
 
                 {/* Toolbar */}
                 <div className="flex flex-col lg:flex-row gap-3 lg:items-center justify-between">
@@ -80,6 +145,18 @@ export function JobTracker({ jobs, portfolio, projects }: JobTrackerProps) {
                                 className="pl-9 h-10 rounded-xl bg-muted/40 border-border/40 focus-visible:bg-background focus-visible:ring-1 focus-visible:ring-primary/20"
                             />
                         </div>
+
+                        <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortMode)}>
+                            <SelectTrigger className="h-10 w-[160px] shrink-0 rounded-xl bg-muted/40 border-border/40 gap-1.5 text-xs">
+                                <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" /> <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl">
+                                <SelectItem value="recent">Mais recentes</SelectItem>
+                                <SelectItem value="followup">Follow-up próximo</SelectItem>
+                                <SelectItem value="priority">Prioridade</SelectItem>
+                                <SelectItem value="progress">Progresso</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
 
                     <Dialog>
@@ -153,6 +230,23 @@ export function JobTracker({ jobs, portfolio, projects }: JobTrackerProps) {
             <JobAiDialog job={aiJob} onOpenChange={(open) => { if (!open) setAiJob(null); }} />
             <JobProjectDialog job={projectJob} projects={projects} onOpenChange={(open) => { if (!open) setProjectJob(null); }} />
         </>
+    );
+}
+
+// --- ETAPA DO FUNIL DE CONVERSÃO ---
+
+function FunnelStep({ label, value, pct, tone }: { label: string; value: number; pct: number; tone: string }) {
+    return (
+        <div className="space-y-1.5">
+            <div className="flex items-baseline justify-between gap-2">
+                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider truncate">{label}</span>
+                <span className={cn("text-[11px] font-bold", tone)}>{pct}%</span>
+            </div>
+            <p className="text-xl font-black tracking-tight">{value}</p>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+                <div className={cn("h-full rounded-full", tone.replace("text-", "bg-"))} style={{ width: `${pct}%` }} />
+            </div>
+        </div>
     );
 }
 

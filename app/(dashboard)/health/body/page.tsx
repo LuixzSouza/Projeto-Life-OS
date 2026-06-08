@@ -2,7 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { BodyDashboard } from "@/components/health/body/body-dashboard";
 import { User } from "lucide-react";
 import { Metadata } from "next";
-import { BodyStats } from "@/lib/body-math";
+import { BodyStats, calculateBodyFat } from "@/lib/body-math";
+import type { BodyEvolutionPoint } from "@/components/health/body/body-evolution-chart";
 import { HealthActions } from "@/components/health/health-actions";
 import { getCurrentUserId } from "@/lib/auth";
 import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
@@ -16,16 +17,55 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic';
 
+// Dia (YYYY-MM-DD) para mesclar séries de fontes diferentes no mesmo ponto do eixo X.
+function dayKey(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
 export default async function BodyPage() {
   let currentStats: BodyStats | null = null;
+  let evolution: BodyEvolutionPoint[] = [];
   let hasError = false;
 
   try {
     const userId = await getCurrentUserId();
-    const latestMeasurement = await prisma.bodyMeasurement.findFirst({
-      where: { userId },
-      orderBy: { date: 'desc' },
-    });
+    // Snapshot atual + histórico (peso via HealthMetric, leve; % gordura via snapshots).
+    const [latestMeasurement, weightHistory, measurements] = await Promise.all([
+      prisma.bodyMeasurement.findFirst({ where: { userId }, orderBy: { date: "desc" } }),
+      prisma.healthMetric.findMany({
+        where: { userId, type: "WEIGHT" },
+        orderBy: { date: "asc" },
+        select: { date: true, value: true },
+      }),
+      prisma.bodyMeasurement.findMany({
+        where: { userId },
+        orderBy: { date: "asc" },
+        select: { date: true, weight: true, height: true, gender: true, neck: true, waist: true, hip: true },
+      }),
+    ]);
+
+    // Mescla por dia: peso (HealthMetric) + % gordura (Navy a partir dos snapshots).
+    const byDay = new Map<string, BodyEvolutionPoint>();
+    for (const w of weightHistory) {
+      byDay.set(dayKey(w.date), { date: w.date.toISOString(), weight: w.value, bodyFat: null });
+    }
+    for (const m of measurements) {
+      const key = dayKey(m.date);
+      const point = byDay.get(key) ?? { date: m.date.toISOString(), weight: null, bodyFat: null };
+      if (point.weight == null) point.weight = m.weight; // dia sem HealthMetric → usa o do snapshot
+      const bf = calculateBodyFat({
+        weight: m.weight,
+        height: m.height,
+        gender: (m.gender as "MALE" | "FEMALE") || "MALE",
+        activityFactor: 1.2,
+        waist: m.waist ?? 0,
+        neck: m.neck ?? 0,
+        hip: m.hip ?? 0,
+      });
+      if (bf > 0) point.bodyFat = Math.round(bf * 10) / 10;
+      byDay.set(key, point);
+    }
+    evolution = Array.from(byDay.values()).sort((a, b) => +new Date(a.date) - +new Date(b.date));
 
     if (latestMeasurement) {
       currentStats = {
@@ -93,7 +133,7 @@ export default async function BodyPage() {
       </PageHeader>
 
       <PageContainer>
-        <BodyDashboard stats={currentStats!} />
+        <BodyDashboard stats={currentStats!} evolution={evolution} />
       </PageContainer>
     </PageShell>
   );

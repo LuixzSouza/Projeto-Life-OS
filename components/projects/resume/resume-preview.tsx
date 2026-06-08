@@ -20,7 +20,7 @@ export function ResumePreview({ data, onChange }: ResumePreviewProps) {
   const updateProject = (id: string, field: string, val: string) => onChange({ ...data, projects: data.projects.map(p => p.id === id ? { ...p, [field]: val } : p) });
 
   return (
-    <div className="p-[12mm] md:p-[15mm] h-full flex flex-col font-sans text-zinc-900 leading-relaxed bg-white selection:bg-zinc-200">
+    <div className="resume-page p-[12mm] md:p-[15mm] h-full flex flex-col font-sans text-zinc-900 leading-relaxed bg-white selection:bg-zinc-200 print:p-0">
       
       {/* 1. HEADER (Identidade e Contato) */}
       <header className="border-b-4 border-zinc-900 pb-6 mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
@@ -72,8 +72,9 @@ export function ResumePreview({ data, onChange }: ResumePreviewProps) {
         </div>
       </header>
 
-      {/* 2. CORPO DO CURRÍCULO (Grid 2 Colunas Fixas para A4) */}
-      <div className="grid grid-cols-[1fr_240px] gap-10">
+      {/* 2. CORPO DO CURRÍCULO — 2 colunas na tela; coluna única na impressão
+            (uma linha de grid não pagina entre páginas → vira fluxo linear no PDF). */}
+      <div className="grid grid-cols-[1fr_240px] gap-10 resume-body print:block print:gap-0">
         
         {/* COLUNA ESQUERDA (Experiência e Projetos) */}
         <div className="space-y-10 min-w-0"> {/* min-w-0 impede que o flex/grid estoure com links longos */}
@@ -156,7 +157,7 @@ export function ResumePreview({ data, onChange }: ResumePreviewProps) {
 
             {/* PROJETOS */}
             {data.projects.length > 0 && (
-                <section className="break-inside-avoid">
+                <section>
                     <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-400 mb-5 flex items-center gap-2">
                         <span className="w-2 h-2 bg-zinc-900 rounded-sm inline-block shrink-0" /> Projetos em Destaque
                     </h2>
@@ -198,7 +199,7 @@ export function ResumePreview({ data, onChange }: ResumePreviewProps) {
 
             {/* CERTIFICAÇÕES */}
             {data.certifications.length > 0 && (
-                <section className="break-inside-avoid">
+                <section>
                     <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-400 mb-5 flex items-center gap-2">
                         <span className="w-2 h-2 bg-zinc-900 rounded-sm inline-block shrink-0" /> Cursos & Certificações
                     </h2>
@@ -215,8 +216,8 @@ export function ResumePreview({ data, onChange }: ResumePreviewProps) {
             )}
         </div>
 
-        {/* COLUNA DIREITA (Sidebar Tática) */}
-        <div className="space-y-10 min-w-0">
+        {/* COLUNA DIREITA (Sidebar Tática) — vira full-width abaixo no print */}
+        <div className="resume-sidebar space-y-10 min-w-0 print:mt-8 print:space-y-8">
             
             {/* SKILLS */}
             {(data.skills.languages.length > 0 || data.skills.frameworks.length > 0 || data.skills.tools.length > 0) && (

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { JobApplication } from "@prisma/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -15,8 +16,15 @@ import { generateCoverLetter, analyzeJobMatch } from "@/app/(dashboard)/jobs/ai-
 type Mode = "cover" | "match";
 
 export function JobAiDialog({ job, onOpenChange }: { job: JobApplication | null; onOpenChange: (open: boolean) => void }) {
+    const router = useRouter();
     const [loading, setLoading] = useState<Mode | null>(null);
     const [results, setResults] = useState<Record<Mode, string>>({ cover: "", match: "" });
+
+    // Pré-carrega a carta persistida (não regenerar sempre). O match guarda só o score,
+    // então a aba de análise começa vazia mas o score aparece no cabeçalho.
+    useEffect(() => {
+        setResults({ cover: job?.coverLetter ?? "", match: "" });
+    }, [job?.id, job?.coverLetter]);
 
     const run = async (mode: Mode) => {
         if (!job) return;
@@ -25,6 +33,7 @@ export function JobAiDialog({ job, onOpenChange }: { job: JobApplication | null;
             const res = mode === "cover" ? await generateCoverLetter(job.id) : await analyzeJobMatch(job.id);
             if (res.success) {
                 setResults(prev => ({ ...prev, [mode]: res.content }));
+                router.refresh(); // reflete coverLetter/matchScore persistidos
             } else {
                 toast.error(res.error);
             }
@@ -92,9 +101,16 @@ export function JobAiDialog({ job, onOpenChange }: { job: JobApplication | null;
                             <Sparkles className="h-6 w-6 text-violet-500" /> Assistente de Carreira
                         </DialogTitle>
                         {job && (
-                            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest pt-1">
-                                {job.role} · {job.company}
-                            </p>
+                            <div className="flex items-center gap-2 pt-1">
+                                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                                    {job.role} · {job.company}
+                                </p>
+                                {job.matchScore != null && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-2 py-0.5 text-[10px] font-black text-violet-600">
+                                        <Target className="h-3 w-3" /> Match {job.matchScore}%
+                                    </span>
+                                )}
+                            </div>
                         )}
                     </DialogHeader>
                 </div>

@@ -11,17 +11,24 @@ import { cn } from "@/lib/utils";
 
 import { GymForm } from "./gym-form";
 import { GymGallery } from "./session/gallery-view";
-import { WorkoutPlanBuilder } from "./workout-plan-builder";
+import { PlanBuilder } from "./plan-builder";
 import { VolumeChart } from "./volume-chart";
 import { MuscleFrequencyCard } from "./muscle-frequency-card";
+import { MuscleRecoveryCard } from "./muscle-recovery-card";
 import { WorkoutCard } from "./workout-card";
 import type { GymWorkout, VolumePoint, MuscleCount } from "./gym-types";
+import type { MuscleRecovery } from "./session/session-types";
 
 export type { Exercise, GymWorkout } from "./gym-types";
 
-export function GymDashboard({ workouts }: { workouts: GymWorkout[] }) {
+export function GymDashboard({ workouts, recovery = [] }: { workouts: GymWorkout[]; recovery?: MuscleRecovery[] }) {
   const [selectedMuscle, setSelectedMuscle] = useState<string | 'ALL'>('ALL');
   const [isAddOpen, setIsAddOpen] = useState(false);
+  // Abre direto na aba "Fichas" quando chega um link de importação (?planimport=),
+  // garantindo que o PlanBuilder monte e dispare a importação.
+  const [tab, setTab] = useState<string>(() =>
+    typeof window !== "undefined" && /[?&]planimport=/.test(window.location.search) ? "planner" : "dashboard"
+  );
 
   // --- Calculations & Memoization ---
 
@@ -72,30 +79,32 @@ export function GymDashboard({ workouts }: { workouts: GymWorkout[] }) {
 
   return (
     <div className="pb-12">
-      <Tabs defaultValue="dashboard" className="space-y-6">
+      <Tabs value={tab} onValueChange={setTab} className="space-y-6">
 
         {/* Tabs Navigation & Actions */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <TabsList className="bg-muted/50 p-1 rounded-xl self-start h-auto">
-            <TabsTrigger value="dashboard" className="gap-2 px-4 py-2 text-xs font-medium rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-              <LineChartIcon className="h-4 w-4" />
-              Progresso
-            </TabsTrigger>
-            <TabsTrigger value="planner" className="gap-2 px-4 py-2 text-xs font-medium rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-              <LayoutList className="h-4 w-4" />
-              Fichas de Treino
-            </TabsTrigger>
-            <TabsTrigger value="gallery" className="gap-2 px-4 py-2 text-xs font-medium rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm">
-              <Images className="h-4 w-4" />
-              Galeria
-            </TabsTrigger>
-          </TabsList>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="-mx-1 overflow-x-auto px-1 scrollbar-hide">
+            <TabsList className="inline-flex w-auto bg-muted/50 p-1 rounded-xl h-auto">
+              <TabsTrigger value="dashboard" className="shrink-0 gap-1.5 px-3 py-2 text-xs font-medium rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm sm:gap-2 sm:px-4">
+                <LineChartIcon className="h-4 w-4" />
+                Progresso
+              </TabsTrigger>
+              <TabsTrigger value="planner" className="shrink-0 gap-1.5 px-3 py-2 text-xs font-medium rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm sm:gap-2 sm:px-4">
+                <LayoutList className="h-4 w-4" />
+                Fichas
+              </TabsTrigger>
+              <TabsTrigger value="gallery" className="shrink-0 gap-1.5 px-3 py-2 text-xs font-medium rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm sm:gap-2 sm:px-4">
+                <Images className="h-4 w-4" />
+                Galeria
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* Ação: registrar sessão manual (o "Treinar agora" agora é o hero no topo). */}
-          <div className="flex items-center gap-2 self-start sm:self-auto">
+          <div className="flex items-center gap-2 self-stretch sm:self-auto">
           <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" variant="outline" className="h-9 gap-2 font-medium rounded-lg shadow-sm">
+              <Button size="sm" variant="outline" className="h-9 w-full gap-2 font-medium rounded-lg shadow-sm sm:w-auto">
                 <Plus className="h-4 w-4" /> Registrar Sessão
               </Button>
             </DialogTrigger>
@@ -120,6 +129,7 @@ export function GymDashboard({ workouts }: { workouts: GymWorkout[] }) {
 
             {/* Left Column: Stats (4/12) */}
             <div className="lg:col-span-4 space-y-6">
+              <MuscleRecoveryCard recovery={recovery} />
               <VolumeChart data={volumeData} />
               <MuscleFrequencyCard distribution={muscleDistribution} />
             </div>
@@ -180,9 +190,9 @@ export function GymDashboard({ workouts }: { workouts: GymWorkout[] }) {
           </div>
         </TabsContent>
 
-        {/* --- TAB: PLANNER --- */}
+        {/* --- TAB: PLANNER (Fichas estruturadas: divisões A/B/C + metas tipadas) --- */}
         <TabsContent value="planner" className="m-0 focus-visible:outline-none">
-          <WorkoutPlanBuilder />
+          <PlanBuilder />
         </TabsContent>
 
         {/* --- TAB: GALERIA --- */}

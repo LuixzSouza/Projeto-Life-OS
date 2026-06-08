@@ -28,6 +28,9 @@ export async function logWorkout(formData: FormData): Promise<ActionResponse> {
     const pace = formData.get("pace") as string;
     const muscleGroup = formData.get("muscleGroup") as string;
     const exercises = formData.get("exercises") as string; // JSON String
+    // Corrida estruturada (vazio → null, não grava string vazia).
+    const terrain = (formData.get("terrain") as string) || null;
+    const shoeName = (formData.get("shoeName") as string) || null;
 
     // Validação Básica
     if (!title || !type || duration <= 0) {
@@ -46,6 +49,8 @@ export async function logWorkout(formData: FormData): Promise<ActionResponse> {
         notes,
         distance,
         pace,
+        terrain,
+        shoeName,
         muscleGroup,
         exercises,
         date: new Date(), // Data atual
@@ -82,6 +87,8 @@ export async function updateWorkout(formData: FormData): Promise<ActionResponse>
     const pace = formData.get("pace") as string;
     const muscleGroup = formData.get("muscleGroup") as string;
     const exercises = formData.get("exercises") as string;
+    const terrain = (formData.get("terrain") as string) || null;
+    const shoeName = (formData.get("shoeName") as string) || null;
 
     const userId = await requireUserId();
 
@@ -96,6 +103,8 @@ export async function updateWorkout(formData: FormData): Promise<ActionResponse>
         notes,
         distance,
         pace,
+        terrain,
+        shoeName,
         muscleGroup,
         exercises
       },

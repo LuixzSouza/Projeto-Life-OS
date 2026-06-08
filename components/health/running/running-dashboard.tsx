@@ -1,20 +1,29 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { 
-    Footprints, Calendar, TrendingUp, 
-    MapPin, Plus, Trophy, Gauge, Activity 
+import {
+    AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+    AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+    Footprints, Calendar, TrendingUp,
+    MapPin, Plus, Trophy, Gauge, Activity, Pencil, Trash2, Navigation
 } from "lucide-react";
 import { AreaChart, Area, XAxis, Tooltip, CartesianGrid, YAxis } from "recharts";
 import { ChartContainer } from "@/components/ui/chart-container";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { RunForm } from "./run-form";
+import { cn } from "@/lib/utils";
+import { RunForm, SURFACE_OPTIONS } from "./run-form";
 import { ImportRunsDialog } from "./import-runs-dialog";
+import { ShoeMileageCard } from "./shoe-mileage-card";
+import { deleteWorkout, type ShoeWithMileage } from "@/app/(dashboard)/health/actions";
 
 // --- Tipagem Estrita ---
 interface RunWorkout {
@@ -26,42 +35,78 @@ interface RunWorkout {
     pace: string | null;
     feeling: string | null;
     notes: string | null;
+    terrain: string | null;
+    shoeName: string | null;
 }
 
-export function RunningDashboard({ runs }: { runs: RunWorkout[] }) {
-    const [open, setOpen] = useState(false);
+// Lookups de rótulo (reaproveitam as opções de terreno do RunForm).
+const TERRAIN_META = Object.fromEntries(SURFACE_OPTIONS.map(o => [o.value, o]));
 
-    // --- CÁLCULOS ESTATÍSTICOS ---
-    
-    const totalKm = runs.reduce((acc, r) => acc + (r.distance || 0), 0);
-    const totalRuns = runs.length;
-    
-    // Pace Médio Geral
+export function RunningDashboard({ runs, bodyWeight = null, shoes = [] }: { runs: RunWorkout[]; bodyWeight?: number | null; shoes?: ShoeWithMileage[] }) {
+    const router = useRouter();
+    const [open, setOpen] = useState(false);
+    const [editing, setEditing] = useState<RunWorkout | null>(null);
+    const [deleting, setDeleting] = useState<RunWorkout | null>(null);
+    const [terrainFilter, setTerrainFilter] = useState<string>("ALL");
+
+    // Tênis ativos para o seletor do formulário (não aposentados).
+    const shoeOptions = useMemo(() => shoes.filter(s => !s.retired).map(s => s.name), [shoes]);
+
+    // Terrenos presentes no histórico (para os chips de filtro).
+    const availableTerrains = useMemo(
+        () => Array.from(new Set(runs.map(r => r.terrain).filter((t): t is string => !!t))),
+        [runs]
+    );
+
+    // Conjunto filtrado por terreno — alimenta KPIs, gráfico e histórico.
+    const filteredRuns = useMemo(
+        () => (terrainFilter === "ALL" ? runs : runs.filter(r => r.terrain === terrainFilter)),
+        [runs, terrainFilter]
+    );
+
+    const confirmDelete = async () => {
+        if (!deleting) return;
+        const res = await deleteWorkout(deleting.id);
+        if (res.success) {
+            toast.success("Corrida removida.");
+            router.refresh();
+        } else {
+            toast.error(res.message);
+        }
+        setDeleting(null);
+    };
+
+    // --- CÁLCULOS ESTATÍSTICOS (respeitam o filtro de terreno) ---
+
+    const totalKm = filteredRuns.reduce((acc, r) => acc + (r.distance || 0), 0);
+    const totalRuns = filteredRuns.length;
+
+    // Pace Médio (do conjunto filtrado → permite comparar asfalto vs trilha)
     const avgPace = useMemo(() => {
         if (totalRuns === 0 || totalKm === 0) return "0'00\"";
-        const totalDuration = runs.reduce((acc, r) => acc + r.duration, 0);
+        const totalDuration = filteredRuns.reduce((acc, r) => acc + r.duration, 0);
         const paceDecimal = totalDuration / totalKm;
         const pMin = Math.floor(paceDecimal);
         const pSec = Math.round((paceDecimal - pMin) * 60);
         return `${pMin}'${pSec.toString().padStart(2, '0')}"`;
-    }, [runs, totalKm, totalRuns]);
+    }, [filteredRuns, totalKm, totalRuns]);
 
     // Recorde Pessoal (Distância)
     const bestRun = useMemo(() => {
-        if (runs.length === 0) return null;
-        return runs.reduce((prev, current) => (prev.distance || 0) > (current.distance || 0) ? prev : current);
-    }, [runs]);
+        if (filteredRuns.length === 0) return null;
+        return filteredRuns.reduce((prev, current) => (prev.distance || 0) > (current.distance || 0) ? prev : current);
+    }, [filteredRuns]);
 
     // Dados do Gráfico
     const chartData = useMemo(() => {
-        return runs.slice(0, 10).reverse().map(r => ({
+        return filteredRuns.slice(0, 10).reverse().map(r => ({
             date: format(new Date(r.date), "dd/MM"),
             fullDate: format(new Date(r.date), "d 'de' MMMM", { locale: ptBR }),
             km: r.distance || 0,
             pace: r.pace,
             title: r.title
         }));
-    }, [runs]);
+    }, [filteredRuns]);
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pb-24 animate-in fade-in duration-700">
@@ -86,7 +131,7 @@ export function RunningDashboard({ runs }: { runs: RunWorkout[] }) {
                             </DialogTitle>
                         </div>
                         <div className="p-6">
-                            <RunForm onSuccess={() => setOpen(false)} />
+                            <RunForm bodyWeight={bodyWeight} shoeOptions={shoeOptions} onSuccess={() => { setOpen(false); router.refresh(); }} />
                         </div>
                     </DialogContent>
                 </Dialog>
@@ -163,11 +208,46 @@ export function RunningDashboard({ runs }: { runs: RunWorkout[] }) {
                         )}
                     </CardContent>
                 </Card>
+
+                {/* Monitor de desgaste de tênis */}
+                <ShoeMileageCard shoes={shoes} />
             </div>
 
             {/* --- COLUNA DIREITA: GRÁFICOS E FEED (8/12) --- */}
             <div className="lg:col-span-8 space-y-6">
-                
+
+                {/* Filtro de terreno (segmenta gráfico + histórico) */}
+                {availableTerrains.length > 0 && (
+                    <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
+                        <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground shrink-0">
+                            <Navigation className="h-3.5 w-3.5" /> Terreno
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => setTerrainFilter("ALL")}
+                            className={cn(
+                                "shrink-0 rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
+                                terrainFilter === "ALL" ? "border-primary bg-primary/10 text-primary" : "border-border/60 text-muted-foreground hover:border-primary/40"
+                            )}
+                        >
+                            Todos
+                        </button>
+                        {availableTerrains.map((t) => (
+                            <button
+                                key={t}
+                                type="button"
+                                onClick={() => setTerrainFilter(t)}
+                                className={cn(
+                                    "shrink-0 rounded-full border px-3 py-1 text-xs font-semibold transition-colors",
+                                    terrainFilter === t ? "border-primary bg-primary/10 text-primary" : "border-border/60 text-muted-foreground hover:border-primary/40"
+                                )}
+                            >
+                                {TERRAIN_META[t]?.icon} {TERRAIN_META[t]?.label ?? t}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
                 {/* Gráfico de Evolução */}
                 <Card className="border-border/60 bg-card shadow-sm">
                     <CardHeader className="pb-2 border-b border-border/40 bg-muted/20">
@@ -249,62 +329,129 @@ export function RunningDashboard({ runs }: { runs: RunWorkout[] }) {
                         <h3 className="text-sm font-bold text-foreground">Histórico de Corridas</h3>
                     </div>
                     
-                    {runs.length === 0 ? (
+                    {filteredRuns.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-24 border-2 border-dashed border-border rounded-3xl bg-muted/10">
                             <div className="p-4 bg-muted/30 rounded-full mb-3">
                                 <Footprints className="h-8 w-8 text-muted-foreground/50" />
                             </div>
-                            <h3 className="text-lg font-semibold text-foreground">Nenhuma corrida registrada</h3>
-                            <p className="text-sm text-muted-foreground mt-1">Bora correr? 🏃‍♂️💨</p>
+                            <h3 className="text-lg font-semibold text-foreground">{terrainFilter === "ALL" ? "Nenhuma corrida registrada" : "Nenhuma corrida neste terreno"}</h3>
+                            <p className="text-sm text-muted-foreground mt-1">{terrainFilter === "ALL" ? "Bora correr? 🏃‍♂️💨" : "Tente outro filtro de terreno."}</p>
                         </div>
                     ) : (
                         <div className="grid gap-3">
-                            {runs.map(run => (
-                                <RunCard key={run.id} run={run} />
+                            {filteredRuns.map(run => (
+                                <RunCard key={run.id} run={run} onEdit={() => setEditing(run)} onDelete={() => setDeleting(run)} />
                             ))}
                         </div>
                     )}
                 </div>
 
             </div>
+
+            {/* Editar corrida (modal único controlado) */}
+            <Dialog open={editing !== null} onOpenChange={(o) => !o && setEditing(null)}>
+                <DialogContent className="max-w-lg p-0 gap-0 bg-background border-border shadow-2xl rounded-xl overflow-hidden">
+                    <div className="p-6 border-b border-border/40 bg-muted/10">
+                        <DialogTitle className="flex items-center gap-2 text-xl">
+                            <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                                <Pencil className="h-5 w-5" />
+                            </div>
+                            Editar Corrida
+                        </DialogTitle>
+                    </div>
+                    <div className="p-6">
+                        {editing && (
+                            <RunForm
+                                bodyWeight={bodyWeight}
+                                shoeOptions={shoeOptions}
+                                initialData={{
+                                    id: editing.id,
+                                    distance: editing.distance,
+                                    duration: editing.duration,
+                                    notes: editing.notes,
+                                    pace: editing.pace,
+                                    feeling: editing.feeling,
+                                    terrain: editing.terrain,
+                                    shoeName: editing.shoeName,
+                                }}
+                                onSuccess={() => { setEditing(null); router.refresh(); }}
+                            />
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Excluir corrida (confirmação padronizada) */}
+            <AlertDialog open={deleting !== null} onOpenChange={(o) => !o && setDeleting(null)}>
+                <AlertDialogContent className="rounded-2xl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Excluir esta corrida?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            {deleting ? `"${deleting.title}" de ${format(new Date(deleting.date), "d 'de' MMMM", { locale: ptBR })} será removida permanentemente.` : ""}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className="rounded-xl">Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmDelete} className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90">Excluir</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
 
 // --- SUBCOMPONENTES ---
 
-function RunCard({ run }: { run: RunWorkout }) {
+function RunCard({ run, onEdit, onDelete }: { run: RunWorkout; onEdit: () => void; onDelete: () => void }) {
+    const terrain = run.terrain ? TERRAIN_META[run.terrain] : null;
+    const shoe = run.shoeName || null;
+
     return (
         <Card className="group border-border/60 bg-card hover:border-primary/30 hover:shadow-md transition-all duration-300">
             <CardContent className="p-5">
                 <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-6">
-                    
+
                     {/* Info Principal */}
-                    <div className="flex items-start gap-4">
+                    <div className="flex items-start gap-4 min-w-0">
                         <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 border border-primary/20 transition-colors group-hover:bg-primary/20">
                             <Footprints className="h-6 w-6" />
                         </div>
-                        <div>
+                        <div className="min-w-0">
                             <h4 className="font-bold text-foreground text-base truncate pr-2">{run.title}</h4>
                             <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mt-1 font-medium">
                                 <span className="flex items-center gap-1.5">
-                                    <Calendar className="h-3.5 w-3.5 text-primary/70" /> 
+                                    <Calendar className="h-3.5 w-3.5 text-primary/70" />
                                     {format(new Date(run.date), "dd MMM, HH:mm", { locale: ptBR })}
                                 </span>
                                 {run.feeling && (
                                     <>
                                         <span className="w-1 h-1 rounded-full bg-border" />
                                         <span className="flex items-center gap-1.5">
-                                            <Activity className="h-3.5 w-3.5 text-primary/70" /> 
+                                            <Activity className="h-3.5 w-3.5 text-primary/70" />
                                             {run.feeling === 'GOOD' ? 'Bom' : run.feeling === 'TIRED' ? 'Cansado' : 'Intenso'}
                                         </span>
                                     </>
                                 )}
                             </div>
+                            {/* Chips estruturados: terreno + tênis */}
+                            {(terrain || shoe) && (
+                                <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                                    {terrain && (
+                                        <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/30 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                                            <Navigation className="h-3 w-3" /> {terrain.icon} {terrain.label}
+                                        </span>
+                                    )}
+                                    {shoe && (
+                                        <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/30 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                                            <Footprints className="h-3 w-3" /> {shoe}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
 
-                    {/* Métricas (Grid Compacto) */}
+                    {/* Métricas + ações */}
                     <div className="flex items-center justify-between sm:justify-end gap-6 sm:gap-8 border-t sm:border-t-0 sm:border-l border-border/60 pt-4 sm:pt-0 sm:pl-8">
                         <div className="text-center sm:text-right">
                             <p className="text-[10px] uppercase text-muted-foreground font-bold tracking-wider mb-0.5">Distância</p>
@@ -325,6 +472,11 @@ function RunCard({ run }: { run: RunWorkout }) {
                                 <span className="text-lg font-bold text-foreground">{run.duration}</span>
                                 <span className="text-xs font-medium text-muted-foreground">min</span>
                             </div>
+                        </div>
+                        {/* Editar / Excluir (revela no hover; sempre visível no mobile) */}
+                        <div className="flex items-center gap-1 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={onEdit} title="Editar"><Pencil className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={onDelete} title="Excluir"><Trash2 className="h-4 w-4" /></Button>
                         </div>
                     </div>
 

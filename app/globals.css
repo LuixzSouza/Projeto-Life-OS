@@ -231,6 +231,29 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  /* Alias usado em todo o sistema (toolbars/tabs roláveis no mobile, ver CLAUDE.md).
+     Estava sendo referenciado em ~16 telas sem nunca ter sido definido. */
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Safe-area (notch / barra inferior do iOS). Reserva o respiro do dispositivo
+     em rodapés e navegação fixa sem precisar repetir env() em cada arquivo. */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  .px-safe {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
 }
 
 /* ========================================= */

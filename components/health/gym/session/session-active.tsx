@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Check, Plus, Trash2, X, Timer, ChevronDown, ChevronUp, History, Flag, Trophy,
-  List, Target, ChevronLeft, ChevronRight, CircleCheck,
+  Check, Plus, Minus, Trash2, X, Timer, ChevronDown, ChevronUp, History, Flag, Trophy,
+  List, Target, ChevronLeft, ChevronRight, CircleCheck, Replace, Volume2, VolumeX, AlertTriangle,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,11 +14,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { useWakeLock } from "./use-wake-lock";
-import { sessionStats, type LiveSession, type LastPerf } from "./session-types";
+import { sessionStats, estimatedOneRepMax, EQUIPMENT_META, SET_TYPE_META, isWorkingSet, type Equipment, type SetType, type LiveSession, type LastPerf, type ExerciseHistoryPoint, type LiveTarget } from "./session-types";
 import { RestOverlay } from "./rest-overlay";
 import { ExerciseDemoModal } from "./exercise-demo-modal";
 import { ExerciseThumb } from "./exercise-thumb";
+import { MusicButton } from "./music-button";
 import { getAllMedia, persistMedia, mediaFor, setVideoFor, type MediaMap } from "./exercise-media";
+import { isSfxMuted, setSfxMuted, playSuccess, playRestEnd, playFinish, primeAudio, hapticTick, hapticExerciseDone, hapticRestEnd } from "./sfx";
 
 type Ex = LiveSession["exercises"][number];
 
@@ -31,17 +34,38 @@ function clock(totalSeconds: number): string {
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
-// Rótulo da próxima série não-feita (para a tela de descanso).
-function nextSetLabel(exercises: Ex[]): string | undefined {
+// "Há X dias" a partir de um ISO (só roda no cliente, pós-hidratação — sem mismatch).
+function relativeDays(iso?: string): string | null {
+  if (!iso) return null;
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return null;
+  const days = Math.floor((Date.now() - then) / 86_400_000);
+  if (days <= 0) return "hoje";
+  if (days === 1) return "ontem";
+  if (days < 7) return `há ${days} dias`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `há ${weeks} sem`;
+  const months = Math.max(1, Math.floor(days / 30));
+  return `há ${months} ${months > 1 ? "meses" : "mês"}`;
+}
+
+// Exercício que contém a PRÓXIMA série não-feita (capa/preview na tela de descanso).
+function nextSetExercise(exercises: Ex[]): { name: string; group?: string } | undefined {
   for (const ex of exercises) {
-    const idx = ex.sets.findIndex((s) => !s.done);
-    if (idx !== -1 && ex.name.trim()) {
-      const s = ex.sets[idx];
-      const target = s.weight || s.reps ? ` · ${s.weight || "?"}kg × ${s.reps || "?"}` : "";
-      return `${ex.name} — série ${idx + 1}${target}`;
-    }
+    if (ex.sets.some((s) => !s.done) && ex.name.trim()) return { name: ex.name, group: ex.group };
   }
   return undefined;
+}
+
+// Parceiro de bi-set: exercício de OUTRO grupo, ainda com séries pendentes, para
+// intercalar no descanso do exercício atual.
+function supersetPartner(exercises: Ex[], restExId: string | null): Ex | undefined {
+  if (!restExId) return undefined;
+  const rest = exercises.find((e) => e.id === restExId);
+  if (!rest) return undefined;
+  return exercises.find(
+    (e) => e.id !== restExId && e.name.trim() && (e.group ?? "") !== (rest.group ?? "") && e.sets.some((s) => !s.done),
+  );
 }
 
 const numOf = (v: string) => parseFloat((v || "").replace(",", ".")) || 0;
@@ -53,7 +77,7 @@ function isPR(ex: Ex, last?: LastPerf): boolean {
   const lastR = numOf(last.reps);
   let best: { w: number; r: number } | null = null;
   for (const s of ex.sets) {
-    if (!s.done) continue;
+    if (!s.done || !isWorkingSet(s)) continue; // aquecimento não vira recorde
     const w = numOf(s.weight), r = numOf(s.reps);
     if (!best || w > best.w || (w === best.w && r > best.r)) best = { w, r };
   }
@@ -63,21 +87,32 @@ function isPR(ex: Ex, last?: LastPerf): boolean {
 
 const allDone = (ex: Ex) => ex.sets.length > 0 && ex.sets.every((s) => s.done);
 
+// Carga é obrigatória para concluir a série, salvo equipamento de peso corporal.
+function requiresWeight(ex: Ex): boolean {
+  const meta = ex.equipment ? EQUIPMENT_META[ex.equipment] : null;
+  return !(meta?.allowsZero ?? false);
+}
+
 export interface SessionControls {
   renameExercise: (exId: string, name: string) => void;
+  replaceExercise: (exId: string, name: string, group?: string, equipment?: Equipment) => void;
+  setExerciseEquipment: (exId: string, equipment: Equipment) => void;
+  setRestSeconds: (seconds: number) => void;
   addExercise: (name: string, group?: string) => void;
   removeExercise: (exId: string) => void;
   addSet: (exId: string) => void;
   removeSet: (exId: string, setId: string) => void;
   updateSet: (exId: string, setId: string, field: "reps" | "weight", value: string) => void;
   toggleSetDone: (exId: string, setId: string) => void;
+  setSetType: (exId: string, setId: string, type: SetType) => void;
 }
 
 export function SessionActive({
-  session, lastPerf, controls, onFinish, onCancel,
+  session, lastPerf, volumeHistory, controls, onFinish, onCancel,
 }: {
   session: LiveSession;
   lastPerf: Record<string, LastPerf>;
+  volumeHistory?: Record<string, ExerciseHistoryPoint[]>;
   controls: SessionControls;
   onFinish: () => void;
   onCancel: () => void;
@@ -92,6 +127,12 @@ export function SessionActive({
 
   const [mode, setMode] = useState<"list" | "focus">("list");
   const [focusIdx, setFocusIdx] = useState(0);
+  const [muted, setMuted] = useState(false);
+  // Sincroniza a preferência de mudo (store externo) só na montagem — ler no
+  // initializer causaria mismatch de hidratação no SSR.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setMuted(isSfxMuted()); }, []);
+  const toggleMuted = () => { const m = !muted; setMuted(m); setSfxMuted(m); if (!m) primeAudio(); };
 
   // Biblioteca local de vídeos por exercício (init lazy — só roda no cliente).
   const [media, setMedia] = useState<MediaMap>(getAllMedia);
@@ -105,6 +146,13 @@ export function SessionActive({
   // Cronômetro de descanso: o fim fica num ref para o tick checar sem stale closure.
   // NÃO zera ao chegar a 0 — passa a contar o excedente (overtime) até o usuário seguir.
   const [restEndsAt, setRestEndsAt] = useState<number | null>(null);
+  const [restExId, setRestExId] = useState<string | null>(null);
+  // Duração do descanso ATUAL (pode ser o override do exercício, ex.: 120s no
+  // agachamento) — base do anel de progresso, independente do padrão da sessão.
+  const [restTotal, setRestTotal] = useState(session.restSeconds);
+  // Bi-set: descanso "minimizado" — o cronômetro de A continua rodando em background
+  // (vira uma pílula) enquanto a tela mostra o exercício B.
+  const [restMinimized, setRestMinimized] = useState(false);
   const restEndsRef = useRef<number | null>(null);
   const buzzed = useRef(false);
   const setRest = (end: number | null) => {
@@ -118,9 +166,11 @@ export function SessionActive({
     const t = setInterval(() => {
       const n = Date.now();
       setNow(n);
+      // Dispara mesmo com o descanso minimizado (o timer de A roda em background).
       if (restEndsRef.current !== null && n >= restEndsRef.current && !buzzed.current) {
         buzzed.current = true;
-        if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.([250, 120, 250]);
+        hapticRestEnd();
+        playRestEnd();
       }
     }, 1000);
     return () => clearInterval(t);
@@ -129,20 +179,58 @@ export function SessionActive({
   const elapsed = Math.floor((now - session.startedAt) / 1000);
   const restRemaining = restEndsAt ? Math.round((restEndsAt - now) / 1000) : 0;
 
-  const startRest = () => setRest(Date.now() + session.restSeconds * 1000);
+  const startRest = (exId: string) => {
+    setRestExId(exId);
+    setRestMinimized(false);
+    // Descanso do exercício, se a ficha definiu um; senão, o padrão da sessão.
+    const secs = exercises.find((e) => e.id === exId)?.target?.restSeconds ?? session.restSeconds;
+    setRestTotal(secs);
+    setRest(Date.now() + secs * 1000);
+  };
   const adjustRest = (deltaSeconds: number) => {
     const base = restRemaining > 0 ? (restEndsRef.current ?? Date.now()) : Date.now();
-    setRest(Math.max(Date.now() - 2000, base + deltaSeconds * 1000));
+    const end = Math.max(Date.now() - 2000, base + deltaSeconds * 1000);
+    // Mantém o anel coerente quando o usuário estende além da duração programada.
+    setRestTotal((t) => Math.max(t, Math.round((end - Date.now()) / 1000)));
+    setRest(end);
+  };
+  // Define o tempo de descanso exato (e adota como novo padrão da sessão).
+  const setRestExact = (seconds: number) => {
+    controls.setRestSeconds(seconds);
+    setRestTotal(seconds);
+    setRest(Date.now() + seconds * 1000);
   };
 
+  // Conclui/desmarca uma série. Ao concluir: valida carga (peso 0 bloqueia, salvo
+  // peso corporal), toca som e inicia o descanso.
   const handleToggle = (exId: string, setId: string, wasDone: boolean) => {
-    controls.toggleSetDone(exId, setId);
-    if (!wasDone) startRest();
+    if (!wasDone) {
+      const ex = exercises.find((e) => e.id === exId);
+      const set = ex?.sets.find((s) => s.id === setId);
+      if (ex && set && requiresWeight(ex) && numOf(set.weight) <= 0) {
+        toast.warning("Informe a carga antes de concluir a série (peso 0).", {
+          description: "Se for peso corporal, troque o equipamento para “Peso corporal”.",
+        });
+        return;
+      }
+      controls.toggleSetDone(exId, setId);
+      playSuccess();
+      // Feedback tátil: toque curto na série; vibração dupla se fechou o exercício.
+      const willComplete = !!ex && ex.sets.every((s) => (s.id === setId ? true : s.done));
+      if (willComplete) hapticExerciseDone();
+      else hapticTick();
+      // Em bi-set (descanso de A minimizado), concluir uma série de B NÃO reinicia o
+      // descanso — preserva o cronômetro de A rodando na pílula.
+      if (!restMinimized) startRest(exId);
+    } else {
+      controls.toggleSetDone(exId, setId);
+    }
   };
 
   // Ao concluir o descanso: no modo Foco, avança pro próximo exercício incompleto.
   const handleRestDone = () => {
     setRest(null);
+    setRestMinimized(false);
     if (mode === "focus") {
       const cur = exercises[focusIdx];
       if (cur && allDone(cur)) {
@@ -158,30 +246,60 @@ export function SessionActive({
     setMode("focus");
   };
 
+  // Bi-set: pula pro parceiro durante o descanso (faz B no descanso de A). O
+  // cronômetro de A NÃO é cancelado — apenas minimizado (continua na pílula).
+  const goSuperset = () => {
+    const partner = supersetPartner(exercises, restExId);
+    if (!partner) return;
+    const i = exercises.findIndex((e) => e.id === partner.id);
+    if (i === -1) return;
+    setFocusIdx(i);
+    setMode("focus");
+    setRestMinimized(true);
+  };
+
+  // Nome do exercício cujo descanso está rodando (rótulo da pílula).
+  const restExName = restExId ? exercises.find((e) => e.id === restExId)?.name : undefined;
+
+  const handleFinish = () => { playFinish(); onFinish(); };
+
   const stats = useMemo(() => sessionStats(exercises), [exercises]);
-  const nextLabel = useMemo(() => nextSetLabel(exercises), [exercises]);
+  const nextEx = useMemo(() => nextSetExercise(exercises), [exercises]);
+  // Enriquecimento p/ a tela de descanso produtiva: "última vez" + histórico de volume.
+  const nextInfo = useMemo(() => {
+    if (!nextEx) return null;
+    const key = nextEx.name.toLowerCase();
+    return { ...nextEx, last: lastPerf[key], history: volumeHistory?.[key] ?? [] };
+  }, [nextEx, lastPerf, volumeHistory]);
+  const partner = useMemo(() => supersetPartner(exercises, restExId), [exercises, restExId]);
   const demoId = demoFor ? mediaFor(media, demoFor)?.youtubeId : undefined;
 
   const idx = Math.min(focusIdx, Math.max(0, exercises.length - 1));
   const focusEx = exercises[idx];
+  const pct = stats.totalSets > 0 ? Math.round((stats.doneSets / stats.totalSets) * 100) : 0;
 
   return (
     <div className="flex min-h-dvh flex-col bg-background">
       {/* HEADER fixo */}
       <header className="sticky top-0 z-30 border-b border-border/40 bg-background/95 backdrop-blur">
-        <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-2.5">
-          <div className="flex items-center gap-2">
+        <div className="mx-auto flex max-w-2xl items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <Timer className="h-5 w-5 text-primary" />
-            <span className="font-mono text-xl font-bold tabular-nums tracking-tight">{clock(elapsed)}</span>
+            <span className="font-mono text-lg font-bold tabular-nums tracking-tight sm:text-xl">{clock(elapsed)}</span>
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{session.title}</p>
-            <p className="text-[11px] text-muted-foreground">{stats.doneSets}/{stats.totalSets} séries · {stats.volume.toLocaleString("pt-BR")} kg</p>
+            <p className="truncate text-[11px] text-muted-foreground">{stats.doneSets}/{stats.totalSets} séries · {stats.volume.toLocaleString("pt-BR")} kg</p>
           </div>
+
+          {/* Mudo dos efeitos sonoros */}
+          <Button variant="ghost" size="icon" onClick={toggleMuted} className="shrink-0 text-muted-foreground" aria-label={muted ? "Ativar sons" : "Silenciar sons"}>
+            {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+          </Button>
 
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive" aria-label="Descartar">
+              <Button variant="ghost" size="icon" className="shrink-0 text-muted-foreground hover:text-destructive" aria-label="Descartar">
                 <X className="h-5 w-5" />
               </Button>
             </AlertDialogTrigger>
@@ -197,7 +315,7 @@ export function SessionActive({
             </AlertDialogContent>
           </AlertDialog>
 
-          <Button onClick={onFinish} className="h-9 gap-1.5 font-semibold">
+          <Button onClick={handleFinish} className="h-9 shrink-0 gap-1.5 px-3 font-semibold sm:px-4">
             <Flag className="h-4 w-4" /> Finalizar
           </Button>
         </div>
@@ -220,6 +338,11 @@ export function SessionActive({
               <Target className="h-3.5 w-3.5" /> Foco
             </button>
           </div>
+        </div>
+
+        {/* Barra de progresso da sessão (feedback visual conforme conclui as séries) */}
+        <div className="h-1 w-full bg-muted/40">
+          <div className="h-full bg-primary transition-[width] duration-500 ease-out" style={{ width: `${pct}%` }} />
         </div>
       </header>
 
@@ -256,9 +379,31 @@ export function SessionActive({
         />
       ) : null}
 
+      {/* Mini atalho de música (recolhido; some durante o descanso em tela cheia) */}
+      {!(restEndsAt !== null && !restMinimized) && <MusicButton />}
+
       {/* Tela de descanso (100vh) */}
-      {restEndsAt !== null && (
-        <RestOverlay total={session.restSeconds} remaining={restRemaining} nextLabel={nextLabel} onAdjust={adjustRest} onDone={handleRestDone} />
+      {restEndsAt !== null && !restMinimized && (
+        <RestOverlay
+          total={restTotal}
+          remaining={restRemaining}
+          next={nextInfo}
+          superset={partner ? { name: partner.name, group: partner.group } : null}
+          onAdjust={adjustRest}
+          onSetExact={setRestExact}
+          onDone={handleRestDone}
+          onSuperset={partner ? goSuperset : undefined}
+          onMinimize={() => setRestMinimized(true)}
+        />
+      )}
+
+      {/* Pílula do descanso minimizado (bi-set): timer de A rodando em background */}
+      {restEndsAt !== null && restMinimized && (
+        <RestMiniPill
+          remaining={restRemaining}
+          label={restExName || undefined}
+          onExpand={() => setRestMinimized(false)}
+        />
       )}
 
       {/* Demonstração em vídeo */}
@@ -269,55 +414,171 @@ export function SessionActive({
   );
 }
 
+// ---- Seletor de equipamento (muda a semântica da carga) ----
+function EquipmentPicker({ value, onChange }: { value?: Equipment; onChange: (e: Equipment) => void }) {
+  const keys = Object.keys(EQUIPMENT_META) as Equipment[];
+  return (
+    <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-hide">
+      {keys.map((k) => (
+        <button
+          key={k}
+          type="button"
+          onClick={() => onChange(k)}
+          className={cn(
+            "shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors",
+            value === k ? "border-primary bg-primary/10 text-primary" : "border-border/50 text-muted-foreground hover:border-primary/40",
+          )}
+        >
+          {EQUIPMENT_META[k].short}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ---- Pílula do descanso minimizado (bi-set): cronômetro de A rodando no canto ----
+function RestMiniPill({ remaining, label, onExpand }: { remaining: number; label?: string; onExpand: () => void }) {
+  const over = remaining <= 0;
+  const s = Math.abs(Math.floor(remaining));
+  const mm = Math.floor(s / 60);
+  const ss = String(s % 60).padStart(2, "0");
+  return (
+    <button
+      type="button"
+      onClick={onExpand}
+      className={cn(
+        "fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2.5 rounded-full border px-4 py-2.5 shadow-lg backdrop-blur transition-colors",
+        over ? "animate-pulse border-red-500/50 bg-red-500/95 text-white" : "border-border/50 bg-card/95 text-foreground",
+      )}
+    >
+      <Timer className={cn("h-4 w-4", over ? "text-white" : "text-primary")} />
+      <span className="font-mono text-base font-bold tabular-nums">{over ? "+" : ""}{mm}:{ss}</span>
+      <span className="max-w-[42vw] truncate text-xs opacity-80">{over ? "Volte ao descanso!" : `descanso${label ? ` · ${label}` : ""}`}</span>
+      <ChevronUp className="h-4 w-4 opacity-70" />
+    </button>
+  );
+}
+
+// ---- Campo de carga com modificadores rápidos (−/+ 2,5 kg) ao lado do input ----
+function WeightStepper({ value, onChange, big, placeholder = "0" }: { value: string; onChange: (v: string) => void; big?: boolean; placeholder?: string }) {
+  const step = (delta: number) => {
+    const cur = parseFloat((value || "0").replace(",", ".")) || 0;
+    const next = Math.max(0, Math.round((cur + delta) * 100) / 100);
+    onChange(String(next));
+  };
+  return (
+    <div className={cn("flex items-stretch overflow-hidden rounded-lg border border-border/60 bg-background", big ? "h-12" : "h-10")}>
+      <button type="button" tabIndex={-1} onClick={() => step(-2.5)} className="flex items-center px-1.5 text-muted-foreground transition-colors hover:bg-muted/50 active:bg-muted" aria-label="Diminuir 2,5 kg">
+        <Minus className="h-3.5 w-3.5" />
+      </button>
+      <input
+        inputMode="decimal"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={cn("w-full min-w-0 border-0 bg-transparent text-center font-mono outline-none placeholder:text-muted-foreground/40", big ? "text-lg" : "text-base")}
+      />
+      <button type="button" tabIndex={-1} onClick={() => step(2.5)} className="flex items-center px-1.5 text-muted-foreground transition-colors hover:bg-muted/50 active:bg-muted" aria-label="Aumentar 2,5 kg">
+        <Plus className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
+// Próximo tipo na rotação: Normal → Aquecimento → Falha → Normal.
+function nextSetType(t?: SetType): SetType {
+  return t === "warmup" ? "failure" : t === "failure" ? "normal" : "warmup";
+}
+
+// Cor da rep digitada vs. a meta da ficha: abaixo do mínimo = âmbar; na/acima da
+// faixa = verde; vazio/sem meta = neutro. Aquecimento não é avaliado.
+function repTone(reps: string, type: SetType, target?: LiveTarget): string {
+  if (!target || type === "warmup") return "";
+  const r = parseFloat((reps || "").replace(",", ".")) || 0;
+  if (r <= 0) return "";
+  return r < target.minReps ? "text-amber-600" : "text-emerald-600";
+}
+
 // ---- Linhas de série (reutilizadas em Lista e Foco) ----
-function SetRows({ ex, controls, onToggle, big = false }: {
+function SetRows({ ex, controls, onToggle, big = false, last }: {
   ex: Ex;
   controls: SessionControls;
   onToggle: (exId: string, setId: string, wasDone: boolean) => void;
   big?: boolean;
+  last?: LastPerf;
 }) {
+  const perHand = ex.equipment === "dumbbell";
+  const target = ex.target;
+  const targetReps = target ? (target.minReps === target.maxReps ? `${target.minReps}` : `${target.minReps}-${target.maxReps}`) : null;
+  // Alvo-fantasma: última execução; sem histórico, cai pra meta da ficha.
+  const ghostW = last?.weight && last.weight !== "0" ? last.weight : "0";
+  const ghostR = last?.reps && last.reps !== "0" ? last.reps : targetReps ?? "0";
   return (
     <>
-      <div className="grid grid-cols-[2rem_1fr_1fr_2.5rem_2rem] items-center gap-2 px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-        <span className="text-center">#</span>
-        <span className="text-center">Carga (kg)</span>
+      {target && (
+        <div className="mb-1.5 flex items-center gap-1.5 rounded-lg bg-primary/5 px-2 py-1 text-[11px] font-medium text-primary">
+          <Target className="h-3 w-3" /> Meta: {ex.sets.length} × {targetReps} reps
+          {target.intensity && <span className="text-primary/70">· {target.intensity.type} {target.intensity.value}</span>}
+        </div>
+      )}
+      <div className="grid grid-cols-[1.75rem_1.4fr_1fr_2.5rem_1.75rem] items-center gap-1.5 px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+        <span className="text-center">Tipo</span>
+        <span className="text-center">{perHand ? "Carga/mão" : "Carga (kg)"}</span>
         <span className="text-center">Reps</span>
         <span className="text-center">Ok</span>
         <span />
       </div>
       <div className="space-y-1.5">
-        {ex.sets.map((s, i) => (
-          <div key={s.id} className={cn("grid grid-cols-[2rem_1fr_1fr_2.5rem_2rem] items-center gap-2 rounded-lg p-1 transition-colors", s.done && "bg-emerald-500/5")}>
-            <span className="text-center text-xs font-mono text-muted-foreground">{i + 1}</span>
-            <Input inputMode="decimal" value={s.weight} onChange={(e) => controls.updateSet(ex.id, s.id, "weight", e.target.value)} placeholder="0" className={cn("text-center font-mono", big ? "h-12 text-lg" : "h-10 text-base")} />
-            <Input inputMode="numeric" value={s.reps} onChange={(e) => controls.updateSet(ex.id, s.id, "reps", e.target.value)} placeholder="0" className={cn("text-center font-mono", big ? "h-12 text-lg" : "h-10 text-base")} />
-            <button
-              type="button"
-              onClick={() => onToggle(ex.id, s.id, s.done)}
-              className={cn("mx-auto flex items-center justify-center rounded-lg border transition-all", big ? "h-11 w-11" : "h-9 w-9", s.done ? "border-emerald-500 bg-emerald-500 text-white" : "border-border/60 text-muted-foreground hover:border-emerald-500/60")}
-              aria-label={s.done ? "Desmarcar série" : "Marcar série feita"}
-            >
-              <Check className={big ? "h-6 w-6" : "h-5 w-5"} />
-            </button>
-            <button type="button" onClick={() => controls.removeSet(ex.id, s.id)} className="mx-auto text-muted-foreground/50 hover:text-destructive" aria-label="Remover série" disabled={ex.sets.length === 1}>
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        ))}
+        {ex.sets.map((s, i) => {
+          const type = s.type ?? "normal";
+          const meta = SET_TYPE_META[type];
+          return (
+            <div key={s.id} className={cn("grid grid-cols-[1.75rem_1.4fr_1fr_2.5rem_1.75rem] items-center gap-1.5 rounded-lg p-1 transition-colors", s.done && "bg-emerald-500/5")}>
+              <button
+                type="button"
+                onClick={() => controls.setSetType(ex.id, s.id, nextSetType(type))}
+                className={cn("mx-auto flex h-7 w-7 items-center justify-center rounded-md border text-[11px] font-bold tabular-nums transition-colors", meta.tone)}
+                title={`Série: ${meta.label} — toque para alternar (A/N/F)`}
+                aria-label={`Tipo da série: ${meta.label}`}
+              >
+                {type === "normal" ? i + 1 : meta.short}
+              </button>
+              <WeightStepper value={s.weight} onChange={(v) => controls.updateSet(ex.id, s.id, "weight", v)} big={big} placeholder={ghostW} />
+              <Input inputMode="numeric" value={s.reps} onChange={(e) => controls.updateSet(ex.id, s.id, "reps", e.target.value)} placeholder={ghostR} className={cn("text-center font-mono font-semibold placeholder:font-normal placeholder:text-muted-foreground/40", repTone(s.reps, type, target), big ? "h-12 text-lg" : "h-10 text-base")} />
+              <button
+                type="button"
+                onClick={() => onToggle(ex.id, s.id, s.done)}
+                className={cn("mx-auto flex items-center justify-center rounded-lg border transition-all", big ? "h-11 w-11" : "h-9 w-9", s.done ? "border-emerald-500 bg-emerald-500 text-white" : "border-border/60 text-muted-foreground hover:border-emerald-500/60")}
+                aria-label={s.done ? "Desmarcar série" : "Marcar série feita"}
+              >
+                <Check className={big ? "h-6 w-6" : "h-5 w-5"} />
+              </button>
+              <button type="button" onClick={() => controls.removeSet(ex.id, s.id)} className="mx-auto text-muted-foreground/50 hover:text-destructive" aria-label="Remover série" disabled={ex.sets.length === 1}>
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          );
+        })}
       </div>
       <Button type="button" variant="ghost" onClick={() => controls.addSet(ex.id)} className="mt-1.5 w-full gap-1.5 border border-dashed border-border/50 text-xs font-semibold text-muted-foreground hover:border-primary/40 hover:text-foreground">
-        <Plus className="h-4 w-4" /> Adicionar série
+        <Plus className="h-4 w-4" /> Adicionar série <span className="text-muted-foreground/50">(clona a anterior)</span>
       </Button>
     </>
   );
 }
 
-function LastAndPR({ last, pr }: { last?: LastPerf; pr: boolean }) {
+function LastAndPR({ last, pr, orm = 0 }: { last?: LastPerf; pr: boolean; orm?: number }) {
+  const rel = relativeDays(last?.date);
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
       {last && (
         <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-          <History className="h-3 w-3" /> última vez: {last.weight}kg × {last.reps} ({last.sets} séries)
+          <History className="h-3 w-3 shrink-0" /> última vez: {last.sets}×{last.reps} · {last.weight}kg{rel ? ` · ${rel}` : ""}
+        </span>
+      )}
+      {orm > 0 && (
+        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary" title="1RM estimado (Epley) das séries de trabalho">
+          1RM ~{orm}kg
         </span>
       )}
       {pr && (
@@ -325,6 +586,42 @@ function LastAndPR({ last, pr }: { last?: LastPerf; pr: boolean }) {
           <Trophy className="h-3 w-3" /> Recorde!
         </span>
       )}
+    </div>
+  );
+}
+
+// Botão de trocar exercício (erro do usuário) — input inline que substitui o movimento.
+function SwapControl({ ex, controls, iconOnly = false }: { ex: Ex; controls: SessionControls; iconOnly?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState(ex.name);
+  const submit = () => {
+    const name = value.trim();
+    if (name) controls.replaceExercise(ex.id, name, ex.group, ex.equipment);
+    setOpen(false);
+  };
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => { setValue(ex.name); setOpen(true); }}
+        className={cn("text-muted-foreground hover:text-primary", iconOnly ? "" : "inline-flex items-center gap-1 text-xs font-medium")}
+        aria-label="Trocar exercício"
+      >
+        <Replace className="h-4 w-4" /> {!iconOnly && "Trocar"}
+      </button>
+    );
+  }
+  return (
+    <div className="flex items-center gap-1.5">
+      <Input
+        autoFocus
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") submit(); if (e.key === "Escape") setOpen(false); }}
+        placeholder="Trocar por…"
+        className="h-8 w-40 text-sm"
+      />
+      <Button size="sm" className="h-8 px-2" onClick={submit}>OK</Button>
     </div>
   );
 }
@@ -341,6 +638,7 @@ function ExerciseCard({ ex, last, youtubeId, controls, onToggle, onOpenDemo }: {
   const [open, setOpen] = useState(true);
   const doneCount = ex.sets.filter((s) => s.done).length;
   const pr = isPR(ex, last);
+  const orm = estimatedOneRepMax(ex);
 
   return (
     <section className={cn("overflow-hidden rounded-2xl border bg-card shadow-sm transition-colors", allDone(ex) ? "border-emerald-500/30" : "border-border/40")}>
@@ -350,7 +648,7 @@ function ExerciseCard({ ex, last, youtubeId, controls, onToggle, onOpenDemo }: {
         {ex.name ? (
           <button type="button" onClick={() => setOpen((v) => !v)} className="min-w-0 flex-1 text-left">
             <p className="truncate text-sm font-semibold">{ex.name}</p>
-            <LastAndPR last={last} pr={pr} />
+            <LastAndPR last={last} pr={pr} orm={orm} />
           </button>
         ) : (
           <div className="min-w-0 flex-1">
@@ -367,7 +665,15 @@ function ExerciseCard({ ex, last, youtubeId, controls, onToggle, onOpenDemo }: {
         </button>
       </div>
 
-      {open && <div className="border-t border-border/40 p-2"><SetRows ex={ex} controls={controls} onToggle={onToggle} /></div>}
+      {open && (
+        <div className="space-y-2.5 border-t border-border/40 p-2">
+          <div className="flex items-center justify-between gap-2 px-1">
+            <EquipmentPicker value={ex.equipment} onChange={(eq) => controls.setExerciseEquipment(ex.id, eq)} />
+            {ex.name && <SwapControl ex={ex} controls={controls} />}
+          </div>
+          <SetRows ex={ex} controls={controls} onToggle={onToggle} last={last} />
+        </div>
+      )}
     </section>
   );
 }
@@ -389,6 +695,22 @@ function FocusView({ ex, index, total, last, youtubeId, controls, onToggle, onOp
 }) {
   const done = allDone(ex);
   const pr = isPR(ex, last);
+  const orm = estimatedOneRepMax(ex);
+  const [confirmNext, setConfirmNext] = useState(false);
+
+  // Bloqueia/Confirma o "Próximo" se a série atual não foi concluída.
+  const handleNext = () => {
+    if (!done && !confirmNext) {
+      setConfirmNext(true);
+      return;
+    }
+    setConfirmNext(false);
+    onNext();
+  };
+
+  // Some o aviso ao concluir tudo ou ao trocar de exercício (reset de flag de UI).
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setConfirmNext(false); }, [ex.id, done]);
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-4 pb-28">
@@ -405,29 +727,48 @@ function FocusView({ ex, index, total, last, youtubeId, controls, onToggle, onOp
       {/* Capa grande animada (toca → demonstração) */}
       <ExerciseThumb key={ex.id} name={ex.name || "?"} group={ex.group} youtubeId={youtubeId} size="lg" onClick={onOpenDemo} className="aspect-video w-full rounded-2xl" />
 
-      {/* Nome + última vez/PR */}
+      {/* Nome + última vez/PR + trocar */}
+      <div className="mt-3 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          {ex.name ? (
+            <h2 className="truncate text-xl font-bold tracking-tight">{ex.name}</h2>
+          ) : (
+            <Input autoFocus defaultValue="" onBlur={(e) => controls.renameExercise(ex.id, e.target.value)} placeholder="Nome do exercício…" className="h-10 text-lg font-bold" />
+          )}
+          <div className="mt-1"><LastAndPR last={last} pr={pr} orm={orm} /></div>
+        </div>
+        {ex.name && <div className="shrink-0 pt-1"><SwapControl ex={ex} controls={controls} /></div>}
+      </div>
+
+      {/* Equipamento */}
       <div className="mt-3">
-        {ex.name ? (
-          <h2 className="text-xl font-bold tracking-tight">{ex.name}</h2>
-        ) : (
-          <Input autoFocus defaultValue="" onBlur={(e) => controls.renameExercise(ex.id, e.target.value)} placeholder="Nome do exercício…" className="h-10 text-lg font-bold" />
-        )}
-        <div className="mt-1"><LastAndPR last={last} pr={pr} /></div>
+        <EquipmentPicker value={ex.equipment} onChange={(eq) => controls.setExerciseEquipment(ex.id, eq)} />
       </div>
 
       {/* Séries (grandes) */}
-      <div className="mt-4 rounded-2xl border border-border/40 bg-card p-3 shadow-sm">
-        <SetRows ex={ex} controls={controls} onToggle={onToggle} big />
+      <div className="mt-3 rounded-2xl border border-border/40 bg-card p-3 shadow-sm">
+        <SetRows ex={ex} controls={controls} onToggle={onToggle} big last={last} />
       </div>
 
+      {/* Aviso de série incompleta */}
+      {confirmNext && (
+        <div className="mt-3 flex items-center gap-2 rounded-xl border border-amber-400/40 bg-amber-400/10 px-3 py-2 text-xs font-medium text-amber-600">
+          <AlertTriangle className="h-4 w-4 shrink-0" /> Ainda há séries não concluídas. Toque em “Avançar mesmo assim” para continuar.
+        </div>
+      )}
+
       {/* Navegação */}
-      <div className="mt-5 flex items-center gap-3">
+      <div className="mt-4 flex items-center gap-3">
         <Button variant="outline" onClick={onPrev} disabled={!hasPrev} className="h-12 flex-1 gap-1.5">
           <ChevronLeft className="h-4 w-4" /> Anterior
         </Button>
         {hasNext ? (
-          <Button onClick={onNext} className={cn("h-12 flex-1 gap-1.5 text-base font-bold", done && "animate-pulse")}>
-            {done ? <CircleCheck className="h-5 w-5" /> : null} Próximo <ChevronRight className="h-4 w-4" />
+          <Button
+            onClick={handleNext}
+            variant={confirmNext ? "destructive" : "default"}
+            className={cn("h-12 flex-1 gap-1.5 text-base font-bold", done && "animate-pulse")}
+          >
+            {done ? <CircleCheck className="h-5 w-5" /> : null} {confirmNext ? "Avançar mesmo assim" : "Próximo"} <ChevronRight className="h-4 w-4" />
           </Button>
         ) : (
           <div className="flex h-12 flex-1 items-center justify-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 text-sm font-bold text-emerald-600">

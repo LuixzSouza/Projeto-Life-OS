@@ -15,6 +15,7 @@ import { QuickActionsBar } from "@/components/dashboard/quick-actions-bar";
 import { FinanceSection } from "./_components/finance-section";
 import { ProductivitySection } from "./_components/productivity-section";
 import { PersonalSection } from "./_components/personal-section";
+import { HealthOverviewSection } from "./_components/health-overview-section";
 
 export default async function DashboardPage() {
   const userId = await getCurrentUserId();
@@ -27,7 +28,7 @@ export default async function DashboardPage() {
   const greeting = getGreeting();
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-8 px-6 py-8 sm:px-8 animate-in fade-in duration-500">
+    <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:space-y-8 sm:px-8 sm:py-8 animate-in fade-in duration-500">
       
       {!settings?.onboardingCompleted && <WelcomeTour />}
 
@@ -39,12 +40,17 @@ export default async function DashboardPage() {
       
       <QuickActionsBar />
 
+      {/* Overview do Dia: unifica Treino + Nutrição numa olhada (topo da Home) */}
+      <Suspense fallback={<Skeleton className="h-[200px] w-full rounded-xl" />}>
+        <HealthOverviewSection userId={userId} />
+      </Suspense>
+
       {/* Tabs para melhor UX e navegação modular */}
       <Tabs defaultValue="finance" className="w-full space-y-6">
         <TabsList className="grid w-full grid-cols-3 max-w-md bg-muted/50">
-          <TabsTrigger value="finance">Financeiro</TabsTrigger>
-          <TabsTrigger value="productivity">Produtividade</TabsTrigger>
-          <TabsTrigger value="personal">Pessoal</TabsTrigger>
+          <TabsTrigger value="finance" className="text-xs sm:text-sm">Financeiro</TabsTrigger>
+          <TabsTrigger value="productivity" className="text-xs sm:text-sm">Produtividade</TabsTrigger>
+          <TabsTrigger value="personal" className="text-xs sm:text-sm">Pessoal</TabsTrigger>
         </TabsList>
 
         <TabsContent value="finance" className="space-y-6">

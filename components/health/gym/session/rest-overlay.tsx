@@ -1,7 +1,11 @@
 "use client";
 
-import { Minus, Plus, Play, Timer } from "lucide-react";
+import { useState } from "react";
+import { Minus, Plus, Play, Timer, Repeat2, ChevronRight, Minimize2, History, TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { playClick } from "./sfx";
+import { ExerciseThumb } from "./exercise-thumb";
+import type { ExerciseHistoryPoint, LastPerf } from "./session-types";
 
 function fmt(totalSeconds: number): string {
   const s = Math.abs(Math.floor(totalSeconds));
@@ -10,22 +14,69 @@ function fmt(totalSeconds: number): string {
   return `${m}:${String(sec).padStart(2, "0")}`;
 }
 
+function relDays(iso?: string): string | null {
+  if (!iso) return null;
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return null;
+  const days = Math.floor((Date.now() - then) / 86_400_000);
+  if (days <= 0) return "hoje";
+  if (days === 1) return "ontem";
+  if (days < 7) return `há ${days}d`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `há ${weeks}sem`;
+  return `há ${Math.max(1, Math.floor(days / 30))}m`;
+}
+
+const PRESETS = [45, 60, 90, 120, 180];
+
+interface NextInfo { name: string; group?: string; last?: LastPerf; history?: ExerciseHistoryPoint[] }
+
+// Mini-gráfico de linha do volume (sem libs — SVG puro, leve p/ o overlay).
+function Sparkline({ values }: { values: number[] }) {
+  const w = 116;
+  const h = 34;
+  const pad = 3;
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  const range = max - min || 1;
+  const stepX = values.length > 1 ? (w - pad * 2) / (values.length - 1) : 0;
+  const pts = values.map((v, i) => [pad + i * stepX, h - pad - ((v - min) / range) * (h - pad * 2)] as const);
+  const d = pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+  const up = values[values.length - 1] >= values[0];
+  const [lx, ly] = pts[pts.length - 1];
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="overflow-visible">
+      <path d={d} fill="none" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={up ? "stroke-emerald-500" : "stroke-amber-500"} />
+      <circle cx={lx} cy={ly} r={2.5} className={up ? "fill-emerald-500" : "fill-amber-500"} />
+    </svg>
+  );
+}
+
 /**
- * Tela de descanso (100vh, sobre a sessão). Anel de progresso grande; dá pra começar
- * antes (Pular) e, se o tempo passar, conta o EXCEDENTE em vermelho em vez de só avisar.
+ * Tela de descanso (100vh, sobre a sessão). Fundo SÓLIDO (não vaza o conteúdo de
+ * trás), sem scroll. Anel de progresso; conta o excedente em vermelho; permite
+ * ajustar/definir o tempo exato e — em bi-set — adiantar o exercício pareado.
  */
 export function RestOverlay({
   total,
   remaining,
-  nextLabel,
+  next,
+  superset,
   onAdjust,
+  onSetExact,
   onDone,
+  onSuperset,
+  onMinimize,
 }: {
   total: number;        // segundos do descanso programado
   remaining: number;    // segundos restantes (negativo = excedente)
-  nextLabel?: string;   // dica da próxima série
+  next?: NextInfo | null;
+  superset?: NextInfo | null;   // exercício de OUTRO grupo p/ intercalar no descanso
   onAdjust: (deltaSeconds: number) => void;
+  onSetExact: (seconds: number) => void;
   onDone: () => void;   // começar a próxima / pular
+  onSuperset?: () => void;
+  onMinimize?: () => void;   // recolhe mantendo o cronômetro rodando (pílula)
 }) {
   const over = remaining <= 0;
   const frac = over ? 1 : Math.min(1, Math.max(0, remaining / Math.max(1, total)));
@@ -34,70 +85,189 @@ export function RestOverlay({
   const C = 2 * Math.PI * R;
   const offset = C * (1 - frac);
 
+  const [custom, setCustom] = useState("");
+  const applyCustom = () => {
+    const v = Math.round(parseFloat(custom.replace(",", ".")));
+    if (Number.isFinite(v) && v > 0) {
+      onSetExact(Math.min(v, 3600));
+      playClick();
+    }
+    setCustom("");
+  };
+
   return (
-    <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center gap-8 bg-gradient-to-b from-background via-background to-primary/5 px-6">
-      <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-        <Timer className="h-4 w-4" />
-        {over ? "Tempo extra" : "Descanso"}
-      </div>
+    <div className="fixed inset-0 z-[70] flex flex-col overflow-hidden bg-background px-5 pb-safe pt-safe">
+      {/* Glow decorativo (não reduz a opacidade do fundo — fica atrás do conteúdo). */}
+      <div
+        aria-hidden
+        className={cn(
+          "pointer-events-none absolute inset-x-0 top-1/2 -z-0 mx-auto h-[60vh] max-w-lg -translate-y-1/2 blur-3xl transition-colors",
+          over ? "bg-red-500/10" : "bg-primary/10",
+        )}
+      />
 
-      {/* Anel + número */}
-      <div className="relative flex items-center justify-center">
-        <svg width="300" height="300" viewBox="0 0 300 300" className="-rotate-90">
-          <circle cx="150" cy="150" r={R} fill="none" stroke="currentColor" strokeWidth="14" className="text-muted/20" />
-          <circle
-            cx="150" cy="150" r={R} fill="none" strokeWidth="14" strokeLinecap="round"
-            stroke="currentColor"
-            className={cn("transition-[stroke-dashoffset] duration-1000 ease-linear", over ? "text-red-500" : "text-primary")}
-            strokeDasharray={C}
-            strokeDashoffset={over ? 0 : offset}
-          />
-        </svg>
-        <div className="absolute flex flex-col items-center">
-          <span className={cn("font-mono text-6xl font-bold tabular-nums tracking-tight", over ? "text-red-500" : "text-foreground")}>
-            {over ? "+" : ""}{fmt(remaining)}
-          </span>
-          {over && <span className="mt-1 text-xs font-medium text-red-500/80">passou do tempo</span>}
-        </div>
-      </div>
-
-      {/* Próxima série */}
-      {nextLabel && (
-        <div className="text-center">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">A seguir</p>
-          <p className="text-base font-semibold text-foreground">{nextLabel}</p>
-        </div>
+      {/* Recolher mantendo o cronômetro (ir fazer outro exercício / bi-set) */}
+      {onMinimize && (
+        <button
+          type="button"
+          onClick={() => { onMinimize(); playClick(); }}
+          className="absolute right-4 top-[calc(env(safe-area-inset-top)+0.75rem)] z-10 flex h-9 w-9 items-center justify-center rounded-full border border-border/50 bg-card/70 text-muted-foreground transition-colors hover:text-foreground"
+          aria-label="Recolher descanso (continuar contando)"
+        >
+          <Minimize2 className="h-4 w-4" />
+        </button>
       )}
 
-      {/* Ajustes */}
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          onClick={() => onAdjust(-15)}
-          className="flex h-12 w-16 items-center justify-center gap-1 rounded-xl border border-border/60 bg-card text-sm font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-        >
-          <Minus className="h-4 w-4" /> 15
-        </button>
-        <button
-          type="button"
-          onClick={() => onAdjust(30)}
-          className="flex h-12 w-16 items-center justify-center gap-1 rounded-xl border border-border/60 bg-card text-sm font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-        >
-          <Plus className="h-4 w-4" /> 30
-        </button>
+      {/* Topo flexível: centraliza anel + ajustes; encolhe em telas baixas */}
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4">
+        <div className="relative flex items-center gap-2 text-sm font-semibold uppercase tracking-widest text-muted-foreground">
+          <Timer className="h-4 w-4" />
+          {over ? "Tempo extra" : "Descanso"}
+        </div>
+
+        {/* Anel + número — escala com a largura E a altura (nunca estoura/scrolla) */}
+        <div className="relative flex aspect-square w-[min(56vw,38vh,240px)] items-center justify-center">
+          <svg viewBox="0 0 300 300" className="-rotate-90 h-full w-full">
+            <circle cx="150" cy="150" r={R} fill="none" stroke="currentColor" strokeWidth="14" className="text-muted/20" />
+            <circle
+              cx="150" cy="150" r={R} fill="none" strokeWidth="14" strokeLinecap="round"
+              stroke="currentColor"
+              className={cn("transition-[stroke-dashoffset] duration-1000 ease-linear", over ? "text-red-500" : "text-primary")}
+              strokeDasharray={C}
+              strokeDashoffset={over ? 0 : offset}
+            />
+          </svg>
+          <div className="absolute flex flex-col items-center">
+            <span className={cn("font-mono text-5xl font-bold tabular-nums tracking-tight", over ? "text-red-500" : "text-foreground")}>
+              {over ? "+" : ""}{fmt(remaining)}
+            </span>
+            {over && <span className="mt-1 text-xs font-medium text-red-500/80">passou do tempo</span>}
+          </div>
+        </div>
+
+        {/* Ajustes rápidos + tempo exato */}
+        <div className="relative flex w-full max-w-sm flex-col items-center gap-2.5">
+        <div className="flex items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={() => { onAdjust(-15); playClick(); }}
+            className="flex h-10 w-14 items-center justify-center gap-0.5 rounded-xl border border-border/60 bg-card text-sm font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+          >
+            <Minus className="h-3.5 w-3.5" />15
+          </button>
+          {PRESETS.map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => { onSetExact(p); playClick(); }}
+              className={cn(
+                "h-10 w-12 rounded-xl border text-xs font-semibold tabular-nums transition-colors",
+                p === total ? "border-primary bg-primary/10 text-primary" : "border-border/60 bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground",
+              )}
+            >
+              {p < 60 ? `${p}s` : `${Math.floor(p / 60)}:${String(p % 60).padStart(2, "0")}`}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => { onAdjust(30); playClick(); }}
+            className="flex h-10 w-14 items-center justify-center gap-0.5 rounded-xl border border-border/60 bg-card text-sm font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+          >
+            <Plus className="h-3.5 w-3.5" />30
+          </button>
+        </div>
+
+        {/* Tempo exato (digite os segundos) */}
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="uppercase tracking-wider">Tempo exato:</span>
+          <input
+            inputMode="numeric"
+            value={custom}
+            onChange={(e) => setCustom(e.target.value.replace(/[^\d]/g, ""))}
+            onKeyDown={(e) => { if (e.key === "Enter") applyCustom(); }}
+            placeholder="seg"
+            className="h-8 w-16 rounded-lg border border-border/60 bg-card text-center font-mono text-sm text-foreground outline-none focus:border-primary/50"
+          />
+          <button
+            type="button"
+            onClick={applyCustom}
+            disabled={!custom}
+            className="h-8 rounded-lg border border-border/60 bg-card px-2.5 font-semibold transition-colors hover:border-primary/40 hover:text-foreground disabled:opacity-40"
+          >
+            ok
+          </button>
+        </div>
+        </div>
       </div>
+
+      {/* Rodapé: pareado + próxima + ação — fixo no fim, sempre visível (nunca clipado) */}
+      <div className="relative flex w-full shrink-0 flex-col items-center gap-2.5 pb-1 pt-3">
+      {/* Bi-set: adiantar o exercício pareado (outro grupo) durante o descanso */}
+      {superset && onSuperset && (
+        <button
+          type="button"
+          onClick={() => { onSuperset(); playClick(); }}
+          className="relative flex w-full max-w-sm items-center gap-3 rounded-2xl border border-amber-400/40 bg-amber-400/10 p-2.5 text-left transition-colors hover:bg-amber-400/15"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-400/20 text-amber-600">
+            <Repeat2 className="h-5 w-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[10px] font-bold uppercase tracking-wider text-amber-600">Bi-set · aproveite o descanso</span>
+            <span className="block truncate text-sm font-semibold text-foreground">Fazer agora: {superset.name}</span>
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-amber-600" />
+        </button>
+      )}
+
+      {/* A seguir — tela de descanso PRODUTIVA: capa + "última vez" + evolução do volume */}
+      {next && (
+        <div className="relative w-full max-w-sm rounded-2xl border border-border/40 bg-card/60 p-2.5">
+          <div className="flex items-center gap-3">
+            <ExerciseThumb name={next.name} group={next.group} showPlay={false} className="h-11 w-11 rounded-lg" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">A seguir</p>
+              <p className="truncate text-sm font-semibold text-foreground">{next.name}</p>
+              {next.last && (
+                <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-muted-foreground">
+                  <History className="h-3 w-3 shrink-0" />
+                  {next.last.sets}×{next.last.reps} · {next.last.weight}kg{relDays(next.last.date) ? ` · ${relDays(next.last.date)}` : ""}
+                </p>
+              )}
+            </div>
+            {next.history && next.history.length >= 2 && (
+              <div className="flex shrink-0 flex-col items-end">
+                <Sparkline values={next.history.map((p) => p.volume)} />
+                {(() => {
+                  const h = next.history!;
+                  const first = h[0].volume, lastV = h[h.length - 1].volume;
+                  const up = lastV >= first;
+                  const pct = first > 0 ? Math.round(((lastV - first) / first) * 100) : 0;
+                  return (
+                    <span className={cn("flex items-center gap-0.5 text-[10px] font-bold", up ? "text-emerald-500" : "text-amber-500")}>
+                      {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                      {pct > 0 ? "+" : ""}{pct}%
+                    </span>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Começar / pular */}
       <button
         type="button"
-        onClick={onDone}
+        onClick={() => { onDone(); playClick(); }}
         className={cn(
-          "flex h-14 w-full max-w-xs items-center justify-center gap-2 rounded-2xl text-base font-bold text-white shadow-lg transition-transform active:scale-[0.98]",
+          "relative flex h-14 w-full max-w-sm items-center justify-center gap-2 rounded-2xl text-base font-bold text-white shadow-lg transition-transform active:scale-[0.98]",
           over ? "bg-red-500 hover:bg-red-600" : "bg-primary hover:bg-primary/90",
         )}
       >
         <Play className="h-5 w-5" /> {over ? "Começar agora" : "Estou pronto"}
       </button>
+      </div>
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { HealthActions } from "@/components/health/health-actions";
 import { getCurrentUserId } from "@/lib/auth";
 import { getHealthGoals } from "@/app/(dashboard)/health/actions";
 import { suggestDailyGoal } from "@/lib/nutrition-calc";
+import { estimateDayBurn } from "@/lib/workout-calories";
 import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
 import { BackLink } from "@/components/ui/back-link";
 import { ErrorState } from "@/components/ui/error-state";
@@ -29,9 +30,12 @@ interface SerializedMeal {
   id: string;
   date: string;
   title: string;
-  calories: number; 
+  calories: number;
   type: string;
-  items: string;    
+  items: string;
+  protein: number | null;
+  carbs: number | null;
+  fat: number | null;
 }
 
 interface SerializedWeekData {
@@ -58,6 +62,7 @@ export default async function NutritionPage(props: PageProps) {
   let suggestedGoal: number | null = null;
   let estimatedTdee: number | null = null;
   let calorieOverride: number | null = null;
+  let workoutBurn = 0;
   let userName: string | undefined;
 
   let selectedDate = new Date();
@@ -85,7 +90,7 @@ export default async function NutritionPage(props: PageProps) {
 
     // Busca Paralela Otimizada (Agora inclui o MealPlan)
     const userId = await getCurrentUserId();
-    const [dayMeals, weekMeals, mealPlan, latestBody, currentUser] = await Promise.all([
+    const [dayMeals, weekMeals, mealPlan, latestBody, currentUser, dayWorkouts] = await Promise.all([
       // 1. Refeições do dia selecionado (Histórico)
       prisma.meal.findMany({
         where: { date: { gte: startOfDay, lte: endOfDay }, userId },
@@ -109,6 +114,13 @@ export default async function NutritionPage(props: PageProps) {
       userId
         ? prisma.user.findUnique({ where: { id: userId }, select: { name: true } })
         : Promise.resolve(null),
+      // 6. Treinos do dia (ponte Treino → Nutrição: gasto calórico estimado)
+      userId
+        ? prisma.workout.findMany({
+            where: { userId, date: { gte: startOfDay, lte: endOfDay } },
+            select: { type: true, duration: true, intensity: true, distance: true },
+          })
+        : Promise.resolve([]),
     ]);
 
     // Meta calórica sugerida automaticamente a partir do perfil corporal.
@@ -127,6 +139,17 @@ export default async function NutritionPage(props: PageProps) {
     }
     userName = currentUser?.name ?? undefined;
 
+    // Gasto calórico estimado dos treinos do dia (some ao orçamento do diário).
+    workoutBurn = estimateDayBurn(
+      dayWorkouts.map((w) => ({
+        type: w.type,
+        durationMin: w.duration,
+        intensity: w.intensity,
+        distanceKm: w.distance,
+        bodyWeightKg: latestBody?.weight ?? null,
+      }))
+    );
+
     // Override manual da meta calórica (centralizado no perfil/banco).
     calorieOverride = (await getHealthGoals()).calorieGoalOverride;
 
@@ -138,6 +161,9 @@ export default async function NutritionPage(props: PageProps) {
       type: m.type,
       calories: m.calories ?? 0,
       items: m.items ?? "",
+      protein: m.protein ?? null,
+      carbs: m.carbs ?? null,
+      fat: m.fat ?? null,
     }));
 
     serializedWeekMeals = weekMeals.map(m => ({
@@ -194,6 +220,7 @@ export default async function NutritionPage(props: PageProps) {
             suggestedGoal={suggestedGoal}
             tdee={estimatedTdee}
             calorieOverride={calorieOverride}
+            workoutBurn={workoutBurn}
             userName={userName}
         />
       </PageContainer>

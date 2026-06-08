@@ -64,6 +64,10 @@ export function SetupWizard({ dbFromEnv = false }: SetupWizardProps) {
       const raw = localStorage.getItem(DRAFT_KEY);
       if (raw) {
         const saved = JSON.parse(raw) as Partial<SetupFormData>;
+        // Sincroniza com um store externo (localStorage) só na montagem — ler no
+        // initializer do useState causaria mismatch de hidratação no SSR. É o uso
+        // legítimo de setState em efeito; a regra abaixo é falso-positivo aqui.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setFormData((prev) => ({ ...prev, ...saved }));
         setRestored(true);
       }

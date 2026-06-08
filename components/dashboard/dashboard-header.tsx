@@ -10,8 +10,8 @@ interface DashboardHeaderProps {
 export function DashboardHeader({ greeting, userName, productivityScore }: DashboardHeaderProps) {
   return (
     <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-border/40">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2 text-foreground">
+      <div className="min-w-0">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex flex-wrap items-center gap-x-2 text-foreground">
           {greeting}, <span className="text-primary">{userName}</span>
         </h1>
         <p className="text-muted-foreground flex items-center gap-2 mt-1.5 text-sm">

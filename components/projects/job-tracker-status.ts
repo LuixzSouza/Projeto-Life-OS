@@ -10,6 +10,9 @@ export interface StatusDetail {
     icon: React.ElementType;
 }
 
+// Ordem canônica do funil (usada em dropdown de status, Kanban e timeline).
+export const STATUS_ORDER = ["APPLIED", "SCREENING", "TEST", "INTERVIEW", "OFFER", "ACTIVE", "REJECTED"] as const;
+
 export const STATUS_MAP: Record<string, StatusDetail> = {
     APPLIED: { label: "Inscrito", theme: "blue", progress: 15, icon: Clock },
     SCREENING: { label: "Triagem", theme: "purple", progress: 30, icon: Search },

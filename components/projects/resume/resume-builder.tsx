@@ -6,12 +6,16 @@ import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
+    DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
     LayoutTemplate, Printer, Save, User, Briefcase, Layers, Code,
     GraduationCap, MessageSquare, ShieldCheck, Loader2, CheckCircle2,
-    Award, Languages, FileDown
+    Award, Languages, FileDown, Download, Upload, ChevronDown, Database, Lightbulb, Circle
 } from "lucide-react";
 import { PortfolioData, INITIAL_PORTFOLIO } from "@/types/portfolio";
 import { savePortfolio } from "@/app/(dashboard)/projects/actions";
+import { resumeHealth } from "@/lib/resume-health";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -42,7 +46,10 @@ export function ResumeBuilder({ initialData }: { initialData: PortfolioData }) {
     // 1. INICIALIZAÇÃO A PARTIR DO BANCO (SQLite via Server Action)
     const [data, setData] = useState<PortfolioData>(initialData);
     const [isSaving, setIsSaving] = useState(false);
+    const [autoSave, setAutoSave] = useState<"idle" | "saving" | "saved">("idle");
     const printRef = useRef<HTMLDivElement>(null);
+    const fileRef = useRef<HTMLInputElement>(null);
+    const firstRender = useRef(true);
 
     // 2. MIGRAÇÃO SUAVE: se houver currículo legado no localStorage e o banco
     //    estiver vazio, importa uma única vez e limpa a chave antiga.
@@ -54,23 +61,69 @@ export function ResumeBuilder({ initialData }: { initialData: PortfolioData }) {
             if (legacy) {
                 setData({ ...INITIAL_PORTFOLIO, ...JSON.parse(legacy) });
                 localStorage.removeItem("life-os-resume");
-                toast.info("Currículo antigo importado do navegador. Clique em Gravar para salvar no banco.");
+                toast.info("Currículo antigo importado do navegador — salvo automaticamente no banco.");
             }
         } catch (e) {
             console.error("Erro ao migrar currículo legado", e);
         }
     }, [initialData]);
 
-    // 3. SALVAMENTO (Banco de Dados / SQLite)
+    // 3. SALVAMENTO MANUAL (Banco de Dados / SQLite)
     const handleSave = async () => {
         setIsSaving(true);
         try {
             await savePortfolio(data);
+            setAutoSave("saved");
             toast.success("Currículo salvo no banco de dados!");
         } catch {
             toast.error("Falha ao salvar. Tente novamente.");
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    // 3b. AUTOSAVE: grava sozinho ~1,2s após a última edição (debounce). Acaba com o
+    // risco de perder alterações por esquecer de clicar em Gravar.
+    useEffect(() => {
+        if (firstRender.current) { firstRender.current = false; return; }
+        setAutoSave("saving");
+        const t = setTimeout(async () => {
+            try {
+                await savePortfolio(data);
+                setAutoSave("saved");
+            } catch {
+                setAutoSave("idle");
+            }
+        }, 1200);
+        return () => clearTimeout(t);
+    }, [data]);
+
+    // 3c. EXPORT / IMPORT JSON (backup e portabilidade — local-first).
+    const exportJson = () => {
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `curriculo-${(data.hero.name || "export").replace(/\s+/g, "_").toLowerCase()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        toast.success("Currículo exportado (.json).");
+    };
+
+    const importJson = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+            const parsed = JSON.parse(await file.text()) as Partial<PortfolioData>;
+            if (!parsed || typeof parsed !== "object" || !parsed.hero) throw new Error("invalid");
+            setData({ ...INITIAL_PORTFOLIO, ...parsed });
+            toast.success("Currículo importado! O autosave já vai gravar.");
+        } catch {
+            toast.error("Arquivo inválido — exporte um .json gerado aqui.");
+        } finally {
+            if (fileRef.current) fileRef.current.value = "";
         }
     };
 
@@ -99,21 +152,40 @@ export function ResumeBuilder({ initialData }: { initialData: PortfolioData }) {
                     <title>Curriculo_${data.hero.name ? data.hero.name.replace(/\s+/g, '_') : 'Export'}</title>
                     ${stylesHtml}
                     <style>
-                        @page { size: A4 portrait; margin: 0; }
-                        body { 
-                            margin: 0; 
-                            padding: 0; 
-                            background: white !important; 
-                            -webkit-print-color-adjust: exact !important; 
-                            print-color-adjust: exact !important; 
+                        /* Margens aplicadas por PÁGINA (toda página ganha respiro, não só a 1ª). */
+                        @page { size: A4 portrait; margin: 14mm; }
+                        * {
+                            -webkit-print-color-adjust: exact !important;
+                            print-color-adjust: exact !important;
+                            box-sizing: border-box;
                         }
+                        html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
                         #resume-preview-container {
-                            width: 210mm !important;
-                            min-height: 297mm !important;
+                            width: auto !important;
+                            min-height: 0 !important;
                             box-shadow: none !important;
                             border: none !important;
-                            margin: 0 auto !important;
+                            border-radius: 0 !important;
+                            margin: 0 !important;
                         }
+                        /* O @page cuida das margens — zera o padding interno da folha. */
+                        #resume-preview-container .resume-page { padding: 0 !important; height: auto !important; }
+                        /* Coluna única no papel: o grid de 2 colunas não pagina entre páginas. */
+                        #resume-preview-container .resume-body { display: block !important; }
+                        #resume-preview-container .resume-sidebar { width: 100% !important; margin-top: 1.5rem !important; }
+                        /* Regras de quebra: itens inteiros nunca partem; títulos não ficam órfãos no rodapé. */
+                        #resume-preview-container .break-inside-avoid,
+                        #resume-preview-container li,
+                        #resume-preview-container .resume-entry { break-inside: avoid; page-break-inside: avoid; }
+                        #resume-preview-container h1,
+                        #resume-preview-container h2,
+                        #resume-preview-container h3 { break-after: avoid-page; }
+                        #resume-preview-container section { margin-bottom: 1.25rem; }
+                        /* Com margem de página a largura cai abaixo do breakpoint md;
+                           reforço o cabeçalho em linha (nome à esquerda, contato à direita). */
+                        #resume-preview-container header { flex-direction: row !important; align-items: flex-end !important; }
+                        #resume-preview-container header > div:first-child { width: 65% !important; }
+                        #resume-preview-container header > div:last-child { width: 35% !important; align-items: flex-end !important; }
                     </style>
                 </head>
                 <body>
@@ -144,6 +216,9 @@ export function ResumeBuilder({ initialData }: { initialData: PortfolioData }) {
 
     const completion = Math.round((Object.values(checklist).filter(Boolean).length / 9) * 100);
 
+    // Força do currículo (heurísticas de boas práticas) — dicas acionáveis.
+    const pendingTips = useMemo(() => resumeHealth(data).filter((t) => !t.done), [data]);
+
     return (
         <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-140px)] w-full">
             
@@ -167,15 +242,31 @@ export function ResumeBuilder({ initialData }: { initialData: PortfolioData }) {
                                     </p>
                                 </div>
                             </div>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => { setData(LUIZ_PORTFOLIO); toast.success("Dados do PDF importados! Revise e clique em Gravar."); }}
-                                className="h-9 rounded-xl font-black uppercase tracking-widest text-[9px] gap-1.5 border-border/60 hover:bg-primary/5 hover:text-primary"
-                                title="Preencher com os dados do seu PDF"
-                            >
-                                <FileDown className="h-3.5 w-3.5" /> Importar PDF
-                            </Button>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-9 rounded-xl font-black uppercase tracking-widest text-[9px] gap-1.5 border-border/60 hover:bg-primary/5 hover:text-primary"
+                                    >
+                                        <Database className="h-3.5 w-3.5" /> Dados <ChevronDown className="h-3 w-3 opacity-60" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="rounded-xl">
+                                    <DropdownMenuLabel className="text-[10px] uppercase tracking-widest">Backup & importação</DropdownMenuLabel>
+                                    <DropdownMenuItem onClick={exportJson} className="gap-2 text-xs cursor-pointer">
+                                        <Download className="h-3.5 w-3.5" /> Exportar JSON (backup)
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => fileRef.current?.click()} className="gap-2 text-xs cursor-pointer">
+                                        <Upload className="h-3.5 w-3.5" /> Importar JSON
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => { setData(LUIZ_PORTFOLIO); toast.success("Dados do PDF importados! Revise — o autosave grava sozinho."); }} className="gap-2 text-xs cursor-pointer">
+                                        <FileDown className="h-3.5 w-3.5" /> Preencher com dados do PDF
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                            <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={importJson} />
                         </div>
 
                         {/* Barra de Integridade Otimizada */}
@@ -190,6 +281,24 @@ export function ResumeBuilder({ initialData }: { initialData: PortfolioData }) {
                             <div className="w-full h-2 bg-muted/60 rounded-full overflow-hidden shadow-inner">
                                 <div className="h-full bg-primary transition-all duration-1000 ease-out" style={{ width: `${completion}%` }} />
                             </div>
+
+                            {/* Força do currículo: dicas acionáveis (só as pendentes) */}
+                            {pendingTips.length > 0 ? (
+                                <div className="mt-3 space-y-1.5 border-t border-border/30 pt-3">
+                                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 flex items-center gap-1.5">
+                                        <Lightbulb className="h-3 w-3 text-amber-500" /> Fortaleça seu currículo
+                                    </span>
+                                    {pendingTips.slice(0, 3).map((t) => (
+                                        <div key={t.id} className="flex items-start gap-1.5 text-[10px] font-medium text-muted-foreground">
+                                            <Circle className="h-2.5 w-2.5 mt-[3px] shrink-0 text-amber-500" /> {t.label}
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="mt-3 flex items-center gap-1.5 border-t border-border/30 pt-3 text-[10px] font-bold text-emerald-600">
+                                    <CheckCircle2 className="h-3.5 w-3.5" /> Currículo forte — boas práticas atendidas!
+                                </div>
+                            )}
                         </div>
                     </div>
                     
@@ -364,8 +473,15 @@ export function ResumeBuilder({ initialData }: { initialData: PortfolioData }) {
                             disabled={isSaving}
                             className="flex-1 gap-2 rounded-xl h-14 font-black uppercase tracking-widest text-[11px] shadow-sm hover:bg-muted hover:text-foreground transition-all border-border/60"
                             onClick={handleSave}
+                            title="Autosave ativo — clique para gravar agora"
                         >
-                            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Gravar Dados
+                            {isSaving || autoSave === "saving" ? (
+                                <><Loader2 className="h-4 w-4 animate-spin" /> Salvando…</>
+                            ) : autoSave === "saved" ? (
+                                <><CheckCircle2 className="h-4 w-4 text-emerald-500" /> Salvo</>
+                            ) : (
+                                <><Save className="h-4 w-4" /> Gravar Dados</>
+                            )}
                         </Button>
                         <Button 
                             className="flex-1 gap-2 rounded-xl h-14 bg-foreground text-background hover:bg-foreground/90 font-black uppercase tracking-widest text-[11px] shadow-xl transition-all" 

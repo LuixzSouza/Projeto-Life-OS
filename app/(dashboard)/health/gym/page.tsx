@@ -5,10 +5,13 @@ import { Dumbbell } from "lucide-react";
 import { Metadata } from "next";
 import { HealthActions } from "@/components/health/health-actions";
 import { getCurrentUserId } from "@/lib/auth";
+import { getMuscleRecovery } from "@/app/(dashboard)/health/actions";
 import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
 import { BackLink } from "@/components/ui/back-link";
 import { ErrorState } from "@/components/ui/error-state";
 import { StartLiveButton } from "@/components/health/gym/session/start-live-button";
+import { PendingSessionsSync } from "@/components/health/gym/session/pending-sync";
+import type { MuscleRecovery } from "@/components/health/gym/session/session-types";
 
 export const metadata: Metadata = {
   title: "Treino de Força | Life OS",
@@ -89,10 +92,11 @@ export default async function GymPage() {
   let hasError = false;
 
   let serializedChallenges: SerializedChallenge[] = [];
+  let recovery: MuscleRecovery[] = [];
 
   try {
     const userId = await getCurrentUserId();
-    const [gymWorkouts, challenges] = await Promise.all([
+    const [gymWorkouts, challenges, muscleRecovery] = await Promise.all([
       prisma.workout.findMany({
         where: { type: "GYM", userId },
         orderBy: { date: "desc" },
@@ -103,7 +107,9 @@ export default async function GymPage() {
         orderBy: { createdAt: "desc" },
         include: { checkins: { select: { dayIndex: true } } },
       }),
+      getMuscleRecovery().catch((): MuscleRecovery[] => []),
     ]);
+    recovery = muscleRecovery;
 
     serializedChallenges = challenges.map(c => ({
       id: c.id,
@@ -163,9 +169,11 @@ export default async function GymPage() {
       </PageHeader>
 
       <PageContainer>
+        {/* Despacha treinos concluídos offline assim que houver rede. */}
+        <PendingSessionsSync />
         {/* CTA proeminente do treino ao vivo — visível em qualquer aba, ótimo no mobile. */}
         <StartLiveButton variant="hero" className="mb-6" />
-        <GymView workouts={serializedWorkouts} challenges={serializedChallenges} />
+        <GymView workouts={serializedWorkouts} challenges={serializedChallenges} recovery={recovery} />
       </PageContainer>
     </PageShell>
   );

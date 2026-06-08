@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Meal } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,13 +10,17 @@ import {
     Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger
 } from "@/components/ui/dialog";
 import {
+    AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+    AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
 import {
     Utensils, Trash2, Plus, Minus, Leaf, Pizza, Coffee,
-    Pencil, Search, Loader2, UtensilsCrossed, X, Tags
+    Pencil, Search, Loader2, UtensilsCrossed, X, Tags, CopyPlus
 } from "lucide-react";
-import { logMeal, updateMeal, deleteMeal } from "@/app/(dashboard)/health/actions";
+import { logMeal, updateMeal, deleteMeal, copyYesterdayMeals } from "@/app/(dashboard)/health/actions";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -43,15 +48,38 @@ const mealConfigs: Record<MealType, { color: string; bg: string; icon: React.Ele
 const fmtQty = (q: number) => (Number.isInteger(q) ? `${q}` : q.toFixed(2).replace(/\.?0+$/, ""));
 
 // --- DASHBOARD PRINCIPAL ---
-export function FoodLogger({ meals }: { meals: Meal[] }) {
+export function FoodLogger({ meals, dailyGoal = 2000, workoutBurn = 0 }: { meals: Meal[]; dailyGoal?: number; workoutBurn?: number }) {
+    const router = useRouter();
     const today = new Date().toDateString();
     const todayMeals = meals.filter(m => new Date(m.date).toDateString() === today);
     const [connMeal, setConnMeal] = useState<{ id: string; title: string } | null>(null);
+    const [mealToDelete, setMealToDelete] = useState<{ id: string; title: string } | null>(null);
+    const [copying, setCopying] = useState(false);
 
     const totalCals = todayMeals.reduce((acc, m) => acc + (m.calories || 0), 0);
-    const dailyGoal = 2500;
-    const progress = Math.min((totalCals / dailyGoal) * 100, 100);
-    const isOverLimit = totalCals > dailyGoal;
+    // Alvo do dia = meta + gasto do treino (mesma conta do saldo do dashboard).
+    const effectiveGoal = dailyGoal + workoutBurn;
+    const progress = effectiveGoal > 0 ? Math.min((totalCals / effectiveGoal) * 100, 100) : 0;
+    const isOverLimit = effectiveGoal > 0 && totalCals > effectiveGoal;
+
+    const confirmDelete = async () => {
+        if (!mealToDelete) return;
+        await deleteMeal(mealToDelete.id);
+        toast.success("Refeição excluída.");
+        setMealToDelete(null);
+    };
+
+    const handleCopyYesterday = async () => {
+        setCopying(true);
+        const res = await copyYesterdayMeals();
+        setCopying(false);
+        if (res.success) {
+            toast.success(res.message);
+            router.refresh(); // re-busca os dados do servidor (page é server-rendered)
+        } else {
+            toast.error(res.message);
+        }
+    };
 
     return (
         <div className="flex flex-col h-full bg-background rounded-2xl">
@@ -63,14 +91,30 @@ export function FoodLogger({ meals }: { meals: Meal[] }) {
                         </h3>
                         <p className="text-xs text-muted-foreground">{todayMeals.length} registros ativos hoje</p>
                     </div>
-                    <MealFormDialog />
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleCopyYesterday}
+                            disabled={copying}
+                            className="h-9 gap-1.5 rounded-lg text-xs"
+                            title="Copiar todas as refeições de ontem para hoje"
+                        >
+                            {copying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CopyPlus className="h-3.5 w-3.5" />}
+                            <span className="hidden sm:inline">Copiar ontem</span>
+                        </Button>
+                        <MealFormDialog />
+                    </div>
                 </div>
 
                 <div className="space-y-2 pt-2">
                     <div className="flex justify-between items-end">
                         <div className="flex items-baseline gap-1">
                             <span className={cn("text-3xl font-bold tracking-tight", isOverLimit ? "text-rose-500" : "text-foreground")}>{totalCals}</span>
-                            <span className="text-xs font-medium text-muted-foreground">/ {dailyGoal} kcal alvo</span>
+                            <span className="text-xs font-medium text-muted-foreground">
+                                / {effectiveGoal} kcal alvo
+                                {workoutBurn > 0 && <span className="text-emerald-500 font-semibold"> (+{workoutBurn} treino)</span>}
+                            </span>
                         </div>
                         <span className="text-xs font-bold text-muted-foreground">{Math.round(progress)}%</span>
                     </div>
@@ -89,7 +133,14 @@ export function FoodLogger({ meals }: { meals: Meal[] }) {
                             <p className="text-xs text-muted-foreground mt-1">Acompanhe seus macros clicando em Registrar.</p>
                         </div>
                     ) : (
-                        todayMeals.map(meal => <MealRow key={meal.id} meal={meal} onConnections={(m) => setConnMeal({ id: m.id, title: m.title })} />)
+                        todayMeals.map(meal => (
+                            <MealRow
+                                key={meal.id}
+                                meal={meal}
+                                onConnections={(m) => setConnMeal({ id: m.id, title: m.title })}
+                                onDelete={(m) => setMealToDelete({ id: m.id, title: m.title })}
+                            />
+                        ))
                     )}
                 </div>
             </ScrollArea>
@@ -99,21 +150,29 @@ export function FoodLogger({ meals }: { meals: Meal[] }) {
                 item={connMeal}
                 onOpenChange={(o) => !o && setConnMeal(null)}
             />
+
+            {/* Exclusão de refeição — modal único controlado (substitui o confirm() nativo) */}
+            <AlertDialog open={mealToDelete !== null} onOpenChange={(o) => !o && setMealToDelete(null)}>
+                <AlertDialogContent className="rounded-2xl">
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Excluir &quot;{mealToDelete?.title}&quot;?</AlertDialogTitle>
+                        <AlertDialogDescription>A refeição será removida permanentemente do seu diário.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel className="rounded-xl">Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmDelete} className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90">Excluir</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
 
 // --- LINHA DE REFEIÇÃO ---
-function MealRow({ meal, onConnections }: { meal: Meal; onConnections: (meal: Meal) => void }) {
+function MealRow({ meal, onConnections, onDelete }: { meal: Meal; onConnections: (meal: Meal) => void; onDelete: (meal: Meal) => void }) {
     const config = mealConfigs[meal.type as MealType] || mealConfigs.NEUTRAL;
     const Icon = config.icon;
-
-    const handleDelete = async () => {
-        if (confirm("Excluir esta refeição permanentemente?")) {
-            await deleteMeal(meal.id);
-            toast.success("Refeição excluída.");
-        }
-    };
+    const hasMacros = meal.protein != null || meal.carbs != null || meal.fat != null;
 
     return (
         <div className="group flex items-center justify-between p-3.5 rounded-xl border border-border/40 bg-card hover:bg-muted/40 transition-all shadow-sm">
@@ -124,6 +183,13 @@ function MealRow({ meal, onConnections }: { meal: Meal; onConnections: (meal: Me
                 <div className="min-w-0">
                     <p className="text-sm font-bold truncate leading-none mb-1.5">{meal.title}</p>
                     <p className="text-[11px] text-muted-foreground truncate leading-none">{meal.items || "Sem descrição detalhada"}</p>
+                    {hasMacros && (
+                        <div className="flex items-center gap-2 mt-1.5 text-[10px] font-semibold">
+                            {meal.protein != null && <span className="text-blue-500">P {fmtQty(meal.protein)}g</span>}
+                            {meal.carbs != null && <span className="text-emerald-500">C {fmtQty(meal.carbs)}g</span>}
+                            {meal.fat != null && <span className="text-amber-500">G {fmtQty(meal.fat)}g</span>}
+                        </div>
+                    )}
                 </div>
             </div>
             <div className="flex items-center gap-3 shrink-0 pl-3">
@@ -133,7 +199,7 @@ function MealRow({ meal, onConnections }: { meal: Meal; onConnections: (meal: Me
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary rounded-lg"><Pencil className="h-4 w-4" /></Button>
                     </MealFormDialog>
                     <Button variant="ghost" size="icon" title="Tags & Anexos" onClick={() => onConnections(meal)} className="h-8 w-8 text-muted-foreground hover:text-primary rounded-lg"><Tags className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" onClick={handleDelete} className="h-8 w-8 text-muted-foreground hover:text-rose-500 rounded-lg"><Trash2 className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => onDelete(meal)} className="h-8 w-8 text-muted-foreground hover:text-rose-500 rounded-lg"><Trash2 className="h-4 w-4" /></Button>
                 </div>
             </div>
         </div>
@@ -150,6 +216,10 @@ function MealFormDialog({ meal, children }: { meal?: Meal; children?: React.Reac
     const [type, setType] = useState<MealType>((meal?.type as MealType) || "HEALTHY");
     const [manualDesc, setManualDesc] = useState(meal?.items || "");
     const [manualCals, setManualCals] = useState<number>(meal?.calories || 0);
+    // Macros em gramas (opcionais) — string vazia = não informado (vira null no banco).
+    const [protein, setProtein] = useState<string>(meal?.protein != null ? String(meal.protein) : "");
+    const [carbs, setCarbs] = useState<string>(meal?.carbs != null ? String(meal.carbs) : "");
+    const [fat, setFat] = useState<string>(meal?.fat != null ? String(meal.fat) : "");
 
     // Prato = lista de alimentos com quantidade (porções).
     const [plate, setPlate] = useState<PlateItem[]>([]);
@@ -189,6 +259,7 @@ function MealFormDialog({ meal, children }: { meal?: Meal; children?: React.Reac
 
     const reset = () => {
         setManualDesc(""); setManualCals(0); setPlate([]); setShowSearchMobile(false);
+        setProtein(""); setCarbs(""); setFat("");
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -201,6 +272,9 @@ function MealFormDialog({ meal, children }: { meal?: Meal; children?: React.Reac
         formData.append("type", (usingPlate && !meal) ? detectedType : type);
         formData.append("items", finalDesc);
         formData.append("calories", finalCals.toString());
+        formData.append("protein", protein.trim());
+        formData.append("carbs", carbs.trim());
+        formData.append("fat", fat.trim());
 
         try {
             if (meal) {
@@ -370,6 +444,25 @@ function MealFormDialog({ meal, children }: { meal?: Meal; children?: React.Reac
                                     </div>
                                 </>
                             )}
+
+                            {/* Macros (opcional) — gramas. Vazio = não informado. */}
+                            <div className="space-y-1.5">
+                                <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Macros <span className="font-normal normal-case">(opcional, em gramas)</span></Label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    <div className="relative">
+                                        <Input inputMode="decimal" value={protein} onChange={(e) => setProtein(e.target.value)} placeholder="0" className="h-11 pl-9 rounded-xl bg-muted/20 border-border/40 font-mono" />
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-blue-500">P</span>
+                                    </div>
+                                    <div className="relative">
+                                        <Input inputMode="decimal" value={carbs} onChange={(e) => setCarbs(e.target.value)} placeholder="0" className="h-11 pl-9 rounded-xl bg-muted/20 border-border/40 font-mono" />
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-500">C</span>
+                                    </div>
+                                    <div className="relative">
+                                        <Input inputMode="decimal" value={fat} onChange={(e) => setFat(e.target.value)} placeholder="0" className="h-11 pl-9 rounded-xl bg-muted/20 border-border/40 font-mono" />
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-500">G</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         {/* RODAPÉ: total + ações */}

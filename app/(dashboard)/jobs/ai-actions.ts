@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "next/cache";
 import { requireUserId } from "@/lib/auth";
 import { decryptKey } from "@/lib/settings-crypto";
 import { callAIProvider } from "@/app/(dashboard)/ai/actions/providers";
@@ -75,7 +76,7 @@ async function runForJob(jobId: string, buildPrompts: (job: { company: string; r
 }
 
 export async function generateCoverLetter(jobId: string): Promise<AIResult> {
-  return runForJob(jobId, (job, portfolio) => ({
+  const res = await runForJob(jobId, (job, portfolio) => ({
     system:
       "Você é um especialista em recrutamento e redação de cartas de apresentação no Brasil. " +
       "Escreva uma carta de apresentação profissional, calorosa e objetiva (3 a 4 parágrafos), em português do Brasil, " +
@@ -87,10 +88,19 @@ export async function generateCoverLetter(jobId: string): Promise<AIResult> {
       `### PERFIL DO CANDIDATO\n${portfolio}\n\n` +
       `Escreva a carta de apresentação para esta vaga.`,
   }));
+  // Persiste a carta gerada (não regenerar à toa).
+  if (res.success) {
+    try {
+      const userId = await requireUserId();
+      await prisma.jobApplication.updateMany({ where: { id: jobId, userId }, data: { coverLetter: res.content } });
+      revalidatePath("/jobs");
+    } catch { /* persistência é best-effort */ }
+  }
+  return res;
 }
 
 export async function analyzeJobMatch(jobId: string): Promise<AIResult> {
-  return runForJob(jobId, (job, portfolio) => ({
+  const res = await runForJob(jobId, (job, portfolio) => ({
     system:
       "Você é um analista de talentos técnico. Compare o perfil do candidato com a vaga e responda em português do Brasil, " +
       "em Markdown, EXATAMENTE nesta estrutura:\n" +
@@ -103,4 +113,15 @@ export async function analyzeJobMatch(jobId: string): Promise<AIResult> {
       `### PERFIL DO CANDIDATO\n${portfolio}\n\n` +
       `Analise a compatibilidade do candidato com esta vaga.`,
   }));
+  // Extrai o "## Compatibilidade: X%" e persiste o score (ordenação por fit).
+  if (res.success) {
+    const m = res.content.match(/Compatibilidade:\s*(\d{1,3})\s*%/i);
+    const matchScore = m ? Math.min(100, Math.max(0, parseInt(m[1], 10))) : null;
+    try {
+      const userId = await requireUserId();
+      await prisma.jobApplication.updateMany({ where: { id: jobId, userId }, data: { matchScore } });
+      revalidatePath("/jobs");
+    } catch { /* best-effort */ }
+  }
+  return res;
 }
