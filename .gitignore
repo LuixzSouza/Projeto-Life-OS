@@ -49,9 +49,14 @@ next-env.d.ts
 *.db-wal
 prisma/*.db
 prisma/*.db-journal
+# sidecars da réplica libSQL embarcada (modo Híbrido)
+*.db-info
+*.db-client_wal_index
+*.db-client_wal_index-shm
 
 # config de instalação local (caminho do banco + segredos da máquina)
 life-os-config.json
+life-os-config.json.bak
 
 # launcher local (PID do servidor em background + logs)
 .life-os-server.pid
@@ -62,4 +67,4 @@ life-os-config.json
 *.vsidx
 
 # log do dev server (artefato local)
-.next-dev.log
+.next-dev*.log
