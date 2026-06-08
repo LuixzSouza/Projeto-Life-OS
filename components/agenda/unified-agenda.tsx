@@ -13,11 +13,20 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AgendaItemIcon } from "./agenda-item-icon";
 import { CATEGORY_META, SOURCE_ORDER, type AgendaItem, type AgendaSource } from "./agenda-shared";
+import { type ThemedDayData } from "@/app/(dashboard)/agenda/themed-days-actions";
 
 const dayKey = (d: Date) => format(d, "yyyy-MM-dd");
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
-export function UnifiedAgenda({ items, selectedDateISO }: { items: AgendaItem[]; selectedDateISO: string }) {
+export type ThemeByWeekday = Record<number, ThemedDayData | undefined>;
+
+export function UnifiedAgenda({ items, selectedDateISO, themedDays = [] }: { items: AgendaItem[]; selectedDateISO: string; themedDays?: ThemedDayData[] }) {
+  const themeByWeekday = useMemo<ThemeByWeekday>(() => {
+    const map: ThemeByWeekday = {};
+    for (const t of themedDays) map[t.weekday] = t;
+    return map;
+  }, [themedDays]);
+
   const router = useRouter();
   const cursor = useMemo(() => parseISO(selectedDateISO), [selectedDateISO]);
 
@@ -153,9 +162,9 @@ export function UnifiedAgenda({ items, selectedDateISO }: { items: AgendaItem[];
 
       {/* CONTEÚDO */}
       {view === "month" ? (
-        <MonthGrid days={days} cursor={cursor} byDay={byDay} onOpenDay={openDay} />
+        <MonthGrid days={days} cursor={cursor} byDay={byDay} onOpenDay={openDay} themeByWeekday={themeByWeekday} />
       ) : (
-        <DayView items={dayItems} day={day} />
+        <DayView items={dayItems} day={day} theme={themeByWeekday[day.getDay()]} />
       )}
     </div>
   );
@@ -163,20 +172,29 @@ export function UnifiedAgenda({ items, selectedDateISO }: { items: AgendaItem[];
 
 /* ----------------------------- MONTH GRID ----------------------------- */
 function MonthGrid({
-  days, cursor, byDay, onOpenDay,
+  days, cursor, byDay, onOpenDay, themeByWeekday,
 }: {
   days: Date[];
   cursor: Date;
   byDay: Map<string, AgendaItem[]>;
   onOpenDay: (d: Date) => void;
+  themeByWeekday: ThemeByWeekday;
 }) {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      {/* Cabeçalho dos dias da semana */}
+      {/* Cabeçalho dos dias da semana (com o tema de cada dia, se houver) */}
       <div className="grid grid-cols-7 border-b border-border/40 bg-muted/5">
-        {WEEKDAYS.map((w) => (
-          <div key={w} className="py-2 text-center text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{w}</div>
-        ))}
+        {WEEKDAYS.map((w, i) => {
+          const theme = themeByWeekday[i];
+          return (
+            <div key={w} className="flex flex-col items-center gap-0.5 py-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider" style={theme ? { color: theme.color } : undefined}>
+                {theme?.icon ? `${theme.icon} ` : ""}{w}
+              </span>
+              {theme && <span className="max-w-full truncate px-1 text-[9px] font-semibold leading-none text-muted-foreground">{theme.name}</span>}
+            </div>
+          );
+        })}
       </div>
 
       <ScrollArea className="flex-1">
@@ -185,10 +203,12 @@ function MonthGrid({
             const items = byDay.get(dayKey(d)) ?? [];
             const inMonth = isSameMonth(d, cursor);
             const today = isToday(d);
+            const theme = themeByWeekday[d.getDay()];
             return (
               <button
                 key={d.toISOString()}
                 onClick={() => onOpenDay(d)}
+                style={inMonth && theme ? { backgroundColor: `${theme.color}0d` } : undefined}
                 className={cn(
                   "group flex min-h-[96px] flex-col gap-1 border-b border-r border-border/30 p-1.5 text-left transition-colors hover:bg-muted/40",
                   !inMonth && "bg-muted/20"
@@ -233,12 +253,26 @@ function MonthGrid({
 }
 
 /* ------------------------------ DAY VIEW ------------------------------ */
-function DayView({ items, day }: { items: AgendaItem[]; day: Date }) {
+function DayView({ items, day, theme }: { items: AgendaItem[]; day: Date; theme?: ThemedDayData }) {
   const allDay = items.filter((i) => !i.time);
   const timed = items.filter((i) => i.time);
 
+  const themeBanner = theme ? (
+    <div className="mx-4 mt-4 flex items-center gap-2.5 rounded-2xl border border-border/40 p-3 sm:mx-6" style={{ backgroundColor: `${theme.color}12` }}>
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-lg" style={{ backgroundColor: `${theme.color}1f`, color: theme.color }}>
+        {theme.icon || "✦"}
+      </span>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-black leading-none" style={{ color: theme.color }}>{theme.name}</p>
+        {theme.focus && <p className="mt-0.5 truncate text-[11px] font-medium text-muted-foreground">{theme.focus}</p>}
+      </div>
+    </div>
+  ) : null;
+
   if (items.length === 0) {
     return (
+      <>
+        {themeBanner}
       <div className="flex flex-1 flex-col items-center justify-center p-10 text-center">
         <div className="mb-3 rounded-full bg-muted p-4">
           <CalendarRange className="h-7 w-7 text-muted-foreground/40" />
@@ -248,10 +282,13 @@ function DayView({ items, day }: { items: AgendaItem[]; day: Date }) {
           Tudo que você anotar no sistema com data — refeições, treinos, gastos, filmes — aparece aqui automaticamente.
         </p>
       </div>
+      </>
     );
   }
 
   return (
+    <>
+      {themeBanner}
     <ScrollArea className="flex-1">
       <div className="space-y-5 p-4 sm:p-6">
         {allDay.length > 0 && (
@@ -265,6 +302,7 @@ function DayView({ items, day }: { items: AgendaItem[]; day: Date }) {
         </p>
       </div>
     </ScrollArea>
+    </>
   );
 }
 
