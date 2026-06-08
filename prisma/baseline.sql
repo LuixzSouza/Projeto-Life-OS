@@ -673,10 +673,12 @@ CREATE TABLE "Event" (
     "color" TEXT DEFAULT '#6366f1',
     "emailAlert" BOOLEAN NOT NULL DEFAULT true,
     "projectId" TEXT,
+    "taskId" TEXT,
     "userId" TEXT,
     "deletedAt" DATETIME,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "Event_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
+    CONSTRAINT "Event_taskId_fkey" FOREIGN KEY ("taskId") REFERENCES "Task" ("id") ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT "Event_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -692,6 +694,36 @@ CREATE TABLE "RoutineItem" (
     "userId" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "RoutineItem_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ThemedDay" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "weekday" INTEGER NOT NULL,
+    "name" TEXT NOT NULL,
+    "color" TEXT NOT NULL DEFAULT '#6366f1',
+    "icon" TEXT,
+    "focus" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "ThemedDay_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "FocusSession" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "label" TEXT,
+    "minutes" INTEGER NOT NULL,
+    "mode" TEXT NOT NULL DEFAULT 'POMODORO',
+    "cycles" INTEGER NOT NULL DEFAULT 1,
+    "taskId" TEXT,
+    "eventId" TEXT,
+    "startedAt" DATETIME NOT NULL,
+    "endedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "FocusSession_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -1323,6 +1355,9 @@ CREATE INDEX "Event_userId_idx" ON "Event"("userId");
 CREATE INDEX "Event_projectId_idx" ON "Event"("projectId");
 
 -- CreateIndex
+CREATE INDEX "Event_taskId_idx" ON "Event"("taskId");
+
+-- CreateIndex
 CREATE INDEX "Event_userId_startTime_idx" ON "Event"("userId", "startTime");
 
 -- CreateIndex
@@ -1330,6 +1365,18 @@ CREATE INDEX "Event_userId_deletedAt_startTime_idx" ON "Event"("userId", "delete
 
 -- CreateIndex
 CREATE INDEX "RoutineItem_userId_idx" ON "RoutineItem"("userId");
+
+-- CreateIndex
+CREATE INDEX "ThemedDay_userId_idx" ON "ThemedDay"("userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ThemedDay_userId_weekday_key" ON "ThemedDay"("userId", "weekday");
+
+-- CreateIndex
+CREATE INDEX "FocusSession_userId_idx" ON "FocusSession"("userId");
+
+-- CreateIndex
+CREATE INDEX "FocusSession_userId_endedAt_idx" ON "FocusSession"("userId", "endedAt");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Settings_userId_key" ON "Settings"("userId");

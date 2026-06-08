@@ -72,7 +72,7 @@ export async function notify(input: NotifyInput) {
  * Cria uma notificação SÓ se ainda não existir uma do mesmo (type, entityType,
  * entityId) para o usuário — evita duplicar lembretes a cada geração.
  */
-async function notifyOnce(userId: string, input: NotifyInput) {
+export async function notifyOnce(userId: string, input: NotifyInput) {
   const exists = await prisma.notification.findFirst({
     where: { userId, type: input.type, entityType: input.entityType ?? null, entityId: input.entityId ?? null },
     select: { id: true },

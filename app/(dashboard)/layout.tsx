@@ -1,5 +1,7 @@
 import { Sidebar } from "@/components/layout/sidebar"; // ou o caminho correto
 import { CommandPalette } from "@/components/layout/command-palette";
+import { FocusDock } from "@/components/focus/focus-dock";
+import { BlockReminders } from "@/components/agenda/block-reminders";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserId } from "@/lib/auth";
 import { getNotificationInbox } from "@/lib/notifications";
@@ -34,6 +36,13 @@ export default async function DashboardLayout({
       <Sidebar user={serializedUser} inbox={inbox} />
 
       <CommandPalette />
+
+      {/* Modo Foco: widget global persistente (Pomodoro/cronômetro). Vive aqui no
+          layout para não desmontar na navegação — o timer segue em qualquer rota. */}
+      <FocusDock />
+
+      {/* Lembretes de blocos: poller global que avisa quando um bloco vai começar. */}
+      <BlockReminders />
 
       {/* pb no mobile: o bottom-nav é fixo (h-16) e cobriria os últimos ~64px do
           conteúdo. Reserva o espaço dele + a safe-area do iOS. No desktop (md+) o

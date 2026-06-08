@@ -57,6 +57,7 @@ model User {
   workoutPlans      WorkoutPlan[]
   workoutPhotos     WorkoutPhoto[]
   energyCheckins    EnergyCheckin[]
+  themedDays        ThemedDay[]
   habits            Habit[]
   habitLogs         HabitLog[]
   healthMetrics     HealthMetric[]
@@ -98,6 +99,7 @@ model User {
   activityLogs  ActivityLog[]
   attachments   Attachment[]
   entityLinks   EntityLink[]
+  focusSessions FocusSession[]
 }
 
 model UserStats {
@@ -739,6 +741,9 @@ model Task {
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // Blocos de tempo (Agenda) agendados a partir desta tarefa.
+  scheduledEvents Event[]
+
   deletedAt DateTime?
 
   @@index([userId])
@@ -1128,6 +1133,11 @@ model Event {
   projectId String?
   project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
+  // Bloco gerado ao AGENDAR uma tarefa na grade de Time-Blocking (Fase 1). SetNull:
+  // excluir a tarefa não apaga o bloco já reservado na linha do tempo.
+  taskId String?
+  task   Task?   @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1136,6 +1146,7 @@ model Event {
 
   @@index([userId])
   @@index([projectId])
+  @@index([taskId])
   @@index([userId, startTime])
   @@index([userId, deletedAt, startTime])
 }
@@ -1156,6 +1167,52 @@ model RoutineItem {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+// Dia Temático (Fase 1) — identidade recorrente de cada dia da semana (ex.: Segunda
+// = "Deep Work", Sexta = "Admin"). Um registro por (userId, weekday). `focus` é a
+// intenção curta do dia. Aparece na grade de Time-Blocking como banner/realce.
+model ThemedDay {
+  id      String  @id @default(uuid())
+  userId  String
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekday Int // 0=Domingo … 6=Sábado
+  name    String
+  color   String  @default("#6366f1")
+  icon    String? // emoji
+  focus   String? // intenção/lema do dia (texto curto)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, weekday])
+  @@index([userId])
+}
+
+// Sessão de Foco (Pomodoro / cronômetro) — Fase 1 do roadmap (Time-Blocking + Foco).
+// Cada registro = um intervalo de FOCO concluído (não conta as pausas). Alimenta a
+// inteligência futura (foco × energia #8, vetor de fricção #15) e o relatório de tempo.
+// taskId/eventId são referências leves (sem FK rígida, padrão do tecido conectivo) ao
+// que foi focado — a tarefa/bloco pode ser removido sem apagar o histórico de foco.
+model FocusSession {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  label   String? // o que foi focado (texto livre, ex.: "Estudo React")
+  minutes Int // minutos de foco concluídos
+  mode    String  @default("POMODORO") // POMODORO | STOPWATCH
+  cycles  Int     @default(1) // ciclos de foco concluídos nesta sessão
+
+  taskId  String? // tarefa vinculada (referência leve)
+  eventId String? // bloco de tempo vinculado (referência leve)
+
+  startedAt DateTime
+  endedAt   DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, endedAt])
 }
 
 // =========================================================
