@@ -14,6 +14,7 @@ import { EnergyCheckinCard } from "@/components/health/energy-checkin-card";
 import { HabitsCard } from "@/components/health/habits-card";
 import { QuickCaptureCard } from "@/components/dashboard/quick-capture-card";
 import { DailyInsightCard } from "@/components/dashboard/daily-insight-card";
+import { DailyRegulatorCard } from "@/components/dashboard/daily-regulator-card";
 import { FrictionVectorCard } from "@/components/health/friction-vector-card";
 
 // Componentes Server-side separados (seções)
@@ -55,6 +56,11 @@ export default async function DashboardPage() {
       {/* Insight do dia: o padrão mais forte (foco/energia) do Motor de Correlação (#8). */}
       <Suspense fallback={<Skeleton className="h-[76px] w-full rounded-2xl" />}>
         <DailyInsightCard />
+      </Suspense>
+
+      {/* Regulador Adaptativo (#13): o que fazer hoje conforme o estado/energia. */}
+      <Suspense fallback={null}>
+        <DailyRegulatorCard />
       </Suspense>
 
       {/* Vetor de Fricção (#15): por que os hábitos falham (some se não há dados). */}
