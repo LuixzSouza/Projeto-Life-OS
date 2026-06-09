@@ -222,6 +222,19 @@ export function SetupWizard({ dbFromEnv = false }: SetupWizardProps) {
                   {step === 3 && "Escolha o motor de inteligência do sistema."}
                   {step === 4 && "Tudo pronto. Vamos inicializar o Life OS."}
                 </p>
+
+                {/* Saída para quem já tem conta e caiu aqui por engano. */}
+                {step === 1 && (
+                  <p className="text-xs text-muted-foreground pt-1">
+                    Já tem uma conta?{" "}
+                    <Link
+                      href="/login"
+                      className="font-semibold text-primary hover:underline inline-flex items-center gap-1"
+                    >
+                      <LogIn className="h-3 w-3" /> Entrar
+                    </Link>
+                  </p>
+                )}
               </div>
 
               {/* Aviso de rascunho restaurado + reiniciar */}

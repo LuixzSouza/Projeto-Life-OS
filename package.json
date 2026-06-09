@@ -20,6 +20,11 @@
     "db:probe": "node scripts/turso-probe.mjs",
     "db:up": "echo 'Usando SQLite. O banco de dados é inicializado com npx prisma migrate dev.'"
   },
+  "overrides": {
+    "@prisma/adapter-libsql": {
+      "@libsql/client": "$@libsql/client"
+    }
+  },
   "dependencies": {
     "@codemirror/lang-javascript": "^6.2.5",
     "@codemirror/lang-json": "^6.0.2",

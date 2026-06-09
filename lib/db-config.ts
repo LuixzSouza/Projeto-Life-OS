@@ -88,17 +88,33 @@ function writeConfig(config: ConfigShape) {
 /**
  * Perfil de banco vindo de variáveis de ambiente (prioridade máxima).
  * Essencial em deploy serverless (Vercel), onde o config em arquivo não persiste.
- *   - TURSO_DATABASE_URL (+ TURSO_AUTH_TOKEN): banco na nuvem (Turso/libSQL).
+ *
+ * Aceita o URL do Turso/libSQL por VÁRIOS nomes de variável, porque é fácil
+ * errar o nome no painel da Vercel e cair em /setup sem perceber:
+ *   - TURSO_DATABASE_URL  (nome canônico — documentado)
+ *   - TURSO_URL           (atalho comum)
+ *   - DATABASE_URL        (só se for libsql://… — `file:` é local, ignorado aqui)
+ * O token sai de TURSO_AUTH_TOKEN | TURSO_TOKEN | DATABASE_AUTH_TOKEN.
  */
 export function getEnvProfile(): DbProfile | null {
-  const tursoUrl = process.env.TURSO_DATABASE_URL;
-  if (tursoUrl) {
-    return {
-      mode: "cloud",
-      provider: "turso",
-      url: tursoUrl,
-      authToken: process.env.TURSO_AUTH_TOKEN,
-    };
+  // Considera apenas URLs realmente remotas (libsql/https). `file:` é local e
+  // não faz sentido em serverless — deixa o config/arquivo decidir nesse caso.
+  const candidates = [
+    process.env.TURSO_DATABASE_URL,
+    process.env.TURSO_URL,
+    process.env.DATABASE_URL,
+  ];
+  const url = candidates
+    .map((u) => u?.trim())
+    .find((u) => !!u && /^(libsql|https):\/\//.test(u));
+
+  if (url) {
+    const authToken =
+      process.env.TURSO_AUTH_TOKEN ||
+      process.env.TURSO_TOKEN ||
+      process.env.DATABASE_AUTH_TOKEN ||
+      undefined;
+    return { mode: "cloud", provider: "turso", url, authToken };
   }
   return null;
 }
