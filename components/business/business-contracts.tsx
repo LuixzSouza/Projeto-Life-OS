@@ -110,7 +110,9 @@ export function ContractsList({
                   </div>
 
                   <div className="flex flex-col">
-                    {billing.invoices.map((invoice) => {
+                    {/* Canceladas ficam ocultas (são "lápides" — inclusive as de
+                        cobrança recorrente, que não podem ser apagadas de verdade). */}
+                    {relevantInvoices.map((invoice) => {
                       const isLate = new Date(invoice.dueDate) < new Date() && invoice.status !== 'PAID';
                       const isPaid = invoice.status === 'PAID';
 
@@ -175,6 +177,11 @@ export function ContractsList({
                         </div>
                       );
                     })}
+                    {billing.invoices.length > relevantInvoices.length && (
+                      <p className="px-4 py-2 text-[9px] font-bold uppercase tracking-widest text-muted-foreground/50">
+                        {billing.invoices.length - relevantInvoices.length} fatura(s) cancelada(s) oculta(s)
+                      </p>
+                    )}
                   </div>
                 </div>
               );

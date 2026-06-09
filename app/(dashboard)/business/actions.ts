@@ -432,10 +432,18 @@ export async function updateInvoice(formData: FormData) {
 
 // 9. Excluir Fatura específica (parcela). Se estava PAGA com lançamento vinculado,
 // estorna a receita do Financeiro e reverte o saldo da conta antes de apagar.
+//
+// ⚠️ Faturas de COBRANÇA RECORRENTE ativa no mês atual não podem ser apagadas de
+// verdade: o syncRecurringChargeInvoices (que roda ao abrir Negócios/Finanças)
+// recriaria a fatura na hora — era o bug do "excluí mas voltou". Para essas, a
+// fatura vira CANCELED (lápide): a sync vê que o dia já tem fatura e não recria,
+// e a UI esconde canceladas da lista.
 export async function deleteInvoice(invoiceId: string) {
   try {
     if (!invoiceId) return { success: false, message: "ID não fornecido." }
     const userId = await requireUserId()
+
+    let canceledInstead = false
 
     await prisma.$transaction(async (tx) => {
       const invoice = await tx.invoice.findFirst({ where: { id: invoiceId, userId } })
@@ -456,10 +464,33 @@ export async function deleteInvoice(invoiceId: string) {
         }
       }
 
-      await tx.invoice.deleteMany({ where: { id: invoiceId, userId } })
+      // A sync rematerializa ocorrências do MÊS ATUAL de cobranças recorrentes
+      // ativas deste contrato. Se for o caso, cancela (lápide) em vez de apagar.
+      const now = new Date()
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
+      const activeCharge = invoice.dueDate >= monthStart && invoice.dueDate <= monthEnd
+        ? await tx.recurringCharge.findFirst({
+            where: { userId, billingId: invoice.billingId, active: true },
+            select: { id: true },
+          })
+        : null
 
-      // Sincroniza o contrato pai (total = soma das faturas restantes).
-      const remaining = await tx.invoice.findMany({ where: { billingId: invoice.billingId, userId }, select: { value: true } })
+      if (activeCharge) {
+        canceledInstead = true
+        await tx.invoice.updateMany({
+          where: { id: invoiceId, userId },
+          data: { status: "CANCELED", paidAt: null, transactionId: null },
+        })
+      } else {
+        await tx.invoice.deleteMany({ where: { id: invoiceId, userId } })
+      }
+
+      // Sincroniza o contrato pai (total/parcelas = somente faturas não canceladas).
+      const remaining = await tx.invoice.findMany({
+        where: { billingId: invoice.billingId, userId, status: { not: "CANCELED" } },
+        select: { value: true },
+      })
       const newTotalValue = remaining.reduce((sum, inv) => sum + Number(inv.value), 0)
       await tx.billing.updateMany({
         where: { id: invoice.billingId, userId },
@@ -469,7 +500,12 @@ export async function deleteInvoice(invoiceId: string) {
 
     revalidatePath("/business", "layout") // inclui a página de detalhe /business/[id]
     revalidatePath("/finance")
-    return { success: true, message: "Fatura excluída (contrato resincronizado)." }
+    return {
+      success: true,
+      message: canceledInstead
+        ? "Fatura cancelada e oculta. Ela vem de uma cobrança recorrente ATIVA — para encerrar de vez, desative a cobrança recorrente em Finanças."
+        : "Fatura excluída (contrato resincronizado).",
+    }
   } catch (error) {
     console.error("Erro ao excluir fatura:", error)
     return { success: false, message: "Falha ao excluir a fatura." }
