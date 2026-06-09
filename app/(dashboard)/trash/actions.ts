@@ -67,21 +67,30 @@ export async function getTrash(): Promise<TrashItem[]> {
 
 /**
  * Restaura uma Transação: reaplica o impacto no saldo da conta (espelho exato do
- * que o soft-delete reverteu) e limpa deletedAt — tudo numa transação atômica.
+ * que o soft-delete reverteu) e limpa deletedAt.
+ * ⚠️ Modo réplica: leituras FORA da $transaction (na transação iriam ao primário,
+ * onde datas INTEGER estouram a conversão do Prisma); escritas em lote atômico.
  */
 async function restoreTransaction(userId: string, id: string) {
-  await prisma.$transaction(async (tx) => {
-    const t = await tx.transaction.findFirst({ where: { id, userId, deletedAt: { not: null } } });
-    if (!t) return;
-    const account = await tx.account.findFirst({ where: { id: t.accountId, userId } });
-    if (account && !account.isConnected) {
-      const newBalance = t.type === "INCOME"
-        ? Number(account.balance) + Number(t.amount)
-        : Number(account.balance) - Number(t.amount);
-      await tx.account.update({ where: { id: account.id }, data: { balance: newBalance } });
-    }
-    await tx.transaction.updateMany({ where: { id, userId }, data: { deletedAt: null } });
+  const t = await prisma.transaction.findFirst({
+    where: { id, userId, deletedAt: { not: null } },
+    select: { id: true, accountId: true, type: true, amount: true },
   });
+  if (!t) return;
+
+  const ops = [];
+  const account = await prisma.account.findFirst({
+    where: { id: t.accountId, userId },
+    select: { id: true, isConnected: true, balance: true },
+  });
+  if (account && !account.isConnected) {
+    const newBalance = t.type === "INCOME"
+      ? Number(account.balance) + Number(t.amount)
+      : Number(account.balance) - Number(t.amount);
+    ops.push(prisma.account.update({ where: { id: account.id }, data: { balance: newBalance }, select: { id: true } }));
+  }
+  ops.push(prisma.transaction.updateMany({ where: { id, userId }, data: { deletedAt: null } }));
+  await prisma.$transaction(ops);
 }
 
 /** Restaura um item (limpa deletedAt). */

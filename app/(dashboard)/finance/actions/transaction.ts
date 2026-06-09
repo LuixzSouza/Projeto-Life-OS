@@ -1,5 +1,7 @@
 "use server";
 
+import { randomUUID } from "crypto";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireUserId } from "@/lib/auth";
@@ -9,6 +11,10 @@ import { parseAmount } from "./helpers";
 // =========================================================
 // GESTÃO DE TRANSAÇÕES (COM CORREÇÃO DE SALDO)
 // =========================================================
+// ⚠️ REGRA (modo réplica/Turso): NÃO ler colunas DateTime dentro de $transaction
+// interativa — leituras na transação vão ao PRIMÁRIO, onde datas INTEGER (ms)
+// estouram a conversão do Prisma. Padrão: ler ANTES com prisma normal e escrever
+// em lote via prisma.$transaction([...]) com select: { id: true }.
 
 export async function createTransaction(formData: FormData) {
   const description = formData.get("description") as string;
@@ -23,29 +29,34 @@ export async function createTransaction(formData: FormData) {
 
   const userId = await requireUserId();
 
-  const createdId = await prisma.$transaction(async (tx) => {
-      // Garante que a conta pertence ao usuário
-      const account = await tx.account.findFirst({ where: { id: accountId, userId } });
-      if (!account) throw new Error("Conta não encontrada");
-
-      const created = await tx.transaction.create({
-        data: { description, amount, type, accountId, category, date, userId },
-      });
-
-      // Só atualizamos saldo manualmente se a conta NÃO for automática (Pluggy)
-      // Se for automática, o saldo virá da sincronização oficial
-      if (account && !account.isConnected) {
-          const currentBalance = Number(account.balance);
-          const newBalance = type === 'INCOME' ? currentBalance + amount : currentBalance - amount;
-
-          await tx.account.update({
-              where: { id: accountId },
-              data: { balance: newBalance }
-          });
-      }
-
-      return created.id;
+  // Garante que a conta pertence ao usuário (leitura FORA da transação — ver regra acima)
+  const account = await prisma.account.findFirst({
+    where: { id: accountId, userId },
+    select: { id: true, isConnected: true, balance: true },
   });
+  if (!account) throw new Error("Conta não encontrada");
+
+  const createdId = randomUUID();
+  const ops: Prisma.PrismaPromise<{ id: string }>[] = [
+    prisma.transaction.create({
+      data: { id: createdId, description, amount, type, accountId, category, date, userId },
+      select: { id: true },
+    }),
+  ];
+
+  // Só atualizamos saldo manualmente se a conta NÃO for automática (Pluggy)
+  // Se for automática, o saldo virá da sincronização oficial
+  if (!account.isConnected) {
+    const currentBalance = Number(account.balance);
+    const newBalance = type === 'INCOME' ? currentBalance + amount : currentBalance - amount;
+
+    ops.push(prisma.account.update({
+      where: { id: accountId },
+      data: { balance: newBalance },
+      select: { id: true },
+    }));
+  }
+  await prisma.$transaction(ops);
 
   await logActivity({
     action: type === "INCOME" ? "INCOME" : "EXPENSE",
@@ -70,35 +81,41 @@ export async function updateTransaction(formData: FormData) {
 
   const userId = await requireUserId();
 
-  // Transação atômica para garantir consistência do saldo
-  await prisma.$transaction(async (tx) => {
-      const oldTx = await tx.transaction.findFirst({ where: { id, userId, deletedAt: null } });
-      if (!oldTx) throw new Error("Transação não encontrada");
-
-      const account = await tx.account.findFirst({ where: { id: oldTx.accountId, userId } });
-      if (!account) throw new Error("Conta não encontrada");
-
-      // 1. Reverter o impacto da transação antiga no saldo
-      let tempBalance = Number(account.balance);
-      if (oldTx.type === 'INCOME') tempBalance -= Number(oldTx.amount);
-      else tempBalance += Number(oldTx.amount);
-
-      // 2. Aplicar o impacto da nova transação
-      if (newType === 'INCOME') tempBalance += newAmount;
-      else tempBalance -= newAmount;
-
-      // 3. Atualizar a conta com o novo saldo corrigido
-      await tx.account.update({
-          where: { id: account.id },
-          data: { balance: tempBalance }
-      });
-
-      // 4. Atualizar a transação
-      await tx.transaction.update({
-          where: { id },
-          data: { description, amount: newAmount, type: newType, category: newCategory, date: newDate }
-      });
+  // Leituras FORA da transação (ver regra acima); escritas em lote atômico.
+  const oldTx = await prisma.transaction.findFirst({
+    where: { id, userId, deletedAt: null },
+    select: { id: true, accountId: true, type: true, amount: true },
   });
+  if (!oldTx) throw new Error("Transação não encontrada");
+
+  const account = await prisma.account.findFirst({
+    where: { id: oldTx.accountId, userId },
+    select: { id: true, balance: true },
+  });
+  if (!account) throw new Error("Conta não encontrada");
+
+  // 1. Reverter o impacto da transação antiga no saldo
+  let tempBalance = Number(account.balance);
+  if (oldTx.type === 'INCOME') tempBalance -= Number(oldTx.amount);
+  else tempBalance += Number(oldTx.amount);
+
+  // 2. Aplicar o impacto da nova transação
+  if (newType === 'INCOME') tempBalance += newAmount;
+  else tempBalance -= newAmount;
+
+  // 3 e 4. Atualiza conta e transação no mesmo lote atômico
+  await prisma.$transaction([
+    prisma.account.update({
+      where: { id: account.id },
+      data: { balance: tempBalance },
+      select: { id: true },
+    }),
+    prisma.transaction.update({
+      where: { id },
+      data: { description, amount: newAmount, type: newType, category: newCategory, date: newDate },
+      select: { id: true },
+    }),
+  ]);
 
   revalidatePath("/finance");
 }
@@ -107,22 +124,35 @@ export async function updateTransaction(formData: FormData) {
 // (um item na lixeira não conta no saldo). Restaurar reaplica; ver app/(dashboard)/trash.
 export async function deleteTransaction(id: string) {
     const userId = await requireUserId();
-    await prisma.$transaction(async (tx) => {
-        const transaction = await tx.transaction.findFirst({ where: { id, userId, deletedAt: null } });
-        if(!transaction) return;
 
-        // Reverte o impacto no saldo — só em contas NÃO automáticas (Pluggy sincroniza sozinho).
-        const account = await tx.account.findFirst({ where: { id: transaction.accountId, userId } });
-        if(account && !account.isConnected) {
-            const reversedBalance = transaction.type === 'INCOME'
-                ? Number(account.balance) - Number(transaction.amount)
-                : Number(account.balance) + Number(transaction.amount);
-
-            await tx.account.update({ where: { id: transaction.accountId }, data: { balance: reversedBalance } });
-        }
-
-        await tx.transaction.updateMany({ where: { id, userId }, data: { deletedAt: new Date() } });
+    // Leituras FORA da transação (ver regra acima); escritas em lote atômico.
+    const transaction = await prisma.transaction.findFirst({
+      where: { id, userId, deletedAt: null },
+      select: { id: true, accountId: true, type: true, amount: true },
     });
+    if (!transaction) return;
+
+    const ops = [];
+
+    // Reverte o impacto no saldo — só em contas NÃO automáticas (Pluggy sincroniza sozinho).
+    const account = await prisma.account.findFirst({
+      where: { id: transaction.accountId, userId },
+      select: { id: true, isConnected: true, balance: true },
+    });
+    if (account && !account.isConnected) {
+      const reversedBalance = transaction.type === 'INCOME'
+        ? Number(account.balance) - Number(transaction.amount)
+        : Number(account.balance) + Number(transaction.amount);
+
+      ops.push(prisma.account.update({
+        where: { id: transaction.accountId },
+        data: { balance: reversedBalance },
+        select: { id: true },
+      }));
+    }
+
+    ops.push(prisma.transaction.updateMany({ where: { id, userId }, data: { deletedAt: new Date() } }));
+    await prisma.$transaction(ops);
 
     await logActivity({
       action: "DELETE",

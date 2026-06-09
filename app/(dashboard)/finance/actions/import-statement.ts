@@ -16,56 +16,67 @@ export async function importTransactions(accountId: string, items: ParsedTransac
 
     const userId = await requireUserId();
 
-    const result = await prisma.$transaction(async (tx) => {
-      const account = await tx.account.findFirst({ where: { id: accountId, userId } });
-      if (!account) throw new Error("Conta não encontrada.");
-
-      let imported = 0;
-      let skipped = 0;
-      let balanceDelta = 0;
-
-      for (const item of items) {
-        const amount = Math.abs(Number(item.amount));
-        if (!amount || isNaN(amount)) { skipped++; continue; }
-        const type = item.type === "INCOME" ? "INCOME" : "EXPENSE";
-
-        const date = new Date(`${item.date}T12:00:00`);
-        if (isNaN(date.getTime())) { skipped++; continue; }
-
-        // Dedupe: mesmo dia + valor + descrição na mesma conta.
-        const dayStart = new Date(date); dayStart.setHours(0, 0, 0, 0);
-        const dayEnd = new Date(date); dayEnd.setHours(23, 59, 59, 999);
-        const exists = await tx.transaction.findFirst({
-          where: {
-            accountId, userId, amount, type,
-            description: item.description,
-            date: { gte: dayStart, lte: dayEnd },
-          },
-          select: { id: true },
-        });
-        if (exists) { skipped++; continue; }
-
-        await tx.transaction.create({
-          data: {
-            accountId, userId, amount, type, date,
-            description: item.description || "Lançamento importado",
-            category: "Importado",
-          },
-        });
-        balanceDelta += type === "INCOME" ? amount : -amount;
-        imported++;
-      }
-
-      // Atualiza saldo só em contas manuais (Pluggy sincroniza sozinho).
-      if (imported > 0 && !account.isConnected) {
-        await tx.account.update({
-          where: { id: accountId },
-          data: { balance: Number(account.balance) + balanceDelta },
-        });
-      }
-
-      return { imported, skipped };
+    // ⚠️ Modo réplica: leituras/dedupe FORA da $transaction interativa (na transação
+    // iriam ao primário, onde datas INTEGER estouram a conversão do Prisma) e
+    // escritas em lote atômico com select: { id: true }.
+    const account = await prisma.account.findFirst({
+      where: { id: accountId, userId },
+      select: { id: true, isConnected: true, balance: true },
     });
+    if (!account) throw new Error("Conta não encontrada.");
+
+    let imported = 0;
+    let skipped = 0;
+    let balanceDelta = 0;
+    const ops = [];
+    const seenInFile = new Set<string>(); // dedupe entre linhas do PRÓPRIO arquivo
+
+    for (const item of items) {
+      const amount = Math.abs(Number(item.amount));
+      if (!amount || isNaN(amount)) { skipped++; continue; }
+      const type = item.type === "INCOME" ? "INCOME" : "EXPENSE";
+
+      const date = new Date(`${item.date}T12:00:00`);
+      if (isNaN(date.getTime())) { skipped++; continue; }
+
+      // Dedupe: mesmo dia + valor + descrição na mesma conta.
+      const dayStart = new Date(date); dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(date); dayEnd.setHours(23, 59, 59, 999);
+      const fileKey = `${item.date}|${type}|${amount}|${item.description}`;
+      const exists = seenInFile.has(fileKey) || await prisma.transaction.findFirst({
+        where: {
+          accountId, userId, amount, type,
+          description: item.description,
+          date: { gte: dayStart, lte: dayEnd },
+        },
+        select: { id: true },
+      });
+      if (exists) { skipped++; continue; }
+      seenInFile.add(fileKey);
+
+      ops.push(prisma.transaction.create({
+        data: {
+          accountId, userId, amount, type, date,
+          description: item.description || "Lançamento importado",
+          category: "Importado",
+        },
+        select: { id: true },
+      }));
+      balanceDelta += type === "INCOME" ? amount : -amount;
+      imported++;
+    }
+
+    // Atualiza saldo só em contas manuais (Pluggy sincroniza sozinho).
+    if (imported > 0 && !account.isConnected) {
+      ops.push(prisma.account.update({
+        where: { id: accountId },
+        data: { balance: Number(account.balance) + balanceDelta },
+        select: { id: true },
+      }));
+    }
+    if (ops.length > 0) await prisma.$transaction(ops);
+
+    const result = { imported, skipped };
 
     if (result.imported > 0) {
       await logActivity({

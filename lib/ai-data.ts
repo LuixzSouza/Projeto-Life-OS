@@ -5,6 +5,7 @@
 // custo de token não cresce com o volume de dados ("pronto pra vida").
 //
 // Módulo server-only: importado só por actions/tools.ts (nunca por client).
+import { randomUUID } from "crypto";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { encrypt } from "@/lib/crypto";
@@ -346,14 +347,15 @@ async function deleteRecord(userId: string, module: AIModule, id: string): Promi
     case "FINANCE": {
       // Apaga o lançamento e reverte o saldo da conta de forma ATÔMICA: ou os dois
       // passos acontecem, ou nenhum (evita saldo inconsistente se falhar no meio).
-      await prisma.$transaction(async (txc) => {
-        const t = await txc.transaction.findFirst({ where: { id, userId }, select: { amount: true, type: true, accountId: true } });
-        await txc.transaction.deleteMany({ where: { id, userId } });
-        if (t) {
-          const delta = t.type === "INCOME" ? -Number(t.amount) : Number(t.amount);
-          await txc.account.updateMany({ where: { id: t.accountId, userId }, data: { balance: { increment: delta } } });
-        }
-      });
+      // ⚠️ Modo réplica: leitura FORA da $transaction (na transação iria ao primário,
+      // onde datas INTEGER estouram a conversão); escritas em lote.
+      const t = await prisma.transaction.findFirst({ where: { id, userId }, select: { amount: true, type: true, accountId: true } });
+      if (!t) return;
+      const delta = t.type === "INCOME" ? -Number(t.amount) : Number(t.amount);
+      await prisma.$transaction([
+        prisma.transaction.deleteMany({ where: { id, userId } }),
+        prisma.account.updateMany({ where: { id: t.accountId, userId }, data: { balance: { increment: delta } } }),
+      ]);
       return;
     }
     case "TASKS": await prisma.task.deleteMany({ where: { id, userId } }); return;
@@ -386,13 +388,17 @@ async function handleCreate(userId: string, args: ToolArgs): Promise<MutationRes
       if (!account) return { ok: false, summary: "Nenhuma conta cadastrada. Crie uma conta antes de lançar." };
       const type = category === "INCOME" ? "INCOME" : "EXPENSE";
       const delta = type === "INCOME" ? value : -value;
-      // Cria o lançamento e aplica o saldo de forma ATÔMICA (transação).
-      const tx = await prisma.$transaction(async (txc) => {
-        const created = await txc.transaction.create({ data: { description: title, amount: value, type, category: description ?? "Geral", date: due ?? new Date(), accountId: account.id, userId } });
-        await txc.account.updateMany({ where: { id: account.id, userId }, data: { balance: { increment: delta } } });
-        return created;
-      });
-      return { ok: true, id: tx.id, summary: `Lançado ${type} de ${value} (id ${tx.id}).` };
+      // Cria o lançamento e aplica o saldo de forma ATÔMICA (lote — sem transação
+      // interativa, que no modo réplica leria datas INTEGER do primário).
+      const txId = randomUUID();
+      await prisma.$transaction([
+        prisma.transaction.create({
+          data: { id: txId, description: title, amount: value, type, category: description ?? "Geral", date: due ?? new Date(), accountId: account.id, userId },
+          select: { id: true },
+        }),
+        prisma.account.updateMany({ where: { id: account.id, userId }, data: { balance: { increment: delta } } }),
+      ]);
+      return { ok: true, id: txId, summary: `Lançado ${type} de ${value} (id ${txId}).` };
     }
     case "HEALTH": {
       if (category === "WEIGHT" && value != null) {

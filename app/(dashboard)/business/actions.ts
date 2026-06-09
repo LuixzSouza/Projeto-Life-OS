@@ -1,10 +1,18 @@
 'use server'
 
+import { randomUUID } from "crypto"
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { requireUserId } from "@/lib/auth"
 import { logActivity } from "@/lib/activity"
 import { notify } from "@/lib/notifications"
+
+// ⚠️ REGRA DESTE MÓDULO (modo réplica/Turso): NÃO ler colunas DateTime dentro de
+// $transaction interativa. Em réplica, leituras dentro da transação vão ao
+// PRIMÁRIO (Turso/hrana), onde datas gravadas como INTEGER (ms) estouram a
+// conversão do Prisma ("Could not convert value ... to type DateTime").
+// Padrão seguro: ler ANTES com prisma normal (réplica local lê inteiro numa boa)
+// e escrever em lote via prisma.$transaction([...]) com select: { id: true }.
 
 // Lê um campo do FormData, normaliza vazio para null.
 function field(formData: FormData, key: string): string | null {
@@ -261,31 +269,42 @@ export async function receiveInvoicePayment(formData: FormData) {
 
     const userId = await requireUserId()
 
-    let receipt: { title: string; value: number; client: string } | null = null
+    // Leituras FORA da transação (ver regra no topo do módulo) — só campos sem data.
+    const invoice = await prisma.invoice.findFirst({
+      where: { id: invoiceId, userId },
+      select: {
+        id: true, title: true, value: true, status: true, transactionId: true,
+        billing: { select: { client: { select: { name: true } } } },
+      },
+    })
+    if (!invoice) return { success: false, message: "Fatura não encontrada." }
+    // Idempotência: já recebida se tem transação vinculada OU já está PAID (contas
+    // conectadas marcam PAID sem transação — ver abaixo).
+    if (invoice.transactionId || invoice.status === "PAID") {
+      return { success: false, message: "Esta fatura já foi recebida." }
+    }
 
-    await prisma.$transaction(async (tx) => {
-      const invoice = await tx.invoice.findFirst({
-        where: { id: invoiceId, userId },
-        include: { billing: { include: { client: { select: { name: true } } } } },
-      })
-      if (!invoice) throw new Error("Fatura não encontrada.")
-      // Idempotência: já recebida se tem transação vinculada OU já está PAID (contas
-      // conectadas marcam PAID sem transação — ver abaixo).
-      if (invoice.transactionId || invoice.status === "PAID") throw new Error("Esta fatura já foi recebida.")
+    const account = await prisma.account.findFirst({
+      where: { id: accountId, userId },
+      select: { id: true, isConnected: true, balance: true },
+    })
+    if (!account) return { success: false, message: "Conta não encontrada." }
 
-      const account = await tx.account.findFirst({ where: { id: accountId, userId } })
-      if (!account) throw new Error("Conta não encontrada.")
+    const value = Number(invoice.value)
+    const clientName = invoice.billing.client?.name || "Cliente"
 
-      const value = Number(invoice.value)
-      const clientName = invoice.billing.client?.name || "Cliente"
-
-      // Conta CONECTADA (Pluggy): NÃO criamos a transação manual — o Pluggy importa a
-      // entrada real do banco e duplicaria o lançamento (a descrição difere, então o
-      // dedup do sync não a reconhece). Em conta comum, lançamos a receita e somamos o saldo.
-      let transactionId: string | null = null
-      if (!account.isConnected) {
-        const transaction = await tx.transaction.create({
+    // Conta CONECTADA (Pluggy): NÃO criamos a transação manual — o Pluggy importa a
+    // entrada real do banco e duplicaria o lançamento (a descrição difere, então o
+    // dedup do sync não a reconhece). Em conta comum, lançamos a receita e somamos o saldo.
+    // Escritas em LOTE atômico; id da transação gerado aqui p/ vincular na fatura.
+    const ops = []
+    let transactionId: string | null = null
+    if (!account.isConnected) {
+      transactionId = randomUUID()
+      ops.push(
+        prisma.transaction.create({
           data: {
+            id: transactionId,
             description: `${clientName} — ${invoice.title}`,
             amount: value,
             type: "INCOME",
@@ -294,24 +313,27 @@ export async function receiveInvoicePayment(formData: FormData) {
             date: new Date(),
             userId,
           },
-        })
-        transactionId = transaction.id
-        await tx.account.update({
+          select: { id: true },
+        }),
+        prisma.account.update({
           where: { id: account.id },
           data: { balance: Number(account.balance) + value },
-        })
-      }
-
-      await tx.invoice.updateMany({
+          select: { id: true },
+        }),
+      )
+    }
+    ops.push(
+      prisma.invoice.updateMany({
         where: { id: invoiceId, userId },
         data: { status: "PAID", paidAt: new Date(), transactionId },
-      })
+      }),
+    )
+    await prisma.$transaction(ops)
 
-      receipt = { title: invoice.title, value, client: clientName }
-    })
+    const receipt = { title: invoice.title, value, client: clientName }
 
     if (receipt) {
-      const r = receipt as { title: string; value: number; client: string }
+      const r = receipt
       await logActivity({
         action: "INCOME",
         module: "business",
@@ -356,69 +378,88 @@ export async function updateInvoice(formData: FormData) {
 
     const userId = await requireUserId()
 
-    let billingId = ""
+    // Leitura FORA da transação (regra do topo): só campos sem data. O paidAt
+    // antigo nem é lido — se a fatura continua paga, simplesmente não tocamos nele.
+    const existingInvoice = await prisma.invoice.findFirst({
+      where: { id, userId },
+      select: { id: true, status: true, transactionId: true, billingId: true },
+    })
+    if (!existingInvoice) return { success: false, message: "Fatura não encontrada." }
+    const billingId = existingInvoice.billingId
 
-    await prisma.$transaction(async (tx) => {
-      // 🟢 Busca a fatura original (escopada) para não sobrescrever o dia que o cara pagou
-      const existingInvoice = await tx.invoice.findFirst({ where: { id, userId } })
-      if (!existingInvoice) throw new Error("Fatura não encontrada.")
-      billingId = existingInvoice.billingId
+    // 🟢 Sem "any": tipo exato dos campos atualizados
+    const dataToUpdate: {
+      title: string;
+      value: number;
+      dueDate: Date;
+      status: string;
+      paidAt?: Date | null;
+      transactionId?: string | null;
+    } = { title, value, dueDate, status }
 
-      // 🟢 Sem "any": tipo exato dos campos atualizados
-      const dataToUpdate: {
-        title: string;
-        value: number;
-        dueDate: Date;
-        status: string;
-        paidAt?: Date | null;
-        transactionId?: string | null;
-      } = { title, value, dueDate, status }
+    if (status === "PAID") {
+      // Se já estava paga, NÃO toca no paidAt (mantém a data original); senão, hoje.
+      if (existingInvoice.status !== "PAID") dataToUpdate.paidAt = new Date()
+    } else {
+      dataToUpdate.paidAt = null
+    }
 
-      if (status === "PAID") {
-        // Se já estava paga, mantém a data antiga; senão, usa hoje.
-        dataToUpdate.paidAt = existingInvoice.status === "PAID" ? existingInvoice.paidAt : new Date()
-      } else {
-        dataToUpdate.paidAt = null
-      }
+    // --- Sincronização do lançamento financeiro vinculado (escritas em lote) ---
+    const ops = []
+    if (existingInvoice.transactionId) {
+      const linkedTx = await prisma.transaction.findFirst({
+        where: { id: existingInvoice.transactionId, userId },
+        select: { id: true, amount: true, accountId: true },
+      })
 
-      // --- Sincronização do lançamento financeiro vinculado ---
-      if (existingInvoice.transactionId) {
-        const linkedTx = await tx.transaction.findFirst({ where: { id: existingInvoice.transactionId, userId } })
-
-        if (status !== "PAID") {
-          // Estorno: remove a receita e reverte o saldo da conta.
-          if (linkedTx) {
-            const account = await tx.account.findFirst({ where: { id: linkedTx.accountId, userId } })
-            if (account && !account.isConnected) {
-              await tx.account.update({
-                where: { id: account.id },
-                data: { balance: Number(account.balance) - Number(linkedTx.amount) },
-              })
-            }
-            await tx.transaction.delete({ where: { id: linkedTx.id } })
-          }
-          dataToUpdate.transactionId = null
-        } else if (linkedTx && Number(linkedTx.amount) !== value) {
-          // Continua paga, mas o valor mudou: ajusta a transação e o saldo pela diferença.
-          const delta = value - Number(linkedTx.amount)
-          const account = await tx.account.findFirst({ where: { id: linkedTx.accountId, userId } })
+      if (status !== "PAID") {
+        // Estorno: remove a receita e reverte o saldo da conta.
+        if (linkedTx) {
+          const account = await prisma.account.findFirst({
+            where: { id: linkedTx.accountId, userId },
+            select: { id: true, isConnected: true, balance: true },
+          })
           if (account && !account.isConnected) {
-            await tx.account.update({
+            ops.push(prisma.account.update({
               where: { id: account.id },
-              data: { balance: Number(account.balance) + delta },
-            })
+              data: { balance: Number(account.balance) - Number(linkedTx.amount) },
+              select: { id: true },
+            }))
           }
-          await tx.transaction.update({ where: { id: linkedTx.id }, data: { amount: value } })
+          ops.push(prisma.transaction.delete({ where: { id: linkedTx.id }, select: { id: true } }))
         }
+        dataToUpdate.transactionId = null
+      } else if (linkedTx && Number(linkedTx.amount) !== value) {
+        // Continua paga, mas o valor mudou: ajusta a transação e o saldo pela diferença.
+        const delta = value - Number(linkedTx.amount)
+        const account = await prisma.account.findFirst({
+          where: { id: linkedTx.accountId, userId },
+          select: { id: true, isConnected: true, balance: true },
+        })
+        if (account && !account.isConnected) {
+          ops.push(prisma.account.update({
+            where: { id: account.id },
+            data: { balance: Number(account.balance) + delta },
+            select: { id: true },
+          }))
+        }
+        ops.push(prisma.transaction.update({ where: { id: linkedTx.id }, data: { amount: value }, select: { id: true } }))
       }
+    }
 
-      // Atualiza a fatura (escopada ao usuário)
-      await tx.invoice.updateMany({ where: { id, userId }, data: dataToUpdate })
+    // Atualiza a fatura (escopada ao usuário) no mesmo lote atômico.
+    ops.push(prisma.invoice.updateMany({ where: { id, userId }, data: dataToUpdate }))
+    await prisma.$transaction(ops)
 
-      // Sincroniza o total do contrato pai
-      const allInvoices = await tx.invoice.findMany({ where: { billingId, userId }, select: { value: true } })
-      const newTotalValue = allInvoices.reduce((sum, inv) => sum + Number(inv.value), 0)
-      await tx.billing.updateMany({ where: { id: billingId, userId }, data: { totalValue: newTotalValue } })
+    // Sincroniza o total do contrato pai (canceladas não contam).
+    const allInvoices = await prisma.invoice.findMany({
+      where: { billingId, userId, status: { not: "CANCELED" } },
+      select: { value: true },
+    })
+    const newTotalValue = allInvoices.reduce((sum, inv) => sum + Number(inv.value), 0)
+    await prisma.billing.updateMany({
+      where: { id: billingId, userId },
+      data: { totalValue: newTotalValue, installments: allInvoices.length },
     })
 
     revalidatePath("/business")
@@ -445,57 +486,69 @@ export async function deleteInvoice(invoiceId: string) {
 
     let canceledInstead = false
 
-    await prisma.$transaction(async (tx) => {
-      const invoice = await tx.invoice.findFirst({ where: { id: invoiceId, userId } })
-      if (!invoice) throw new Error("Fatura não encontrada.")
+    // Leituras FORA da transação (ver regra no topo do módulo).
+    const invoice = await prisma.invoice.findFirst({
+      where: { id: invoiceId, userId },
+      select: { id: true, billingId: true, transactionId: true, dueDate: true },
+    })
+    if (!invoice) return { success: false, message: "Fatura não encontrada." }
 
-      // Estorno do lançamento financeiro vinculado (mesma lógica do updateInvoice).
-      if (invoice.transactionId) {
-        const linkedTx = await tx.transaction.findFirst({ where: { id: invoice.transactionId, userId } })
-        if (linkedTx) {
-          const account = await tx.account.findFirst({ where: { id: linkedTx.accountId, userId } })
-          if (account && !account.isConnected) {
-            await tx.account.update({
-              where: { id: account.id },
-              data: { balance: Number(account.balance) - Number(linkedTx.amount) },
-            })
-          }
-          await tx.transaction.delete({ where: { id: linkedTx.id } })
-        }
-      }
+    const ops = []
 
-      // A sync rematerializa ocorrências do MÊS ATUAL de cobranças recorrentes
-      // ativas deste contrato. Se for o caso, cancela (lápide) em vez de apagar.
-      const now = new Date()
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
-      const activeCharge = invoice.dueDate >= monthStart && invoice.dueDate <= monthEnd
-        ? await tx.recurringCharge.findFirst({
-            where: { userId, billingId: invoice.billingId, active: true },
-            select: { id: true },
-          })
-        : null
-
-      if (activeCharge) {
-        canceledInstead = true
-        await tx.invoice.updateMany({
-          where: { id: invoiceId, userId },
-          data: { status: "CANCELED", paidAt: null, transactionId: null },
+    // Estorno do lançamento financeiro vinculado (mesma lógica do updateInvoice).
+    if (invoice.transactionId) {
+      const linkedTx = await prisma.transaction.findFirst({
+        where: { id: invoice.transactionId, userId },
+        select: { id: true, amount: true, accountId: true },
+      })
+      if (linkedTx) {
+        const account = await prisma.account.findFirst({
+          where: { id: linkedTx.accountId, userId },
+          select: { id: true, isConnected: true, balance: true },
         })
-      } else {
-        await tx.invoice.deleteMany({ where: { id: invoiceId, userId } })
+        if (account && !account.isConnected) {
+          ops.push(prisma.account.update({
+            where: { id: account.id },
+            data: { balance: Number(account.balance) - Number(linkedTx.amount) },
+            select: { id: true },
+          }))
+        }
+        ops.push(prisma.transaction.delete({ where: { id: linkedTx.id }, select: { id: true } }))
       }
+    }
 
-      // Sincroniza o contrato pai (total/parcelas = somente faturas não canceladas).
-      const remaining = await tx.invoice.findMany({
-        where: { billingId: invoice.billingId, userId, status: { not: "CANCELED" } },
-        select: { value: true },
-      })
-      const newTotalValue = remaining.reduce((sum, inv) => sum + Number(inv.value), 0)
-      await tx.billing.updateMany({
-        where: { id: invoice.billingId, userId },
-        data: { totalValue: newTotalValue, installments: remaining.length },
-      })
+    // A sync rematerializa ocorrências do MÊS ATUAL de cobranças recorrentes
+    // ativas deste contrato. Se for o caso, cancela (lápide) em vez de apagar.
+    const now = new Date()
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
+    const activeCharge = invoice.dueDate >= monthStart && invoice.dueDate <= monthEnd
+      ? await prisma.recurringCharge.findFirst({
+          where: { userId, billingId: invoice.billingId, active: true },
+          select: { id: true },
+        })
+      : null
+
+    if (activeCharge) {
+      canceledInstead = true
+      ops.push(prisma.invoice.updateMany({
+        where: { id: invoiceId, userId },
+        data: { status: "CANCELED", paidAt: null, transactionId: null },
+      }))
+    } else {
+      ops.push(prisma.invoice.deleteMany({ where: { id: invoiceId, userId } }))
+    }
+    await prisma.$transaction(ops)
+
+    // Sincroniza o contrato pai (total/parcelas = somente faturas não canceladas).
+    const remaining = await prisma.invoice.findMany({
+      where: { billingId: invoice.billingId, userId, status: { not: "CANCELED" } },
+      select: { value: true },
+    })
+    const newTotalValue = remaining.reduce((sum, inv) => sum + Number(inv.value), 0)
+    await prisma.billing.updateMany({
+      where: { id: invoice.billingId, userId },
+      data: { totalValue: newTotalValue, installments: remaining.length },
     })
 
     revalidatePath("/business", "layout") // inclui a página de detalhe /business/[id]
@@ -530,18 +583,22 @@ export async function addInvoice(formData: FormData) {
     // Meio-dia UTC: evita o bug do "dia anterior" por fuso.
     const dueDate = new Date(`${dueDateStr.split("T")[0]}T12:00:00Z`)
 
-    await prisma.$transaction(async (tx) => {
-      await tx.invoice.create({
-        data: { billingId, title, value, dueDate, status: "PENDING", userId },
-      })
-      const all = await tx.invoice.findMany({ where: { billingId, userId }, select: { value: true } })
-      await tx.billing.updateMany({
-        where: { id: billingId, userId },
-        data: {
-          totalValue: all.reduce((sum, inv) => sum + Number(inv.value), 0),
-          installments: all.length,
-        },
-      })
+    // Sem transação interativa (ver regra no topo do módulo): cria a parcela e
+    // depois resincroniza o contrato pai (canceladas não contam).
+    await prisma.invoice.create({
+      data: { billingId, title, value, dueDate, status: "PENDING", userId },
+      select: { id: true },
+    })
+    const all = await prisma.invoice.findMany({
+      where: { billingId, userId, status: { not: "CANCELED" } },
+      select: { value: true },
+    })
+    await prisma.billing.updateMany({
+      where: { id: billingId, userId },
+      data: {
+        totalValue: all.reduce((sum, inv) => sum + Number(inv.value), 0),
+        installments: all.length,
+      },
     })
 
     revalidatePath("/business", "layout") // inclui a página de detalhe /business/[id]
