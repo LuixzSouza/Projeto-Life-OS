@@ -612,7 +612,9 @@ export function DeleteAlert({ target, onClose, onConfirm }: DeleteAlertProps) {
     <AlertDialog open={!!target} onOpenChange={onClose}>
       <AlertDialogContent
         className={cn(
-          "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%]",
+          // z-[110]: SEMPRE acima do overlay (z-[100]) — z-50 deixava o vidro
+          // desfocado NA FRENTE da caixa de confirmação (modal "fantasma").
+          "fixed left-[50%] top-[50%] z-[110] grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%]",
           "rounded-[2rem] border border-destructive/20 bg-background p-8 shadow-2xl duration-200",
           "animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
         )}
