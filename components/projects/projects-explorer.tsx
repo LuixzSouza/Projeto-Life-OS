@@ -1,14 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Search, Inbox, Sparkles, LayoutGrid, ArrowDownUp } from "lucide-react";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Search, Inbox, Sparkles, LayoutGrid, ArrowDownUp, Tag } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ProjectCard } from "./project-card";
 import { NewProjectDialog } from "./new-project-dialog";
+import { setProjectPara } from "@/app/(dashboard)/projects/actions";
+import { PARA_TYPES, PARA_META, type ParaType } from "@/lib/para";
 
 export interface ProjectItem {
   id: string;
@@ -17,12 +23,14 @@ export interface ProjectItem {
   description: string | null;
   status: string;
   color: string | null;
+  paraType: string | null;
   updatedAt: string;
   totalTasks: number;
   completedTasks: number;
 }
 
 type FilterKey = "all" | "active" | "done";
+type ParaFilter = "all" | ParaType | "none";
 type SortKey = "recent" | "name" | "progress" | "pending";
 
 const FILTERS: { key: FilterKey; label: string }[] = [
@@ -36,6 +44,7 @@ const progressOf = (p: ProjectItem) => (p.totalTasks === 0 ? 0 : Math.round((p.c
 export function ProjectsExplorer({ projects, inbox }: { projects: ProjectItem[]; inbox: { total: number; completed: number } }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
+  const [paraFilter, setParaFilter] = useState<ParaFilter>("all");
   const [sort, setSort] = useState<SortKey>("recent");
 
   const visible = useMemo(() => {
@@ -45,7 +54,9 @@ export function ProjectsExplorer({ projects, inbox }: { projects: ProjectItem[];
       const prog = progressOf(p);
       const matchesFilter =
         filter === "all" ? true : filter === "done" ? prog === 100 && p.totalTasks > 0 : !(prog === 100 && p.totalTasks > 0);
-      return matchesSearch && matchesFilter;
+      const matchesPara =
+        paraFilter === "all" ? true : paraFilter === "none" ? !p.paraType : p.paraType === paraFilter;
+      return matchesSearch && matchesFilter && matchesPara;
     });
 
     list = [...list].sort((a, b) => {
@@ -57,7 +68,7 @@ export function ProjectsExplorer({ projects, inbox }: { projects: ProjectItem[];
       }
     });
     return list;
-  }, [projects, search, filter, sort]);
+  }, [projects, search, filter, paraFilter, sort]);
 
   return (
     <div className="space-y-8">
@@ -116,6 +127,21 @@ export function ProjectsExplorer({ projects, inbox }: { projects: ProjectItem[];
               ))}
             </div>
 
+            {/* Filtro PARA (#10) */}
+            <Select value={paraFilter} onValueChange={(v) => setParaFilter(v as ParaFilter)}>
+              <SelectTrigger className="h-10 w-[140px] rounded-xl bg-muted/40 border-border/40 shrink-0 gap-2">
+                <Tag className="h-3.5 w-3.5 text-muted-foreground" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="all">PARA: todos</SelectItem>
+                {PARA_TYPES.map((key) => (
+                  <SelectItem key={key} value={key}>{PARA_META[key].label}</SelectItem>
+                ))}
+                <SelectItem value="none">Sem classificação</SelectItem>
+              </SelectContent>
+            </Select>
+
             {/* Ordenação */}
             <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
               <SelectTrigger className="h-10 w-[150px] rounded-xl bg-muted/40 border-border/40 shrink-0 gap-2">
@@ -155,22 +181,73 @@ export function ProjectsExplorer({ projects, inbox }: { projects: ProjectItem[];
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 items-stretch">
             {visible.map((project) => (
-              <ProjectCard
-                key={project.id}
-                id={project.id}
-                slug={project.slug}
-                title={project.title}
-                description={project.description}
-                status={project.status}
-                color={project.color || undefined}
-                totalTasks={project.totalTasks}
-                completedTasks={project.completedTasks}
-                updatedAt={project.updatedAt}
-              />
+              <div key={project.id} className="relative">
+                <ProjectCard
+                  id={project.id}
+                  slug={project.slug}
+                  title={project.title}
+                  description={project.description}
+                  status={project.status}
+                  color={project.color || undefined}
+                  totalTasks={project.totalTasks}
+                  completedTasks={project.completedTasks}
+                  updatedAt={project.updatedAt}
+                />
+                <ParaBadge projectId={project.id} paraType={project.paraType} />
+              </div>
             ))}
           </div>
         )}
       </section>
     </div>
+  );
+}
+
+// Badge PARA no canto do card: mostra a gaveta atual e troca em 1 clique,
+// sem entrar no projeto. Fica FORA do <Link> do card (overlay), então não
+// precisa de stopPropagation.
+function ParaBadge({ projectId, paraType }: { projectId: string; paraType: string | null }) {
+  const router = useRouter();
+  const [isPending, start] = useTransition();
+  const meta = paraType ? PARA_META[paraType as ParaType] : null;
+
+  const choose = (next: ParaType | null) => {
+    start(async () => {
+      await setProjectPara(projectId, next);
+      router.refresh();
+    });
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          title={meta ? `PARA: ${meta.label} — clique para trocar` : "Classificar no PARA"}
+          className={cn(
+            "absolute right-3 top-3 z-10 rounded-md px-2 py-0.5 text-[9px] font-black uppercase tracking-widest shadow-sm transition-all hover:scale-105",
+            meta ? meta.badgeClass : "bg-muted/80 text-muted-foreground/70 hover:text-foreground",
+            isPending && "pointer-events-none opacity-50",
+          )}
+        >
+          {meta ? meta.label : "PARA?"}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-44 rounded-xl">
+        {PARA_TYPES.map((key) => (
+          <DropdownMenuItem key={key} onClick={() => choose(key)} className="gap-2 text-xs font-semibold">
+            <span className={cn("rounded px-1.5 py-0.5 text-[9px] font-black uppercase", PARA_META[key].badgeClass)}>
+              {PARA_META[key].label}
+            </span>
+            <span className="truncate text-[10px] text-muted-foreground">{PARA_META[key].hint}</span>
+          </DropdownMenuItem>
+        ))}
+        {paraType && (
+          <DropdownMenuItem onClick={() => choose(null)} className="text-xs text-muted-foreground">
+            Remover classificação
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

@@ -510,3 +510,106 @@ export async function getDailyInsight(presolvedUserId?: string): Promise<DailyIn
 
   return { windowDays: DRIVER_WINDOW_DAYS, loggedDays: activeDays.size, insight };
 }
+
+// ----------------------------------------------------------------------------
+// Correlation Dashboard (#8 completo) — todos os padrões + série diária.
+// Mesmo motor (collectDailySignals), apresentação ampla: a página de Saúde mostra
+// a série sobreposta (sono × treino × energia × foco) e TODOS os padrões fortes,
+// não só o nº 1 do card da Home.
+// ----------------------------------------------------------------------------
+
+export interface CorrelationDayPoint {
+  date: string; // ISO 00:00 local
+  label: string; // "dd/MM"
+  focusMin: number;
+  energy: number | null; // 1–5
+  sleepH: number | null;
+  trained: boolean;
+  habitsDone: number;
+}
+
+export interface CorrelationMatrix {
+  windowDays: number;
+  loggedDays: number;
+  sleepGoal: number;
+  days: CorrelationDayPoint[]; // mais antigo → hoje (apenas a janela)
+  insights: DailyInsight[]; // todos os padrões fortes, mais forte primeiro
+}
+
+export async function getCorrelationMatrix(): Promise<CorrelationMatrix> {
+  const userId = await getCurrentUserId();
+  const empty: CorrelationMatrix = { windowDays: DRIVER_WINDOW_DAYS, loggedDays: 0, sleepGoal: 7, days: [], insights: [] };
+  if (!userId) return empty;
+
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - (DRIVER_WINDOW_DAYS - 1));
+
+  const sig = await collectDailySignals(userId, start);
+
+  // Série diária completa da janela (inclui dias vazios — o gráfico mostra lacunas).
+  const days: CorrelationDayPoint[] = [];
+  for (let i = 0; i < DRIVER_WINDOW_DAYS; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const k = localDayKey(d);
+    days.push({
+      date: d.toISOString(),
+      label: `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`,
+      focusMin: sig.focusByDay.get(k) ?? 0,
+      energy: sig.energyByDay.get(k) ?? null,
+      sleepH: sig.sleepByDay.get(k) ?? null,
+      trained: sig.workoutDays.has(k),
+      habitsDone: sig.habitDoneByDay.get(k) ?? 0,
+    });
+  }
+
+  // Todos os padrões (alvos foco E energia) — mesma matemática do Insight do dia.
+  const { energyByDay, workoutDays, sleepByDay, habitDoneByDay, activeDays, sleepGoal } = sig;
+  const focusOf = (day: string) => sig.focusByDay.get(day) ?? 0;
+  const candidates: (DailyInsight | null)[] = [];
+
+  {
+    const hi: number[] = [], lo: number[] = [];
+    for (const [day, e] of energyByDay) { if (e >= 4) hi.push(focusOf(day)); else if (e <= 2) lo.push(focusOf(day)); }
+    candidates.push(compare("energy", "focus", "min", "dias de energia alta", "dias de energia baixa", hi, lo));
+
+    const wW: number[] = [], wO: number[] = [];
+    for (const day of activeDays) (workoutDays.has(day) ? wW : wO).push(focusOf(day));
+    candidates.push(compare("workout", "focus", "min", "dias com treino", "dias sem treino", wW, wO));
+
+    const sG: number[] = [], sP: number[] = [];
+    for (const [day, h] of sleepByDay) (h >= sleepGoal ? sG : sP).push(focusOf(day));
+    candidates.push(compare("sleep", "focus", "min", `dias bem dormidos (≥${sleepGoal}h)`, "dias de sono curto", sG, sP));
+
+    const hW: number[] = [], hO: number[] = [];
+    for (const day of activeDays) ((habitDoneByDay.get(day) ?? 0) > 0 ? hW : hO).push(focusOf(day));
+    candidates.push(compare("habits", "focus", "min", "dias com hábitos em dia", "dias sem hábitos", hW, hO));
+  }
+  {
+    const bucket = (predicate: (day: string) => boolean) => {
+      const yes: number[] = [], no: number[] = [];
+      for (const [day, e] of energyByDay) (predicate(day) ? yes : no).push(e);
+      return [yes, no] as const;
+    };
+    const [wYes, wNo] = bucket((day) => workoutDays.has(day));
+    candidates.push(compare("workout", "energy", "pts", "dias com treino", "dias sem treino", wYes, wNo));
+
+    const [hYes, hNo] = bucket((day) => (habitDoneByDay.get(day) ?? 0) > 0);
+    candidates.push(compare("habits", "energy", "pts", "dias com hábitos em dia", "dias sem hábitos", hYes, hNo));
+
+    const sYes: number[] = [], sNo: number[] = [];
+    for (const [day, e] of energyByDay) {
+      const h = sleepByDay.get(day);
+      if (h == null) continue;
+      (h >= sleepGoal ? sYes : sNo).push(e);
+    }
+    candidates.push(compare("sleep", "energy", "pts", `noites ≥ ${sleepGoal}h`, "noites curtas", sYes, sNo));
+  }
+
+  const insights = candidates
+    .filter((c): c is DailyInsight => c !== null)
+    .sort((a, b) => Math.abs(b.deltaPct) - Math.abs(a.deltaPct));
+
+  return { windowDays: DRIVER_WINDOW_DAYS, loggedDays: activeDays.size, sleepGoal, days, insights };
+}

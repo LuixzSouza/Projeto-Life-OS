@@ -17,6 +17,9 @@ import { DailyInsightCard } from "@/components/dashboard/daily-insight-card";
 import { DailyRegulatorCard } from "@/components/dashboard/daily-regulator-card";
 import { FrictionVectorCard } from "@/components/health/friction-vector-card";
 import { WeeklyResetCard } from "@/components/dashboard/weekly-reset-card";
+import { BlindSpotRadar } from "@/components/dashboard/blind-spot-radar";
+import { InertiaCostCard } from "@/components/dashboard/inertia-cost-card";
+import { DigitalRotCard } from "@/components/dashboard/digital-rot-card";
 
 // Componentes Server-side separados (seções)
 import { FinanceSection } from "./_components/finance-section";
@@ -68,6 +71,19 @@ export default async function DashboardPage() {
       <Suspense fallback={null}>
         <FrictionVectorCard />
       </Suspense>
+
+      {/* Custo Fantasma da Inércia (#20): o preço de não agir (treino/dinheiro parado). */}
+      <Suspense fallback={null}>
+        <InertiaCostCard />
+      </Suspense>
+
+      {/* Radar de Pontos Cegos (#23): áreas da vida sem registro nos últimos 14 dias. */}
+      <Suspense fallback={null}>
+        <BlindSpotRadar />
+      </Suspense>
+
+      {/* Digital Rot (#21): tarefas/notas apodrecendo + Limpeza Fantasma. */}
+      <DigitalRotCard />
 
       {/* Reset Semanal: resumo dos últimos 7 dias + direção da próxima. */}
       <Suspense fallback={null}>

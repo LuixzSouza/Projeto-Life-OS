@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import {
     Activity, Utensils, Droplets, Moon,
-    Dumbbell, Target
+    Dumbbell, Target, FlaskConical
 } from "lucide-react";
 
 // Componentes Core
@@ -18,6 +18,8 @@ import { getCurrentUserId } from "@/lib/auth";
 import { calculateAge } from "@/lib/body-math";
 import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
 import { ErrorState } from "@/components/ui/error-state";
+import { CorrelationDashboard } from "@/components/health/correlation-dashboard";
+import { getCorrelationMatrix } from "@/app/(dashboard)/agenda/focus-actions";
 
 // --- PROTOCOLOS DE TIPAGEM ESTREITA ---
 type Gender = "MALE" | "FEMALE";
@@ -31,13 +33,14 @@ export default async function HealthPage() {
 
         const userId = await getCurrentUserId();
 
-        const [workouts, lastBodySnapshot, lastWeightLegacy, waterMetrics, lastSleep, meals] = await Promise.all([
+        const [workouts, lastBodySnapshot, lastWeightLegacy, waterMetrics, lastSleep, meals, correlationMatrix] = await Promise.all([
             prisma.workout.findMany({ where: { userId }, orderBy: { date: 'desc' }, take: 10 }),
             prisma.bodyMeasurement.findFirst({ where: { userId }, orderBy: { date: 'desc' } }),
             prisma.healthMetric.findFirst({ where: { type: "WEIGHT", userId }, orderBy: { date: 'desc' } }),
             prisma.healthMetric.findMany({ where: { type: "WATER", date: { gte: today }, userId } }),
             prisma.healthMetric.findFirst({ where: { type: "SLEEP", userId }, orderBy: { date: 'desc' } }),
-            prisma.meal.findMany({ where: { date: { gte: today }, userId }, orderBy: { date: 'desc' } })
+            prisma.meal.findMany({ where: { date: { gte: today }, userId }, orderBy: { date: 'desc' } }),
+            getCorrelationMatrix(),
         ]);
 
         const weight = lastBodySnapshot?.weight || lastWeightLegacy?.value || 0;
@@ -112,6 +115,12 @@ export default async function HealthPage() {
                             </div>
                         </div>
 
+                    </section>
+
+                    {/* --- CORRELATION DASHBOARD (#8): sono × treino × energia × foco --- */}
+                    <section className="space-y-4">
+                        <SectionHeader icon={FlaskConical} title="Correlações — o que move você" />
+                        <CorrelationDashboard matrix={correlationMatrix} />
                     </section>
                 </PageContainer>
             </PageShell>

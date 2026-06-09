@@ -23,9 +23,10 @@ import {
     Check,
     FolderPlus
 } from "lucide-react";
-import { createProject } from "@/app/(dashboard)/projects/actions"; 
+import { createProject } from "@/app/(dashboard)/projects/actions";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { PARA_TYPES, PARA_META, type ParaType } from "@/lib/para";
 
 // Definição estrita do tipo para evitar 'any'
 interface ProjectColor {
@@ -48,10 +49,12 @@ export function NewProjectDialog() {
     const [open, setOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [selectedColor, setSelectedColor] = useState<ProjectColor>(PROJECT_COLORS[0]);
+    const [paraType, setParaType] = useState<ParaType | null>("PROJECT");
 
     async function handleSubmit(formData: FormData): Promise<void> {
         setIsLoading(true);
         formData.set("color", selectedColor.value);
+        if (paraType) formData.set("paraType", paraType);
 
         try {
             const result = await createProject(formData);
@@ -133,6 +136,34 @@ export function NewProjectDialog() {
                                 className="h-12 pl-11 bg-muted/20 border-border/50 rounded-xl font-medium focus-visible:ring-offset-0 focus-visible:ring-1 transition-all" 
                             />
                         </div>
+                    </div>
+
+                    {/* Taxonomia PARA (#10): em qual gaveta isso vive? */}
+                    <div className="space-y-2">
+                        <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">
+                            Método PARA
+                        </Label>
+                        <div className="grid grid-cols-4 gap-1.5">
+                            {PARA_TYPES.map((key) => (
+                                <button
+                                    key={key}
+                                    type="button"
+                                    onClick={() => setParaType(paraType === key ? null : key)}
+                                    title={PARA_META[key].hint}
+                                    className={cn(
+                                        "rounded-xl border px-2 py-2 text-[10px] font-black uppercase tracking-wider transition-all",
+                                        paraType === key
+                                            ? cn("border-transparent shadow-sm", PARA_META[key].badgeClass)
+                                            : "border-border/40 bg-muted/20 text-muted-foreground hover:bg-muted/50",
+                                    )}
+                                >
+                                    {PARA_META[key].label}
+                                </button>
+                            ))}
+                        </div>
+                        <p className="ml-1 text-[10px] text-muted-foreground">
+                            {paraType ? PARA_META[paraType].hint : "Sem classificação — dá pra definir depois."}
+                        </p>
                     </div>
 
                     {/* Color Picker Corrigido */}

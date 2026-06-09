@@ -16,7 +16,7 @@ export default async function ProjectsPage() {
       where: { userId, deletedAt: null },
       orderBy: { updatedAt: "desc" },
       select: {
-        id: true, slug: true, title: true, description: true, status: true, color: true, updatedAt: true,
+        id: true, slug: true, title: true, description: true, status: true, color: true, updatedAt: true, paraType: true,
         _count: { select: { tasks: { where: { deletedAt: null } } } },
         tasks: { where: { isDone: true, deletedAt: null }, select: { id: true } },
       },
@@ -33,6 +33,7 @@ export default async function ProjectsPage() {
     description: p.description,
     status: p.status,
     color: p.color,
+    paraType: p.paraType,
     updatedAt: p.updatedAt.toISOString(),
     totalTasks: p._count.tasks,
     completedTasks: p.tasks.length,

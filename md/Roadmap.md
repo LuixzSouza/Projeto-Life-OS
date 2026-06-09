@@ -1,4 +1,4 @@
-# 🗺️ Roadmap de Desenvolvimento — Life OS
+﻿# 🗺️ Roadmap de Desenvolvimento — Life OS
 
 > Plano de execução das ideias do [`SistemaIdeias.md`](./SistemaIdeias.md) (#1–#24).
 > Ordenado por **dependência e valor**: o que destrava mais e reaproveita o que já existe vem primeiro.
@@ -75,8 +75,8 @@
   *Módulo:* Finanças · `lib/budget-buckets.ts` + `budget-section.tsx` (classificação por heurística de categoria; custo fixo pago = Essencial)
 - [x] 🟢 **Contas recorrentes / automação** — cadastro de contas fixas com lembrete e marca "débito automático". **(#10 finanças)** ✅ *jun/2026*
   *Módulo:* Finanças · `RecurringExpense` (+pagamentos por ocorrência) + lembretes `BILL_DUE` no sino
-- [ ] 🔴 **Taxonomia PARA (leve)** — campo `paraType` (Projeto/Área/Recurso/Arquivo) **aditivo** nos modelos, com filtro/busca global. *Decisão estratégica: introduzir cedo, mas incremental.* **(#10)**
-  *Base p/:* #23
+- [x] 🔴 **Taxonomia PARA (leve)** — campo `paraType` (Projeto/Área/Recurso/Arquivo) **aditivo** nos modelos, com filtro/busca global. *Decisão estratégica: introduzir cedo, mas incremental.* **(#10)** ✅ *09/jun/2026*
+  *Base p/:* #23 · migration `20260609120000_para_taxonomy` (Project/Notebook/SavedLink) + `lib/para.ts` + UI em Projetos (seletor na criação, badge 1-clique no card, filtro na toolbar). *Estender a UI p/ Notas/Links é incremental.*
 - [x] 🟡 **Gamificação Espacial + Skill Trees (base)** — metas grandes viram "jornada" visual com etapas; hábitos-raiz que desbloqueiam multiplicadores. Evolui Desafios + Motor de Hábitos. **(#11, #22)** ✅ *base em 08/jun/2026*
   *Skill Trees entregue (hábitos que evoluem de nível — Saúde). A "jornada espacial" visual de metas grandes fica como evolução futura.*
 
@@ -88,8 +88,8 @@
 
 > Só faz sentido depois que as Fases 0–2 estão gerando dados.
 
-- [ ] 🔴 **Motor de Correlação** — "Correlation Dashboard" cruzando sono × treino (RIR/carga) × energia × diário; gera frases-insight automáticas. **(#8)** ⚙️ *núcleo entregue: "Insight do dia" (Home) + painel de drivers (Agenda→Foco) cruzando foco × energia. Falta o dashboard amplo com sono × treino.*
-  *Depende de:* #12, Saúde, diário
+- [x] 🔴 **Motor de Correlação** — "Correlation Dashboard" cruzando sono × treino (RIR/carga) × energia × diário; gera frases-insight automáticas. **(#8)** ✅ *09/jun/2026*
+  *Depende de:* #12, Saúde, diário · `getCorrelationMatrix` (focus-actions) + `correlation-dashboard.tsx` na Saúde: série diária sobreposta (sono × treino × energia × foco) + TODOS os padrões fortes; o "Insight do dia" (Home) segue como resumo nº 1
 - [x] 🟡 **Regulador Adaptativo de Carga** — energia 1–2 → encurta blocos (50→25min) + treino conservador; energia 5 → "Modo Deus" pro Hiperfoco. **(#13)** ✅ *jun/2026*
   *Módulo:* Home · `daily-regulator-card.tsx`
 - [x] 🟡 **Finanças Preditivas + Custo de Hesitação** — linha de tendência pela taxa de poupança → mês/ano da meta; gasto supérfluo mostra o "custo no Eu do Futuro". **(#16)** ✅ *09/jun/2026*
@@ -101,22 +101,25 @@
 
 **Entregável:** o sistema começa a te dizer verdades que você não veria sozinho.
 
+> ## 🎉 FASE 3 CONCLUÍDA *(09/jun/2026)* — correlações, regulador, preditivas, serendipidade e fricção no ar.
+
 ---
 
 ## 🤖 Fase 4 — Autonomia (co-piloto) *(o sistema age por você)*
 
 > Camada mais ambiciosa: depende de quase tudo acima. Vários itens usam **IA** (já temos o Cérebro Digital) e alguns exigem **integração externa**.
 
-- [ ] 🟡 **Custo Fantasma da Inércia** — contador no painel: treino pulado sem motivo biológico → atraso projetado; dinheiro parado → perda/hora pra inflação. **(#20)**
-  *Depende de:* #15, Investimentos
-- [ ] 🟡 **Digital Rot** — tarefas/notas não tocadas perdem opacidade e se autoarquivam (Limpeza Fantasma). **(#21)**
+- [x] 🟡 **Custo Fantasma da Inércia** — contador no painel: treino pulado sem motivo biológico → atraso projetado; dinheiro parado → perda/hora pra inflação. **(#20)** ✅ *09/jun/2026*
+  *Depende de:* #15, Investimentos · `inertia-cost-card.tsx` na Home: dias sem treino vs ritmo próprio (treinos "devidos") + saldo parado × inflação (perda/ano e /dia); some sem alerta
+- [x] 🟡 **Digital Rot** — tarefas/notas não tocadas perdem opacidade e se autoarquivam (Limpeza Fantasma). **(#21)** ✅ *09/jun/2026*
+  *Módulo:* Home · `digital-rot-actions.ts` + `digital-rot-card.tsx`: tarefa >45d / nota >90d sem toque desbota com a idade; reviver (zera relógio) ou arquivar (Lixeira, reversível) + botão "Limpeza Fantasma" (tudo de uma vez); pinada/favorita nunca apodrece
 - [ ] 🔴 **Advogado do Diabo (IA)** — ao tentar adiar meta/estourar balde, resgata seus argumentos passados pra confrontar a desculpa atual. **(#17)**
   *Depende de:* histórico de Notas/Metas + IA
 - [ ] 🔴 **Liquefação de Tarefas** — bloco vencido 2× → divide a tarefa em micro-passos automaticamente. **(#18)**
   *Depende de:* Time-Blocking + 2min
 - [ ] 🟡 **Orçamento de Carga Cognitiva** — "peso de decisão" por interação → Modo de Preservação (simplifica a UI quando você está exausto). **(#19)**
-- [ ] 🟡 **Radar de Pontos Cegos** — audita densidade de dados por PARA; alerta quando uma área (Descanso/Lazer) é negligenciada. **(#23)**
-  *Depende de:* #10 PARA
+- [x] 🟡 **Radar de Pontos Cegos** — audita densidade de dados por PARA; alerta quando uma área (Descanso/Lazer) é negligenciada. **(#23)** ✅ *09/jun/2026*
+  *Depende de:* #10 PARA · `blind-spot-radar.tsx` na Home: densidade de registros em 7 áreas de vida (Corpo/Descanso/Mente/Lazer/Social/Finanças/Projetos) nos últimos 14 dias; barra por área + alerta "ponto cego" nas zeradas
 - [ ] 🔴 **Balanço Dopaminérgico** — cataloga dopamina barata × conquistada; via integração **AppBlock/Screen Time** recalibra a agenda. **(#24)**
   *Risco:* integração externa (web não acessa Screen Time facilmente) → **deixar por último / como experimento**.
 
@@ -178,4 +181,13 @@ A ordem que dá mais resultado com menos esforço, reaproveitando o que acabamos
 - **09/jun/2026** — ✅ Fase 1 · **Limpeza Programada (#3)**: `seedCleaningRotation` + diálogo de rodízio (cômodos × dias, round-robin) criando blocos fixos na Rotina.
 - **09/jun/2026** — ✅ Fase 2 · **Orçamento 75/10/15 (#9)**: `lib/budget-buckets.ts` (classificação por heurística de categoria + origem fixa) + seção no dashboard de Finanças com baldes e estouro.
 - **09/jun/2026** — ✅ Fase 3 · **Finanças Preditivas (#16)**: projeção pela taxa de poupança (média/mês, 12 meses, mês/ano de cada meta da wishlist) no card "No ritmo atual".
+- **09/jun/2026** — ✅ Fase 2 · **Taxonomia PARA (#10)**: migration `20260609120000_para_taxonomy` (coluna `paraType` em Project/Notebook/SavedLink) + `lib/para.ts` + UI em Projetos (seletor no diálogo de criação, badge 1-clique no card, filtro PARA na toolbar). Baseline regenerado.
 - **09/jun/2026** — ✅ Fase 3 · **Serendipidade Ativa (#14)**: `lib/note-serendipity.ts` + card "Conexões esquecidas" no editor de notas (tags/assunto/vocabulário; ignora notas já linkadas).
+- **09/jun/2026** — ✅ Fase 3 · **Motor de Correlação completo (#8)**: `getCorrelationMatrix` em `focus-actions.ts` + `correlation-dashboard.tsx` na página de Saúde — série diária (sono × treino × energia × foco) + lista de todos os padrões fortes. **🎉 FASE 3 COMPLETA**.
+- **09/jun/2026** — ✅ Fase 4 · **Custo Fantasma da Inércia (#20)**: `inertia-cost-card.tsx` na Home — dias sem treino vs ritmo recente do próprio usuário (treinos "devidos") + dinheiro parado × inflação (perda/ano e /dia). Some quando não há alerta.
+- **09/jun/2026** — ✅ Fase 4 · **Radar de Pontos Cegos (#23)**: `blind-spot-radar.tsx` na Home — densidade de registros em 7 áreas de vida (14 dias) com barras e alerta de "ponto cego" nas áreas zeradas.
+- **09/jun/2026** — ✅ Fase 4 · **Digital Rot / Limpeza Fantasma (#21)**: `digital-rot-actions.ts` + `digital-rot-card.tsx` na Home — tarefa >45d / nota >90d sem toque desbota com a idade; reviver ou arquivar (Lixeira, reversível), botão "Limpeza Fantasma" arquiva tudo; pinada/favorita nunca apodrece.
+
+### 🔭 Próximos (o que resta no Roadmap)
+- Fase 2: Segundo Cérebro reforçado (#2) e Notas Atômicas + Mapas de Conteúdo (#9).
+- Fase 4: Advogado do Diabo (#17), Liquefação de Tarefas (#18), Carga Cognitiva (#19) e Balanço Dopaminérgico (#24 — experimento, depende de integração externa).

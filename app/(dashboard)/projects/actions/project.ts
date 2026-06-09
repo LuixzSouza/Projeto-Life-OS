@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireUserId } from "@/lib/auth";
 import { logActivity } from "@/lib/activity";
 import { getString, generateUniqueSlug } from "./helpers";
+import { asParaType, type ParaType } from "@/lib/para";
 
 // =========================================================
 // AÇÕES DE PROJETOS
@@ -32,6 +33,7 @@ export async function createProject(
         slug,
         description,
         color,
+        paraType: asParaType(getString(formData, "paraType")),
         userId,
       },
     });
@@ -69,6 +71,16 @@ export async function updateProject(formData: FormData) {
 
   revalidatePath("/projects");
   revalidatePath(`/projects/${slug}`);
+}
+
+/** Define (ou limpa) a classificação PARA de um projeto, direto da listagem. */
+export async function setProjectPara(projectId: string, paraType: ParaType | null) {
+  const userId = await requireUserId();
+  await prisma.project.updateMany({
+    where: { id: projectId, userId },
+    data: { paraType: asParaType(paraType) },
+  });
+  revalidatePath("/projects");
 }
 
 // Soft-delete: o projeto vai para a Lixeira (deletedAt) e some das listagens.

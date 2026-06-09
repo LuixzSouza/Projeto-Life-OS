@@ -306,6 +306,9 @@ model Notebook {
   isInbox Boolean @default(false)
   position Int    @default(0)
 
+  // Taxonomia PARA (#10): null = não classificado.
+  paraType String?
+
   notes StudyNote[]
 
   userId String?
@@ -670,6 +673,10 @@ model Project {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
   color       String?  @default("#6366f1")
+
+  // Taxonomia PARA (Fase 2 — #10), aditiva: PROJECT | AREA | RESOURCE | ARCHIVE.
+  // null = ainda não classificado (compatível com dados existentes).
+  paraType String?
 
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1366,6 +1373,9 @@ model SavedLink {
   imageUrl    String?
   category    String?
   isFavorite  Boolean @default(false)
+
+  // Taxonomia PARA (#10): null = não classificado.
+  paraType String?
 
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
