@@ -124,7 +124,9 @@ const DialogContent = React.forwardRef<
           DIALOG_SIZES[size],
           // Estrutura: cantos arredondados, borda, sombra e altura limitada com scroll interno
           "rounded-3xl border border-border/50 bg-background shadow-2xl",
-          "outline-none overflow-hidden",
+          // isolate: cria um stacking context próprio — impede que o conteúdo rolável
+          // "vaze" por cima dos cantos arredondados durante a animação de zoom.
+          "outline-none overflow-hidden isolate",
           "max-h-[90dvh]", // dvh respeita a barra dinâmica dos navegadores mobile
 
           /* Radix animations */

@@ -7,20 +7,42 @@ import {
   isSameMonth, isToday, addMonths, addDays, parseISO,
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, CalendarDays, LayoutList, ArrowLeft, CalendarRange } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, LayoutList, ArrowLeft, CalendarRange, Pencil, CalendarPlus, Trash2, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Dialog, DialogContent, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { deleteEvent } from "@/app/(dashboard)/agenda/actions";
 import { AgendaItemIcon } from "./agenda-item-icon";
+import { EventForm } from "./event-form";
+import { EventDeleteButton } from "./event-delete-button";
 import { CATEGORY_META, SOURCE_ORDER, type AgendaItem, type AgendaSource } from "./agenda-shared";
 import { type ThemedDayData } from "@/app/(dashboard)/agenda/themed-days-actions";
+
+/** Evento completo (serializado) para editar/excluir direto do calendário. */
+export interface EditableAgendaEvent {
+  id: string;
+  title: string;
+  description: string | null;
+  startTime: string; // ISO
+  endTime: string | null; // ISO
+  location: string | null;
+  color: string | null;
+}
 
 const dayKey = (d: Date) => format(d, "yyyy-MM-dd");
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
 export type ThemeByWeekday = Record<number, ThemedDayData | undefined>;
 
-export function UnifiedAgenda({ items, selectedDateISO, themedDays = [] }: { items: AgendaItem[]; selectedDateISO: string; themedDays?: ThemedDayData[] }) {
+export function UnifiedAgenda({ items, selectedDateISO, themedDays = [], events = [] }: { items: AgendaItem[]; selectedDateISO: string; themedDays?: ThemedDayData[]; events?: EditableAgendaEvent[] }) {
   const themeByWeekday = useMemo<ThemeByWeekday>(() => {
     const map: ThemeByWeekday = {};
     for (const t of themedDays) map[t.weekday] = t;
@@ -33,6 +55,28 @@ export function UnifiedAgenda({ items, selectedDateISO, themedDays = [] }: { ite
   const [view, setView] = useState<"month" | "day">("month");
   const [day, setDay] = useState<Date>(cursor);
   const [hidden, setHidden] = useState<Set<AgendaSource>>(new Set());
+  // Evento em edição/exclusão (diálogos ÚNICOS no topo — nunca um Dialog por linha).
+  const [editingEvent, setEditingEvent] = useState<EditableAgendaEvent | null>(null);
+  const [deletingEvent, setDeletingEvent] = useState<EditableAgendaEvent | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Eventos editáveis indexados pelo id real (AgendaItem.id = "event-{id}").
+  const eventById = useMemo(() => new Map(events.map((e) => [e.id, e])), [events]);
+
+  const confirmDelete = async () => {
+    if (!deletingEvent || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await deleteEvent(deletingEvent.id);
+      toast.success("Evento removido do calendário.");
+      setDeletingEvent(null);
+      router.refresh();
+    } catch {
+      toast.error("Falha ao excluir o evento.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   // Index dos itens por dia (filtrados pelas categorias ativas).
   const { byDay, presentSources } = useMemo(() => {
@@ -164,8 +208,65 @@ export function UnifiedAgenda({ items, selectedDateISO, themedDays = [] }: { ite
       {view === "month" ? (
         <MonthGrid days={days} cursor={cursor} byDay={byDay} onOpenDay={openDay} themeByWeekday={themeByWeekday} />
       ) : (
-        <DayView items={dayItems} day={day} theme={themeByWeekday[day.getDay()]} />
+        <DayView items={dayItems} day={day} theme={themeByWeekday[day.getDay()]} eventById={eventById} onEditEvent={setEditingEvent} onDeleteEvent={setDeletingEvent} />
       )}
+
+      {/* CONFIRMAÇÃO ÚNICA de exclusão (regra: nunca AlertDialog dentro do .map). */}
+      <AlertDialog open={!!deletingEvent} onOpenChange={(o) => { if (!o && !isDeleting) setDeletingEvent(null); }}>
+        <AlertDialogContent className="rounded-[2rem]">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir este evento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong className="text-foreground">&quot;{deletingEvent?.title}&quot;</strong> vai para a Lixeira e some do calendário
+              (dá pra restaurar em Lixeira).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting} className="rounded-xl">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); confirmDelete(); }}
+              disabled={isDeleting}
+              className="rounded-xl bg-rose-500 text-white hover:bg-rose-600"
+            >
+              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* DIÁLOGO ÚNICO de edição de evento (mesmo padrão da grade de Blocos). */}
+      <Dialog open={!!editingEvent} onOpenChange={(o) => { if (!o) setEditingEvent(null); }}>
+        <DialogContent size="md" className="p-0">
+          {editingEvent && (
+            <>
+              <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/40 bg-muted/10 px-5 py-4 pr-14 sm:px-8">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="shrink-0 rounded-xl border border-primary/20 bg-primary/10 p-2.5 text-primary shadow-sm">
+                    <CalendarPlus className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <DialogTitle>Editar evento</DialogTitle>
+                    <DialogDescription>Atualizar este registro do calendário</DialogDescription>
+                  </div>
+                </div>
+                <EventDeleteButton eventId={editingEvent.id} eventTitle={editingEvent.title} variant="ghost" />
+              </div>
+              <EventForm
+                onClose={() => setEditingEvent(null)}
+                initialData={{
+                  id: editingEvent.id,
+                  title: editingEvent.title,
+                  description: editingEvent.description,
+                  startTime: new Date(editingEvent.startTime),
+                  endTime: editingEvent.endTime ? new Date(editingEvent.endTime) : null,
+                  location: editingEvent.location,
+                  color: editingEvent.color,
+                }}
+              />
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -253,7 +354,13 @@ function MonthGrid({
 }
 
 /* ------------------------------ DAY VIEW ------------------------------ */
-function DayView({ items, day, theme }: { items: AgendaItem[]; day: Date; theme?: ThemedDayData }) {
+interface DayEditProps {
+  eventById: Map<string, EditableAgendaEvent>;
+  onEditEvent: (e: EditableAgendaEvent) => void;
+  onDeleteEvent: (e: EditableAgendaEvent) => void;
+}
+
+function DayView({ items, day, theme, eventById, onEditEvent, onDeleteEvent }: { items: AgendaItem[]; day: Date; theme?: ThemedDayData } & DayEditProps) {
   const allDay = items.filter((i) => !i.time);
   const timed = items.filter((i) => i.time);
 
@@ -292,10 +399,10 @@ function DayView({ items, day, theme }: { items: AgendaItem[]; day: Date; theme?
     <ScrollArea className="flex-1">
       <div className="space-y-5 p-4 sm:p-6">
         {allDay.length > 0 && (
-          <Section title="Dia inteiro" items={allDay} />
+          <Section title="Dia inteiro" items={allDay} eventById={eventById} onEditEvent={onEditEvent} onDeleteEvent={onDeleteEvent} />
         )}
         {timed.length > 0 && (
-          <Section title="Ao longo do dia" items={timed} showTime />
+          <Section title="Ao longo do dia" items={timed} showTime eventById={eventById} onEditEvent={onEditEvent} onDeleteEvent={onDeleteEvent} />
         )}
         <p className="pt-2 text-center text-[11px] text-muted-foreground/60">
           {items.length} {items.length === 1 ? "registro" : "registros"} em {format(day, "d 'de' MMMM", { locale: ptBR })}
@@ -306,21 +413,24 @@ function DayView({ items, day, theme }: { items: AgendaItem[]; day: Date; theme?
   );
 }
 
-function Section({ title, items, showTime }: { title: string; items: AgendaItem[]; showTime?: boolean }) {
+function Section({ title, items, showTime, eventById, onEditEvent, onDeleteEvent }: { title: string; items: AgendaItem[]; showTime?: boolean } & DayEditProps) {
   return (
     <div className="space-y-2">
       <h3 className="px-1 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">{title}</h3>
       <div className="space-y-2">
         {items.map((it) => (
-          <AgendaRow key={it.id} item={it} showTime={showTime} />
+          <AgendaRow key={it.id} item={it} showTime={showTime} eventById={eventById} onEditEvent={onEditEvent} onDeleteEvent={onDeleteEvent} />
         ))}
       </div>
     </div>
   );
 }
 
-function AgendaRow({ item, showTime }: { item: AgendaItem; showTime?: boolean }) {
+function AgendaRow({ item, showTime, eventById, onEditEvent, onDeleteEvent }: { item: AgendaItem; showTime?: boolean } & DayEditProps) {
   const meta = CATEGORY_META[item.source];
+  // Eventos do calendário são editáveis aqui mesmo (AgendaItem.id = "event-{id}").
+  const editable = item.source === "event" ? eventById.get(item.id.slice("event-".length)) : undefined;
+
   return (
     <div className="group flex items-center gap-3 rounded-xl border border-border/40 bg-card p-3 shadow-sm transition-all hover:border-primary/20 hover:shadow-md">
       <div className="h-9 w-1 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />
@@ -337,6 +447,33 @@ function AgendaRow({ item, showTime }: { item: AgendaItem; showTime?: boolean })
           {item.subtitle ? ` · ${item.subtitle}` : ""}
         </p>
       </div>
+
+      {editable && (
+        <div className={cn(
+          "flex shrink-0 items-center gap-0.5 transition-opacity",
+          "opacity-100 md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100",
+        )}>
+          <Button
+            variant="ghost"
+            size="icon"
+            title="Editar evento"
+            onClick={() => onEditEvent(editable)}
+            className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-primary/10 hover:text-primary"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            title="Excluir evento"
+            onClick={() => onDeleteEvent(editable)}
+            className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      )}
+
       <div className="shrink-0 text-right">
         {showTime && item.time && <p className="font-mono text-xs font-semibold text-foreground">{item.time}</p>}
         {item.meta && <p className="text-[11px] font-bold text-muted-foreground">{item.meta}</p>}

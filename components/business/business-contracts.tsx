@@ -2,10 +2,9 @@
 
 import {
   Phone, CheckCircle2, AlertCircle, Briefcase,
-  MoreHorizontal, Circle, CalendarDays, Copy, Plus,
+  MoreHorizontal, Circle, CalendarDays, Copy, Plus, Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -24,15 +23,16 @@ interface ContractsListProps {
   onCopyCharge: (clientName: string, billing: BillingData) => void;
   onWhatsapp: (phone: string, clientName: string, billing: BillingData) => void;
   onDeleteTarget: (target: DeleteTarget) => void;
-  /** Altura/estilo da área rolável (lista). Permite usar compacto ou expandido. */
-  scrollClassName?: string;
+  /** Abre o modal de Nova Parcela para o contrato. */
+  onAddInvoice: (billing: { id: string; title: string }) => void;
 }
 
-// Lista de Contratos & Projetos (com faturas) de um cliente. Reutilizada na
-// página de detalhe (/business/[id]) — extraída do antigo card denso.
+// Lista de Contratos & Projetos (com faturas) de um cliente, usada na página de
+// detalhe (/business/[id]). SEM área de rolagem interna: a lista flui na página
+// (scroll natural do navegador — nada de conteúdo preso em 60vh).
 export function ContractsList({
   client, onNewBilling, onEditBilling, onEditInvoice, onReceiveInvoice,
-  onCopyCharge, onWhatsapp, onDeleteTarget, scrollClassName,
+  onCopyCharge, onWhatsapp, onDeleteTarget, onAddInvoice,
 }: ContractsListProps) {
   const formatCurrency = useFormatCurrency();
 
@@ -47,8 +47,7 @@ export function ContractsList({
         </Button>
       </div>
 
-      <ScrollArea className={cn("pr-3", scrollClassName)}>
-        <div className="space-y-4">
+      <div className="space-y-4">
           {client.billings.length === 0 ? (
             <div className="py-12 text-center border-2 border-dashed border-border/40 rounded-2xl bg-muted/10">
               <p className="text-xs font-medium text-muted-foreground">Nenhum contrato ativo.</p>
@@ -93,6 +92,9 @@ export function ContractsList({
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="rounded-xl shadow-lg">
                             <DropdownMenuItem onClick={() => onEditBilling(billing)} className="cursor-pointer font-medium">Ajustar Título/Status</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onAddInvoice({ id: billing.id, title: billing.title })} className="cursor-pointer font-medium">
+                              <Plus size={13} className="mr-1.5" /> Nova Parcela
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem className="text-destructive cursor-pointer font-medium" onClick={() => onDeleteTarget({ type: 'BILLING', id: billing.id, name: billing.title })}>Excluir Projeto</DropdownMenuItem>
                           </DropdownMenuContent>
@@ -137,19 +139,19 @@ export function ContractsList({
                             <span className={cn("text-xs font-bold font-mono", isPaid ? "text-muted-foreground/40" : isLate ? "text-rose-600" : "text-foreground/70")}>
                               {formatCurrency(invoice.value)}
                             </span>
-                            {!isPaid && (
-                              <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover/inv:opacity-100 transition-opacity">
-                                {client.phone && (
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-7 w-7 text-emerald-600 hover:bg-emerald-50"
-                                    title="Enviar no WhatsApp"
-                                    onClick={() => onWhatsapp(client.phone!, client.name, billing)}
-                                  >
-                                    <Phone size={14} />
-                                  </Button>
-                                )}
+                            <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover/inv:opacity-100 transition-opacity">
+                              {!isPaid && client.phone && (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 text-emerald-600 hover:bg-emerald-50"
+                                  title="Enviar no WhatsApp"
+                                  onClick={() => onWhatsapp(client.phone!, client.name, billing)}
+                                >
+                                  <Phone size={14} />
+                                </Button>
+                              )}
+                              {!isPaid && (
                                 <Button
                                   variant="ghost"
                                   className="h-7 px-2 text-[10px] font-bold uppercase bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500 hover:text-white transition-all rounded-lg"
@@ -158,8 +160,17 @@ export function ContractsList({
                                 >
                                   Receber
                                 </Button>
-                              </div>
-                            )}
+                              )}
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10"
+                                title={isPaid ? "Excluir fatura (estorna a receita lançada)" : "Excluir fatura"}
+                                onClick={() => onDeleteTarget({ type: 'INVOICE', id: invoice.id, name: `${billing.title} · ${invoice.title}` })}
+                              >
+                                <Trash2 size={13} />
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       );
@@ -169,8 +180,7 @@ export function ContractsList({
               );
             })
           )}
-        </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { deleteClient, deleteBilling, markBillingReminded } from "@/app/(dashboard)/business/actions"
+import { deleteClient, deleteBilling, deleteInvoice, markBillingReminded } from "@/app/(dashboard)/business/actions"
 import { Plus, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -94,6 +94,8 @@ export function BusinessView({ initialClients, friends, pixKey, businessName }: 
     let res: ActionResponse;
     if (deleteTarget.type === 'CLIENT') {
       res = await deleteClient(deleteTarget.id) as ActionResponse
+    } else if (deleteTarget.type === 'INVOICE') {
+      res = await deleteInvoice(deleteTarget.id) as ActionResponse
     } else {
       res = await deleteBilling(deleteTarget.id) as ActionResponse
     }

@@ -78,6 +78,17 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
   // Dias com qualquer registro (para marcar no calendário).
   const bookedDays = agendaItems.map((i) => new Date(i.date));
 
+  // Eventos serializados p/ editar/excluir direto no Calendário unificado.
+  const editableEvents = blockEvents.map((e) => ({
+    id: e.id,
+    title: e.title,
+    description: e.description,
+    startTime: e.startTime.toISOString(),
+    endTime: e.endTime ? e.endTime.toISOString() : null,
+    location: e.location,
+    color: e.color,
+  }));
+
   // Resumo do dia selecionado.
   const itemsToday = agendaItems.filter((i) => isSameDay(new Date(i.date), selectedDate));
   const nextUp = itemsToday
@@ -174,7 +185,7 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
 
                 {/* CALENDÁRIO UNIFICADO */}
                 <TabsContent value="calendar" className="m-0 flex h-full flex-1 flex-col overflow-hidden p-0 data-[state=active]:flex">
-                  <UnifiedAgenda items={agendaItems} selectedDateISO={selectedDate.toISOString()} themedDays={themedDays} />
+                  <UnifiedAgenda items={agendaItems} selectedDateISO={selectedDate.toISOString()} themedDays={themedDays} events={editableEvents} />
                 </TabsContent>
 
                 {/* TIME-BLOCKING (grade de horas interativa) */}

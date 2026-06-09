@@ -28,4 +28,4 @@ export type AccountOption = { id: string; name: string; color?: string | null; i
 
 export type ActionResponse = { success: boolean; message: string; }
 
-export type DeleteTarget = { type: 'CLIENT' | 'BILLING'; id: string; name: string };
+export type DeleteTarget = { type: 'CLIENT' | 'BILLING' | 'INVOICE'; id: string; name: string };

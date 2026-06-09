@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Globe, Copy, Check, MessageCircle, MoreHorizontal,
-  Pencil, Trash2, Tag as TagIcon,
+  Pencil, Trash2, Tag as TagIcon, Mail, FileText, MapPin, StickyNote, IdCard,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -18,11 +18,11 @@ import {
 import { cn } from "@/lib/utils";
 import { useFormatCurrency } from "@/components/providers/currency-provider";
 
-import { deleteClient, deleteBilling } from "@/app/(dashboard)/business/actions";
+import { deleteClient, deleteBilling, deleteInvoice } from "@/app/(dashboard)/business/actions";
 import type { AccountOption, ActionResponse, BillingData, ClientData, DeleteTarget, FriendOption, InvoiceData } from "./business-types";
 import { clearMask, generateChargeMessage, maskPhone } from "./business-helpers";
 import { ContractsList } from "./business-contracts";
-import { ClientModal, BillingModal, InvoiceModal, BillingEditModal, DeleteAlert, PaymentModal } from "./business-modals";
+import { ClientModal, BillingModal, InvoiceModal, BillingEditModal, DeleteAlert, PaymentModal, AddInvoiceModal } from "./business-modals";
 import { EntityConnectionsDialog } from "@/components/connect/entity-connections-dialog";
 
 interface ClientDetailViewProps {
@@ -45,6 +45,7 @@ export function ClientDetailView({ client, accounts, friends, pixKey, businessNa
 
   const [selectedClientForBilling, setSelectedClientForBilling] = useState<string | null>(null);
   const [editingBilling, setEditingBilling] = useState<BillingData | null>(null);
+  const [addingInvoiceTo, setAddingInvoiceTo] = useState<{ id: string; title: string } | null>(null);
   const [editingInvoice, setEditingInvoice] = useState<InvoiceData | null>(null);
   const [payingInvoice, setPayingInvoice] = useState<InvoiceData | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
@@ -88,13 +89,16 @@ export function ClientDetailView({ client, accounts, friends, pixKey, businessNa
     const toastId = toast.loading("Excluindo...");
     const res = (deleteTarget.type === 'CLIENT'
       ? await deleteClient(deleteTarget.id)
-      : await deleteBilling(deleteTarget.id)) as ActionResponse;
+      : deleteTarget.type === 'INVOICE'
+        ? await deleteInvoice(deleteTarget.id)
+        : await deleteBilling(deleteTarget.id)) as ActionResponse;
 
     if (res.success) {
       toast.success(res.message, { id: toastId });
       const wasClient = deleteTarget.type === 'CLIENT';
       setDeleteTarget(null);
       if (wasClient) router.push("/business"); // o cliente não existe mais
+      else router.refresh(); // recarrega contratos/resumo já resincronizados
     } else {
       toast.error(res.message, { id: toastId });
     }
@@ -205,19 +209,48 @@ export function ClientDetailView({ client, accounts, friends, pixKey, businessNa
         </div>
       </div>
 
-      {/* CONTRATOS & PROJETOS (lista completa, sem altura fixa) */}
-      <div className="rounded-[1.5rem] border border-border/40 bg-card/50 p-5 sm:p-6 shadow-sm">
-        <ContractsList
-          client={client}
-          onNewBilling={setSelectedClientForBilling}
-          onEditBilling={setEditingBilling}
-          onEditInvoice={setEditingInvoice}
-          onReceiveInvoice={setPayingInvoice}
-          onCopyCharge={handleCopyChargeMessage}
-          onWhatsapp={handleWhatsappCharge}
-          onDeleteTarget={setDeleteTarget}
-          scrollClassName="max-h-[60vh]"
-        />
+      {/* CONTRATOS + INFORMAÇÕES — a lista flui na página (scroll natural, nada preso). */}
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+        <div className="rounded-[1.5rem] border border-border/40 bg-card/50 p-5 sm:p-6 shadow-sm lg:col-span-2">
+          <ContractsList
+            client={client}
+            onNewBilling={setSelectedClientForBilling}
+            onEditBilling={setEditingBilling}
+            onEditInvoice={setEditingInvoice}
+            onReceiveInvoice={setPayingInvoice}
+            onCopyCharge={handleCopyChargeMessage}
+            onWhatsapp={handleWhatsappCharge}
+            onDeleteTarget={setDeleteTarget}
+            onAddInvoice={setAddingInvoiceTo}
+          />
+        </div>
+
+        {/* Ficha do cliente: campos que antes ficavam invisíveis (email, documento,
+            endereço, notas). Editáveis pelo menu ⋯ → Editar Cliente. */}
+        <div className="rounded-[1.5rem] border border-border/40 bg-card/50 p-5 sm:p-6 shadow-sm space-y-4">
+          <span className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.1em] flex items-center gap-2">
+            <IdCard size={12} className="text-primary/60" /> Ficha do Cliente
+          </span>
+
+          <div className="space-y-3">
+            <InfoRow icon={Mail} label="Email" value={client.email} href={client.email ? `mailto:${client.email}` : undefined} />
+            <InfoRow icon={FileText} label="CPF / CNPJ" value={client.document} mono />
+            <InfoRow icon={MapPin} label="Endereço" value={client.address} />
+            {client.notes ? (
+              <div className="rounded-xl border border-border/40 bg-background/60 p-3">
+                <p className="mb-1 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  <StickyNote size={11} /> Notas internas
+                </p>
+                <p className="whitespace-pre-line text-xs leading-relaxed text-foreground/80">{client.notes}</p>
+              </div>
+            ) : null}
+            {!client.email && !client.document && !client.address && !client.notes && (
+              <p className="rounded-xl border border-dashed border-border/40 bg-muted/20 p-3 text-[11px] text-muted-foreground">
+                Sem dados extras ainda — use <strong>⋯ → Editar Cliente</strong> para preencher email, documento, endereço e notas.
+              </p>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* ================= MODAIS ================= */}
@@ -241,6 +274,7 @@ export function ClientDetailView({ client, accounts, friends, pixKey, businessNa
       <BillingModal clientId={selectedClientForBilling} onClose={() => setSelectedClientForBilling(null)} />
       <InvoiceModal invoice={editingInvoice} onClose={() => setEditingInvoice(null)} />
       <BillingEditModal billing={editingBilling} onClose={() => setEditingBilling(null)} />
+      <AddInvoiceModal billing={addingInvoiceTo} onClose={() => setAddingInvoiceTo(null)} />
 
       <DeleteAlert target={deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={executeDelete} />
 
@@ -249,6 +283,37 @@ export function ClientDetailView({ client, accounts, friends, pixKey, businessNa
         item={connClient}
         onOpenChange={(o) => !o && setConnClient(null)}
       />
+    </div>
+  );
+}
+
+// Linha da Ficha do Cliente: ícone + rótulo + valor (some quando vazio).
+function InfoRow({
+  icon: Icon, label, value, href, mono,
+}: {
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  label: string;
+  value?: string | null;
+  href?: string;
+  mono?: boolean;
+}) {
+  if (!value) return null;
+  const content = (
+    <p className={cn("text-xs font-medium text-foreground break-words", mono && "font-mono")}>{value}</p>
+  );
+  return (
+    <div className="flex items-start gap-2.5">
+      <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/5 text-primary/70">
+        <Icon size={13} />
+      </span>
+      <div className="min-w-0">
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{label}</p>
+        {href ? (
+          <a href={href} className="hover:underline">{content}</a>
+        ) : (
+          content
+        )}
+      </div>
     </div>
   );
 }

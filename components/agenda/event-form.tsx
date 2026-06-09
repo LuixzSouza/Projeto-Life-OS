@@ -116,8 +116,9 @@ export function EventForm({
   };
 
   return (
-    // 🟢 CORREÇÃO AQUI: Trocado 'h-full' por 'max-h-[75vh] w-full'. Isso garante que ele nunca ultrapasse a tela do celular/monitor!
-    <form action={handleSubmit} className="flex flex-col w-full max-h-[75vh] sm:max-h-[80vh] overflow-hidden">
+    // Altura: o form NÃO impõe max-h próprio — ele preenche o espaço do DialogContent
+    // (que já limita em 90dvh). Fonte única de altura = sem overflow vazando do card.
+    <form action={handleSubmit} className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
       
       {initialData && <input type="hidden" name="id" value={initialData.id} />}
       {!initialData && taskId && <input type="hidden" name="taskId" value={taskId} />}

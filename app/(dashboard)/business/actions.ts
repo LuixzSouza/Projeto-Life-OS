@@ -429,3 +429,89 @@ export async function updateInvoice(formData: FormData) {
     return { success: false, message: "Falha ao ajustar a fatura." }
   }
 }
+
+// 9. Excluir Fatura específica (parcela). Se estava PAGA com lançamento vinculado,
+// estorna a receita do Financeiro e reverte o saldo da conta antes de apagar.
+export async function deleteInvoice(invoiceId: string) {
+  try {
+    if (!invoiceId) return { success: false, message: "ID não fornecido." }
+    const userId = await requireUserId()
+
+    await prisma.$transaction(async (tx) => {
+      const invoice = await tx.invoice.findFirst({ where: { id: invoiceId, userId } })
+      if (!invoice) throw new Error("Fatura não encontrada.")
+
+      // Estorno do lançamento financeiro vinculado (mesma lógica do updateInvoice).
+      if (invoice.transactionId) {
+        const linkedTx = await tx.transaction.findFirst({ where: { id: invoice.transactionId, userId } })
+        if (linkedTx) {
+          const account = await tx.account.findFirst({ where: { id: linkedTx.accountId, userId } })
+          if (account && !account.isConnected) {
+            await tx.account.update({
+              where: { id: account.id },
+              data: { balance: Number(account.balance) - Number(linkedTx.amount) },
+            })
+          }
+          await tx.transaction.delete({ where: { id: linkedTx.id } })
+        }
+      }
+
+      await tx.invoice.deleteMany({ where: { id: invoiceId, userId } })
+
+      // Sincroniza o contrato pai (total = soma das faturas restantes).
+      const remaining = await tx.invoice.findMany({ where: { billingId: invoice.billingId, userId }, select: { value: true } })
+      const newTotalValue = remaining.reduce((sum, inv) => sum + Number(inv.value), 0)
+      await tx.billing.updateMany({
+        where: { id: invoice.billingId, userId },
+        data: { totalValue: newTotalValue, installments: remaining.length },
+      })
+    })
+
+    revalidatePath("/business", "layout") // inclui a página de detalhe /business/[id]
+    revalidatePath("/finance")
+    return { success: true, message: "Fatura excluída (contrato resincronizado)." }
+  } catch (error) {
+    console.error("Erro ao excluir fatura:", error)
+    return { success: false, message: "Falha ao excluir a fatura." }
+  }
+}
+
+// 10. Nova parcela/fatura avulsa em um contrato EXISTENTE (ex.: aditivo, hora extra).
+export async function addInvoice(formData: FormData) {
+  try {
+    const billingId = formData.get("billingId") as string
+    const title = (formData.get("title") as string)?.trim()
+    const value = parseFloat(formData.get("value") as string) || 0
+    const dueDateStr = formData.get("dueDate") as string
+
+    if (!billingId || !title || !dueDateStr) return { success: false, message: "Título e vencimento são obrigatórios." }
+    if (value <= 0) return { success: false, message: "Informe um valor maior que zero." }
+
+    const userId = await requireUserId()
+    const billing = await prisma.billing.findFirst({ where: { id: billingId, userId }, select: { id: true } })
+    if (!billing) return { success: false, message: "Contrato não encontrado." }
+
+    // Meio-dia UTC: evita o bug do "dia anterior" por fuso.
+    const dueDate = new Date(`${dueDateStr.split("T")[0]}T12:00:00Z`)
+
+    await prisma.$transaction(async (tx) => {
+      await tx.invoice.create({
+        data: { billingId, title, value, dueDate, status: "PENDING", userId },
+      })
+      const all = await tx.invoice.findMany({ where: { billingId, userId }, select: { value: true } })
+      await tx.billing.updateMany({
+        where: { id: billingId, userId },
+        data: {
+          totalValue: all.reduce((sum, inv) => sum + Number(inv.value), 0),
+          installments: all.length,
+        },
+      })
+    })
+
+    revalidatePath("/business", "layout") // inclui a página de detalhe /business/[id]
+    return { success: true, message: "Parcela adicionada ao contrato." }
+  } catch (error) {
+    console.error("Erro ao adicionar parcela:", error)
+    return { success: false, message: "Falha ao adicionar a parcela." }
+  }
+}

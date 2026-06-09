@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { compressImageFile } from "@/lib/image";
 import {
   createClient, createBilling, updateClient,
-  updateBilling, updateInvoice, receiveInvoicePayment,
+  updateBilling, updateInvoice, receiveInvoicePayment, addInvoice,
 } from "@/app/(dashboard)/business/actions";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { useCurrencySymbol, useFormatCurrency } from "@/components/providers/currency-provider";
@@ -542,6 +542,64 @@ export function PaymentModal({ invoice, accounts, onClose }: PaymentModalProps) 
   );
 }
 
+// --- Modal Nova Parcela (fatura avulsa num contrato existente) ---
+interface AddInvoiceModalProps {
+  /** Contrato alvo (null = fechado). */
+  billing: { id: string; title: string } | null;
+  onClose: () => void;
+}
+
+export function AddInvoiceModal({ billing, onClose }: AddInvoiceModalProps) {
+  const currencySymbol = useCurrencySymbol();
+  return (
+    <Dialog open={!!billing} onOpenChange={onClose}>
+      <DialogContent size="md">
+        <DialogHeader
+          icon={<Receipt className="h-5 w-5" />}
+          title="Nova Parcela"
+          description={billing ? `Adicionar fatura avulsa em "${billing.title}" (aditivo, hora extra, ajuste).` : ""}
+        />
+        <form action={async (fd) => {
+          const res = await addInvoice(fd) as ActionResponse;
+          if (res.success) {
+            toast.success(res.message);
+            onClose();
+          } else {
+            toast.error(res.message);
+          }
+        }} className="flex flex-col flex-1 min-h-0">
+          <input type="hidden" name="billingId" value={billing?.id || ""} />
+          <DialogBody className="space-y-5">
+            <div className="space-y-1.5">
+              <Label className="text-[10px] uppercase font-black text-muted-foreground ml-1">Descrição</Label>
+              <Input name="title" placeholder="Ex: Aditivo — nova página" required className="rounded-xl h-12 bg-muted/20 font-medium" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-[10px] uppercase font-black text-muted-foreground ml-1">Valor ({currencySymbol})</Label>
+                <Input type="number" step="0.01" min="0.01" name="value" placeholder="0,00" required className="rounded-xl h-12 bg-muted/20 font-mono" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-[10px] uppercase font-black text-muted-foreground ml-1">Vencimento</Label>
+                <Input type="date" name="dueDate" required className="rounded-xl h-12 bg-muted/20" />
+              </div>
+            </div>
+
+            <p className="rounded-xl border border-dashed border-border/40 bg-muted/20 p-3 text-[11px] text-muted-foreground">
+              O total e o nº de parcelas do contrato são resincronizados automaticamente.
+            </p>
+          </DialogBody>
+
+          <DialogFooter>
+            <SubmitButton className="w-full h-12 rounded-xl font-bold">Adicionar Parcela</SubmitButton>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // --- Alerta de Exclusão ---
 interface DeleteAlertProps {
   target: DeleteTarget | null;
@@ -573,7 +631,9 @@ export function DeleteAlert({ target, onClose, onConfirm }: DeleteAlertProps) {
             <span className="block mt-2">
               {target?.type === 'CLIENT'
                 ? "Esta ação é irreversível e apagará todos os contratos, faturas e o histórico financeiro deste cliente no sistema."
-                : "Esta ação removerá permanentemente este projeto e todas as parcelas/faturas vinculadas a ele."}
+                : target?.type === 'INVOICE'
+                  ? "Esta parcela será removida do contrato (o total é resincronizado). Se já estava paga, a receita lançada no Financeiro é estornada."
+                  : "Esta ação removerá permanentemente este projeto e todas as parcelas/faturas vinculadas a ele."}
             </span>
           </AlertDialogDescription>
         </AlertDialogHeader>
