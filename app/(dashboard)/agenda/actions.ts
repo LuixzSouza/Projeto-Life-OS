@@ -290,3 +290,62 @@ export async function resetRoutine() {
   await prisma.routineItem.deleteMany({ where: { userId } });
   revalidatePath("/agenda");
 }
+
+// --- LIMPEZA PROGRAMADA (Fase 1 — #3) ---
+
+const VALID_DAY_IDS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const;
+
+export interface CleaningRotationInput {
+  /** Cômodos/áreas na ordem desejada (ex.: ["Cozinha", "Banheiro"]). */
+  rooms: string[];
+  /** Dias da semana do rodízio (ids: mon, tue, …). */
+  days: string[];
+  /** Horário do bloco (HH:mm). */
+  startTime: string;
+  /** Duração em minutos (default 30). */
+  durationMinutes?: number;
+}
+
+/**
+ * Gera o rodízio de limpeza: distribui os cômodos em round-robin pelos dias
+ * escolhidos e cria UM bloco fixo de rotina por cômodo (categoria "home").
+ * Com mais cômodos que dias, o dia recebe mais de um cômodo no mesmo bloco.
+ */
+export async function seedCleaningRotation(input: CleaningRotationInput) {
+  const userId = await requireUserId();
+
+  const rooms = input.rooms.map((r) => r.trim()).filter(Boolean).slice(0, 20);
+  const days = input.days.filter((d): d is (typeof VALID_DAY_IDS)[number] =>
+    (VALID_DAY_IDS as readonly string[]).includes(d),
+  );
+  if (rooms.length === 0) return { success: false, message: "Liste pelo menos um cômodo." };
+  if (days.length === 0) return { success: false, message: "Escolha pelo menos um dia." };
+  if (!/^\d{2}:\d{2}$/.test(input.startTime)) return { success: false, message: "Horário inválido." };
+
+  const duration = Math.min(Math.max(input.durationMinutes ?? 30, 10), 240);
+  const [h, m] = input.startTime.split(":").map(Number);
+  const endMinutes = (h * 60 + m + duration) % (24 * 60);
+  const endTime = `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`;
+
+  // Round-robin: cômodo i → dia (i % days.length). Agrupa por dia p/ 1 bloco/dia.
+  const roomsByDay = new Map<string, string[]>();
+  rooms.forEach((room, i) => {
+    const day = days[i % days.length];
+    roomsByDay.set(day, [...(roomsByDay.get(day) ?? []), room]);
+  });
+
+  await prisma.routineItem.createMany({
+    data: [...roomsByDay.entries()].map(([day, dayRooms]) => ({
+      title: `🧹 Limpeza: ${dayRooms.join(" + ")}`,
+      startTime: input.startTime,
+      endTime,
+      category: "home",
+      daysOfWeek: day,
+      description: "Rodízio da Limpeza Programada — um pedaço da casa por dia, sem faxina-monstro.",
+      userId,
+    })),
+  });
+
+  revalidatePath("/agenda");
+  return { success: true, message: `Rodízio criado: ${rooms.length} cômodo(s) em ${roomsByDay.size} dia(s).` };
+}

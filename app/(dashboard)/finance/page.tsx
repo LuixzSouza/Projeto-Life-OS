@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { calculateNetSalary } from "@/lib/finance-utils";
+import { buildBudgetSnapshot } from "@/lib/budget-buckets";
 import { monthlyEquivalent, asFrequency, hasEnded, currentDueOccurrence } from "@/lib/recurrence";
 import { syncRecurringChargeInvoices } from "@/lib/notifications";
 import { FinanceDashboardLoader } from "@/components/finance/finance-dashboard-loader";
@@ -63,6 +64,13 @@ export default async function FinancePage() {
         select: { amount: true, type: true, date: true },
       }),
     ]);
+
+    // Despesas do mês atual p/ o Orçamento 75/10/15 (categoria + origem fixa).
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthExpenseTxs = await prisma.transaction.findMany({
+      where: { userId, deletedAt: null, type: { not: "INCOME" }, date: { gte: monthStart } },
+      select: { amount: true, category: true, recurringExpensePayment: { select: { id: true } } },
+    });
 
     /* ---------------------------------------------------------------------- */
     /* NORMALIZAÇÃO DOS DADOS                                                  */
@@ -206,6 +214,18 @@ export default async function FinancePage() {
     const SALARIO_BRUTO = user?.salary ? Number(user.salary) : 0;
     const { net: netSalary } = calculateNetSalary(SALARIO_BRUTO);
 
+    // Orçamento 75/10/15 do mês (Fase 2 do roadmap) — heurística de categoria;
+    // pagamento de custo fixo conta como Essencial mesmo sem categoria.
+    const budget = buildBudgetSnapshot({
+      monthIncome,
+      netSalary,
+      expenses: monthExpenseTxs.map((tx) => ({
+        amount: Number(tx.amount),
+        category: tx.category || "",
+        fromRecurring: !!tx.recurringExpensePayment,
+      })),
+    });
+
     /* ---------------------------------------------------------------------- */
     /* RENDER                                                                 */
     /* ---------------------------------------------------------------------- */
@@ -227,6 +247,7 @@ export default async function FinancePage() {
         monthlyFlow={monthlyFlow}
         monthIncome={monthIncome}
         monthExpense={monthExpense}
+        budget={budget}
       />
     );
   } catch (error) {

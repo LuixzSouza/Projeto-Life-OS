@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Plus, Trash2, Wand2, Loader2, Sparkles,
-  LayoutGrid, CalendarDays, MoreVertical,
+  LayoutGrid, CalendarDays, MoreVertical, BrushCleaning,
 } from "lucide-react";
 import { seedRoutine, resetRoutine } from "@/app/(dashboard)/agenda/actions";
 import { toast } from "sonner";
@@ -36,12 +36,14 @@ import { cn } from "@/lib/utils";
 import { DAYS } from "./routine-config";
 import { RoutineGrid } from "./routine-grid";
 import { RoutineForm } from "./routine-form";
+import { CleaningRotationDialog } from "./cleaning-rotation-dialog";
 
 // --- COMPONENTE PRINCIPAL ---
 export function RoutineManager({ items }: { items: RoutineItem[] }) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isCleaningOpen, setIsCleaningOpen] = useState(false);
 
   const currentDayIndex = new Date().getDay();
   const jsDayToId = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
@@ -111,6 +113,14 @@ export function RoutineManager({ items }: { items: RoutineItem[] }) {
               </DropdownMenuContent>
             </DropdownMenu>
           )}
+          <Button
+            onClick={() => setIsCleaningOpen(true)}
+            variant="outline"
+            className="h-11 px-4 rounded-xl gap-2 border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 font-black uppercase tracking-widest text-[10px] shadow-sm transition-all"
+            title="Limpeza Programada: rodízio de cômodos por dia"
+          >
+            <BrushCleaning className="h-4 w-4" /> Limpeza
+          </Button>
           <Button onClick={() => setIsDialogOpen(true)} className="h-11 px-5 rounded-xl bg-foreground text-background hover:bg-primary shadow-lg font-black uppercase tracking-widest text-[10px] gap-2 transition-all">
             <Plus className="h-4 w-4 stroke-[3]" /> Novo Bloco
           </Button>
@@ -191,6 +201,9 @@ export function RoutineManager({ items }: { items: RoutineItem[] }) {
           <RoutineForm onClose={() => setIsDialogOpen(false)} />
         </DialogContent>
       </Dialog>
+
+      {/* LIMPEZA PROGRAMADA (rodízio de cômodos → blocos fixos) */}
+      <CleaningRotationDialog open={isCleaningOpen} onClose={() => setIsCleaningOpen(false)} />
     </div>
   );
 }

@@ -9,6 +9,8 @@ import { AccountsSection } from "@/components/finance/dashboard/accounts-section
 import { StatementSection } from "@/components/finance/dashboard/statement-section";
 import { RecurringChargesSection } from "@/components/finance/dashboard/recurring-charges-section";
 import { WishlistSection } from "@/components/finance/dashboard/wishlist-section";
+import { BudgetSection } from "@/components/finance/dashboard/budget-section";
+import type { BudgetSnapshot } from "@/lib/budget-buckets";
 
 // Re-export dos tipos (mantém compatibilidade com imports existentes)
 export type {
@@ -45,6 +47,8 @@ interface FinanceDashboardProps {
   monthlyFlow: CashFlowPoint[];
   monthIncome: number;
   monthExpense: number;
+  /** Orçamento 75/10/15 do mês (calculado no servidor). */
+  budget: BudgetSnapshot;
 }
 
 export function FinanceDashboard({
@@ -62,7 +66,8 @@ export function FinanceDashboard({
   hasSalarySet,
   monthlyFlow,
   monthIncome,
-  monthExpense
+  monthExpense,
+  budget
 }: FinanceDashboardProps) {
   return (
     <div className="min-h-screen bg-background relative overflow-hidden animate-in fade-in duration-700 pb-24">
@@ -95,6 +100,9 @@ export function FinanceDashboard({
           monthExpense={monthExpense}
           monthlyFlow={monthlyFlow}
         />
+
+        {/* SEÇÃO 1.75: ORÇAMENTO 75/10/15 + PROJEÇÃO (some sem renda-base) */}
+        <BudgetSection budget={budget} monthlyFlow={monthlyFlow} wishlist={wishlist} />
 
         {/* SEÇÃO 2: CARTEIRAS */}
         <AccountsSection accounts={accounts} />

@@ -3,6 +3,7 @@ import { getNote, getNotes, getNoteSubjects, getNoteProjects, getNoteBacklinks }
 import { getNotebooks } from "../notebook-actions";
 import { getPaletteTasks } from "../../palette-actions";
 import { NoteFullEditor } from "@/components/notes/note-full-editor";
+import { findRelatedNotes } from "@/lib/note-serendipity";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Editar nota | Life OS" };
@@ -26,6 +27,10 @@ export default async function NoteEditPage(props: { params: Promise<{ id: string
     .filter((n) => n.id !== id)
     .map((n) => ({ id: n.id, title: n.title }));
 
+  // Serendipidade Ativa (#14): notas antigas que se conectam ao tema desta —
+  // calculada sobre o que a página já buscou (sem query extra).
+  const related = findRelatedNotes(note, allNotes);
+
   return (
     <NoteFullEditor
       note={note}
@@ -35,6 +40,7 @@ export default async function NoteEditPage(props: { params: Promise<{ id: string
       mentionNotes={mentionNotes}
       mentionTasks={tasks}
       backlinks={backlinks}
+      related={related}
     />
   );
 }

@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Target, CalendarClock, ListChecks, Clock, ListTodo, Sun, CalendarRange, Timer, Brain } from "lucide-react";
+import { Target, CalendarClock, ListChecks, Clock, ListTodo, Sun, CalendarRange, Timer, Brain, PenLine } from "lucide-react";
 import {
   parseISO, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameDay,
 } from "date-fns";
@@ -14,6 +14,7 @@ import { UnifiedAgenda } from "@/components/agenda/unified-agenda";
 import { TaskList } from "@/components/agenda/task-list";
 import { RoutineManager } from "@/components/agenda/routine-manager";
 import { TimeBlockingDay } from "@/components/agenda/time-blocking-day";
+import { WeekPlanner } from "@/components/agenda/week-planner";
 import { getRoutineItems } from "./actions";
 import { getThemedDays } from "./themed-days-actions";
 import { getFocusStats, getFocusDrivers } from "./focus-actions";
@@ -42,7 +43,12 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
 
   const userId = await getCurrentUserId();
 
-  const [agendaItems, pendingTasks, pendingTaskCount, routineItems, blockEvents, themedDays, focusStats, focusDrivers] = await Promise.all([
+  // Semana do Planner (Método Alastrar): tarefas com vencimento na semana,
+  // INCLUINDO as concluídas — riscar e continuar vendo é o ponto do método.
+  const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
+  const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 0 });
+
+  const [agendaItems, pendingTasks, pendingTaskCount, routineItems, blockEvents, themedDays, focusStats, focusDrivers, weekTasks] = await Promise.all([
     getAgendaItems(rangeStart, rangeEnd),
     prisma.task.findMany({
       where: { isDone: false, userId, deletedAt: null },
@@ -62,6 +68,11 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
     getThemedDays(),
     getFocusStats(),
     getFocusDrivers(),
+    prisma.task.findMany({
+      where: { userId, deletedAt: null, dueDate: { gte: weekStart, lte: weekEnd } },
+      orderBy: { createdAt: "asc" },
+      include: { project: projectSelect },
+    }),
   ]);
 
   // Dias com qualquer registro (para marcar no calendário).
@@ -146,6 +157,9 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
                     <TabsTrigger value="blocks" className="gap-2 rounded-lg px-5 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm">
                       <Timer className="h-4 w-4" /> Blocos
                     </TabsTrigger>
+                    <TabsTrigger value="planner" className="gap-2 rounded-lg px-5 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm">
+                      <PenLine className="h-4 w-4" /> Planner
+                    </TabsTrigger>
                     <TabsTrigger value="focus" className="gap-2 rounded-lg px-5 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm">
                       <Brain className="h-4 w-4" /> Foco
                     </TabsTrigger>
@@ -166,6 +180,11 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
                 {/* TIME-BLOCKING (grade de horas interativa) */}
                 <TabsContent value="blocks" className="m-0 flex h-full flex-1 flex-col overflow-hidden p-0 data-[state=active]:flex">
                   <TimeBlockingDay events={blockEvents} tasks={pendingTasks} themedDays={themedDays} selectedDateISO={selectedDate.toISOString()} />
+                </TabsContent>
+
+                {/* PLANNER SEMANAL (Método Alastrar — dias × tarefas, riscar ao concluir) */}
+                <TabsContent value="planner" className="m-0 flex h-full flex-1 flex-col overflow-hidden p-0 data-[state=active]:flex">
+                  <WeekPlanner tasks={weekTasks} selectedDateISO={selectedDate.toISOString()} themedDays={themedDays} />
                 </TabsContent>
 
                 {/* FOCO (painel de produtividade — últimos 7 dias + padrões) */}

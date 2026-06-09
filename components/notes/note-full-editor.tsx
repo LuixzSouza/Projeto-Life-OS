@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft, Star, History, Save, Loader2, Trash2, Check, Briefcase,
-  FileDown, FileText, MoreVertical, Search, ExternalLink, Link2,
+  FileDown, FileText, MoreVertical, Search, ExternalLink, Link2, Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -37,6 +37,7 @@ export function NoteFullEditor({
   mentionNotes,
   mentionTasks,
   backlinks,
+  related = [],
 }: {
   note: NoteData;
   notebooks: NotebookData[];
@@ -48,6 +49,8 @@ export function NoteFullEditor({
   mentionTasks: { id: string; title: string; projectSlug: string }[];
   /** Notas que mencionam/linkam esta (backlinks). */
   backlinks: { id: string; title: string }[];
+  /** Serendipidade (#14): notas antigas que se conectam ao tema desta. */
+  related?: { id: string; title: string; reason: string }[];
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(note.title);
@@ -400,6 +403,30 @@ export function NoteFullEditor({
                   <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <span className="truncate">{b.title}</span>
                   <ExternalLink className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground/40 transition-opacity opacity-0 group-hover:opacity-100" />
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Serendipidade Ativa (#14): redescoberta — notas antigas do mesmo tema
+            que NÃO estão linkadas (as linkadas aparecem nos backlinks acima). */}
+        {related.length > 0 && (
+          <div className="space-y-2 rounded-xl border border-border/40 bg-card p-4 shadow-sm">
+            <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+              <Sparkles className="h-3.5 w-3.5 text-amber-500" /> Conexões esquecidas ({related.length})
+            </p>
+            <div className="flex flex-col">
+              {related.map((r) => (
+                <Link
+                  key={r.id}
+                  href={`/notes/${r.id}`}
+                  className="group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground transition-colors hover:bg-muted/40"
+                >
+                  <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{r.title}</span>
+                  <span className="ml-auto shrink-0 text-[10px] text-muted-foreground/60">{r.reason}</span>
+                  <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40 transition-opacity opacity-0 group-hover:opacity-100" />
                 </Link>
               ))}
             </div>
