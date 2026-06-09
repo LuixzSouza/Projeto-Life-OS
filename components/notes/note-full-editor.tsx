@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft, Star, History, Save, Loader2, Trash2, Check, Briefcase,
-  FileDown, FileText, MoreVertical, Search, ExternalLink, Link2, Sparkles,
+  FileDown, FileText, MoreVertical, Search, ExternalLink, Link2, Sparkles, Atom,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -25,6 +25,7 @@ import { NoteEditor } from "@/components/notes/note-editor";
 import { NoteHistoryDialog } from "@/components/notes/note-history-dialog";
 import { EntityConnections } from "@/components/connect/entity-connections";
 import { updateNote, deleteNote, uploadNoteImage, inlineNoteImages, type NoteData, type NoteSubject, type NoteProject } from "@/app/(dashboard)/notes/actions";
+import { assessAtomicity, isAtomicityExempt } from "@/lib/note-atomicity";
 import type { NotebookData } from "@/app/(dashboard)/notes/notebook-actions";
 
 const AUTOSAVE_DELAY = 1500; // ms de ociosidade antes de salvar sozinho.
@@ -384,6 +385,9 @@ export function NoteFullEditor({
           </div>
         </div>
 
+        {/* Notas Atômicas (#9): nudge Zettelkasten — 1 ideia por nota, título descritivo. */}
+        <AtomicityHint title={title} content={content} />
+
         {/* Tecido conectivo (card recolhível) */}
         <EntityConnections entityType="note" entityId={note.id} />
 
@@ -447,6 +451,35 @@ export function NoteFullEditor({
           router.refresh();
         }}
       />
+    </div>
+  );
+}
+
+// Nudge de atomicidade (#9): avaliação heurística local (sem servidor) do
+// princípio "1 ideia por nota". Some quando está tudo bem ou a nota é isenta
+// (Diário e Mapas de Conteúdo são longos por design).
+function AtomicityHint({ title, content }: { title: string; content: string }) {
+  const report = useMemo(() => assessAtomicity(title, content), [title, content]);
+  if (isAtomicityExempt(title) || report.hints.length === 0) return null;
+
+  return (
+    <div
+      className={cn(
+        "flex items-start gap-2.5 rounded-xl border p-3",
+        report.level === "dense"
+          ? "border-amber-500/30 bg-amber-500/5"
+          : "border-border/40 bg-muted/20",
+      )}
+    >
+      <Atom className={cn("mt-0.5 h-3.5 w-3.5 shrink-0", report.level === "dense" ? "text-amber-500" : "text-muted-foreground")} />
+      <div className="space-y-0.5">
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+          Nota atômica · 1 ideia por nota
+        </p>
+        {report.hints.map((h) => (
+          <p key={h} className="text-[11px] leading-relaxed text-muted-foreground">{h}</p>
+        ))}
+      </div>
     </div>
   );
 }

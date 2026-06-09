@@ -14,6 +14,7 @@ import {
 } from "@/lib/budget-buckets";
 import type { CashFlowPoint } from "@/components/finance/cash-flow-chart";
 import type { DashboardWishlist } from "@/components/finance/dashboard/types";
+import { DevilsAdvocateButton } from "@/components/finance/dashboard/devils-advocate-dialog";
 
 const BUCKET_META: Record<
   BudgetBucketKey,
@@ -81,6 +82,14 @@ export function BudgetSection({ budget, monthlyFlow, wishlist }: BudgetSectionPr
     [wishlist, projection],
   );
 
+  // Advogado do Diabo (#17): o balde mais estourado vira o "réu" do confronto.
+  const worstOver = useMemo(() => {
+    const over = budget.buckets
+      .filter((b) => b.limit > 0 && b.spent > b.limit)
+      .sort((a, b) => b.spent - b.limit - (a.spent - a.limit));
+    return over[0] ?? null;
+  }, [budget.buckets]);
+
   if (budget.income <= 0) return null; // sem renda-base não há o que orçar
 
   return (
@@ -146,6 +155,20 @@ export function BudgetSection({ budget, monthlyFlow, wishlist }: BudgetSectionPr
               {money(budget.unclassified, hidden)} em lançamentos <strong>sem categoria</strong> caíram em
               “Prazeres”. Categorize-os no extrato para o orçamento ficar fiel.
             </p>
+          )}
+
+          {/* Advogado do Diabo (#17): só aparece com balde estourado. */}
+          {worstOver && (
+            <DevilsAdvocateButton
+              input={{
+                bucketLabel: BUCKET_META[worstOver.key].label,
+                over: worstOver.spent - worstOver.limit,
+                spent: worstOver.spent,
+                limit: worstOver.limit,
+                avgMonthlySavings: projection?.avgMonthlySavings ?? 0,
+                goals: goals.map((g) => ({ name: g.name, remaining: g.remaining, monthsAway: g.months })),
+              }}
+            />
           )}
         </div>
 

@@ -20,6 +20,9 @@ import { WeeklyResetCard } from "@/components/dashboard/weekly-reset-card";
 import { BlindSpotRadar } from "@/components/dashboard/blind-spot-radar";
 import { InertiaCostCard } from "@/components/dashboard/inertia-cost-card";
 import { DigitalRotCard } from "@/components/dashboard/digital-rot-card";
+import { LiquefyCard } from "@/components/dashboard/liquefy-card";
+import { PreservationGate } from "@/components/dashboard/preservation-gate";
+import { prisma } from "@/lib/prisma";
 
 // Componentes Server-side separados (seções)
 import { FinanceSection } from "./_components/finance-section";
@@ -36,6 +39,15 @@ export default async function DashboardPage() {
   // Carrega apenas o essencial para a primeira pintura (Header/Configurações)
   const { user, settings } = await getUserSettings(userId);
   const greeting = getGreeting();
+
+  // Modo de Preservação (#19): energia 1–2 hoje → esconde os painéis pesados.
+  const dayStart = new Date();
+  dayStart.setHours(0, 0, 0, 0);
+  const todayEnergy = await prisma.energyCheckin.findFirst({
+    where: { userId, date: { gte: dayStart } },
+    select: { energy: true },
+  });
+  const lowEnergy = todayEnergy != null && todayEnergy.energy <= 2;
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:space-y-8 sm:px-8 sm:py-8 animate-in fade-in duration-500">
@@ -57,71 +69,78 @@ export default async function DashboardPage() {
       </div>
       <QuickCaptureCard />
 
-      {/* Insight do dia: o padrão mais forte (foco/energia) do Motor de Correlação (#8). */}
-      <Suspense fallback={<Skeleton className="h-[76px] w-full rounded-2xl" />}>
-        <DailyInsightCard />
-      </Suspense>
-
-      {/* Regulador Adaptativo (#13): o que fazer hoje conforme o estado/energia. */}
+      {/* Regulador Adaptativo (#13): o que fazer hoje conforme o estado/energia.
+          Fica FORA do Modo de Preservação — é ele que orienta o dia exausto. */}
       <Suspense fallback={null}>
         <DailyRegulatorCard />
       </Suspense>
 
-      {/* Vetor de Fricção (#15): por que os hábitos falham (some se não há dados). */}
-      <Suspense fallback={null}>
-        <FrictionVectorCard />
-      </Suspense>
+      {/* Modo de Preservação (#19): energia 1–2 → painéis pesados escondidos. */}
+      <PreservationGate lowEnergy={lowEnergy}>
+        {/* Insight do dia: o padrão mais forte (foco/energia) do Motor de Correlação (#8). */}
+        <Suspense fallback={<Skeleton className="h-[76px] w-full rounded-2xl" />}>
+          <DailyInsightCard />
+        </Suspense>
 
-      {/* Custo Fantasma da Inércia (#20): o preço de não agir (treino/dinheiro parado). */}
-      <Suspense fallback={null}>
-        <InertiaCostCard />
-      </Suspense>
+        {/* Vetor de Fricção (#15): por que os hábitos falham (some se não há dados). */}
+        <Suspense fallback={null}>
+          <FrictionVectorCard />
+        </Suspense>
 
-      {/* Radar de Pontos Cegos (#23): áreas da vida sem registro nos últimos 14 dias. */}
-      <Suspense fallback={null}>
-        <BlindSpotRadar />
-      </Suspense>
+        {/* Custo Fantasma da Inércia (#20): o preço de não agir (treino/dinheiro parado). */}
+        <Suspense fallback={null}>
+          <InertiaCostCard />
+        </Suspense>
 
-      {/* Digital Rot (#21): tarefas/notas apodrecendo + Limpeza Fantasma. */}
-      <DigitalRotCard />
+        {/* Radar de Pontos Cegos (#23): áreas da vida sem registro nos últimos 14 dias. */}
+        <Suspense fallback={null}>
+          <BlindSpotRadar />
+        </Suspense>
 
-      {/* Reset Semanal: resumo dos últimos 7 dias + direção da próxima. */}
-      <Suspense fallback={null}>
-        <WeeklyResetCard />
-      </Suspense>
+        {/* Digital Rot (#21): tarefas/notas apodrecendo + Limpeza Fantasma. */}
+        <DigitalRotCard />
 
-      {/* Overview do Dia: unifica Treino + Nutrição numa olhada (topo da Home) */}
-      <Suspense fallback={<Skeleton className="h-[200px] w-full rounded-xl" />}>
-        <HealthOverviewSection userId={userId} />
-      </Suspense>
+        {/* Liquefação (#18): tarefas com blocos vencidos 2× viram micro-passos. */}
+        <LiquefyCard />
 
-      {/* Tabs para melhor UX e navegação modular */}
-      <Tabs defaultValue="finance" className="w-full space-y-6">
-        <TabsList className="grid w-full grid-cols-3 max-w-md bg-muted/50">
-          <TabsTrigger value="finance" className="text-xs sm:text-sm">Financeiro</TabsTrigger>
-          <TabsTrigger value="productivity" className="text-xs sm:text-sm">Produtividade</TabsTrigger>
-          <TabsTrigger value="personal" className="text-xs sm:text-sm">Pessoal</TabsTrigger>
-        </TabsList>
+        {/* Reset Semanal: resumo dos últimos 7 dias + direção da próxima. */}
+        <Suspense fallback={null}>
+          <WeeklyResetCard />
+        </Suspense>
 
-        <TabsContent value="finance" className="space-y-6">
-          <Suspense fallback={<DashboardSkeleton />}>
-            <FinanceSection userId={userId} currency={settings?.currency || "BRL"} />
-          </Suspense>
-        </TabsContent>
+        {/* Overview do Dia: unifica Treino + Nutrição numa olhada (topo da Home) */}
+        <Suspense fallback={<Skeleton className="h-[200px] w-full rounded-xl" />}>
+          <HealthOverviewSection userId={userId} />
+        </Suspense>
 
-        <TabsContent value="productivity" className="space-y-6">
-          <Suspense fallback={<DashboardSkeleton />}>
-            <ProductivitySection userId={userId} />
-          </Suspense>
-        </TabsContent>
+        {/* Tabs para melhor UX e navegação modular */}
+        <Tabs defaultValue="finance" className="w-full space-y-6">
+          <TabsList className="grid w-full grid-cols-3 max-w-md bg-muted/50">
+            <TabsTrigger value="finance" className="text-xs sm:text-sm">Financeiro</TabsTrigger>
+            <TabsTrigger value="productivity" className="text-xs sm:text-sm">Produtividade</TabsTrigger>
+            <TabsTrigger value="personal" className="text-xs sm:text-sm">Pessoal</TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="personal" className="space-y-6">
-          <Suspense fallback={<DashboardSkeleton />}>
-            <PersonalSection userId={userId} />
-          </Suspense>
-        </TabsContent>
-      </Tabs>
-      
+          <TabsContent value="finance" className="space-y-6">
+            <Suspense fallback={<DashboardSkeleton />}>
+              <FinanceSection userId={userId} currency={settings?.currency || "BRL"} />
+            </Suspense>
+          </TabsContent>
+
+          <TabsContent value="productivity" className="space-y-6">
+            <Suspense fallback={<DashboardSkeleton />}>
+              <ProductivitySection userId={userId} />
+            </Suspense>
+          </TabsContent>
+
+          <TabsContent value="personal" className="space-y-6">
+            <Suspense fallback={<DashboardSkeleton />}>
+              <PersonalSection userId={userId} />
+            </Suspense>
+          </TabsContent>
+        </Tabs>
+      </PreservationGate>
+
     </div>
   );
 }

@@ -19,6 +19,7 @@ import { calculateAge } from "@/lib/body-math";
 import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
 import { ErrorState } from "@/components/ui/error-state";
 import { CorrelationDashboard } from "@/components/health/correlation-dashboard";
+import { DopamineBalanceCard } from "@/components/health/dopamine-balance-card";
 import { getCorrelationMatrix } from "@/app/(dashboard)/agenda/focus-actions";
 
 // --- PROTOCOLOS DE TIPAGEM ESTREITA ---
@@ -122,6 +123,9 @@ export default async function HealthPage() {
                         <SectionHeader icon={FlaskConical} title="Correlações — o que move você" />
                         <CorrelationDashboard matrix={correlationMatrix} />
                     </section>
+
+                    {/* --- BALANÇO DOPAMINÉRGICO (#24, experimento): conquistada × barata --- */}
+                    <DopamineBalanceCard />
                 </PageContainer>
             </PageShell>
         );
