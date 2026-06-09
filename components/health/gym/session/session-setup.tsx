@@ -11,6 +11,9 @@ import { ExerciseThumb } from "./exercise-thumb";
 import { EQUIPMENT_META, guessEquipment, type Equipment, type Routine } from "./session-types";
 import { playClick, primeAudio } from "./sfx";
 import { RoutineShareButton, ImportRoutineButton } from "./routine-share-ui";
+import { divisionToStart } from "./plan-start";
+import type { SharedPlan } from "./plan-share";
+import type { PlanDivision, WorkoutPlan } from "./plan-types";
 import type { StartOptions } from "./use-active-session";
 
 const REST_OPTIONS = [60, 90, 120, 180];
@@ -38,14 +41,18 @@ interface PickedExercise { name: string; group?: string; equipment: Equipment; s
 
 export function SessionSetup({
   routines,
+  plans = [],
   onStart,
   onClose,
   onImportRoutines,
+  onImportPlans,
 }: {
   routines: Routine[];
+  plans?: WorkoutPlan[];
   onStart: (opts: StartOptions) => void;
   onClose: () => void;
   onImportRoutines?: (routines: Routine[]) => void;
+  onImportPlans?: (plans: SharedPlan[]) => void;
 }) {
   const [title, setTitle] = useState("");
   const [titleEdited, setTitleEdited] = useState(false); // não sobrescreve nome manual
@@ -145,6 +152,17 @@ export function SessionSetup({
     });
   };
 
+  // Ficha do banco: escolher a divisão (Treino A/B/C) já inicia, levando as metas.
+  const startDivisionNow = (plan: WorkoutPlan, div: PlanDivision) => {
+    primeAudio();
+    playClick();
+    onStart(divisionToStart(plan, div));
+  };
+
+  // Total de opções salvas: cada divisão de ficha conta como um treino pronto.
+  const plannedCount = routines.length + plans.reduce((acc, p) => acc + p.divisions.length, 0);
+  const hasSaved = plannedCount > 0;
+
   // ---- Tela inicial: dois modos de começar ----
   if (startMode === null) {
     return (
@@ -177,10 +195,10 @@ export function SessionSetup({
             <span className="min-w-0 flex-1">
               <span className="block text-base font-bold">Treino planejado</span>
               <span className="block text-xs text-muted-foreground">
-                {routines.length > 0 ? `Comece por uma das suas ${routines.length} rotina(s) salvas.` : "Use uma rotina salva (você ainda não tem nenhuma)."}
+                {hasSaved ? `Comece por um dos seus ${plannedCount} treino(s) salvos (fichas e rotinas).` : "Use uma ficha ou rotina salva (você ainda não tem nenhuma)."}
               </span>
             </span>
-            <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">{routines.length}</span>
+            <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-bold text-muted-foreground">{plannedCount}</span>
           </button>
 
           {/* Livre */}
@@ -199,33 +217,65 @@ export function SessionSetup({
           </button>
         </div>
 
-        {/* Atalho: rotinas para iniciar com um toque + importar/compartilhar */}
-        <div className="mt-6 space-y-2">
+        {/* Atalho: fichas + rotinas para iniciar com um toque + importar/compartilhar */}
+        <div className="mt-6 space-y-3">
           <div className="flex items-center justify-between gap-2">
             <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              {routines.length > 0 ? "Iniciar rápido" : "Recebeu uma rotina de um amigo?"}
+              {hasSaved ? "Iniciar rápido" : "Recebeu um treino de um amigo?"}
             </p>
-            {onImportRoutines && <ImportRoutineButton onImport={onImportRoutines} />}
+            {onImportRoutines && <ImportRoutineButton onImport={onImportRoutines} onImportPlans={onImportPlans} />}
           </div>
-          {routines.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {routines.map((r) => (
-                <div
-                  key={r.id}
-                  className="inline-flex items-center rounded-full border border-border/60 bg-card pr-1 transition-colors hover:border-primary/40"
-                >
+
+          {/* Fichas do banco: um toque na divisão (Treino A/B/C) já inicia. */}
+          {plans.map((plan) => (
+            <div key={plan.id} className="space-y-1.5">
+              <p className="flex items-center gap-1.5 text-xs font-semibold">
+                <ClipboardList className="h-3.5 w-3.5 text-primary" />
+                {plan.name}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {plan.divisions.map((div) => (
                   <button
+                    key={div.id}
                     type="button"
-                    onClick={() => startRoutineNow(r)}
-                    className="inline-flex items-center gap-1.5 rounded-full py-1.5 pl-3 text-xs font-medium hover:bg-primary/5"
+                    onClick={() => startDivisionNow(plan, div)}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-card py-1.5 pl-3 pr-3 text-xs font-medium transition-colors hover:border-primary/40 hover:bg-primary/5"
                   >
-                    <Star className="h-3.5 w-3.5 text-amber-400" />
-                    {r.name}
-                    <span className="text-muted-foreground/60">{r.exercises.length} ex.</span>
+                    <Play className="h-3 w-3 text-primary" />
+                    {div.label}
+                    <span className="text-muted-foreground/60">{div.exercises.length} ex.</span>
                   </button>
-                  <RoutineShareButton routine={r} className="ml-0.5 flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-primary" />
-                </div>
-              ))}
+                ))}
+              </div>
+            </div>
+          ))}
+
+          {routines.length > 0 && (
+            <div className="space-y-1.5">
+              {plans.length > 0 && (
+                <p className="flex items-center gap-1.5 text-xs font-semibold">
+                  <Star className="h-3.5 w-3.5 text-amber-400" /> Rotinas deste aparelho
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                {routines.map((r) => (
+                  <div
+                    key={r.id}
+                    className="inline-flex items-center rounded-full border border-border/60 bg-card pr-1 transition-colors hover:border-primary/40"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => startRoutineNow(r)}
+                      className="inline-flex items-center gap-1.5 rounded-full py-1.5 pl-3 text-xs font-medium hover:bg-primary/5"
+                    >
+                      <Star className="h-3.5 w-3.5 text-amber-400" />
+                      {r.name}
+                      <span className="text-muted-foreground/60">{r.exercises.length} ex.</span>
+                    </button>
+                    <RoutineShareButton routine={r} className="ml-0.5 flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-primary" />
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -255,6 +305,39 @@ export function SessionSetup({
       </div>
 
       <div className="flex-1 space-y-6 overflow-y-auto pb-28">
+        {/* Fichas do banco: tocar na divisão INICIA o treino (mantém as metas de
+            reps/RIR/descanso — carregar no editor as perderia). */}
+        {startMode === "planned" && plans.length > 0 && (
+          <section className="space-y-2">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Suas fichas <span className="font-normal normal-case text-muted-foreground/70">— toque para iniciar</span>
+            </p>
+            <div className="space-y-2">
+              {plans.map((plan) => (
+                <div key={plan.id} className="rounded-xl border border-border/40 bg-card p-2.5">
+                  <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold">
+                    <ClipboardList className="h-3.5 w-3.5 text-primary" /> {plan.name}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {plan.divisions.map((div) => (
+                      <button
+                        key={div.id}
+                        type="button"
+                        onClick={() => startDivisionNow(plan, div)}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background px-3 py-1.5 text-xs font-medium transition-colors hover:border-primary/40 hover:bg-primary/5"
+                      >
+                        <Play className="h-3 w-3 text-primary" />
+                        {div.label}
+                        <span className="text-muted-foreground/60">{div.exercises.length} ex.</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Rotinas salvas */}
         {routines.length > 0 && (
           <section className="space-y-2">

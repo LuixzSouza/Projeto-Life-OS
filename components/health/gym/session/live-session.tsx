@@ -5,13 +5,15 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { AlertTriangle, Play, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { saveGymSession, saveWorkoutPhotos } from "@/app/(dashboard)/health/actions";
+import { saveGymSession, saveWorkoutPhotos, saveWorkoutPlan } from "@/app/(dashboard)/health/actions";
 import { SessionSetup } from "./session-setup";
 import { SessionActive, type SessionControls } from "./session-active";
 import { SessionSummary } from "./session-summary";
 import { useActiveSession } from "./use-active-session";
 import { loadRoutines, saveRoutines, loadPendingStart, clearPendingStart } from "./session-storage";
 import { decodeRoutines } from "./routine-share";
+import type { SharedPlan } from "./plan-share";
+import type { WorkoutPlan } from "./plan-types";
 import { enqueueGymSession } from "./mutation-queue";
 import { addGalleryPhotos } from "./gym-gallery";
 import { sessionStats, toStoredExercises, uid, type ExerciseHistoryPoint, type LastPerf, type Routine, type SaveGymSessionInput } from "./session-types";
@@ -32,11 +34,21 @@ function formatAgo(ms: number): string {
  * Três fases: preparar (setup) → treinar (active) → resumo (summary). A sessão fica
  * persistida no localStorage, então sobrevive a refresh/navegação até ser salva.
  */
-export function LiveSession({ lastPerf, volumeHistory = {} }: { lastPerf: LastPerf[]; volumeHistory?: Record<string, ExerciseHistoryPoint[]> }) {
+export function LiveSession({
+  lastPerf,
+  volumeHistory = {},
+  plans: initialPlans = [],
+}: {
+  lastPerf: LastPerf[];
+  volumeHistory?: Record<string, ExerciseHistoryPoint[]>;
+  plans?: WorkoutPlan[];
+}) {
   const router = useRouter();
   const s = useActiveSession();
   // Init lazy: lê o localStorage uma vez (só renderiza após hidratar a sessão).
   const [routines, setRoutines] = useState<Routine[]>(loadRoutines);
+  // Fichas do BANCO (sincronizam entre aparelhos); rotinas ficam só no localStorage.
+  const [plans, setPlans] = useState<WorkoutPlan[]>(initialPlans);
   const [saving, startSave] = useTransition();
 
   // --- Sessão obsoleta (stale): detecta treino abandonado e oferece retomar/descartar ---
@@ -91,6 +103,27 @@ export function LiveSession({ lastPerf, volumeHistory = {} }: { lastPerf: LastPe
       saveRoutines(merged);
       return merged;
     });
+  };
+
+  // Importa FICHAS (código do construtor de fichas) direto pelo "Treinar agora":
+  // salva no banco (mesma-nome sobrescreve, como nas rotinas) e já lista aqui.
+  const handleImportPlans = async (shared: SharedPlan[]) => {
+    let saved = 0;
+    for (const sp of shared) {
+      const existing = plans.find((p) => p.name.toLowerCase() === sp.name.toLowerCase());
+      try {
+        const res = await saveWorkoutPlan({ id: existing?.id, name: sp.name, goal: sp.goal, divisions: sp.divisions });
+        if (res.success && res.plan) {
+          const plan = res.plan;
+          setPlans((prev) => [plan, ...prev.filter((p) => p.id !== plan.id)]);
+          saved++;
+        }
+      } catch {
+        /* rede falhou — o toast de erro abaixo cobre */
+      }
+    }
+    if (saved > 0) toast.success(`${saved} ficha${saved > 1 ? "s" : ""} importada${saved > 1 ? "s" : ""}! 🎉`);
+    else toast.error("Não consegui salvar a ficha importada. Verifique a conexão.");
   };
 
   // Import via LINK (?import=<base64>): amigo manda no WhatsApp e cai direto aqui.
@@ -223,7 +256,14 @@ export function LiveSession({ lastPerf, volumeHistory = {} }: { lastPerf: LastPe
   return (
     <div className="fixed inset-0 z-[60] overflow-y-auto bg-background">
       {!s.session ? (
-        <SessionSetup routines={routines} onStart={s.start} onClose={() => router.push("/health/gym")} onImportRoutines={handleImportRoutines} />
+        <SessionSetup
+          routines={routines}
+          plans={plans}
+          onStart={s.start}
+          onClose={() => router.push("/health/gym")}
+          onImportRoutines={handleImportRoutines}
+          onImportPlans={handleImportPlans}
+        />
       ) : s.session.finishedAt ? (
         <SessionSummary
           session={s.session}

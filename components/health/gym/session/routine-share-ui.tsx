@@ -5,6 +5,7 @@ import { Share2, Download, X, ClipboardPaste } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { buildShareLink, decodeRoutines } from "./routine-share";
+import { decodePlans, type SharedPlan } from "./plan-share";
 import { playClick } from "./sfx";
 import type { Routine } from "./session-types";
 
@@ -44,21 +45,37 @@ export function RoutineShareButton({ routine, className }: { routine: Routine; c
   );
 }
 
-/** Botão + caixa de colar pra importar rotinas de um código/link Base64. */
-export function ImportRoutineButton({ onImport }: { onImport: (routines: Routine[]) => void }) {
+/** Botão + caixa de colar pra importar rotinas OU fichas de um código/link.
+ *  Rotina (?import=, Base64) e ficha (?planimport=, lz-string) têm formatos
+ *  diferentes — aqui tentamos os dois, então qualquer código colado funciona. */
+export function ImportRoutineButton({
+  onImport,
+  onImportPlans,
+}: {
+  onImport: (routines: Routine[]) => void;
+  onImportPlans?: (plans: SharedPlan[]) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
 
   const submit = () => {
     const routines = decodeRoutines(value);
-    if (!routines) {
-      toast.error("Código inválido. Cole o link ou o código completo da rotina.");
+    if (routines) {
+      onImport(routines);
+      toast.success(`${routines.length} rotina${routines.length > 1 ? "s" : ""} importada${routines.length > 1 ? "s" : ""}! 🎉`);
+      setValue("");
+      setOpen(false);
       return;
     }
-    onImport(routines);
-    toast.success(`${routines.length} rotina${routines.length > 1 ? "s" : ""} importada${routines.length > 1 ? "s" : ""}! 🎉`);
-    setValue("");
-    setOpen(false);
+    // Não é rotina? Tenta como FICHA (código do construtor de fichas).
+    const plans = onImportPlans ? decodePlans(value) : null;
+    if (plans) {
+      onImportPlans!(plans);
+      setValue("");
+      setOpen(false);
+      return;
+    }
+    toast.error("Código inválido. Cole o link ou o código completo da rotina/ficha.");
   };
 
   if (!open) {
@@ -73,7 +90,7 @@ export function ImportRoutineButton({ onImport }: { onImport: (routines: Routine
     <div className="space-y-2 rounded-xl border border-border/50 bg-card p-2.5">
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-1.5 text-xs font-semibold">
-          <ClipboardPaste className="h-3.5 w-3.5 text-primary" /> Colar link/código da rotina
+          <ClipboardPaste className="h-3.5 w-3.5 text-primary" /> Colar link/código (rotina ou ficha)
         </span>
         <button type="button" onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground" aria-label="Fechar">
           <X className="h-4 w-4" />

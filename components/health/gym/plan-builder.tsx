@@ -17,8 +17,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { listWorkoutPlans, saveWorkoutPlan, deleteWorkoutPlan } from "@/app/(dashboard)/health/actions";
 import { groupOfExercise } from "./exercise-db";
-import { guessEquipment, EQUIPMENT_META, type StartOptions } from "./session/session-types";
+import { guessEquipment, EQUIPMENT_META } from "./session/session-types";
 import { savePendingStart } from "./session/session-storage";
+import { divisionToStart } from "./session/plan-start";
 import {
   PLAN_GOAL_META, formatTarget, totalExercises, newPlan, newDivision, newPlanExercise,
   type WorkoutPlan, type PlanGoal, type PlanDivision, type PlanExercise, type ExerciseTarget, type IntensityType,
@@ -26,29 +27,6 @@ import {
 
 const GOALS = Object.keys(PLAN_GOAL_META) as PlanGoal[];
 const DIVISION_LETTERS = ["A", "B", "C", "D", "E", "F"];
-
-// Converte uma divisão da ficha numa sessão ao vivo (leva as METAS pros fantasmas).
-function divisionToStart(plan: WorkoutPlan, div: PlanDivision): StartOptions {
-  const groups = div.muscleGroups.length
-    ? div.muscleGroups
-    : Array.from(new Set(div.exercises.map((e) => e.group ?? groupOfExercise(e.name)).filter((g): g is string => !!g)));
-  return {
-    title: `${plan.name} · ${div.label}`,
-    muscleGroups: groups,
-    restSeconds: div.defaultRestSeconds,
-    exercises: div.exercises.map((e) => ({
-      name: e.name,
-      group: e.group,
-      equipment: e.equipment,
-      sets: e.target.sets,
-      reps: e.target.minReps === e.target.maxReps ? String(e.target.minReps) : "",
-      weight: "",
-      // Leva também o override de descanso do exercício (ex.: 120s no agachamento);
-      // ausente → a sessão usa o descanso padrão da divisão.
-      target: { minReps: e.target.minReps, maxReps: e.target.maxReps, intensity: e.target.intensity, restSeconds: e.target.restSeconds },
-    })),
-  };
-}
 
 export function PlanBuilder() {
   const router = useRouter();
