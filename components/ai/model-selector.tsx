@@ -1,79 +1,101 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { 
   Select, 
   SelectContent, 
   SelectItem, 
   SelectTrigger, 
 } from "@/components/ui/select";
-import { updateAISettings } from "@/app/(dashboard)/settings/actions"; 
+import { updateAISettings } from "@/app/(dashboard)/settings/actions";
 import { toast } from "sonner";
-import { Bot, Zap, Sparkles, Cloud, HardDrive, Cpu, Box, Brain, Wind } from "lucide-react";
+import { Bot, Cpu } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AI_PROVIDERS } from "@/lib/ai-models";
+import type { AIProviderInfo } from "@/lib/ai-models";
 
 /* -------------------------------------------------------------------------------------------------
- * 1. CONFIGURAÇÃO DE MODELOS (COM BADGES TÁTICAS)
+ * 1. CONFIGURAÇÃO DE MODELOS (derivada do catálogo único em lib/ai-models.ts)
  * -----------------------------------------------------------------------------------------------*/
 
 interface ModelSelectorProps {
   currentProvider: string;
   currentModel: string;
+  /** ids de provedores prontos para uso (chave salva/env ou local) — ganham ponto verde. */
+  configuredProviders?: string[];
+}
+
+function toSelectorItems(providers: AIProviderInfo[]) {
+  return providers.flatMap((p) =>
+    p.models.map((m) => ({
+      value: `${p.id}:${m.value}`,
+      label: m.label,
+      icon: m.icon ?? p.icon,
+      color: p.color,
+      badge: m.badge,
+    }))
+  );
 }
 
 const MODEL_OPTIONS = [
   {
     category: "Cloud_Sync (APIs Oficiais)",
-    items: [
-      { value: "groq:llama-3.3-70b-versatile", label: "Llama 3.3 (Groq)", icon: Zap, color: "text-orange-500", badge: "FAST" },
-      { value: "deepseek:deepseek-reasoner", label: "DeepSeek R1", icon: Brain, color: "text-indigo-500", badge: "REASON" },
-      { value: "openai:gpt-4-turbo", label: "GPT-4 Turbo", icon: Cloud, color: "text-emerald-500", badge: "SMART" },
-      { value: "google:gemini-1.5-flash", label: "Gemini 1.5", icon: Sparkles, color: "text-blue-500", badge: "VISION" },
-      { value: "mistral:mistral-large-latest", label: "Mistral Large", icon: Wind, color: "text-yellow-500", badge: "PRO" },
-    ]
+    items: toSelectorItems(AI_PROVIDERS.filter((p) => !p.local)),
   },
   {
     category: "Offline_Mode (Via Ollama)",
-    items: [
-      { value: "ollama:deepseek-r1", label: "DeepSeek (Local)", icon: Box, color: "text-zinc-500 dark:text-zinc-400", badge: "LOCAL" },
-      { value: "ollama:llama3", label: "Llama 3 (Local)", icon: HardDrive, color: "text-zinc-500 dark:text-zinc-400", badge: "8B" },
-      { value: "ollama:mistral", label: "Mistral (Local)", icon: HardDrive, color: "text-zinc-500 dark:text-zinc-400", badge: "7B" },
-    ]
-  }
+    items: toSelectorItems(AI_PROVIDERS.filter((p) => p.local)),
+  },
 ];
 
 /* -------------------------------------------------------------------------------------------------
  * 2. COMPONENTE PRINCIPAL
  * -----------------------------------------------------------------------------------------------*/
 
-export function ModelSelector({ currentProvider, currentModel }: ModelSelectorProps) {
-  const initialValue = currentProvider && currentModel 
-    ? `${currentProvider}:${currentModel}` 
-    : "ollama:llama3";
+export function ModelSelector({ currentProvider, currentModel, configuredProviders }: ModelSelectorProps) {
+  const configured = new Set(configuredProviders ?? []);
+  const router = useRouter();
+  const initialValue = currentProvider && currentModel
+    ? `${currentProvider}:${currentModel}`
+    : "ollama:llama3.1";
 
   const [value, setValue] = useState(initialValue);
   const [isPending, setIsPending] = useState(false);
 
-  const selectedOption = MODEL_OPTIONS.flatMap(g => g.items).find(i => i.value === value);
-  
+  const allOptions = MODEL_OPTIONS.flatMap(g => g.items);
+  const selectedOption = allOptions.find(i => i.value === value);
+  // Modelo customizado (definido nas Configurações) que não está na lista:
+  // mostra "provider · model" em vez de um trigger vazio/placeholder.
+  const customLabel = !selectedOption && value.includes(":")
+    ? value.replace(":", " · ")
+    : null;
+
   const SelectedIcon = isPending ? Cpu : (selectedOption?.icon || Bot);
   const selectedColor = isPending ? "text-primary" : selectedOption?.color;
 
   const handleValueChange = async (newValue: string) => {
+    const previous = value;
+    // O rótulo do toast vem do NOVO valor (não do estado anterior do render).
+    const newOption = allOptions.find(i => i.value === newValue);
     setValue(newValue);
     setIsPending(true);
-    
+
     const [newProvider, newModel] = newValue.split(":");
     const formData = new FormData();
     formData.append("aiProvider", newProvider);
     formData.append("aiModel", newModel);
-    
+
     try {
         await updateAISettings(formData);
-        toast.success(`Rota neural alterada para: ${selectedOption?.label || newProvider.toUpperCase()}`);
-    } catch (error) {
+        toast.success(`Rota neural alterada para: ${newOption?.label || newProvider.toUpperCase()}`);
+        // Cada IA tem sua própria conversa: limpa o ?id para a página abrir o
+        // histórico da IA recém-selecionada (ou um chat vazio se ela não tem).
+        router.replace("/ai");
+        router.refresh(); // HUD da página (provedor/contexto) reflete na hora
+    } catch {
         toast.error("Falha ao realocar núcleo de processamento.");
-        setValue(initialValue); 
+        setValue(previous);
     } finally {
         setIsPending(false);
     }
@@ -97,7 +119,7 @@ export function ModelSelector({ currentProvider, currentModel }: ModelSelectorPr
                 <SelectedIcon className={cn("h-4 w-4", isPending && "animate-spin")} />
            </div>
            <span className="truncate text-foreground/90 flex-1 text-left">
-               {isPending ? "Alocando..." : (selectedOption?.label || "Selecione a IA")}
+               {isPending ? "Alocando..." : (selectedOption?.label || customLabel || "Selecione a IA")}
            </span>
            {/* Badge no Trigger */}
            {!isPending && selectedOption?.badge && (
@@ -139,6 +161,16 @@ export function ModelSelector({ currentProvider, currentModel }: ModelSelectorPr
                               <span className="flex-1 uppercase tracking-wider text-[10px]">
                                 {item.label}
                               </span>
+                              {/* Status: chave configurada (verde) ou pendente (apagado) */}
+                              <span
+                                title={configured.has(item.value.split(":")[0]) ? "Pronta para usar" : "Sem chave configurada"}
+                                className={cn(
+                                  "h-1.5 w-1.5 rounded-full shrink-0",
+                                  configured.has(item.value.split(":")[0])
+                                    ? "bg-emerald-500 shadow-[0_0_5px_#10b981]"
+                                    : "bg-muted-foreground/25"
+                                )}
+                              />
                               {/* Badge na Lista */}
                               <span className="text-[8px] font-black tracking-widest px-1.5 py-0.5 rounded border border-border/30 bg-background/50 text-muted-foreground">
                                   {item.badge}

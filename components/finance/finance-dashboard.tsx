@@ -1,9 +1,11 @@
 "use client";
 
+import { Wallet } from "lucide-react";
 import { type CashFlowPoint } from "@/components/finance/cash-flow-chart";
 import { FinanceOverview } from "@/components/finance/finance-overview";
+import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
 
-import { DashboardHeader } from "@/components/finance/dashboard/dashboard-header";
+import { FinanceHeaderActions } from "@/components/finance/dashboard/dashboard-header";
 import { MonthlySummary } from "@/components/finance/dashboard/monthly-summary";
 import { AccountsSection } from "@/components/finance/dashboard/accounts-section";
 import { StatementSection } from "@/components/finance/dashboard/statement-section";
@@ -70,30 +72,45 @@ export function FinanceDashboard({
   budget
 }: FinanceDashboardProps) {
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden animate-in fade-in duration-700 pb-24">
+    <PageShell>
+      <PageHeader
+        icon={<Wallet className="h-6 w-6" />}
+        title="Financeiro"
+        description="Patrimônio, fluxo de caixa e orçamento — tudo num lugar só."
+        actions={<FinanceHeaderActions accounts={accounts} />}
+      >
+        {/* Navegação por seções: a página é longa — um toque leva direto ao bloco */}
+        <nav className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5 scrollbar-hide">
+          {[
+            { id: "resumo", label: "Resumo" },
+            { id: "orcamento", label: "Orçamento" },
+            { id: "contas", label: "Contas" },
+            { id: "extrato", label: "Extrato" },
+            { id: "cobrancas", label: "Cobranças" },
+            { id: "desejos", label: "Wishlist" },
+          ].map((s) => (
+            <a
+              key={s.id}
+              href={`#${s.id}`}
+              className="shrink-0 rounded-full border border-border/40 bg-muted/30 px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+            >
+              {s.label}
+            </a>
+          ))}
+        </nav>
+      </PageHeader>
 
-      {/* Background Glows (Premium Feel) */}
-      <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px] pointer-events-none -z-10" />
-      <div className="absolute top-1/4 right-0 w-[400px] h-[400px] bg-emerald-500/5 rounded-full blur-[100px] pointer-events-none -z-10" />
+      <PageContainer className="space-y-10 pb-24">
+        {/* VISÃO GLOBAL */}
+        <FinanceOverview
+          totalBalance={totalBalance}
+          netSalary={netSalary}
+          grossSalary={grossSalary}
+          totalRecurring={totalRecurring}
+          hasSalarySet={hasSalarySet}
+        />
 
-      <div className="relative mx-auto">
-
-        {/* SEÇÃO 1: HEADER & VISÃO GLOBAL */}
-        <section className="space-y-8">
-          <DashboardHeader accounts={accounts} />
-
-          <div className="px-6 md:px-8 max-w-7xl mx-auto pt-4">
-            <FinanceOverview
-              totalBalance={totalBalance}
-              netSalary={netSalary}
-              grossSalary={grossSalary}
-              totalRecurring={totalRecurring}
-              hasSalarySet={hasSalarySet}
-            />
-          </div>
-        </section>
-
-        {/* SEÇÃO 1.5: RESUMO DO MÊS */}
+        {/* RESUMO DO MÊS */}
         <MonthlySummary
           totalBalance={totalBalance}
           monthIncome={monthIncome}
@@ -101,27 +118,21 @@ export function FinanceDashboard({
           monthlyFlow={monthlyFlow}
         />
 
-        {/* SEÇÃO 1.75: ORÇAMENTO 75/10/15 + PROJEÇÃO (some sem renda-base) */}
-        <BudgetSection budget={budget} monthlyFlow={monthlyFlow} wishlist={wishlist} />
+        {/* ORÇAMENTO 75/10/15 + PROJEÇÃO (some sem renda-base) */}
+        <BudgetSection budget={budget} monthlyFlow={monthlyFlow} wishlist={wishlist} totalBalance={totalBalance} />
 
-        {/* SEÇÃO 2: CARTEIRAS */}
+        {/* CARTEIRAS */}
         <AccountsSection accounts={accounts} />
 
-        <div className="h-px w-full bg-border/50" />
-
-        {/* SEÇÃO 3: EXTRATO & CUSTOS FIXOS */}
+        {/* EXTRATO & CUSTOS FIXOS */}
         <StatementSection transactions={transactions} recurring={recurring} totalRecurring={totalRecurring} accounts={accounts} />
 
-        <div className="h-px w-full bg-border/50" />
-
-        {/* SEÇÃO 3.5: COBRANÇAS RECORRENTES (RECEITAS A RECEBER) */}
+        {/* COBRANÇAS RECORRENTES (RECEITAS A RECEBER) */}
         <RecurringChargesSection charges={recurringCharges} totalCharges={totalCharges} clients={clients} />
 
-        <div className="h-px w-full bg-border/50" />
-
-        {/* SEÇÃO 4: WISHLIST */}
-        <WishlistSection wishlist={wishlist} />
-      </div>
-    </div>
+        {/* WISHLIST */}
+        <WishlistSection wishlist={wishlist} accounts={accounts} totalBalance={totalBalance} />
+      </PageContainer>
+    </PageShell>
   );
 }

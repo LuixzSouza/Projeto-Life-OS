@@ -460,8 +460,8 @@ export function SessionActive({
             <p className="truncate text-[11px] text-muted-foreground">{stats.doneSets}/{stats.totalSets} séries · {stats.volume.toLocaleString("pt-BR")} kg</p>
           </div>
 
-          {/* Mudo dos efeitos sonoros */}
-          <Button variant="ghost" size="icon" onClick={toggleMuted} className="shrink-0 text-muted-foreground" aria-label={muted ? "Ativar sons" : "Silenciar sons"}>
+          {/* Mudo dos efeitos sonoros — no mobile vive dentro do menu ⋮ (header enxuto) */}
+          <Button variant="ghost" size="icon" onClick={toggleMuted} className="hidden shrink-0 text-muted-foreground sm:inline-flex" aria-label={muted ? "Ativar sons" : "Silenciar sons"}>
             {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
           </Button>
 
@@ -473,39 +473,51 @@ export function SessionActive({
                 <MoreVertical className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="z-[80] w-64">
-              <DropdownMenuItem onClick={onTogglePause} className="gap-2">
+            {/* Linhas mais altas (py-2.5) e cantos suaves: confortável pro dedo. */}
+            <DropdownMenuContent align="end" className="z-[80] w-72 max-w-[calc(100vw-1rem)] rounded-2xl p-1.5">
+              <DropdownMenuItem onClick={onTogglePause} className="gap-2.5 rounded-xl py-2.5">
                 {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
                 {paused ? "Retomar cronômetro" : "Pausar cronômetro"}
                 <span className="ml-auto text-[10px] text-muted-foreground">congela o tempo</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={cycleWater} className="gap-2">
+              <DropdownMenuItem onClick={toggleMuted} className="gap-2.5 rounded-xl py-2.5 sm:hidden">
+                {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />} Sons do treino
+                <span className="ml-auto text-[10px] font-semibold text-primary">{muted ? "mudo" : "ligado"}</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={cycleWater} className="gap-2.5 rounded-xl py-2.5">
                 <Droplets className="h-4 w-4" /> Lembrete de água
                 <span className="ml-auto text-[10px] font-semibold text-primary">{waterMinutes === 0 ? "desligado" : `${waterMinutes} min`}</span>
               </DropdownMenuItem>
               {isNotifySupported() && (
-                <DropdownMenuItem onClick={() => void toggleNotify()} className="gap-2">
+                <DropdownMenuItem onClick={() => void toggleNotify()} className="gap-2.5 rounded-xl py-2.5">
                   {notifyOn ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />} Notificar fora do app
                   <span className="ml-auto text-[10px] font-semibold text-primary">{notifyOn ? "ligado" : "desligado"}</span>
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem onClick={captureLocation} className="gap-2">
+              <DropdownMenuItem onClick={captureLocation} className="gap-2.5 rounded-xl py-2.5">
                 <MapPin className="h-4 w-4" /> {session.location ? "Atualizar local do treino" : "Registrar local do treino"}
                 {session.location && <span className="ml-auto text-[10px] font-semibold text-emerald-600">✓ salvo</span>}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onPause} className="gap-2">
+              <DropdownMenuItem onClick={onPause} className="gap-2.5 rounded-xl py-2.5">
                 <LogOut className="h-4 w-4" /> Pausar e sair
                 <span className="ml-auto text-[10px] text-muted-foreground">salva o progresso</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setDiscardOpen(true)} className="gap-2 text-destructive focus:text-destructive">
+              <DropdownMenuItem onClick={() => setDiscardOpen(true)} className="gap-2.5 rounded-xl py-2.5 text-destructive focus:text-destructive">
                 <Trash2 className="h-4 w-4" /> Cancelar treino…
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button onClick={handleFinish} className="h-9 shrink-0 gap-1.5 px-3 font-semibold sm:px-4">
-            <Flag className="h-4 w-4" /> Finalizar
+          {/* Finalizar: só o ícone no mobile (o texto comia o espaço do título) */}
+          <Button
+            onClick={handleFinish}
+            className="h-9 w-9 shrink-0 gap-1.5 px-0 font-semibold sm:w-auto sm:px-4"
+            aria-label="Finalizar treino"
+            title="Finalizar treino"
+          >
+            <Flag className="h-4 w-4" />
+            <span className="hidden sm:inline">Finalizar</span>
           </Button>
         </div>
 

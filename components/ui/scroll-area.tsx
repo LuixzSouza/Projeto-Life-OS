@@ -30,6 +30,12 @@ function ScrollArea({
           /* Ocupa todo o espaço */
           "size-full",
 
+          /* O Radix põe display:table no filho do viewport, o que quebra
+             `truncate` (a "tabela" cresce além do card e gera scroll lateral
+             no mobile). Como nenhum ScrollArea do app é horizontal, força
+             block para o conteúdo respeitar a largura do viewport. */
+          "[&>div]:!block [&>div]:!min-w-0",
+
           /* Herda bordas do container */
           "rounded-[inherit]",
 

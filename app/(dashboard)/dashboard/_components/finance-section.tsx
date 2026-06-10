@@ -29,7 +29,7 @@ function KpiCard({ title, value, subtitle, icon: Icon, color }: { title: string;
   const styles = kpiStyles[color] || kpiStyles.slate;
 
   return (
-    <Card className={`border-l-4 ${styles.border} shadow-sm transition-all hover:shadow-md`}>
+    <Card className={`min-w-0 border-l-4 ${styles.border} shadow-sm transition-all hover:shadow-md`}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 sm:p-6 sm:pb-2">
         <CardTitle className="truncate text-xs font-medium text-muted-foreground sm:text-sm">{title}</CardTitle>
         <div className={`shrink-0 p-1.5 sm:p-2 rounded-full bg-background/50 ${styles.icon} bg-opacity-10`}>
@@ -111,15 +111,16 @@ export async function FinanceSection({ userId, currency }: { userId: string, cur
       {/* Grid Principal Adaptativo */}
       <div className="grid gap-6 xl:grid-cols-12">
         
-        {/* Coluna Esquerda: Visão Geral */}
-        <div className="xl:col-span-8 flex flex-col gap-6">
+        {/* Coluna Esquerda: Visão Geral (min-w-0: impede o gráfico/conteúdo
+            de alargar a coluna além da viewport e criar scroll lateral) */}
+        <div className="min-w-0 xl:col-span-8 flex flex-col gap-6">
           
           <Card className="shadow-sm flex-1">
             <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-4">
               <CardTitle className="text-base font-semibold">Fluxo de Caixa</CardTitle>
               <CardDescription>Balanço consolidado do mês atual</CardDescription>
             </CardHeader>
-            <CardContent className="h-full min-h-[250px] p-4 pt-0 sm:p-6 sm:pt-0">
+            <CardContent className="h-full min-h-[250px] overflow-hidden p-4 pt-0 sm:p-6 sm:pt-0">
               {finance === null ? (
                 <EmptyState icon={Activity} title="Erro ao carregar" description="Não foi possível carregar os dados do gráfico." />
               ) : !hasChartData ? (
@@ -145,7 +146,7 @@ export async function FinanceSection({ userId, currency }: { userId: string, cur
         </div>
 
         {/* Coluna Direita: Transações */}
-        <div className="xl:col-span-4 flex flex-col">
+        <div className="min-w-0 xl:col-span-4 flex flex-col">
           {finance === null ? (
             <Card className="p-6 h-full text-center text-muted-foreground text-sm border-dashed">Erro ao carregar transações.</Card>
           ) : !hasTransactions ? (

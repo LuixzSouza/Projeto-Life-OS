@@ -69,8 +69,10 @@ function TooltipContent({
         data-slot="tooltip-content"
         sideOffset={sideOffset}
         className={cn(
-          // Base container
-          "z-50 w-fit max-w-xs rounded-md px-3 py-1.5 text-xs leading-relaxed",
+          // Base container. z-[110]: tooltip é transitório e precisa flutuar
+          // acima de QUALQUER superfície — dialogs usam z-[100] e, com z-50,
+          // o balão ficava escondido atrás do modal (ex.: medidas corporais).
+          "z-[110] w-fit max-w-xs rounded-md px-3 py-1.5 text-xs leading-relaxed",
 
           // Colors & theme
           "bg-foreground text-background",
@@ -104,7 +106,7 @@ function TooltipContent({
         {/* Arrow */}
         <TooltipPrimitive.Arrow
           className={cn(
-            "z-50 size-2.5 rotate-45 rounded-[2px]",
+            "z-[110] size-2.5 rotate-45 rounded-[2px]",
             "bg-foreground fill-foreground",
             "shadow-sm",
             "ring-1 ring-black/5 dark:ring-white/10"

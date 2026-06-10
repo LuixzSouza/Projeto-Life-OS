@@ -6,7 +6,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { decryptKey } from "@/lib/settings-crypto";
-import { getAiStatus, providerMeta } from "@/lib/ai-help";
+import { getAiStatus, providerMeta, normalizeProvider } from "@/lib/ai-help";
 import { isEphemeralServerless } from "@/lib/db-config";
 import { callAIProvider } from "./providers";
 import type { AIKeys } from "./types";
@@ -18,7 +18,7 @@ export async function runOneShotAi(
 ): Promise<string | null> {
   try {
     const settings = await prisma.settings.findUnique({ where: { userId } });
-    const provider = settings?.aiProvider || "ollama";
+    const provider = normalizeProvider(settings?.aiProvider);
 
     const s = settings as unknown as Record<string, string | null | undefined>;
     const keys: AIKeys = {
@@ -27,6 +27,9 @@ export async function runOneShotAi(
       google: decryptKey(s?.googleKey),
       deepseek: decryptKey(s?.deepseekKey),
       mistral: decryptKey(s?.mistralKey),
+      anthropic: decryptKey(s?.anthropicKey),
+      xai: decryptKey(s?.xaiKey),
+      openrouter: decryptKey(s?.openrouterKey),
     };
 
     const meta = providerMeta(provider);

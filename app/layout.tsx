@@ -7,6 +7,7 @@ import { SecurityProvider } from "@/components/providers/security-provider";
 import { isSystemInstalled } from "@/lib/db-config";
 import { ConsoleWelcome } from "@/components/console-welcome";
 import { getCurrentUserId } from "@/lib/auth";
+import { THEME_PRESETS } from "@/components/settings/appearance/theme-presets";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -56,7 +57,7 @@ export const metadata: Metadata = {
 // Paleta de accents para quem ainda NÃO configurou (visitante na landing,
 // telas de login/setup). Cada reload sorteia uma cor — o sistema "se mostra"
 // personalizável antes mesmo do usuário escolher. Usuário logado mantém a sua.
-const ACCENT_PRESETS = ["theme-blue", "theme-green", "theme-orange", "theme-violet", "theme-rose"];
+const ACCENT_PRESETS: string[] = THEME_PRESETS.map((p) => p.name);
 function randomAccent(): string {
   return ACCENT_PRESETS[Math.floor(Math.random() * ACCENT_PRESETS.length)];
 }
@@ -126,7 +127,7 @@ export default async function RootLayout({
           dangerouslySetInnerHTML={{
             __html:
               `(function(){try{if(location.pathname==="/"){` +
-              `var p=["theme-blue","theme-green","theme-orange","theme-violet","theme-rose"];` +
+              `var p=${JSON.stringify(ACCENT_PRESETS)};` +
               `var c=p[Math.floor(Math.random()*p.length)];` +
               `window.__landingAccent=c;` +
               `document.documentElement.setAttribute("data-theme",c);` +

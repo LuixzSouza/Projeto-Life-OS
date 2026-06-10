@@ -76,7 +76,7 @@ export const groupedSidebarItems: SidebarGroup[] = [
 ];
 
 export const mobileNavItems = [
-  { label: "Dashboard", icon: Home, href: "/dashboard" },
+  { label: "Início", icon: Home, href: "/dashboard" },
   { label: "Agenda", icon: Calendar, href: "/agenda" },
   { label: "IA", icon: BrainCircuit, href: "/ai" },
   { label: "Config", icon: Settings, href: "/settings" },

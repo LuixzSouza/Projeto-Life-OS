@@ -744,11 +744,19 @@ CREATE TABLE "Settings" (
     "aiModel" TEXT NOT NULL DEFAULT 'llama3',
     "aiPersona" TEXT,
     "aiUsage" TEXT,
+    "aiBriefing" TEXT,
+    "aiWebAccess" BOOLEAN NOT NULL DEFAULT false,
+    "aiPrivacyRouting" BOOLEAN NOT NULL DEFAULT false,
+    "aiCostRouting" BOOLEAN NOT NULL DEFAULT false,
+    "aiVoiceReply" BOOLEAN NOT NULL DEFAULT false,
     "openaiKey" TEXT,
     "groqKey" TEXT,
     "googleKey" TEXT,
     "deepseekKey" TEXT,
     "mistralKey" TEXT,
+    "anthropicKey" TEXT,
+    "xaiKey" TEXT,
+    "openrouterKey" TEXT,
     "tmdbApiKey" TEXT,
     "rawgApiKey" TEXT,
     "googleBooksApiKey" TEXT,
@@ -812,6 +820,41 @@ CREATE TABLE "AiMessage" (
     "userId" TEXT,
     CONSTRAINT "AiMessage_chatId_fkey" FOREIGN KEY ("chatId") REFERENCES "AiChat" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "AiMessage_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "AiMemory" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "content" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "userId" TEXT NOT NULL,
+    CONSTRAINT "AiMemory_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "AiAutomation" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "title" TEXT NOT NULL,
+    "prompt" TEXT NOT NULL,
+    "schedule" TEXT NOT NULL,
+    "hour" INTEGER NOT NULL DEFAULT 8,
+    "enabled" BOOLEAN NOT NULL DEFAULT true,
+    "lastRunAt" DATETIME,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "userId" TEXT NOT NULL,
+    CONSTRAINT "AiAutomation_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "AiEmbedding" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "entityType" TEXT NOT NULL,
+    "entityId" TEXT NOT NULL,
+    "text" TEXT NOT NULL,
+    "vector" TEXT NOT NULL,
+    "updatedAt" DATETIME NOT NULL,
+    "userId" TEXT NOT NULL,
+    CONSTRAINT "AiEmbedding_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -1405,6 +1448,18 @@ CREATE INDEX "AiMessage_userId_idx" ON "AiMessage"("userId");
 
 -- CreateIndex
 CREATE INDEX "AiMessage_chatId_idx" ON "AiMessage"("chatId");
+
+-- CreateIndex
+CREATE INDEX "AiMemory_userId_idx" ON "AiMemory"("userId");
+
+-- CreateIndex
+CREATE INDEX "AiAutomation_userId_idx" ON "AiAutomation"("userId");
+
+-- CreateIndex
+CREATE INDEX "AiEmbedding_userId_entityType_idx" ON "AiEmbedding"("userId", "entityType");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "AiEmbedding_userId_entityType_entityId_key" ON "AiEmbedding"("userId", "entityType", "entityId");
 
 -- CreateIndex
 CREATE INDEX "AccessItem_userId_idx" ON "AccessItem"("userId");

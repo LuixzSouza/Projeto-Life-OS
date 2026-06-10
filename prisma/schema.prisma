@@ -81,6 +81,9 @@ model User {
   meetings          Meeting[]
   aiChats           AiChat[]
   aiMessages        AiMessage[]
+  aiMemories        AiMemory[]
+  aiAutomations     AiAutomation[]
+  aiEmbeddings      AiEmbedding[]
   savedLinks        SavedLink[]
   billings          Billing[]
   invoices          Invoice[]
@@ -1250,12 +1253,24 @@ model Settings {
   aiPersona  String?
   aiUsage    String? // Dica: use Json para estatísticas complexas se preferir
 
+  // IA — briefing diário proativo (cache JSON {date, text}; 1 geração por dia)
+  aiBriefing String?
+
+  // IA — privacidade e roteamento (todos OPT-IN, desligados por padrão)
+  aiWebAccess      Boolean @default(false) // permite tools de web (busca/leitura de URL)
+  aiPrivacyRouting Boolean @default(false) // assuntos sensíveis vão para o Ollama local
+  aiCostRouting    Boolean @default(false) // perguntas triviais vão para modelo mais barato
+  aiVoiceReply     Boolean @default(false) // ler respostas da IA em voz alta (speechSynthesis)
+
   // Chaves de API (Removido @map para simplificar e evitar confusão no código)
   openaiKey         String?
   groqKey           String?
   googleKey         String?
   deepseekKey       String?
   mistralKey        String?
+  anthropicKey      String? // Claude (Anthropic)
+  xaiKey            String? // Grok (xAI)
+  openrouterKey     String? // OpenRouter (agregador multi-modelo)
   tmdbApiKey        String?
   rawgApiKey        String?
   googleBooksApiKey String?
@@ -1346,6 +1361,54 @@ model AiMessage {
 
   @@index([userId])
   @@index([chatId])
+}
+
+// Memória persistente da IA: fatos curtos que sobrevivem entre conversas
+// ("lembre que..."). Sempre visíveis e apagáveis nas Configurações.
+model AiMemory {
+  id        String   @id @default(uuid())
+  content   String
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Automação agendada da IA ("toda sexta me mande o resumo financeiro").
+// O resultado vira Notification com link para conversar a respeito.
+model AiAutomation {
+  id        String    @id @default(uuid())
+  title     String
+  prompt    String
+  schedule  String // DAILY | WEEKLY:<0-6> | MONTHLY:<1-28>
+  hour      Int       @default(8)
+  enabled   Boolean   @default(true)
+  lastRunAt DateTime?
+  createdAt DateTime  @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Índice semântico (RAG local): vetor JSON por registro indexado. SQLite não
+// tem pgvector — busca por cosseno em memória (escala pessoal, <50k registros).
+model AiEmbedding {
+  id         String   @id @default(uuid())
+  entityType String // TRANSACTION | NOTE | TASK | MEAL | WORKOUT
+  entityId   String
+  text       String // projeção compacta do registro (o que foi vetorizado)
+  vector     String // JSON: number[]
+  updatedAt  DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, entityType, entityId])
+  @@index([userId, entityType])
 }
 
 model AccessItem {

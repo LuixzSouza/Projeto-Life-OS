@@ -47,8 +47,17 @@ export function TransactionDialog({
   accounts = [],
   transaction,
   trigger,
+  open: controlledOpen,
+  onOpenChange,
 }: TransactionDialogProps) {
-  const [open, setOpen] = useState<boolean>(false);
+  const [internalOpen, setInternalOpen] = useState<boolean>(false);
+  // Controlado quando o pai passa `open` (lista usa um diálogo só p/ N linhas)
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = (value: boolean) => {
+    if (isControlled) onOpenChange?.(value);
+    else setInternalOpen(value);
+  };
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState<boolean>(false);
   const [type, setType] = useState<string>(transaction?.type || "EXPENSE");
@@ -107,7 +116,7 @@ export function TransactionDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger asChild>
+        {!isControlled && <DialogTrigger asChild>
           {trigger ? (
             trigger
           ) : (
@@ -118,7 +127,7 @@ export function TransactionDialog({
               <Plus className="mr-2 h-5 w-5" /> Nova Transação
             </Button>
           )}
-        </DialogTrigger>
+        </DialogTrigger>}
 
         <DialogContent size="md">
           <DialogHeader

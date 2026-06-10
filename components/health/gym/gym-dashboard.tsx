@@ -128,14 +128,14 @@ export function GymDashboard({ workouts, recovery = [] }: { workouts: GymWorkout
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
             {/* Left Column: Stats (4/12) */}
-            <div className="lg:col-span-4 space-y-6">
+            <div className="min-w-0 lg:col-span-4 space-y-6">
               <MuscleRecoveryCard recovery={recovery} />
               <VolumeChart data={volumeData} />
               <MuscleFrequencyCard distribution={muscleDistribution} />
             </div>
 
             {/* Right Column: Feed (8/12) */}
-            <div className="lg:col-span-8 space-y-5">
+            <div className="min-w-0 lg:col-span-8 space-y-5">
 
               {/* Filter Chips */}
               <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">

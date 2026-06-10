@@ -213,7 +213,21 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
     available: true,
   },
   {
-    id: "gemini",
+    id: "anthropic",
+    name: "Claude (Anthropic)",
+    tagline: "Raciocínio de ponta",
+    description:
+      "Modelos Claude da Anthropic (Sonnet, Haiku, Opus). Excelente em raciocínio, escrita e uso de ferramentas — combina muito bem com o loop agêntico do Life OS.",
+    icon: Sparkles,
+    badge: "NUVEM",
+    badgeClass: "bg-amber-500/10 text-amber-600",
+    needs: "Requer uma chave de API (console.anthropic.com) e internet. Cobrança por uso.",
+    available: true,
+  },
+  {
+    // id "google" = identificador canônico do provedor em TODO o sistema de IA
+    // (ai-help, providers, settings.googleKey). "gemini" aqui quebrava o chat.
+    id: "google",
     name: "Google Gemini",
     tagline: "Equilíbrio e contexto longo",
     description:

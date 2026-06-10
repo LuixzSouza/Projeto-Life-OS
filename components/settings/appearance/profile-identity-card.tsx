@@ -1,11 +1,13 @@
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Camera, User, Mail, Image as ImageIcon, Upload, Trash2 } from "lucide-react";
+import { Camera, User, Mail, Image as ImageIcon, Upload, Trash2, Wand2 } from "lucide-react";
 import { hexToHsl } from "@/lib/color";
+import { ART_PRESETS, generateGradientCover, generateInitialsAvatar, nameInitials } from "@/lib/profile-art";
 
 interface ProfileIdentityCardProps {
   name: string;
@@ -40,6 +42,24 @@ export function ProfileIdentityCard({
   coverInputRef,
   onImageProcess,
 }: ProfileIdentityCardProps) {
+  // Cicla os presets a cada clique em "Gerar" — repetir o clique troca o estilo.
+  const [coverArtIdx, setCoverArtIdx] = useState(0);
+  const [avatarArtIdx, setAvatarArtIdx] = useState(0);
+
+  const generateCover = (presetIdx?: number) => {
+    const preset = ART_PRESETS[(presetIdx ?? coverArtIdx) % ART_PRESETS.length];
+    const art = generateGradientCover(preset);
+    if (art) setCoverUrl(art);
+    if (presetIdx === undefined) setCoverArtIdx((i) => i + 1);
+  };
+
+  const generateAvatar = () => {
+    const preset = ART_PRESETS[avatarArtIdx % ART_PRESETS.length];
+    const art = generateInitialsAvatar(name, preset);
+    if (art) setAvatarUrl(art);
+    setAvatarArtIdx((i) => i + 1);
+  };
+
   return (
     <Card className="overflow-hidden border-border shadow-sm bg-card group/card">
       <div className="relative h-52 w-full overflow-hidden group/cover rounded-t-lg bg-muted">
@@ -57,7 +77,39 @@ export function ProfileIdentityCard({
           />
         )}
 
+        {/* Sem capa: estilos prontos visíveis direto (sem depender de hover — mobile) */}
+        {!coverUrl && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80 bg-background/50 backdrop-blur-sm px-3 py-1 rounded-full">
+              Envie uma foto ou gere um estilo
+            </span>
+            <div className="flex gap-2.5">
+              {ART_PRESETS.map((preset, idx) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  title={`Capa ${preset.label}`}
+                  onClick={() => generateCover(idx)}
+                  className="h-9 w-9 rounded-full border-2 border-background/80 shadow-md hover:scale-110 hover:border-background transition-all"
+                  style={{ background: `linear-gradient(135deg, ${preset.from}, ${preset.to})` }}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover/cover:opacity-100 transition-all duration-300 translate-y-2 group-hover/cover:translate-y-0">
+          {coverUrl && (
+            <Button
+              type="button" variant="secondary" size="sm"
+              className="bg-background/70 hover:bg-background/90 backdrop-blur-md shadow-sm h-9 px-3 text-xs font-medium border-0"
+              onClick={() => generateCover()}
+              title="Gerar outra capa em gradiente"
+            >
+              <Wand2 className="h-3.5 w-3.5 mr-2 text-primary" />
+              Gerar
+            </Button>
+          )}
           <Button
             type="button" variant="secondary" size="sm"
             className="bg-background/70 hover:bg-background/90 backdrop-blur-md shadow-sm h-9 px-3 text-xs font-medium border-0"
@@ -92,7 +144,7 @@ export function ProfileIdentityCard({
               <Avatar className="h-36 w-36 border-[6px] border-card shadow-xl bg-muted">
                 <AvatarImage src={avatarUrl || ""} className="object-cover" />
                 <AvatarFallback className="text-4xl font-bold bg-muted text-muted-foreground">
-                  {name.substring(0, 2).toUpperCase() || "EU"}
+                  {nameInitials(name)}
                 </AvatarFallback>
               </Avatar>
 
@@ -105,6 +157,13 @@ export function ProfileIdentityCard({
             <div className="flex gap-2">
               <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => avatarInputRef.current?.click()}>
                 <Upload className="h-3 w-3 mr-1" /> Foto
+              </Button>
+              <Button
+                type="button" variant="outline" size="sm" className="h-7 text-xs"
+                onClick={generateAvatar}
+                title="Gerar avatar com suas iniciais — clique de novo para trocar a cor"
+              >
+                <Wand2 className="h-3 w-3 mr-1" /> Gerar
               </Button>
               {avatarUrl && (
                 <Button type="button" variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:bg-destructive/10" onClick={() => setAvatarUrl("")}>

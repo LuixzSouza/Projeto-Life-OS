@@ -64,6 +64,8 @@ export interface FocusStartRequest {
 
 const START_KEY = "lifeos:focus:pending-start";
 export const FOCUS_START_EVENT = "lifeos:focus:start";
+/** Abre o painel do Modo Foco de qualquer lugar (disparado pelo QuickDock). */
+export const FOCUS_OPEN_EVENT = "lifeos:focus:open";
 
 export function requestFocusStart(req: FocusStartRequest): void {
   if (typeof window === "undefined") return;

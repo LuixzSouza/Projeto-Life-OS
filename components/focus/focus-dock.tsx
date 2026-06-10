@@ -6,9 +6,8 @@
 // localStorage, então sobrevive a refresh e ao fechar/reabrir a aba.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
-  Timer, Play, Pause, RotateCcw, SkipForward, X, Settings2,
+  Play, Pause, RotateCcw, SkipForward, X, Settings2,
   Brain, Check, ChevronDown, Maximize2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,10 +15,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   type FocusState, type FocusStartRequest,
-  DEFAULT_FOCUS_STATE, FOCUS_PRESETS, PHASE_META, FOCUS_START_EVENT,
+  DEFAULT_FOCUS_STATE, FOCUS_PRESETS, PHASE_META, FOCUS_START_EVENT, FOCUS_OPEN_EVENT,
   loadFocusState, saveFocusState, elapsedMs, remainingMs, consumeFocusStart,
   isPhaseComplete, nextBreakPhase, phaseDurationMin, formatClock, playChime,
 } from "./focus-core";
+import { QUICK_DOCK_EVENT } from "@/components/layout/quick-dock";
 import {
   getFocusableTasks, logFocusSession, getFocusToday,
   type FocusableTask, type FocusTodaySummary,
@@ -28,7 +28,6 @@ import {
 const TICK_MS = 500;
 
 export function FocusDock() {
-  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [state, setState] = useState<FocusState>(DEFAULT_FOCUS_STATE);
   const [now, setNow] = useState<number>(() => Date.now());
@@ -37,6 +36,8 @@ export function FocusDock() {
   const [tasksLoaded, setTasksLoaded] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showTasks, setShowTasks] = useState(false);
+  // O speed-dial do QuickDock está aberto? A pílula se esconde p/ não sobrepor.
+  const [quickDockOpen, setQuickDockOpen] = useState(false);
 
   // Ref sempre apontando para o estado mais recente — o tick (assíncrono) lê
   // daqui para evitar closures obsoletas ao disparar conclusões de fase.
@@ -99,6 +100,21 @@ export function FocusDock() {
     window.addEventListener(FOCUS_START_EVENT, handler);
     return () => window.removeEventListener(FOCUS_START_EVENT, handler);
   }, [applyStart]);
+
+  // Abre o painel quando o QuickDock pede; acompanha o estado do speed-dial.
+  useEffect(() => {
+    const openPanel = () => update({ open: true });
+    const onDial = (e: Event) => {
+      const detail = (e as CustomEvent<{ open?: boolean }>).detail;
+      setQuickDockOpen(detail?.open === true);
+    };
+    window.addEventListener(FOCUS_OPEN_EVENT, openPanel);
+    window.addEventListener(QUICK_DOCK_EVENT, onDial);
+    return () => {
+      window.removeEventListener(FOCUS_OPEN_EVENT, openPanel);
+      window.removeEventListener(QUICK_DOCK_EVENT, onDial);
+    };
+  }, [update]);
 
   // Registra um intervalo de FOCO concluído (ou parcial) no servidor.
   const logFocus = useCallback((minutes: number, startedAt: number, cycles = 1) => {
@@ -263,49 +279,44 @@ export function FocusDock() {
   const selectedTask = state.taskId ? tasks.find((t) => t.id === state.taskId) ?? null : null;
 
   // --- PÍLULA RECOLHIDA --------------------------------------------------
+  // Sem sessão ativa, o dock recolhido não renderiza nada: quem abre o painel
+  // é o QuickDock (speed-dial). Com sessão ativa, a pílula com o timer ao vivo
+  // fica empilhada ACIMA do botão do QuickDock (mesma coluna, sem sobreposição)
+  // e se esconde com fluidez enquanto o speed-dial está aberto.
   if (!state.open) {
+    if (!isActive) return null;
     return (
-      <div className="fixed right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-50 md:right-6 md:bottom-6">
+      <div
+        className={cn(
+          "fixed right-4 bottom-[calc(8rem+env(safe-area-inset-bottom))] z-50 transition-all duration-300 md:right-6 md:bottom-20",
+          quickDockOpen && "pointer-events-none translate-y-2 opacity-0"
+        )}
+      >
         <button
           onClick={() => update({ open: true })}
-          className={cn(
-            "group flex items-center gap-2.5 rounded-full border px-3.5 py-2.5 shadow-lg backdrop-blur transition-all hover:shadow-xl active:scale-95",
-            isActive
-              ? "border-border/40 bg-card/95"
-              : "border-border/40 bg-card/95 hover:border-primary/40"
-          )}
-          style={isActive ? { boxShadow: `0 8px 30px -8px ${phaseMeta.color}66` } : undefined}
+          className="group flex items-center gap-2.5 rounded-full border border-border/40 bg-card/95 px-3.5 py-2.5 shadow-lg backdrop-blur transition-all hover:shadow-xl active:scale-95"
+          style={{ boxShadow: `0 8px 30px -8px ${phaseMeta.color}66` }}
           aria-label="Abrir Modo Foco"
         >
           <span className="relative flex h-7 w-7 items-center justify-center">
             <Ring progress={progress} color={phaseMeta.color} size={28} stroke={3} />
-            {isActive ? (
-              <span className="absolute text-[8px] font-black tabular-nums" style={{ color: phaseMeta.color }}>
-                {Math.ceil(displayMs / 60_000)}
-              </span>
-            ) : (
-              <Timer className="absolute h-3.5 w-3.5 text-primary" />
-            )}
+            <span className="absolute text-[8px] font-black tabular-nums" style={{ color: phaseMeta.color }}>
+              {Math.ceil(displayMs / 60_000)}
+            </span>
           </span>
-          {isActive ? (
-            <span className="flex flex-col items-start leading-none">
-              <span className="font-mono text-sm font-black tabular-nums text-foreground">{formatClock(displayMs)}</span>
-              <span className="text-[8px] font-bold uppercase tracking-wider" style={{ color: phaseMeta.color }}>{phaseMeta.label}</span>
-            </span>
-          ) : (
-            <span className="text-xs font-black uppercase tracking-wider text-foreground">Foco</span>
-          )}
-          {isActive && (
-            <span
-              role="button"
-              tabIndex={0}
-              onClick={(e) => { e.stopPropagation(); toggleRun(); }}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); toggleRun(); } }}
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-foreground text-background transition-transform hover:scale-105 active:scale-90"
-            >
-              {state.running ? <Pause className="h-3.5 w-3.5" /> : <Play className="ml-0.5 h-3.5 w-3.5" />}
-            </span>
-          )}
+          <span className="flex flex-col items-start leading-none">
+            <span className="font-mono text-sm font-black tabular-nums text-foreground">{formatClock(displayMs)}</span>
+            <span className="text-[8px] font-bold uppercase tracking-wider" style={{ color: phaseMeta.color }}>{phaseMeta.label}</span>
+          </span>
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); toggleRun(); }}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); toggleRun(); } }}
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-foreground text-background transition-transform hover:scale-105 active:scale-90"
+          >
+            {state.running ? <Pause className="h-3.5 w-3.5" /> : <Play className="ml-0.5 h-3.5 w-3.5" />}
+          </span>
         </button>
       </div>
     );

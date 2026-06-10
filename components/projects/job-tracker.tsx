@@ -123,7 +123,9 @@ export function JobTracker({ jobs, portfolio, projects }: JobTrackerProps) {
 
                 {/* Toolbar */}
                 <div className="flex flex-col lg:flex-row gap-3 lg:items-center justify-between">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                    {/* flex-wrap: no mobile a busca desce para a própria linha em vez
+                        de espremer pílula + busca + select nos 375px. */}
+                    <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
                         <div className="flex items-center gap-1 bg-muted/40 p-1 rounded-xl border border-border/40 shrink-0">
                             <button onClick={() => setViewMode('list')} title="Lista" className={cn("h-8 w-8 flex items-center justify-center rounded-lg transition-all", viewMode === 'list' ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground")}>
                                 <List className="h-4 w-4" />
@@ -136,7 +138,7 @@ export function JobTracker({ jobs, portfolio, projects }: JobTrackerProps) {
                             </button>
                         </div>
 
-                        <div className="relative w-full lg:max-w-md">
+                        <div className="relative order-last w-full sm:order-none sm:w-auto sm:flex-1 lg:max-w-md">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
                                 value={search}
@@ -147,7 +149,7 @@ export function JobTracker({ jobs, portfolio, projects }: JobTrackerProps) {
                         </div>
 
                         <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortMode)}>
-                            <SelectTrigger className="h-10 w-[160px] shrink-0 rounded-xl bg-muted/40 border-border/40 gap-1.5 text-xs">
+                            <SelectTrigger className="h-10 min-w-0 flex-1 rounded-xl bg-muted/40 border-border/40 gap-1.5 text-xs sm:flex-none sm:w-[160px]">
                                 <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" /> <SelectValue />
                             </SelectTrigger>
                             <SelectContent className="rounded-xl">
@@ -161,7 +163,7 @@ export function JobTracker({ jobs, portfolio, projects }: JobTrackerProps) {
 
                     <Dialog>
                         <DialogTrigger asChild>
-                            <Button className="gap-2 h-10 rounded-xl font-bold shadow-sm shrink-0">
+                            <Button className="gap-2 h-10 w-full rounded-xl font-bold shadow-sm shrink-0 lg:w-auto">
                                 <Plus className="h-4 w-4" /> Adicionar {type === 'JOB' ? 'vaga' : 'freela'}
                             </Button>
                         </DialogTrigger>

@@ -172,7 +172,9 @@ export function GymGallery() {
       {days.map(([key, list]) => (
         <section key={key} className="space-y-3">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground first-letter:uppercase">{dayLabel(key)}</h3>
-          <div className="space-y-3">
+          {/* Grid no desktop: sem ele, um card de foto única ocupava a largura
+              inteira do conteúdo e a imagem ficava gigante. */}
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {list.map((s) => (
               <SessionCard key={s.key} session={s} onOpen={(idx) => open(s.key, idx)} />
             ))}
@@ -317,7 +319,7 @@ function SessionCard({ session, onOpen }: { session: PhotoSession; onOpen: (inde
         <button
           type="button"
           onClick={() => onOpen(0)}
-          className="group relative block aspect-[4/5] w-full overflow-hidden rounded-xl border border-border/40 sm:aspect-video"
+          className="group relative block aspect-[4/5] w-full overflow-hidden rounded-xl border border-border/40"
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- base64 local */}
           <img src={session.photos[0].dataUrl} alt={session.title} className="h-full w-full object-cover transition-transform group-hover:scale-105" />

@@ -55,6 +55,8 @@ interface BudgetSectionProps {
   budget: BudgetSnapshot;
   monthlyFlow: CashFlowPoint[];
   wishlist: DashboardWishlist[];
+  /** Saldo somado das contas — desconta o que já existe antes de projetar. */
+  totalBalance: number;
 }
 
 /**
@@ -62,24 +64,25 @@ interface BudgetSectionProps {
  * Esquerda: baldes percentuais da renda com o gasto real classificado.
  * Direita: ritmo de poupança e a DATA projetada de cada meta da wishlist.
  */
-export function BudgetSection({ budget, monthlyFlow, wishlist }: BudgetSectionProps) {
+export function BudgetSection({ budget, monthlyFlow, wishlist, totalBalance }: BudgetSectionProps) {
   const { smartView } = useSmartView();
   const hidden = smartView;
 
   const projection = useMemo(() => buildSavingsProjection(monthlyFlow), [monthlyFlow]);
 
-  // Metas com preço definido e ainda não realizadas, mais prioritárias primeiro.
+  // Desejos com preço definido e ainda não comprados, mais prioritários primeiro.
+  // O que falta é medido contra o saldo REAL das contas (não um cofre virtual).
   const goals = useMemo(
     () =>
       wishlist
-        .filter((w) => w.price > 0 && w.saved < w.price)
+        .filter((w) => w.price > 0 && w.status !== "BOUGHT")
         .slice(0, 4)
         .map((w) => {
-          const remaining = w.price - w.saved;
-          const months = projection ? monthsToGoal(remaining, projection.avgMonthlySavings) : null;
+          const remaining = Math.max(w.price - totalBalance, 0);
+          const months = remaining <= 0 ? 0 : projection ? monthsToGoal(remaining, projection.avgMonthlySavings) : null;
           return { ...w, remaining, months };
         }),
-    [wishlist, projection],
+    [wishlist, projection, totalBalance],
   );
 
   // Advogado do Diabo (#17): o balde mais estourado vira o "réu" do confronto.
@@ -93,7 +96,7 @@ export function BudgetSection({ budget, monthlyFlow, wishlist }: BudgetSectionPr
   if (budget.income <= 0) return null; // sem renda-base não há o que orçar
 
   return (
-    <section className="px-6 md:px-8 py-10 max-w-7xl mx-auto space-y-6">
+    <section id="orcamento" className="scroll-mt-36 space-y-6">
       <div className="flex items-center gap-3">
         <div className="p-2 bg-primary/10 rounded-xl">
           <Target className="h-5 w-5 text-primary" />
@@ -209,7 +212,9 @@ export function BudgetSection({ budget, monthlyFlow, wishlist }: BudgetSectionPr
                     <div key={g.id} className="flex items-center justify-between gap-3 rounded-xl border border-border/40 bg-background px-3 py-2.5">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-foreground">{g.name}</p>
-                        <p className="text-[10px] text-muted-foreground">faltam {money(g.remaining, hidden)}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {g.remaining > 0 ? `faltam ${money(g.remaining, hidden)} além do saldo` : "seu saldo atual já cobre"}
+                        </p>
                       </div>
                       <p className="shrink-0 text-xs font-bold text-primary">
                         {g.months === 0

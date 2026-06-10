@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireUserId } from "@/lib/auth";
 import { logActivity } from "@/lib/activity";
+import { runOneShotAi } from "@/app/(dashboard)/ai/actions/oneshot";
 import type { ParsedTransaction } from "@/lib/statement-parser";
 
 // Importa transações de um extrato (OFX/CSV já parseado no cliente) para uma conta.
@@ -97,5 +98,90 @@ export async function importTransactions(accountId: string, items: ParsedTransac
   } catch (error) {
     console.error("Erro ao importar extrato:", error);
     return { success: false, message: error instanceof Error ? error.message : "Falha ao importar extrato." };
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* IMPORT VIA IA — cola o texto de QUALQUER banco (app, e-mail, PDF, fatura)  */
+/* e a IA configurada estrutura os lançamentos. Alternativa gratuita ao       */
+/* agregador pago: com Ollama local, o texto nem sai do computador.           */
+/* -------------------------------------------------------------------------- */
+
+interface AiParseResult {
+  success: boolean;
+  message: string;
+  transactions: ParsedTransaction[];
+}
+
+// Valida e normaliza o que a IA devolveu (nunca confiar cegamente no JSON).
+function sanitizeAiTransactions(raw: unknown): ParsedTransaction[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ParsedTransaction[] = [];
+  for (const item of raw.slice(0, 500)) {
+    if (typeof item !== "object" || item === null) continue;
+    const r = item as Record<string, unknown>;
+    const date = typeof r.date === "string" ? r.date.trim().slice(0, 10) : "";
+    const amount = Math.abs(Number(r.amount));
+    const description = typeof r.description === "string" ? r.description.trim().slice(0, 200) : "";
+    const type = r.type === "INCOME" ? "INCOME" : r.type === "EXPENSE" ? "EXPENSE" : null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) continue;
+    if (!amount || isNaN(amount) || !type) continue;
+    out.push({ date, description: description || "Lançamento", amount, type });
+  }
+  return out;
+}
+
+export async function parseStatementWithAi(rawText: string): Promise<AiParseResult> {
+  try {
+    const userId = await requireUserId();
+    const text = (rawText ?? "").trim().slice(0, 20_000);
+    if (text.length < 10) {
+      return { success: false, message: "Cole o texto do extrato primeiro.", transactions: [] };
+    }
+
+    const currentYear = new Date().getFullYear();
+    const system = [
+      "Você extrai lançamentos financeiros de extratos bancários em texto livre (copiados de apps de banco, e-mails, PDFs ou faturas de cartão, em português).",
+      'Responda SOMENTE com um array JSON válido, sem markdown e sem explicações, no formato:',
+      '[{"date":"YYYY-MM-DD","description":"texto curto","amount":123.45,"type":"INCOME"}]',
+      "Regras:",
+      '- "amount" é SEMPRE positivo; o sentido vai em "type": entradas (salário, pix recebido, depósito, estorno) = INCOME; saídas (compras, pix enviado, boletos, tarifas) = EXPENSE.',
+      "- Em fatura de cartão de crédito, compras são EXPENSE.",
+      `- Datas sem ano usam ${currentYear}; converta dd/mm para ISO (YYYY-MM-DD).`,
+      "- Valores brasileiros: \"1.234,56\" significa 1234.56.",
+      "- Ignore saldos, totais, limites, cabeçalhos, propaganda e linhas que não sejam lançamentos.",
+      "- Se não houver lançamentos, responda [].",
+    ].join("\n");
+
+    const res = await runOneShotAi(userId, system, text);
+    if (!res) {
+      return {
+        success: false,
+        message: "IA não configurada ou indisponível. Configure um provedor em Configurações → Integrações (o Ollama local funciona sem custo).",
+        transactions: [],
+      };
+    }
+
+    // Extrai o array JSON mesmo se o modelo embrulhar em texto/markdown.
+    const start = res.indexOf("[");
+    const end = res.lastIndexOf("]");
+    if (start === -1 || end <= start) {
+      return { success: false, message: "A IA não retornou lançamentos válidos. Tente um trecho menor do extrato.", transactions: [] };
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(res.slice(start, end + 1));
+    } catch {
+      return { success: false, message: "A resposta da IA veio malformada. Tente novamente.", transactions: [] };
+    }
+
+    const transactions = sanitizeAiTransactions(parsed);
+    if (transactions.length === 0) {
+      return { success: false, message: "Nenhum lançamento identificado nesse texto.", transactions: [] };
+    }
+    return { success: true, message: `${transactions.length} lançamento(s) identificado(s).`, transactions };
+  } catch (error) {
+    console.error("Erro no import via IA:", error);
+    return { success: false, message: "Falha ao processar com a IA.", transactions: [] };
   }
 }

@@ -240,7 +240,7 @@ export function PlanBuilder() {
                 type="button"
                 onClick={() => patchDraft((p) => ({ ...p, goal: g }))}
                 className={cn(
-                  "shrink-0 rounded-lg border px-3 text-xs font-semibold transition-colors",
+                  "shrink-0 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors",
                   draft.goal === g ? "border-primary bg-primary/10 text-primary" : "border-border/50 text-muted-foreground hover:border-primary/40",
                 )}
               >
@@ -308,17 +308,18 @@ export function PlanBuilder() {
   // ============================ LISTA ============================
   return (
     <div className="space-y-4 pb-12">
-      <div className="flex items-center justify-between gap-3">
+      {/* Empilha no mobile: título + 3 botões na mesma linha estouravam um iPhone SE. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="flex items-center gap-2 text-base font-bold"><ClipboardList className="h-5 w-5 text-primary" /> Fichas de treino</h3>
           <p className="text-xs text-muted-foreground">Monte divisões A/B/C com metas e inicie direto.</p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex items-center gap-2 sm:shrink-0">
           {plans && plans.length > 0 && (
-            <Button onClick={exportAll} size="sm" variant="outline" className="h-9 gap-1.5 text-xs" title="Exportar todas as fichas (backup)"><Upload className="h-3.5 w-3.5" /> Exportar</Button>
+            <Button onClick={exportAll} size="sm" variant="outline" className="h-9 flex-1 gap-1.5 text-xs sm:flex-none" title="Exportar todas as fichas (backup)"><Upload className="h-3.5 w-3.5" /> Exportar</Button>
           )}
-          <Button onClick={() => setImportOpen((v) => !v)} size="sm" variant="outline" className="h-9 gap-1.5 text-xs"><Download className="h-3.5 w-3.5" /> Importar ficha</Button>
-          <Button onClick={createNew} size="sm" className="h-9 gap-1.5 font-semibold"><Plus className="h-4 w-4" /> Nova ficha</Button>
+          <Button onClick={() => setImportOpen((v) => !v)} size="sm" variant="outline" className="h-9 flex-1 gap-1.5 text-xs sm:flex-none"><Download className="h-3.5 w-3.5" /> Importar</Button>
+          <Button onClick={createNew} size="sm" className="h-9 flex-1 gap-1.5 font-semibold sm:flex-none"><Plus className="h-4 w-4" /> Nova ficha</Button>
         </div>
       </div>
 
@@ -357,9 +358,9 @@ export function PlanBuilder() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {plans.map((plan) => (
-            <div key={plan.id} className="rounded-2xl border border-border/50 bg-card p-4 shadow-sm transition-all hover:border-primary/30 hover:shadow-md">
+            <div key={plan.id} className="min-w-0 overflow-hidden rounded-2xl border border-border/50 bg-card p-4 shadow-sm transition-all hover:border-primary/30 hover:shadow-md">
               <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <h4 className="truncate text-sm font-bold">{plan.name}</h4>
                   <p className="mt-0.5 text-[11px] text-muted-foreground">
                     <span className="rounded-full bg-primary/10 px-1.5 py-0.5 font-semibold text-primary">{PLAN_GOAL_META[plan.goal].label}</span>
@@ -386,17 +387,18 @@ export function PlanBuilder() {
                   </AlertDialog>
                 </div>
               </div>
-              {/* Divisões: iniciar com um toque */}
+              {/* Divisões: iniciar com um toque (truncadas p/ nome longo não estourar o card) */}
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {plan.divisions.map((d) => (
                   <button
                     key={d.id}
                     type="button"
                     onClick={() => startDivision(plan, d)}
-                    className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background px-2.5 py-1 text-[11px] font-medium transition-colors hover:border-primary/50 hover:bg-primary/5"
+                    className="inline-flex max-w-full items-center gap-1 rounded-full border border-border/60 bg-background px-2.5 py-1 text-[11px] font-medium transition-colors hover:border-primary/50 hover:bg-primary/5"
                     title={`Iniciar ${d.label}`}
                   >
-                    <Play className="h-3 w-3 text-primary" /> {d.label}
+                    <Play className="h-3 w-3 shrink-0 text-primary" />
+                    <span className="truncate">{d.label}</span>
                   </button>
                 ))}
               </div>
@@ -468,7 +470,7 @@ function DivisionEditor({ division, canDelete, onPatch, onPatchExercise, onDelet
     <div className="space-y-3 rounded-2xl border border-border/40 bg-card/40 p-3">
       {/* Cabeçalho da divisão */}
       <div className="flex flex-wrap items-center gap-2">
-        <Input value={division.label} onChange={(e) => onPatch((d) => ({ ...d, label: e.target.value }))} placeholder="Nome da divisão (ex: A — Peito/Tríceps)" className="h-9 flex-1 text-sm font-semibold" />
+        <Input value={division.label} onChange={(e) => onPatch((d) => ({ ...d, label: e.target.value }))} placeholder="Nome da divisão (ex: A — Peito/Tríceps)" className="h-9 min-w-0 flex-1 text-sm font-semibold" />
         <Button type="button" size="sm" className="h-9 gap-1.5" onClick={onStart}><Play className="h-4 w-4" /> Iniciar</Button>
         {canDelete && (
           <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-destructive" onClick={onDelete} title="Excluir divisão"><Trash2 className="h-4 w-4" /></Button>
@@ -525,7 +527,7 @@ function ExerciseRow({ ex, first, last, onMove, onPatch, onRemove }: {
           <button type="button" onClick={() => onMove(-1)} disabled={first} className="text-muted-foreground/60 hover:text-foreground disabled:opacity-30" aria-label="Subir"><ArrowUp className="h-3.5 w-3.5" /></button>
           <button type="button" onClick={() => onMove(1)} disabled={last} className="text-muted-foreground/60 hover:text-foreground disabled:opacity-30" aria-label="Descer"><ArrowDown className="h-3.5 w-3.5" /></button>
         </div>
-        <Input value={ex.name} onChange={(e) => onPatch((x) => ({ ...x, name: e.target.value }))} className="h-9 flex-1 text-sm font-medium" />
+        <Input value={ex.name} onChange={(e) => onPatch((x) => ({ ...x, name: e.target.value }))} className="h-9 min-w-0 flex-1 text-sm font-medium" />
         {ex.equipment && <span className="hidden shrink-0 rounded-full border border-border/50 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground sm:inline">{EQUIPMENT_META[ex.equipment].short}</span>}
         <button type="button" onClick={onRemove} className="shrink-0 text-muted-foreground/60 hover:text-destructive" aria-label="Remover"><Trash2 className="h-4 w-4" /></button>
       </div>

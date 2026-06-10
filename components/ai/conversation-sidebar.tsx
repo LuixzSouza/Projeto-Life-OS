@@ -5,12 +5,12 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Plus, MessageSquare, Trash2, X, PanelLeft, Loader2,
-  Cloud, Zap, Sparkles, Brain, Wind, HardDrive, type LucideIcon,
+  Plus, MessageSquare, Trash2, X, PanelLeft, Loader2, Search, Pencil,
+  Cloud, Zap, Sparkles, Brain, Wind, HardDrive, Asterisk, Orbit, Network, type LucideIcon,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { clearChat } from "@/app/(dashboard)/ai/actions";
+import { clearChat, renameChat } from "@/app/(dashboard)/ai/actions";
 import { providerMeta } from "@/lib/ai-help";
 import { cn } from "@/lib/utils";
 
@@ -30,10 +30,11 @@ interface Props {
 
 // Ícone por IA (provedor).
 const PROVIDER_ICON: Record<string, LucideIcon> = {
-  openai: Cloud, groq: Zap, google: Sparkles, deepseek: Brain, mistral: Wind, ollama: HardDrive,
+  openai: Cloud, anthropic: Asterisk, google: Sparkles, groq: Zap,
+  deepseek: Brain, mistral: Wind, xai: Orbit, openrouter: Network, ollama: HardDrive,
 };
 // Ordem de exibição dos grupos.
-const PROVIDER_ORDER = ["openai", "groq", "google", "deepseek", "mistral", "ollama"];
+const PROVIDER_ORDER = ["openai", "anthropic", "google", "groq", "deepseek", "mistral", "xai", "openrouter", "ollama"];
 
 interface Group { key: string; label: string; Icon: LucideIcon; items: ChatSummary[]; }
 
@@ -60,8 +61,27 @@ function groupByProvider(chats: ChatSummary[]): Group[] {
 export function ConversationSidebar({ chats, activeId, activeTitle }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false); // painel deslizante
+  const [query, setQuery] = useState(""); // busca por título
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null); // renomear inline
+  const [draftTitle, setDraftTitle] = useState("");
   const [, startTransition] = useTransition();
+
+  const startEdit = (c: ChatSummary) => {
+    setEditingId(c.id);
+    setDraftTitle(c.title?.replace(/\.\.\.$/, "") || "");
+  };
+
+  const saveEdit = () => {
+    const id = editingId;
+    const title = draftTitle.trim();
+    setEditingId(null);
+    if (!id || !title) return;
+    startTransition(async () => {
+      await renameChat(id, title);
+      router.refresh();
+    });
+  };
 
   // Trava o scroll do body enquanto o painel está aberto.
   // (open só fica true após clique no client, então o portal nunca roda no SSR.)
@@ -83,7 +103,11 @@ export function ConversationSidebar({ chats, activeId, activeTitle }: Props) {
     });
   };
 
-  const groups = groupByProvider(chats);
+  const trimmedQuery = query.trim().toLowerCase();
+  const visibleChats = trimmedQuery
+    ? chats.filter((c) => (c.title || "").toLowerCase().includes(trimmedQuery))
+    : chats;
+  const groups = groupByProvider(visibleChats);
 
   const list = (
     <div className="flex h-full flex-col">
@@ -111,11 +135,30 @@ export function ConversationSidebar({ chats, activeId, activeTitle }: Props) {
         </Link>
       </div>
 
+      {/* Busca por título */}
+      {chats.length > 0 && (
+        <div className="shrink-0 border-b border-border/40 px-3 py-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/50" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Buscar conversa..."
+              className="h-8 w-full rounded-lg border border-border/40 bg-background pl-8 pr-2 text-xs text-foreground outline-none transition focus:border-primary/40"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Histórico agrupado por IA */}
       <div className="min-h-0 flex-1 overflow-y-auto p-2 scrollbar-hide">
         {chats.length === 0 ? (
           <p className="px-2 py-6 text-center text-xs text-muted-foreground/60">
             Nenhuma conversa ainda.<br />Comece uma nova acima.
+          </p>
+        ) : visibleChats.length === 0 ? (
+          <p className="px-2 py-6 text-center text-xs text-muted-foreground/60">
+            Nenhuma conversa com “{query.trim()}”.
           </p>
         ) : (
           groups.map((g) => (
@@ -128,6 +171,31 @@ export function ConversationSidebar({ chats, activeId, activeTitle }: Props) {
               <div className="space-y-1">
                 {g.items.map((c) => {
                   const isActive = c.id === activeId;
+
+                  // Modo edição: troca o link por um input inline (Enter salva, Esc cancela).
+                  if (editingId === c.id) {
+                    return (
+                      <div
+                        key={c.id}
+                        className="flex items-center gap-2 rounded-xl border border-primary/40 bg-primary/5 px-2.5 py-2"
+                      >
+                        <Pencil className="h-4 w-4 shrink-0 text-primary" />
+                        <input
+                          autoFocus
+                          value={draftTitle}
+                          maxLength={60}
+                          onChange={(e) => setDraftTitle(e.target.value)}
+                          onBlur={saveEdit}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") { e.preventDefault(); saveEdit(); }
+                            if (e.key === "Escape") setEditingId(null);
+                          }}
+                          className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-foreground outline-none"
+                        />
+                      </div>
+                    );
+                  }
+
                   return (
                     <Link
                       key={c.id}
@@ -147,6 +215,14 @@ export function ConversationSidebar({ chats, activeId, activeTitle }: Props) {
                           {c.count} msg · {formatDistanceToNow(new Date(c.createdAt), { locale: ptBR, addSuffix: true })}
                         </p>
                       </div>
+                      <button
+                        type="button"
+                        aria-label="Renomear conversa"
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); startEdit(c); }}
+                        className="shrink-0 rounded-md p-1 text-muted-foreground/40 opacity-100 transition md:opacity-0 md:group-hover:opacity-100 hover:bg-primary/10 hover:text-primary"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
                       <button
                         type="button"
                         aria-label="Apagar conversa"

@@ -2,7 +2,7 @@
 // agêntico. A IA pode ler -> agir -> confirmar em vários passos numa mesma
 // mensagem (até MAX_STEPS). Módulo server-only (não é "use server").
 import { tools, executeTool } from "./tools";
-import { AIKeys, ChatHistoryItem, ToolArgs, OpenAIMessage, GeminiContent, GeminiPart, AIResponse } from "./types";
+import { AIKeys, ChatHistoryItem, ToolArgs, OpenAIMessage, OpenAIContentPart, OpenAIToolCall, GeminiContent, GeminiPart, AIResponse, TokenUsage, ChatAttachment, StreamEmitter } from "./types";
 import { moduleInfo, type PendingAction, type AIAction } from "@/lib/ai-help";
 
 // Quantas rodadas de tool-call a IA pode encadear antes de ser forçada a responder.
@@ -47,6 +47,36 @@ interface ProviderResponse {
   error?: { code?: string; message?: string };
   choices?: { message?: OpenAIMessage }[];
   candidates?: { content?: { parts?: GeminiPart[] } }[];
+  // Uso real de tokens — formato OpenAI-like e Gemini, respectivamente.
+  usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+  usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number };
+}
+
+// Acumulador de uso real: soma o usage de CADA rodada do loop agêntico
+// (cada chamada reenvia o contexto, então o custo do turno é a soma de todas).
+function addUsage(acc: TokenUsage, data: ProviderResponse): TokenUsage {
+  const u = data.usage;
+  const g = data.usageMetadata;
+  const input = u?.prompt_tokens ?? g?.promptTokenCount ?? 0;
+  const output = u?.completion_tokens ?? g?.candidatesTokenCount ?? 0;
+  const total = u?.total_tokens ?? g?.totalTokenCount ?? input + output;
+  return { input: acc.input + input, output: acc.output + output, total: acc.total + total };
+}
+
+const ZERO_USAGE: TokenUsage = { input: 0, output: 0, total: 0 };
+
+// Conteúdo OpenAI-like → texto puro (respostas do assistente são string, mas
+// o tipo aceita array multimodal — normalizamos com segurança).
+function contentToText(c: OpenAIMessage["content"]): string {
+  if (typeof c === "string") return c;
+  if (Array.isArray(c)) return c.map((p) => (p.type === "text" ? p.text : "")).join("");
+  return "";
+}
+
+// data:image/webp;base64,XXX → { mimeType, data } (para o inlineData do Gemini).
+function splitDataUrl(dataUrl: string): { mimeType: string; data: string } | null {
+  const m = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  return m ? { mimeType: m[1], data: m[2] } : null;
 }
 
 function delay(ms: number): Promise<void> {
@@ -82,16 +112,202 @@ async function fetchProvider(
   }
 }
 
+/* ============================================================================
+   STREAMING (SSE) — parsers que transformam o stream do provedor no MESMO
+   formato ProviderResponse do caminho não-streamado. Assim o loop agêntico é
+   um só: com `emit`, os pedaços do texto chegam ao vivo; sem, nada muda.
+   ============================================================================ */
+
+// Rótulo amigável do passo de ferramenta (mostrado no client via evento status).
+function toolStatusLabel(name: string): string {
+  switch (name) {
+    case "query_system_data": return "Consultando seus dados...";
+    case "mutate_system_data": return "Executando ações...";
+    case "analyze_system_data": return "Cruzando os números...";
+    case "manage_memory": return "Atualizando memórias...";
+    case "semantic_search": return "Buscando por significado...";
+    case "find_correlations": return "Procurando padrões na sua vida...";
+    case "project_future": return "Simulando o futuro...";
+    case "generate_flashcards": return "Criando flashcards...";
+    case "expert_council": return "Reunindo o conselho de especialistas...";
+    case "curate_media": return "Vasculhando seu catálogo...";
+    case "audit_subscriptions": return "Caçando assinaturas...";
+    case "game_master": return "Consultando o placar da sua vida...";
+    case "system_cleanup_scan": return "Procurando o que faxinar...";
+    case "explain_feature": return "Consultando o manual...";
+    case "web_search": return "Pesquisando na web...";
+    case "read_url": return "Lendo a página...";
+    default: return "Executando ferramenta...";
+  }
+}
+
+/** Lê um corpo SSE linha a linha e entrega cada payload `data: {...}`. */
+async function readSse(res: Response, onData: (json: string) => void): Promise<void> {
+  const reader = res.body?.getReader();
+  if (!reader) return;
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let idx: number;
+    while ((idx = buffer.indexOf("\n")) >= 0) {
+      const line = buffer.slice(0, idx).trim();
+      buffer = buffer.slice(idx + 1);
+      if (!line.startsWith("data:")) continue;
+      const payload = line.slice(5).trim();
+      if (!payload || payload === "[DONE]") continue;
+      onData(payload);
+    }
+  }
+}
+
+// Delta de tool call no formato OpenAI (chunks de stream).
+interface OpenAIToolCallDelta {
+  index?: number;
+  id?: string;
+  function?: { name?: string; arguments?: string };
+}
+interface OpenAIStreamChunk {
+  choices?: { delta?: { content?: string | null; tool_calls?: OpenAIToolCallDelta[] } }[];
+  usage?: ProviderResponse["usage"];
+  error?: { code?: string; message?: string };
+}
+
+/**
+ * POST com stream:true (OpenAI-like). Monta a mensagem completa a partir dos
+ * deltas e devolve no formato ProviderResponse. Texto é emitido ao vivo;
+ * se o turno revelar tool_calls, um `reset` descarta o provisório no client.
+ */
+async function fetchOpenAIStream(
+  url: string,
+  headers: Record<string, string>,
+  body: Record<string, unknown>,
+  emit: StreamEmitter
+): Promise<{ ok: boolean; status: number; data: ProviderResponse }> {
+  let res: Response;
+  try {
+    res = await fetch(url, { method: "POST", headers, body: JSON.stringify({ ...body, stream: true }) });
+  } catch {
+    return { ok: false, status: 0, data: { error: { message: "Falha de rede no streaming." } } };
+  }
+  if (!res.ok || !res.headers.get("content-type")?.includes("text/event-stream")) {
+    const data = (await res.json().catch(() => ({}))) as ProviderResponse;
+    return { ok: false, status: res.status, data };
+  }
+
+  let content = "";
+  let emitted = false;
+  let usage: ProviderResponse["usage"];
+  const calls = new Map<number, { id: string; name: string; arguments: string }>();
+
+  await readSse(res, (payload) => {
+    let chunk: OpenAIStreamChunk;
+    try { chunk = JSON.parse(payload) as OpenAIStreamChunk; } catch { return; }
+    if (chunk.usage) usage = chunk.usage;
+    const delta = chunk.choices?.[0]?.delta;
+    if (!delta) return;
+
+    for (const tc of delta.tool_calls ?? []) {
+      const i = tc.index ?? 0;
+      const cur = calls.get(i) ?? { id: tc.id ?? `call_${i}`, name: "", arguments: "" };
+      if (tc.id) cur.id = tc.id;
+      if (tc.function?.name) cur.name += tc.function.name;
+      if (tc.function?.arguments) cur.arguments += tc.function.arguments;
+      calls.set(i, cur);
+    }
+    if (calls.size > 0 && emitted) {
+      // Texto provisório era preâmbulo de um turno de ferramenta — descarta.
+      emit({ type: "reset" });
+      emitted = false;
+      content = "";
+      return;
+    }
+    if (typeof delta.content === "string" && delta.content && calls.size === 0) {
+      content += delta.content;
+      emitted = true;
+      emit({ type: "delta", text: delta.content });
+    }
+  });
+
+  const tool_calls: OpenAIToolCall[] | undefined = calls.size
+    ? [...calls.entries()].sort((a, b) => a[0] - b[0]).map(([, c]) => ({ id: c.id, type: "function", function: { name: c.name, arguments: c.arguments } }))
+    : undefined;
+
+  return {
+    ok: true,
+    status: res.status,
+    data: { choices: [{ message: { role: "assistant", content, ...(tool_calls ? { tool_calls } : {}) } }], usage },
+  };
+}
+
+interface GeminiStreamChunk {
+  candidates?: { content?: { parts?: GeminiPart[] } }[];
+  usageMetadata?: ProviderResponse["usageMetadata"];
+  error?: { code?: string; message?: string };
+}
+
+/** streamGenerateContent (alt=sse) do Gemini, agregado para ProviderResponse. */
+async function fetchGeminiStream(
+  url: string,
+  body: Record<string, unknown>,
+  emit: StreamEmitter
+): Promise<{ ok: boolean; status: number; data: ProviderResponse }> {
+  let res: Response;
+  try {
+    res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  } catch {
+    return { ok: false, status: 0, data: { error: { message: "Falha de rede no streaming." } } };
+  }
+  if (!res.ok || !res.headers.get("content-type")?.includes("text/event-stream")) {
+    const data = (await res.json().catch(() => ({}))) as ProviderResponse;
+    return { ok: false, status: res.status, data };
+  }
+
+  let text = "";
+  let emitted = false;
+  const fnCalls: GeminiPart[] = [];
+  let usageMetadata: ProviderResponse["usageMetadata"];
+
+  await readSse(res, (payload) => {
+    let chunk: GeminiStreamChunk;
+    try { chunk = JSON.parse(payload) as GeminiStreamChunk; } catch { return; }
+    if (chunk.usageMetadata) usageMetadata = chunk.usageMetadata;
+    const parts = chunk.candidates?.[0]?.content?.parts ?? [];
+    for (const p of parts) {
+      if (p.functionCall) {
+        fnCalls.push(p);
+        if (emitted) {
+          emit({ type: "reset" });
+          emitted = false;
+          text = "";
+        }
+      } else if (p.text && fnCalls.length === 0) {
+        text += p.text;
+        emitted = true;
+        emit({ type: "delta", text: p.text });
+      }
+    }
+  });
+
+  const parts: GeminiPart[] = [...(text ? [{ text }] : []), ...fnCalls];
+  return { ok: true, status: res.status, data: { candidates: [{ content: { parts } }], usageMetadata } };
+}
+
 // Constrói um "card de ação" a partir de uma mutação CONCLUÍDA (CREATE/UPDATE/
 // DELETE confirmado). Ignora previews de exclusão pendente e falhas.
 function captureAction(name: string, args: ToolArgs, resultJson: string): AIAction | null {
-  if (name !== "mutate_system_data" || !args.module || !args.action) return null;
+  if (name !== "mutate_system_data" || !args.module) return null;
+  // Narrowing: ToolArgs.action também cobre as ações de memória (SAVE/LIST).
+  const action = args.action;
+  if (action !== "CREATE" && action !== "UPDATE" && action !== "DELETE") return null;
   try {
     const r = JSON.parse(resultJson) as { ok?: boolean; pending?: boolean };
     if (!r.ok || r.pending) return null;
     const info = moduleInfo(args.module);
     const label = String(args.title || args.description || info.name).slice(0, 60);
-    return { module: args.module, action: args.action, label, href: info.href };
+    return { module: args.module, action, label, href: info.href };
   } catch {
     return null;
   }
@@ -113,8 +329,11 @@ function capturePending(name: string, resultJson: string, current: PendingAction
 /* ============================================================================
    GEMINI (Google) — loop agêntico
    ============================================================================ */
-async function handleGeminiProvider(modelConfig: string, systemPrompt: string, userMessage: string, history: ChatHistoryItem[], apiKey: string): Promise<AIResponse> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelConfig || "gemini-1.5-flash"}:generateContent?key=${apiKey}`;
+async function handleGeminiProvider(modelConfig: string, systemPrompt: string, userMessage: string, history: ChatHistoryItem[], apiKey: string, attachments: ChatAttachment[] = [], emit?: StreamEmitter): Promise<AIResponse> {
+  // Fallback 2.5: o free tier do Google zerou a cota do 2.0-flash ("limit: 0").
+  const model = modelConfig || "gemini-2.5-flash";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const streamUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`;
 
   const geminiTools = [{
     functionDeclarations: tools.map(t => ({
@@ -129,22 +348,33 @@ async function handleGeminiProvider(modelConfig: string, systemPrompt: string, u
     role: h.role === "assistant" ? "model" : "user",
     parts: [{ text: h.content }],
   }));
-  contents.push({ role: "user", parts: [{ text: userMessage }] });
+  // Visão: as imagens anexadas viajam como inlineData junto do texto do turno.
+  const userParts: GeminiPart[] = [{ text: userMessage }];
+  for (const att of attachments) {
+    const img = splitDataUrl(att.dataUrl);
+    if (img) userParts.push({ inlineData: img });
+  }
+  contents.push({ role: "user", parts: userParts });
 
   let pending: PendingAction | null = null;
   const actions: AIAction[] = [];
+  let usage: TokenUsage = ZERO_USAGE;
 
   for (let step = 0; step < MAX_STEPS; step++) {
-    const init = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ systemInstruction, contents, tools: geminiTools }) };
-    const { ok, data } = await fetchProvider(url, init);
+    const requestBody = { systemInstruction, contents, tools: geminiTools };
+    const init = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(requestBody) };
+    const { ok, data } = emit
+      ? await fetchGeminiStream(streamUrl, requestBody, emit)
+      : await fetchProvider(url, init);
     if (!ok) throw new Error(data.error?.message || "Erro na API do Gemini");
+    usage = addUsage(usage, data);
 
     const parts: GeminiPart[] | undefined = data.candidates?.[0]?.content?.parts;
-    if (!parts || parts.length === 0) return { text: "Sem resposta válida do Gemini.", pending, actions };
+    if (!parts || parts.length === 0) return { text: "Sem resposta válida do Gemini.", pending, actions, usage };
 
     const fnCalls = parts.filter((p) => p.functionCall);
     if (fnCalls.length === 0) {
-      return { text: parts.map((p) => p.text ?? "").join("").trim() || "", pending, actions };
+      return { text: parts.map((p) => p.text ?? "").join("").trim() || "", pending, actions, usage };
     }
 
     contents.push({ role: "model", parts });
@@ -152,6 +382,7 @@ async function handleGeminiProvider(modelConfig: string, systemPrompt: string, u
     for (const p of fnCalls) {
       const fc = p.functionCall!;
       const fcArgs = fc.args as unknown as ToolArgs;
+      emit?.({ type: "status", label: toolStatusLabel(fc.name) });
       const result = await executeTool(fc.name, fcArgs);
       pending = capturePending(fc.name, result, pending);
       const act = captureAction(fc.name, fcArgs, result);
@@ -161,32 +392,48 @@ async function handleGeminiProvider(modelConfig: string, systemPrompt: string, u
     contents.push({ role: "user", parts: responseParts });
   }
 
-  const finalInit = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ systemInstruction, contents }) };
-  const { data: finalData } = await fetchProvider(url, finalInit);
+  const finalBody = { systemInstruction, contents };
+  const finalInit = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(finalBody) };
+  const { data: finalData } = emit
+    ? await fetchGeminiStream(streamUrl, finalBody, emit)
+    : await fetchProvider(url, finalInit);
+  usage = addUsage(usage, finalData);
   const fparts: GeminiPart[] | undefined = finalData.candidates?.[0]?.content?.parts;
-  return { text: fparts?.map((p) => p.text ?? "").join("").trim() || "Cheguei ao limite de passos sem concluir. Pode detalhar o pedido?", pending, actions };
+  return { text: fparts?.map((p) => p.text ?? "").join("").trim() || "Cheguei ao limite de passos sem concluir. Pode detalhar o pedido?", pending, actions, usage };
 }
 
 /* ============================================================================
    OPENAI-LIKE (OpenAI, Groq, DeepSeek, Mistral, Ollama) — loop agêntico
    ============================================================================ */
-async function handleOpenAILikeProvider(url: string, finalModel: string, apiKey: string, systemPrompt: string, userMessage: string, history: ChatHistoryItem[]): Promise<AIResponse> {
+async function handleOpenAILikeProvider(url: string, finalModel: string, apiKey: string, systemPrompt: string, userMessage: string, history: ChatHistoryItem[], attachments: ChatAttachment[] = [], emit?: StreamEmitter): Promise<AIResponse> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+
+  // Visão: com anexos, o conteúdo do turno vira array multimodal (texto+imagens).
+  const userContent: string | OpenAIContentPart[] = attachments.length
+    ? [
+        { type: "text", text: userMessage },
+        ...attachments.map((att): OpenAIContentPart => ({ type: "image_url", image_url: { url: att.dataUrl } })),
+      ]
+    : userMessage;
 
   const messages: OpenAIMessage[] = [
     { role: "system", content: systemPrompt },
     ...history.map(h => ({ role: h.role, content: h.content })),
-    { role: "user", content: userMessage },
+    { role: "user", content: userContent },
   ];
 
   let pending: PendingAction | null = null;
   const actions: AIAction[] = [];
+  let usage: TokenUsage = ZERO_USAGE;
 
   for (let step = 0; step < MAX_STEPS; step++) {
-    const init = { method: "POST", headers, body: JSON.stringify({ model: finalModel, messages, tools, tool_choice: "auto" }) };
+    const requestBody = { model: finalModel, messages, tools, tool_choice: "auto" };
+    const init = { method: "POST", headers, body: JSON.stringify(requestBody) };
 
-    let { ok, data } = await fetchProvider(url, init);
+    let { ok, data } = emit
+      ? await fetchOpenAIStream(url, headers, requestBody, emit)
+      : await fetchProvider(url, init);
 
     // tool_use_failed (400): a geração é amostrada — repetir uma vez costuma sair válida.
     if (!ok && isToolUseFailure(data)) {
@@ -198,18 +445,21 @@ async function handleOpenAILikeProvider(url: string, finalModel: string, apiKey:
         text: "Tentei registrar isso, mas a IA gerou a ação num formato inválido — costuma acontecer com textos longos ou com muitas linhas. Tente pedir de forma mais curta (ou divida em partes) que eu salvo de novo. 🙂",
         pending,
         actions,
+        usage,
       };
     }
     if (!ok) throw new Error(data.error?.message || "Erro na comunicação com a API.");
+    usage = addUsage(usage, data);
 
     const aiMsg = data.choices?.[0]?.message;
-    if (!aiMsg) return { text: "Sem resposta da rede neural.", pending, actions };
+    if (!aiMsg) return { text: "Sem resposta da rede neural.", pending, actions, usage };
 
-    if (!aiMsg.tool_calls || aiMsg.tool_calls.length === 0) return { text: aiMsg.content || "", pending, actions };
+    if (!aiMsg.tool_calls || aiMsg.tool_calls.length === 0) return { text: contentToText(aiMsg.content), pending, actions, usage };
 
     messages.push(aiMsg);
     for (const call of aiMsg.tool_calls) {
       const args = parseToolArgs(call.function.arguments);
+      emit?.({ type: "status", label: toolStatusLabel(call.function.name) });
       const result = await executeTool(call.function.name, args);
       pending = capturePending(call.function.name, result, pending);
       const act = captureAction(call.function.name, args, result);
@@ -218,21 +468,25 @@ async function handleOpenAILikeProvider(url: string, finalModel: string, apiKey:
     }
   }
 
-  const finalInit = { method: "POST", headers, body: JSON.stringify({ model: finalModel, messages }) };
-  const { ok: finalOk, data: finalData } = await fetchProvider(url, finalInit);
+  const finalBody = { model: finalModel, messages };
+  const finalInit = { method: "POST", headers, body: JSON.stringify(finalBody) };
+  const { ok: finalOk, data: finalData } = emit
+    ? await fetchOpenAIStream(url, headers, finalBody, emit)
+    : await fetchProvider(url, finalInit);
   if (!finalOk) throw new Error(finalData.error?.message || "Erro na geração final.");
-  return { text: finalData.choices?.[0]?.message?.content || "Cheguei ao limite de passos sem concluir. Pode detalhar o pedido?", pending, actions };
+  usage = addUsage(usage, finalData);
+  return { text: contentToText(finalData.choices?.[0]?.message?.content) || "Cheguei ao limite de passos sem concluir. Pode detalhar o pedido?", pending, actions, usage };
 }
 
 /* ============================================================================
    ROTEADOR DE PROVEDOR
    ============================================================================ */
-export async function callAIProvider(provider: string, modelConfig: string, systemPrompt: string, userMessage: string, history: ChatHistoryItem[], keys: AIKeys): Promise<AIResponse> {
+export async function callAIProvider(provider: string, modelConfig: string, systemPrompt: string, userMessage: string, history: ChatHistoryItem[], keys: AIKeys, attachments: ChatAttachment[] = [], emit?: StreamEmitter): Promise<AIResponse> {
 
   if (provider === "google") {
     const apiKey = keys.google || process.env.GOOGLE_API_KEY;
     if (!apiKey) throw new Error("Credencial ausente. Cadastre sua API Key do Google Gemini.");
-    return await handleGeminiProvider(modelConfig, systemPrompt, userMessage, history, apiKey);
+    return await handleGeminiProvider(modelConfig, systemPrompt, userMessage, history, apiKey, attachments, emit);
   }
 
   let apiKey = "";
@@ -244,6 +498,23 @@ export async function callAIProvider(provider: string, modelConfig: string, syst
       apiKey = keys.openai || process.env.OPENAI_API_KEY || "";
       url = "https://api.openai.com/v1/chat/completions";
       finalModel = modelConfig || "gpt-4o-mini";
+      break;
+    case "anthropic":
+      // Endpoint de compatibilidade OpenAI da Anthropic (suporta tool-calling).
+      apiKey = keys.anthropic || process.env.ANTHROPIC_API_KEY || "";
+      url = "https://api.anthropic.com/v1/chat/completions";
+      finalModel = modelConfig || "claude-sonnet-4-6";
+      break;
+    case "xai":
+      apiKey = keys.xai || process.env.XAI_API_KEY || "";
+      url = "https://api.x.ai/v1/chat/completions";
+      finalModel = modelConfig || "grok-3";
+      break;
+    case "openrouter":
+      // Agregador: acessa dezenas de modelos com uma chave só ("provedor/modelo").
+      apiKey = keys.openrouter || process.env.OPENROUTER_API_KEY || "";
+      url = "https://openrouter.ai/api/v1/chat/completions";
+      finalModel = modelConfig || "openai/gpt-4o-mini";
       break;
     case "groq":
       apiKey = keys.groq || process.env.GROQ_API_KEY || "";
@@ -262,7 +533,8 @@ export async function callAIProvider(provider: string, modelConfig: string, syst
       break;
     case "ollama":
       // Endpoint compatível com OpenAI do Ollama (suporta tool-calling).
-      url = "http://localhost:11434/v1/chat/completions";
+      // OLLAMA_URL no .env permite apontar p/ outra máquina (ex.: PC da rede).
+      url = `${(process.env.OLLAMA_URL || "http://localhost:11434").replace(/\/$/, "")}/v1/chat/completions`;
       finalModel = modelConfig || "llama3.1";
       break;
     default:
@@ -273,5 +545,5 @@ export async function callAIProvider(provider: string, modelConfig: string, syst
     throw new Error(`Credencial ausente. Cadastre sua API Key para ${provider.toUpperCase()} nas configurações.`);
   }
 
-  return await handleOpenAILikeProvider(url, finalModel, apiKey, systemPrompt, userMessage, history);
+  return await handleOpenAILikeProvider(url, finalModel, apiKey, systemPrompt, userMessage, history, attachments, emit);
 }

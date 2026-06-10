@@ -4,6 +4,8 @@ import {
   getNotificationInbox,
   markRead,
   markAllRead,
+  deleteNotification,
+  clearReadNotifications,
   generateReminders,
   type NotificationInbox,
 } from "@/lib/notifications";
@@ -24,5 +26,15 @@ export async function markAllReadAction(): Promise<NotificationInbox> {
 
 export async function generateRemindersAction(): Promise<NotificationInbox> {
   await generateReminders();
+  return getNotificationInbox();
+}
+
+export async function deleteNotificationAction(id: string): Promise<NotificationInbox> {
+  await deleteNotification(id);
+  return getNotificationInbox();
+}
+
+export async function clearReadAction(): Promise<NotificationInbox> {
+  await clearReadNotifications();
   return getNotificationInbox();
 }

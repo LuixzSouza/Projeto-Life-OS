@@ -51,6 +51,21 @@ export function ResumeBuilder({ initialData }: { initialData: PortfolioData }) {
     const fileRef = useRef<HTMLInputElement>(null);
     const firstRender = useRef(true);
 
+    // A folha A4 tem largura fixa (210mm ≈ 794px). Em telas menores que isso o
+    // preview escala para caber (zoom), em vez de estourar com scroll lateral.
+    const previewWrapRef = useRef<HTMLDivElement>(null);
+    const [previewScale, setPreviewScale] = useState(1);
+    useEffect(() => {
+        const el = previewWrapRef.current;
+        if (!el) return;
+        const A4_WIDTH_PX = 794;
+        const ro = new ResizeObserver(() => {
+            setPreviewScale(Math.min(1, el.clientWidth / A4_WIDTH_PX));
+        });
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
+
     // 2. MIGRAÇÃO SUAVE: se houver currículo legado no localStorage e o banco
     //    estiver vazio, importa uma única vez e limpa a chave antiga.
     useEffect(() => {
@@ -220,14 +235,16 @@ export function ResumeBuilder({ initialData }: { initialData: PortfolioData }) {
     const pendingTips = useMemo(() => resumeHealth(data).filter((t) => !t.done), [data]);
 
     return (
-        <div className="flex flex-col lg:flex-row gap-6 h-[calc(100vh-140px)] w-full">
-            
+        // Altura travada só no desktop (painéis lado a lado com scroll interno).
+        // No mobile o conteúdo flui na página — altura fixa esmagava os painéis.
+        <div className="flex flex-col lg:flex-row gap-6 lg:h-[calc(100vh-140px)] w-full">
+
             {/* --- LEFT: EDITOR PANEL --- */}
-            <div className="no-print w-full lg:w-[500px] xl:w-[550px] flex flex-col gap-4 overflow-hidden shrink-0 h-full">
+            <div className="no-print w-full lg:w-[500px] xl:w-[550px] flex flex-col gap-4 overflow-hidden shrink-0 lg:h-full">
                 <Card className="flex-1 flex flex-col overflow-hidden border-border/40 bg-card/60 backdrop-blur-2xl h-full shadow-2xl rounded-[2rem]">
                     
                     {/* Header do Painel */}
-                    <div className="px-8 py-6 border-b border-border/40 bg-background/50 flex flex-col gap-5 shrink-0 z-10">
+                    <div className="px-4 py-4 sm:px-8 sm:py-6 border-b border-border/40 bg-background/50 flex flex-col gap-5 shrink-0 z-10">
                         <div className="flex justify-between items-center">
                             <div className="flex items-center gap-3">
                                 <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
@@ -304,7 +321,7 @@ export function ResumeBuilder({ initialData }: { initialData: PortfolioData }) {
                     
                     {/* Accordion de Seções (Área de Scroll) */}
                     <ScrollArea className="flex-1 bg-muted/5 h-full custom-scrollbar relative">
-                        <div className="px-6 py-6 pb-32"> 
+                        <div className="px-3 py-4 pb-24 sm:px-6 sm:py-6 sm:pb-32">
                             <Accordion type="single" collapsible defaultValue="hero" className="w-full space-y-4">
                                 
                                 {/* Item 1: Identidade */}
@@ -467,11 +484,11 @@ export function ResumeBuilder({ initialData }: { initialData: PortfolioData }) {
                     </ScrollArea>
 
                     {/* Footer Actions (Rodapé Fixo) */}
-                    <div className="px-6 py-5 border-t border-border/40 bg-background/95 backdrop-blur-xl flex gap-4 shrink-0 z-10 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
+                    <div className="px-4 py-4 sm:px-6 sm:py-5 border-t border-border/40 bg-background/95 backdrop-blur-xl flex gap-3 sm:gap-4 shrink-0 z-10 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
                         <Button
                             variant="outline"
                             disabled={isSaving}
-                            className="flex-1 gap-2 rounded-xl h-14 font-black uppercase tracking-widest text-[11px] shadow-sm hover:bg-muted hover:text-foreground transition-all border-border/60"
+                            className="flex-1 gap-2 rounded-xl h-12 sm:h-14 font-black uppercase tracking-widest text-[11px] shadow-sm hover:bg-muted hover:text-foreground transition-all border-border/60"
                             onClick={handleSave}
                             title="Autosave ativo — clique para gravar agora"
                         >
@@ -483,8 +500,8 @@ export function ResumeBuilder({ initialData }: { initialData: PortfolioData }) {
                                 <><Save className="h-4 w-4" /> Gravar Dados</>
                             )}
                         </Button>
-                        <Button 
-                            className="flex-1 gap-2 rounded-xl h-14 bg-foreground text-background hover:bg-foreground/90 font-black uppercase tracking-widest text-[11px] shadow-xl transition-all" 
+                        <Button
+                            className="flex-1 gap-2 rounded-xl h-12 sm:h-14 bg-foreground text-background hover:bg-foreground/90 font-black uppercase tracking-widest text-[11px] shadow-xl transition-all"
                             onClick={handlePrint}
                         >
                             <Printer className="h-4 w-4" /> Exportar PDF
@@ -494,19 +511,23 @@ export function ResumeBuilder({ initialData }: { initialData: PortfolioData }) {
             </div>
 
             {/* --- RIGHT: PREVIEW PANEL --- */}
-            <div className="no-print-bg flex-1 bg-zinc-100/50 dark:bg-zinc-950/50 p-4 lg:p-8 rounded-[2rem] border border-border/40 shadow-inner flex justify-center h-full overflow-hidden relative">
-                <div className="w-full h-full overflow-y-auto scrollbar-hide flex justify-center pb-20">
-                    {/* ESTE É O CONTAINER QUE SERÁ IMPRESSO */}
-                    <div 
-                        id="resume-preview-container" 
-                        ref={printRef}
-                        className="w-[210mm] min-h-[297mm] h-fit bg-white text-zinc-900 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.15)] rounded-sm transition-all"
-                    >
-                        <ResumePreview data={data} onChange={setData} />
+            <div className="no-print-bg flex-1 bg-zinc-100/50 dark:bg-zinc-950/50 p-3 sm:p-4 lg:p-8 rounded-[2rem] border border-border/40 shadow-inner flex justify-center lg:h-full lg:overflow-hidden relative">
+                <div ref={previewWrapRef} className="w-full lg:h-full lg:overflow-y-auto scrollbar-hide flex justify-center pb-6 lg:pb-20">
+                    {/* O zoom fica num wrapper (não no container impresso) para o
+                        PDF não herdar a escala reduzida do preview mobile. */}
+                    <div style={previewScale < 1 ? { zoom: previewScale } : undefined}>
+                        {/* ESTE É O CONTAINER QUE SERÁ IMPRESSO */}
+                        <div
+                            id="resume-preview-container"
+                            ref={printRef}
+                            className="w-[210mm] min-h-[297mm] h-fit bg-white text-zinc-900 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.15)] rounded-sm transition-all"
+                        >
+                            <ResumePreview data={data} onChange={setData} />
+                        </div>
                     </div>
                 </div>
 
-                <div className="no-print absolute bottom-8 right-12 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 bg-background/95 backdrop-blur-md px-5 py-2.5 rounded-xl border border-border/40 shadow-2xl pointer-events-none flex items-center gap-2.5">
+                <div className="no-print absolute bottom-8 right-12 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 bg-background/95 backdrop-blur-md px-5 py-2.5 rounded-xl border border-border/40 shadow-2xl pointer-events-none hidden lg:flex items-center gap-2.5">
                     <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
                     Preview Dinâmico (A4)
                 </div>

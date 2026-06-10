@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Link2, Loader2, ShieldCheck, X } from "lucide-react";
+import { RefreshCw, Link2, Loader2, ShieldCheck, X, FileUp, Settings2, Sparkles } from "lucide-react";
 import { syncBankAccount, createConnectTokenAction, linkAccountToPluggyAction } from "@/app/(dashboard)/finance/actions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -64,16 +65,16 @@ export function SyncButton({ accounts }: { accounts: AccountProp[] }) {
     };
 
     return (
-        <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleSync} 
-            disabled={isSyncing || connectedAccounts.length === 0} 
-            className="gap-2 rounded-xl h-10 font-bold border-border/50 text-foreground/80 hover:bg-muted transition-all active:scale-95"
+        <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSync}
+            disabled={isSyncing || connectedAccounts.length === 0}
+            title="Sincronizar bancos conectados"
+            className="h-9 shrink-0 gap-1.5 rounded-xl border-border/40 font-medium"
         >
             <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
-            <span className="hidden sm:inline">{isSyncing ? "Sincronizando..." : "Sincronizar Bancos"}</span>
-            <span className="sm:hidden">{isSyncing ? "Buscando..." : "Sincronizar"}</span>
+            <span className="hidden lg:inline">{isSyncing ? "Sincronizando…" : "Sincronizar"}</span>
         </Button>
     );
 }
@@ -82,19 +83,28 @@ export function SyncButton({ accounts }: { accounts: AccountProp[] }) {
 /* CONECTOR DE BANCOS (PLUGGY WIDGET NO DIALOG)                               */
 /* -------------------------------------------------------------------------- */
 
-export function BankConnector() {
+export function BankConnector({ onOpenImport }: { onOpenImport?: () => void }) {
     const [connectToken, setConnectToken] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
-    
+
     // Controla a abertura do Dialog do Shadcn
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    // Diálogo de orientação quando a Pluggy ainda não foi configurada
+    const [isGuideOpen, setIsGuideOpen] = useState(false);
 
     const handleStartConnection = async () => {
         setIsLoading(true);
         try {
-            const token = await createConnectTokenAction(); 
-            if (!token) throw new Error("Falha ao obter token");
-            setConnectToken(token);
+            const res = await createConnectTokenAction();
+            if (!res.success) {
+                if (res.reason === "NOT_CONFIGURED") {
+                    setIsGuideOpen(true); // Mostra os caminhos disponíveis em vez de um erro seco
+                } else {
+                    toast.error(res.message);
+                }
+                return;
+            }
+            setConnectToken(res.token);
             setIsDialogOpen(true); // Abre o modal do Shadcn
         } catch {
             toast.error("Erro de conexão. Verifique as configurações do provedor bancário.");
@@ -135,13 +145,16 @@ export function BankConnector() {
 
     return (
         <>
-            <Button 
-                onClick={handleStartConnection} 
-                disabled={isLoading || !!connectToken} 
-                className="gap-2 rounded-xl h-10 font-bold bg-foreground text-background hover:bg-foreground/90 shadow-lg transition-all active:scale-95"
+            <Button
+                variant="outline"
+                size="sm"
+                onClick={handleStartConnection}
+                disabled={isLoading || !!connectToken}
+                title="Conectar banco (Open Finance)"
+                className="h-9 shrink-0 gap-1.5 rounded-xl border-border/40 font-medium"
             >
                 {isLoading ? <Loader2 className="animate-spin h-4 w-4" /> : <Link2 className="h-4 w-4" />}
-                Conectar Banco
+                <span className="hidden lg:inline">Conectar banco</span>
             </Button>
 
             {/* Modal Nativo do Shadcn UI cuidando do scroll lock e blur de forma correta */}
@@ -172,6 +185,63 @@ export function BankConnector() {
                                 onError={handleError} 
                             />
                         )}
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Orientação quando a Pluggy não está configurada: mostra o caminho
+                gratuito (importar extrato) antes de mandar o usuário pagar API. */}
+            <Dialog open={isGuideOpen} onOpenChange={setIsGuideOpen}>
+                <DialogContent className="sm:max-w-[440px] rounded-[2rem] border-border/40 p-6">
+                    <div className="space-y-1.5">
+                        <DialogTitle className="text-lg font-extrabold">Como trazer seus dados bancários</DialogTitle>
+                        <p className="text-sm text-muted-foreground">
+                            A sincronização automática usa a Pluggy (Open Finance), que exige uma conta paga.
+                            Mas você não precisa dela para importar seus lançamentos:
+                        </p>
+                    </div>
+
+                    <div className="space-y-3 pt-2">
+                        <button
+                            type="button"
+                            onClick={() => { setIsGuideOpen(false); onOpenImport?.(); }}
+                            disabled={!onOpenImport}
+                            className="w-full rounded-2xl border border-border/40 bg-card p-4 text-left shadow-sm transition-all hover:border-primary/30 hover:shadow-md disabled:opacity-60"
+                        >
+                            <div className="flex items-start gap-3">
+                                <div className="rounded-xl bg-emerald-500/10 p-2">
+                                    <FileUp className="h-5 w-5 text-emerald-600" />
+                                </div>
+                                <div className="space-y-0.5">
+                                    <p className="flex items-center gap-2 text-sm font-bold text-foreground">
+                                        Importar extrato
+                                        <span className="rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-emerald-600">Grátis</span>
+                                    </p>
+                                    <p className="text-xs leading-relaxed text-muted-foreground">
+                                        Todo banco exporta OFX/CSV — ou cole o texto do extrato e a IA estrutura os lançamentos
+                                        <Sparkles className="ml-1 inline h-3 w-3 text-primary" />
+                                    </p>
+                                </div>
+                            </div>
+                        </button>
+
+                        <Link
+                            href="/settings?tab=integrations"
+                            onClick={() => setIsGuideOpen(false)}
+                            className="block w-full rounded-2xl border border-border/40 bg-card p-4 text-left shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
+                        >
+                            <div className="flex items-start gap-3">
+                                <div className="rounded-xl bg-primary/10 p-2">
+                                    <Settings2 className="h-5 w-5 text-primary" />
+                                </div>
+                                <div className="space-y-0.5">
+                                    <p className="text-sm font-bold text-foreground">Configurar a Pluggy</p>
+                                    <p className="text-xs leading-relaxed text-muted-foreground">
+                                        Sincronização automática via Open Finance. Cadastre o Client ID e o Secret em Integrações &amp; APIs.
+                                    </p>
+                                </div>
+                            </div>
+                        </Link>
                     </div>
                 </DialogContent>
             </Dialog>

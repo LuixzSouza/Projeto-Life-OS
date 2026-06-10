@@ -3,12 +3,12 @@ import { NutritionDashboard } from "@/components/health/nutrition/nutrition-dash
 import { Utensils } from "lucide-react";
 import { Metadata } from "next";
 import { HealthActions } from "@/components/health/health-actions";
+import { AskAiButton } from "@/components/ai/ask-ai-button";
 import { getCurrentUserId } from "@/lib/auth";
 import { getHealthGoals } from "@/app/(dashboard)/health/actions";
 import { suggestDailyGoal } from "@/lib/nutrition-calc";
 import { estimateDayBurn } from "@/lib/workout-calories";
 import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
-import { BackLink } from "@/components/ui/back-link";
 import { ErrorState } from "@/components/ui/error-state";
 
 // ⚠️ CORREÇÃO CRÍTICA: Força renderização dinâmica para evitar erro de build
@@ -206,10 +206,15 @@ export default async function NutritionPage(props: PageProps) {
         icon={<Utensils className="h-6 w-6" />}
         title="Nutrição & Planejamento"
         description="Diário alimentar, controle de macros e planejamento semanal."
-        actions={<HealthActions />}
-      >
-        <BackLink href="/health" label="Voltar para Overview" />
-      </PageHeader>
+        backHref="/health"
+        backLabel="Voltar para Overview"
+        actions={
+          <>
+            <AskAiButton q="Como está minha nutrição hoje? Compare com a meta de calorias e proteína e sugira a próxima refeição." label="Analisar com IA" />
+            <HealthActions />
+          </>
+        }
+      />
 
       <PageContainer>
         <NutritionDashboard

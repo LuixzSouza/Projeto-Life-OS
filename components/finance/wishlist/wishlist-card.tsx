@@ -1,75 +1,93 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, ExternalLink, Target, Pencil, Wallet, Trophy, Check, AlertCircle, Loader2, Flame, Scale, Snowflake, Sparkles, type LucideIcon } from "lucide-react";
-import { addSavings, deleteWishlist } from "@/app/(dashboard)/finance/actions";
+import { Trash2, ExternalLink, Target, Pencil, Wallet, Trophy, Check, AlertCircle, Loader2, Flame, Scale, Snowflake, Sparkles, ShoppingCart, BadgeCheck, ShoppingBag, type LucideIcon } from "lucide-react";
+import { buyWishlistItem, deleteWishlist } from "@/app/(dashboard)/finance/actions";
 import { Dialog, DialogContent, DialogHeader, DialogBody, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { WishlistForm, WishlistData } from "./wishlist-form";
 import { cn } from "@/lib/utils";
-import { useFormatCurrency, useCurrencySymbol } from "@/components/providers/currency-provider";
+import { useFormatCurrency } from "@/components/providers/currency-provider";
 import { useSmartView } from "@/components/finance/smart-view-context";
 import confetti from "canvas-confetti";
 
+/** Conta disponível para registrar a compra de um desejo. */
+export interface WishlistAccountOption {
+    id: string;
+    name: string;
+    balance: number;
+    isConnected: boolean;
+}
+
+interface WishlistGridProps {
+    items: WishlistData[];
+    accounts: WishlistAccountOption[];
+    /** Soma do saldo de todas as contas — a régua do "já dá pra comprar?". */
+    totalBalance: number;
+}
 
 const priorityRank = (p: string) => (p === "URGENT" || p === "HIGH" ? 0 : p === "MEDIUM" ? 1 : 2);
+const isBought = (i: WishlistData) => i.status === "BOUGHT";
 
-export function WishlistGrid({ items }: { items: WishlistData[] }) {
+export function WishlistGrid({ items, accounts, totalBalance }: WishlistGridProps) {
     const { smartView } = useSmartView();
     const formatMoney = useFormatCurrency();
     if (items.length === 0) return null;
 
-    // Métricas agregadas
-    const totalTarget = items.reduce((acc, i) => acc + i.price, 0);
-    const totalSaved = items.reduce((acc, i) => acc + Math.min(i.saved, i.price), 0);
-    const overallPct = totalTarget > 0 ? Math.min((totalSaved / totalTarget) * 100, 100) : 0;
-    const completedCount = items.filter((i) => i.saved >= i.price && i.price > 0).length;
+    // Métricas contra o saldo REAL das contas
+    const active = items.filter((i) => !isBought(i));
+    const boughtCount = items.length - active.length;
+    const affordableCount = active.filter((i) => i.price > 0 && totalBalance >= i.price).length;
+    const totalTarget = active.reduce((acc, i) => acc + i.price, 0);
+    const purchasePower = totalTarget > 0 ? Math.min(Math.max(totalBalance / totalTarget, 0) * 100, 100) : 0;
 
-    // Ordena: não concluídos primeiro, depois por prioridade e progresso; concluídos no fim
+    // Ordena: compráveis agora primeiro, depois por prioridade e cobertura; comprados no fim
     const sorted = [...items].sort((a, b) => {
-        const aDone = a.saved >= a.price && a.price > 0;
-        const bDone = b.saved >= b.price && b.price > 0;
-        if (aDone !== bDone) return aDone ? 1 : -1;
+        if (isBought(a) !== isBought(b)) return isBought(a) ? 1 : -1;
+        const aAfford = a.price > 0 && totalBalance >= a.price;
+        const bAfford = b.price > 0 && totalBalance >= b.price;
+        if (aAfford !== bAfford) return aAfford ? -1 : 1;
         const pr = priorityRank(a.priority) - priorityRank(b.priority);
         if (pr !== 0) return pr;
-        const aProg = a.price > 0 ? a.saved / a.price : 0;
-        const bProg = b.price > 0 ? b.saved / b.price : 0;
-        return bProg - aProg;
+        return a.price - b.price;
     });
 
     return (
         <div className="space-y-6">
-            {/* RESUMO DAS METAS */}
+            {/* RESUMO: a lista de desejos comparada com o dinheiro que existe */}
             <div className="rounded-[1.5rem] border border-border/40 bg-card shadow-sm p-5 sm:p-6">
                 <div className="flex flex-col lg:flex-row lg:items-center gap-6">
                     <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-4">
-                        <SummaryTile icon={<Target className="h-4 w-4 text-primary" />} label="Metas" value={String(items.length)} />
-                        <SummaryTile icon={<Trophy className="h-4 w-4 text-emerald-500" />} label="Conquistadas" value={String(completedCount)} />
-                        <SummaryTile icon={<Wallet className="h-4 w-4 text-foreground" />} label="Guardado" value={formatMoney(totalSaved)} blur={smartView} />
-                        <SummaryTile icon={<Target className="h-4 w-4 text-amber-500" />} label="Meta total" value={formatMoney(totalTarget)} blur={smartView} />
+                        <SummaryTile icon={<Target className="h-4 w-4 text-primary" />} label="Desejos" value={String(active.length)} />
+                        <SummaryTile icon={<BadgeCheck className="h-4 w-4 text-emerald-500" />} label="Dá pra comprar" value={String(affordableCount)} />
+                        <SummaryTile icon={<Wallet className="h-4 w-4 text-foreground" />} label="Saldo em contas" value={formatMoney(totalBalance)} blur={smartView} />
+                        <SummaryTile icon={<ShoppingBag className="h-4 w-4 text-amber-500" />} label="Total da lista" value={formatMoney(totalTarget)} blur={smartView} />
                     </div>
 
-                    {/* Progresso geral */}
+                    {/* Poder de compra: quanto da lista o saldo atual cobre */}
                     <div className="lg:w-72 shrink-0">
                         <div className="flex justify-between items-end mb-2">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Progresso geral</span>
-                            <span className="text-sm font-black font-mono text-primary">{Math.round(overallPct)}%</span>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Poder de compra</span>
+                            <span className="text-sm font-black font-mono text-primary">{smartView ? "•••" : `${Math.round(purchasePower)}%`}</span>
                         </div>
                         <div className="h-2.5 w-full bg-muted rounded-full overflow-hidden shadow-inner">
-                            <div className="h-full bg-primary rounded-full transition-all duration-1000 ease-out" style={{ width: `${overallPct}%` }} />
+                            <div className="h-full bg-primary rounded-full transition-all duration-1000 ease-out" style={{ width: `${purchasePower}%` }} />
                         </div>
+                        <p className="mt-1.5 text-[10px] font-medium text-muted-foreground">
+                            {boughtCount > 0 ? `${boughtCount} conquistado(s) · ` : ""}quanto da lista seu saldo cobre hoje
+                        </p>
                     </div>
                 </div>
             </div>
 
             {/* GRADE DE CARDS */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in zoom-in-95 duration-500">
-                {sorted.map(item => <WishlistCard key={item.id} item={item} />)}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 animate-in fade-in duration-500">
+                {sorted.map(item => <WishlistCard key={item.id} item={item} accounts={accounts} totalBalance={totalBalance} />)}
             </div>
         </div>
     );
@@ -89,91 +107,144 @@ function SummaryTile({ icon, label, value, blur }: { icon: React.ReactNode; labe
     );
 }
 
-function DepositDialog({ item }: { item: WishlistData }) {
-    const formatCurrency = useFormatCurrency();
-    const symbol = useCurrencySymbol();
+/* -------------------------------------------------------------------------- */
+/* DIÁLOGO DE COMPRA — registra a despesa real (ou só marca como comprado)    */
+/* -------------------------------------------------------------------------- */
+
+const NO_ACCOUNT = "none";
+
+function BuyDialog({ item, accounts, affordable }: { item: WishlistData; accounts: WishlistAccountOption[]; affordable: boolean }) {
+    const router = useRouter();
+    const formatMoney = useFormatCurrency();
+    const { smartView } = useSmartView();
     const [open, setOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    const remaining = item.price - item.saved;
 
-    const handleDeposit = async (formData: FormData) => {
+    // Sugere a primeira conta que cobre o preço; sem nenhuma, só marca.
+    const defaultAccount = useMemo(
+        () => accounts.find((a) => a.balance >= item.price)?.id ?? accounts[0]?.id ?? NO_ACCOUNT,
+        [accounts, item.price],
+    );
+    const [accountId, setAccountId] = useState<string>(defaultAccount);
+
+    const selected = accounts.find((a) => a.id === accountId);
+    const willGoNegative = !!selected && !selected.isConnected && selected.balance < item.price;
+
+    const handleBuy = async () => {
         setIsLoading(true);
         try {
-            await addSavings(formData);
-            toast.success("Dinheiro guardado! Mais um passo. 🚀");
-            
-            const amount = Number(formData.get('amount'));
-            if (item.saved + amount >= item.price) {
-                confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 }, colors: ['#10b981', '#3b82f6', '#f59e0b'] });
+            const formData = new FormData();
+            formData.set("id", item.id ?? "");
+            formData.set("accountId", accountId === NO_ACCOUNT ? "" : accountId);
+            const res = await buyWishlistItem(formData);
+            if (res.success) {
+                toast.success(res.message);
+                confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 }, colors: ["#10b981", "#3b82f6", "#f59e0b"] });
+                setOpen(false);
+                router.refresh();
+            } else {
+                toast.error(res.message);
             }
-            setOpen(false);
         } catch {
-            toast.error("Erro ao salvar o valor.");
+            toast.error("Erro ao registrar a compra.");
         } finally {
             setIsLoading(false);
         }
-    }
+    };
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button className="w-full h-12 rounded-xl font-bold bg-foreground text-background hover:bg-foreground/90 shadow-lg transition-all active:scale-95">
-                    <Plus className="h-5 w-5 mr-2" /> Guardar Dinheiro
-                </Button>
+                {affordable ? (
+                    <Button className="w-full h-11 rounded-xl font-bold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm transition-all active:scale-[0.98]">
+                        <ShoppingCart className="h-4 w-4 mr-2" /> Comprar agora
+                    </Button>
+                ) : (
+                    <Button variant="outline" className="w-full h-11 rounded-xl font-semibold border-border/50 text-muted-foreground hover:text-foreground transition-all active:scale-[0.98]">
+                        <Check className="h-4 w-4 mr-2" /> Já comprei
+                    </Button>
+                )}
             </DialogTrigger>
-            
+
             <DialogContent size="sm">
                 <DialogHeader
-                    icon={<Wallet />}
-                    title="Aportar Valor"
-                    description="Quanto você deseja guardar hoje para esta meta?"
+                    icon={<ShoppingCart />}
+                    title="Registrar compra"
+                    description={`"${item.name}" sai da lista e vira uma despesa de verdade.`}
                 />
-
-                <form action={handleDeposit} className="flex flex-col flex-1 min-h-0">
-                    <DialogBody className="space-y-6">
-                    <input type="hidden" name="id" value={item.id} />
-                    <div className="space-y-3">
-                        <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-black text-xl">{symbol}</span>
-                            <Input 
-                                name="amount" type="number" step="0.01" placeholder="0.00" autoFocus required 
-                                className="pl-14 text-4xl font-black font-mono h-20 rounded-2xl bg-muted/20 border-border/50 focus-visible:ring-primary/30 shadow-inner" 
-                            />
-                        </div>
-                        <div className="flex justify-between items-center px-1">
-                            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                                Faltam {formatCurrency(remaining)}
-                            </p>
-                            <button type="button" onClick={() => {
-                                const input = document.querySelector('input[name="amount"]') as HTMLInputElement;
-                                if(input) input.value = remaining.toFixed(2);
-                            }} className="text-[10px] font-black uppercase text-primary hover:underline">
-                                Completar Meta
-                            </button>
-                        </div>
+                <DialogBody className="space-y-4">
+                    <div className="flex items-center justify-between rounded-2xl border border-border/40 bg-muted/10 px-4 py-3">
+                        <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Valor</span>
+                        <span className={cn("text-2xl font-black font-mono tabular-nums text-foreground", smartView && "blur-md select-none")}>
+                            {formatMoney(item.price)}
+                        </span>
                     </div>
-                    </DialogBody>
-                    <DialogFooter>
-                        <Button type="submit" disabled={isLoading} className="w-full h-14 rounded-xl font-bold text-lg shadow-lg shadow-primary/20 transition-all active:scale-95">
-                            {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Confirmar Depósito"}
-                        </Button>
-                    </DialogFooter>
-                </form>
+
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Pagar com</p>
+                        <Select value={accountId} onValueChange={setAccountId}>
+                            <SelectTrigger className="h-12 rounded-xl bg-muted/20 border-border/50 font-medium">
+                                <SelectValue placeholder="Escolha a conta" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {accounts.map((a) => (
+                                    <SelectItem key={a.id} value={a.id}>
+                                        {a.name} — {smartView ? "•••••" : formatMoney(a.balance)}
+                                    </SelectItem>
+                                ))}
+                                <SelectItem value={NO_ACCOUNT}>Só marcar como comprado (sem lançar despesa)</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        {accountId !== NO_ACCOUNT && (
+                            <p className="text-[11px] text-muted-foreground px-1">
+                                {selected?.isConnected
+                                    ? "Conta sincronizada — o saldo será atualizado pelo banco."
+                                    : "A despesa entra no extrato e o saldo da conta é ajustado."}
+                            </p>
+                        )}
+                        {willGoNegative && (
+                            <p className="flex items-start gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-[11px] font-bold text-amber-600">
+                                <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" /> O saldo desta conta vai ficar negativo.
+                            </p>
+                        )}
+                    </div>
+                </DialogBody>
+                <DialogFooter>
+                    <Button onClick={handleBuy} disabled={isLoading} className="w-full h-14 rounded-xl font-bold text-lg shadow-lg shadow-primary/20 transition-all active:scale-95">
+                        {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Confirmar compra"}
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
-    )
+    );
 }
 
-interface PriorityConfig { label: string; Icon: LucideIcon; chip: string; accent: string; }
+/* -------------------------------------------------------------------------- */
+/* CARD DE DESEJO                                                             */
+/* -------------------------------------------------------------------------- */
+
+interface PriorityConfig { label: string; Icon: LucideIcon; chip: string; }
 
 const PRIORITY_CFG: Record<string, PriorityConfig> = {
-    HIGH:   { label: "Alta",  Icon: Flame,     chip: "bg-rose-500/10 text-rose-600 border-rose-500/20",   accent: "from-rose-500 to-rose-400" },
-    URGENT: { label: "Alta",  Icon: Flame,     chip: "bg-rose-500/10 text-rose-600 border-rose-500/20",   accent: "from-rose-500 to-rose-400" },
-    MEDIUM: { label: "Média", Icon: Scale,     chip: "bg-amber-500/10 text-amber-600 border-amber-500/20", accent: "from-amber-500 to-amber-400" },
-    LOW:    { label: "Baixa", Icon: Snowflake, chip: "bg-blue-500/10 text-blue-600 border-blue-500/20",    accent: "from-blue-500 to-blue-400" },
+    HIGH:   { label: "Alta",  Icon: Flame,     chip: "bg-rose-500/10 text-rose-600" },
+    URGENT: { label: "Alta",  Icon: Flame,     chip: "bg-rose-500/10 text-rose-600" },
+    MEDIUM: { label: "Média", Icon: Scale,     chip: "bg-amber-500/10 text-amber-600" },
+    LOW:    { label: "Baixa", Icon: Snowflake, chip: "bg-blue-500/10 text-blue-600" },
 };
 
-function WishlistCard({ item }: { item: WishlistData }) {
+/** Pílula de status sobre a imagem — fundo claro com blur, sem cor chapada. */
+function StatusPill({ icon: Icon, text, className }: { icon: LucideIcon; text: string; className: string }) {
+    return (
+        <div className={cn(
+            "flex items-center gap-1.5 rounded-full border bg-background/85 backdrop-blur-md px-2.5 py-1 text-[10px] font-bold shadow-sm animate-in zoom-in duration-300",
+            className
+        )}>
+            <Icon className="h-3 w-3" /> {text}
+        </div>
+    );
+}
+
+function WishlistCard({ item, accounts, totalBalance }: { item: WishlistData; accounts: WishlistAccountOption[]; totalBalance: number }) {
     const router = useRouter();
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -181,26 +252,26 @@ function WishlistCard({ item }: { item: WishlistData }) {
     const { smartView } = useSmartView();
     const formatMoney = useFormatCurrency();
 
-    const progressRaw = item.price > 0 ? (item.saved / item.price) * 100 : 0;
-    const progress = Math.min(progressRaw, 100);
-    const remaining = Math.max(item.price - item.saved, 0);
-    const isCompleted = progress >= 100;
-    const isNear = !isCompleted && progress >= 80;
+    const bought = isBought(item);
+    // Cobertura: quanto do preço o saldo TOTAL das contas já cobre hoje
+    const coverage = item.price > 0 ? Math.min(Math.max(totalBalance / item.price, 0) * 100, 100) : 0;
+    const affordable = !bought && item.price > 0 && totalBalance >= item.price;
+    const missing = Math.max(item.price - totalBalance, 0);
+    const isNear = !bought && !affordable && coverage >= 80;
 
     const pr = PRIORITY_CFG[item.priority] ?? PRIORITY_CFG.MEDIUM;
-    const accentGradient = isCompleted ? "from-emerald-500 to-emerald-400" : pr.accent;
 
     const handleDeleteConfirmed = async () => {
         if (isDeleting) return;
         setIsDeleting(true);
         try {
             await deleteWishlist(item.id!);
-            toast.success("Meta removida do seu cofre.");
+            toast.success("Desejo removido da lista.");
             setIsConfirmOpen(false);
             router.refresh(); // garante que o card suma da lista na hora
         } catch (e) {
-            console.error("Erro ao remover meta:", e);
-            toast.error(e instanceof Error ? e.message : "Erro ao remover meta.");
+            console.error("Erro ao remover desejo:", e);
+            toast.error(e instanceof Error ? e.message : "Erro ao remover desejo.");
         } finally {
             setIsDeleting(false);
         }
@@ -208,53 +279,59 @@ function WishlistCard({ item }: { item: WishlistData }) {
 
     return (
         <Card className={cn(
-            "group relative overflow-hidden flex flex-col h-full border-border/40 shadow-sm hover:shadow-xl transition-all duration-500 bg-card rounded-[1.5rem] hover:-translate-y-1",
-            isCompleted && "border-emerald-500/30 shadow-emerald-500/10"
+            "group relative flex h-full flex-col overflow-hidden rounded-2xl border-border/40 bg-card shadow-sm transition-all duration-300 hover:shadow-md",
+            affordable ? "hover:border-emerald-500/40" : "hover:border-primary/30",
+            bought && "opacity-90"
         )}>
-            {/* Faixa de destaque no topo (prioridade / conquista) */}
-            <div className={cn("absolute inset-x-0 top-0 h-1 bg-gradient-to-r z-20", accentGradient)} />
-
             {/* ÁREA DA IMAGEM */}
-            <div className="relative h-48 w-full overflow-hidden flex items-center justify-center p-8 transition-all duration-500 border-b border-border/30">
+            <div className="relative h-40 w-full shrink-0 overflow-hidden border-b border-border/30 bg-gradient-to-br from-muted/40 via-muted/15 to-background">
                 {item.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={item.imageUrl} alt={item.name} className="relative z-10 w-full h-full object-contain drop-shadow-xl transition-transform duration-500 group-hover:scale-110" />
+                    <img
+                        src={item.imageUrl}
+                        alt={item.name}
+                        className={cn(
+                            "h-full w-full object-contain p-6 drop-shadow-md transition-transform duration-300 group-hover:scale-[1.04]",
+                            bought && "grayscale opacity-60"
+                        )}
+                    />
                 ) : (
-                    // Fallback frictionless: monograma sobre gradiente suave
-                    <div className="absolute inset-0 bg-gradient-to-br from-muted/50 via-muted/20 to-background flex items-center justify-center">
-                        <span className="text-[7rem] leading-none font-black text-foreground/10 select-none transition-transform duration-500 group-hover:scale-110">
+                    // Fallback frictionless: monograma suave
+                    <div className="flex h-full w-full items-center justify-center">
+                        <span className={cn(
+                            "text-6xl font-black text-foreground/[0.08] select-none transition-transform duration-300 group-hover:scale-105",
+                            bought && "opacity-60"
+                        )}>
                             {(item.name?.trim()?.charAt(0) || "?").toUpperCase()}
                         </span>
                     </div>
                 )}
 
-                {/* Badges (Status) */}
-                <div className="absolute top-4 right-4 z-20 flex flex-col gap-2 items-end">
-                    {isCompleted ? (
-                        <div className="bg-emerald-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5 tracking-widest uppercase animate-in zoom-in duration-300">
-                            <Trophy className="h-3.5 w-3.5" /> Conquistado
-                        </div>
+                {/* Status (uma pílula só, discreta) */}
+                <div className="absolute right-3 top-3 z-10">
+                    {bought ? (
+                        <StatusPill icon={Trophy} text="Comprado" className="border-emerald-500/30 text-emerald-600" />
+                    ) : affordable ? (
+                        <StatusPill icon={BadgeCheck} text="Dá pra comprar" className="border-emerald-500/30 text-emerald-600" />
                     ) : isNear ? (
-                        <div className="bg-amber-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1.5 tracking-widest uppercase animate-in zoom-in duration-300">
-                            <Sparkles className="h-3.5 w-3.5" /> Quase lá
-                        </div>
+                        <StatusPill icon={Sparkles} text="Quase lá" className="border-amber-500/30 text-amber-600" />
                     ) : null}
                 </div>
-                
-                {/* Ações de Edição/Exclusão */}
-                <div className="absolute top-4 left-4 z-20 flex gap-2 transition-all duration-300 opacity-100 translate-x-0 md:opacity-0 md:-translate-x-2 md:group-hover:opacity-100 md:group-hover:translate-x-0">
-                     
+
+                {/* Ações de Edição/Exclusão (aparecem no hover em desktop) */}
+                <div className="absolute left-3 top-3 z-10 flex gap-1.5 transition-all duration-300 opacity-100 md:opacity-0 md:group-hover:opacity-100">
+
                      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
                         <DialogTrigger asChild>
-                            <Button size="icon" variant="secondary" className="h-9 w-9 rounded-xl bg-background/80 backdrop-blur-md shadow-sm border border-border/50 hover:text-primary transition-all">
-                                <Pencil className="h-4 w-4" />
+                            <Button size="icon" variant="secondary" className="h-8 w-8 rounded-lg bg-background/80 backdrop-blur-md shadow-sm border border-border/50 hover:text-primary transition-all">
+                                <Pencil className="h-3.5 w-3.5" />
                             </Button>
                         </DialogTrigger>
                         <DialogContent size="lg">
                             <DialogHeader
                                 icon={<Pencil />}
-                                title="Editar Meta"
-                                description="Ajuste os valores, prioridade ou detalhes do seu sonho."
+                                title="Editar Desejo"
+                                description="Ajuste o preço, prioridade ou detalhes do seu sonho."
                             />
                             <DialogBody>
                                 <WishlistForm item={item} onClose={() => setIsEditOpen(false)} />
@@ -264,8 +341,8 @@ function WishlistCard({ item }: { item: WishlistData }) {
 
                     <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
                         <AlertDialogTrigger asChild>
-                            <Button size="icon" variant="secondary" className="h-9 w-9 rounded-xl bg-background/80 backdrop-blur-md shadow-sm border border-border/50 hover:text-rose-500 transition-all">
-                                <Trash2 className="h-4 w-4" />
+                            <Button size="icon" variant="secondary" className="h-8 w-8 rounded-lg bg-background/80 backdrop-blur-md shadow-sm border border-border/50 hover:text-rose-500 transition-all">
+                                <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent className="border-destructive/20">
@@ -273,7 +350,7 @@ function WishlistCard({ item }: { item: WishlistData }) {
                                 <div className="p-3 rounded-2xl bg-destructive/10 text-destructive"><AlertCircle className="h-6 w-6" /></div>
                                 <AlertDialogTitle className="text-xl font-bold normal-case tracking-normal">Desistir do Sonho?</AlertDialogTitle>
                                 <AlertDialogDescription className="text-sm text-muted-foreground">
-                                    Você já guardou <strong className="text-foreground">{formatMoney(item.saved)}</strong> para &quot;{item.name}&quot;. Tem certeza que deseja excluir esta meta?
+                                    &quot;{item.name}&quot; ({formatMoney(item.price)}) será removido da sua lista de desejos. Tem certeza?
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
@@ -291,67 +368,65 @@ function WishlistCard({ item }: { item: WishlistData }) {
                 </div>
             </div>
 
-            {/* CONTEÚDO DO CARD */}
-            <CardContent className="flex-1 p-6 pb-5 flex flex-col justify-between bg-card">
-                <div className="space-y-2.5">
-                    <div className="flex justify-between items-start gap-2">
-                        <h4 className="font-extrabold text-lg text-foreground leading-tight line-clamp-2" title={item.name}>{item.name}</h4>
-                        {item.productUrl && (
-                            <a href={item.productUrl} target="_blank" rel="noreferrer" title="Abrir na loja" className="p-1.5 bg-muted rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors shrink-0">
-                                <ExternalLink className="h-4 w-4" />
-                            </a>
-                        )}
-                    </div>
-                    {/* Chip de prioridade sempre visível */}
-                    <span className={cn("inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border", pr.chip)}>
+            {/* CONTEÚDO */}
+            <CardContent className="flex flex-1 flex-col p-5">
+                {/* Prioridade + link da loja */}
+                <div className="mb-2 flex items-center justify-between gap-2">
+                    <span className={cn("inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider", pr.chip)}>
                         <pr.Icon className="h-3 w-3" /> {pr.label}
                     </span>
+                    {item.productUrl && (
+                        <a href={item.productUrl} target="_blank" rel="noreferrer" title="Abrir na loja" className="rounded-md p-1 text-muted-foreground/70 transition-colors hover:bg-primary/10 hover:text-primary">
+                            <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                    )}
                 </div>
 
-                <div className="space-y-4 mt-6">
-                    <div className="flex justify-between items-end">
-                        <div>
-                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Cofre atual</p>
-                            <p className={cn("text-3xl font-black font-mono tracking-tighter tabular-nums leading-none", isCompleted ? "text-emerald-500" : "text-foreground", smartView && "blur-md select-none")}>
-                                {formatMoney(item.saved)}
-                            </p>
-                        </div>
-                        <div className="text-right pb-1">
-                             <span className={cn("text-xs text-muted-foreground font-bold uppercase tracking-wider", smartView && "blur-sm select-none")}>de {formatMoney(item.price)}</span>
-                        </div>
+                <h4 className="min-h-[2.6rem] text-[15px] font-bold leading-snug text-foreground line-clamp-2" title={item.name}>
+                    {item.name}
+                </h4>
+
+                {/* Preço + cobertura do saldo (uma informação, um lugar) */}
+                <div className="mt-auto space-y-2 pt-4">
+                    <div className="flex items-baseline justify-between gap-2">
+                        <p className={cn("text-[22px] font-extrabold tabular-nums tracking-tight leading-none", bought ? "text-muted-foreground line-through decoration-2" : "text-foreground", smartView && "blur-md select-none")}>
+                            {formatMoney(item.price)}
+                        </p>
+                        {!bought && !affordable && (
+                            <span className={cn("text-[11px] font-bold tabular-nums", isNear ? "text-amber-600" : "text-muted-foreground")}>
+                                {Math.round(coverage)}% no saldo
+                            </span>
+                        )}
                     </div>
 
-                    <div className="relative h-2.5 w-full bg-muted rounded-full overflow-hidden shadow-inner">
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                         <div
                             className={cn(
-                                "h-full rounded-full transition-all duration-1000 ease-out bg-gradient-to-r",
-                                isCompleted
-                                    ? "from-emerald-500 to-emerald-400"
-                                    : isNear
-                                        ? "from-amber-500 to-amber-400"
-                                        : "from-primary to-primary/60"
+                                "h-full rounded-full transition-all duration-700 ease-out",
+                                bought || affordable ? "bg-emerald-500" : isNear ? "bg-amber-500" : "bg-primary"
                             )}
-                            style={{ width: `${progress}%` }}
+                            style={{ width: `${bought ? 100 : coverage}%` }}
                         />
                     </div>
 
-                    <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                        <span className={cn(isCompleted && "text-emerald-600", isNear && "text-amber-600")}>
-                            {Math.round(progress)}% Concluído
-                        </span>
-                        {!isCompleted && <span className={cn(smartView && "blur-sm select-none")}>Faltam {formatMoney(remaining)}</span>}
-                    </div>
+                    <p className={cn("text-[11px] font-medium", (bought || affordable) ? "text-emerald-600" : "text-muted-foreground")}>
+                        {bought
+                            ? "Desejo conquistado 🎉"
+                            : affordable
+                                ? "Seu saldo já cobre este desejo"
+                                : <>Faltam <span className={cn("font-bold tabular-nums", smartView && "blur-sm select-none")}>{formatMoney(missing)}</span> no saldo</>}
+                    </p>
                 </div>
             </CardContent>
 
-            {/* RODAPÉ E AÇÃO */}
-            <div className="px-6 pb-6 mt-auto bg-card">
-                {!isCompleted ? (
-                    <DepositDialog item={item} />
-                ) : (
-                    <Button variant="outline" className="w-full border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 cursor-default font-bold h-12 rounded-xl">
-                        <Check className="h-5 w-5 mr-2" /> Meta Atingida!
+            {/* AÇÃO */}
+            <div className="px-5 pb-5">
+                {bought ? (
+                    <Button variant="outline" className="w-full h-11 rounded-xl border-emerald-500/25 bg-emerald-500/5 font-semibold text-emerald-600 hover:bg-emerald-500/10 cursor-default">
+                        <Check className="h-4 w-4 mr-2" /> Comprado!
                     </Button>
+                ) : (
+                    <BuyDialog item={item} accounts={accounts} affordable={affordable} />
                 )}
             </div>
         </Card>

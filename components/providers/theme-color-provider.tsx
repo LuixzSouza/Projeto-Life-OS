@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { usePathname } from "next/navigation";
+import { THEME_PRESETS } from "@/components/settings/appearance/theme-presets";
 
 interface ThemeColorContextType {
   themeColor: string;
@@ -17,7 +18,9 @@ export function useThemeColor() {
   return React.useContext(ThemeColorContext);
 }
 
-const PRESET_CLASSES = ["theme-blue", "theme-green", "theme-orange", "theme-violet", "theme-rose"];
+// Derivado do catálogo de presets — adicionar um tema novo lá já o inclui aqui
+// (limpeza de classes antigas e sorteio da landing).
+const PRESET_CLASSES: string[] = THEME_PRESETS.map((p) => p.name);
 
 // Converte #rrggbb para o formato "H S% L%" usado pelas variáveis CSS (Tailwind/shadcn).
 // Retorna também a luminância para calcular o contraste do texto sobre a cor.

@@ -14,6 +14,7 @@ type SearchParams = {
   period?: string;
   type?: string;
   account?: string;
+  category?: string;
   q?: string;
   page?: string;
 };
@@ -45,6 +46,7 @@ export default async function TransactionsPage({
   const typeFilter =
     sp.type === "INCOME" || sp.type === "EXPENSE" ? sp.type : "ALL";
   const accountFilter = sp.account ?? "ALL";
+  const categoryFilter = sp.category ?? "ALL";
   const search = (sp.q ?? "").trim();
   const page = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
 
@@ -52,6 +54,7 @@ export default async function TransactionsPage({
   let pageRows;
   let summaryByType;
   let chartRows;
+  let categoryRows;
   let totalCount = 0;
   let hasError = false;
 
@@ -67,6 +70,7 @@ export default async function TransactionsPage({
       ...(periodStart ? { date: { gte: periodStart } } : {}),
       ...(typeFilter !== "ALL" ? { type: typeFilter } : {}),
       ...(accountFilter !== "ALL" ? { accountId: accountFilter } : {}),
+      ...(categoryFilter !== "ALL" ? { category: categoryFilter } : {}),
       ...(search
         ? {
             OR: [
@@ -109,6 +113,14 @@ export default async function TransactionsPage({
         where: chartWhere,
         select: { date: true, type: true, amount: true },
       }),
+      // Categorias existentes do usuário (p/ o filtro) — findMany distinct é o
+      // padrão seguro no modo réplica (groupBy com datas quebra no libSQL).
+      prisma.transaction.findMany({
+        where: { userId, deletedAt: null },
+        distinct: ["category"],
+        select: { category: true },
+        orderBy: { category: "asc" },
+      }),
     ]);
 
     accountsData = result[0];
@@ -116,12 +128,13 @@ export default async function TransactionsPage({
     summaryByType = result[2];
     totalCount = result[3];
     chartRows = result[4];
+    categoryRows = result[5];
   } catch (error) {
     console.error("Erro crítico ao carregar página de transações:", error);
     hasError = true;
   }
 
-  if (hasError || !accountsData || !pageRows || !summaryByType || !chartRows) {
+  if (hasError || !accountsData || !pageRows || !summaryByType || !chartRows || !categoryRows) {
     return (
       <ErrorState
         title="Erro ao carregar dados"
@@ -167,6 +180,9 @@ export default async function TransactionsPage({
     .slice(-6);
 
   const accounts = accountsData.map((acc) => ({ id: acc.id, name: acc.name }));
+  const categories = categoryRows
+    .map((c) => c.category)
+    .filter((c): c is string => !!c && c.trim().length > 0);
 
   const transactions = pageRows.map((tx) => ({
     id: tx.id,
@@ -185,12 +201,13 @@ export default async function TransactionsPage({
     <TransactionsView
       transactions={transactions}
       accounts={accounts}
+      categories={categories}
       summary={summary}
       monthlyStats={monthlyStats}
       totalCount={totalCount}
       page={page}
       totalPages={totalPages}
-      filters={{ period, type: typeFilter, account: accountFilter, q: search }}
+      filters={{ period, type: typeFilter, account: accountFilter, category: categoryFilter, q: search }}
     />
   );
 }

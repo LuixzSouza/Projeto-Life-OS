@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { fetchPluggyTransactions, createConnectToken, fetchPluggyAccounts } from "@/lib/pluggy";
+import { fetchPluggyTransactions, createConnectToken, fetchPluggyAccounts, isPluggyConfigured } from "@/lib/pluggy";
 import { requireUserId } from "@/lib/auth";
 
 interface PluggyAccount {
@@ -18,12 +18,34 @@ interface PluggyAccount {
 // INTEGRAÇÃO BANCÁRIA (PLUGGY)
 // =========================================================
 
-export async function createConnectTokenAction() {
+// Resultado tipado em vez de throw: mensagens de Error lançadas em Server
+// Actions são mascaradas em produção, e o cliente precisa distinguir
+// "não configurado" (mostrar caminhos alternativos) de "falha de API".
+export type ConnectTokenResult =
+  | { success: true; token: string }
+  | { success: false; reason: "NOT_CONFIGURED" | "API_ERROR"; message: string };
+
+export async function createConnectTokenAction(): Promise<ConnectTokenResult> {
   try {
-    return await createConnectToken();
+    await requireUserId();
+
+    if (!(await isPluggyConfigured())) {
+      return {
+        success: false,
+        reason: "NOT_CONFIGURED",
+        message: "Credenciais da Pluggy não configuradas.",
+      };
+    }
+
+    const token = await createConnectToken();
+    return { success: true, token };
   } catch (error) {
     console.error("Erro ao criar token Pluggy:", error);
-    throw new Error("Falha ao iniciar conexão bancária. Verifique suas chaves de API.");
+    return {
+      success: false,
+      reason: "API_ERROR",
+      message: "Falha ao iniciar conexão bancária. Verifique suas chaves de API.",
+    };
   }
 }
 

@@ -6,11 +6,12 @@
 //
 // Módulo server-only: importado só por actions/tools.ts (nunca por client).
 import { randomUUID } from "crypto";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { encrypt } from "@/lib/crypto";
 import { asEnum, coerceEnum, TASK_STATUSES, TASK_PRIORITIES, CLIENT_STATUSES } from "@/lib/enums";
-import type { AIModule, ToolArgs, MutationResult } from "@/app/(dashboard)/ai/actions/types";
+import type { AIModule, ToolArgs, MutationResult, AnalysisMetric } from "@/app/(dashboard)/ai/actions/types";
 
 /* ----------------------------------------------------------------------------
    HELPERS
@@ -22,6 +23,33 @@ const LIST_MAX = 25;
 function clampLimit(n?: number): number {
   if (!n || n < 1) return LIST_DEFAULT;
   return Math.min(Math.floor(n), LIST_MAX);
+}
+
+/** Remove acentos ("café" → "cafe") para busca tolerante. */
+function deaccent(s: string): string {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+
+/** Variantes do termo de busca (original + sem acento), únicas. */
+function searchVariants(s: string): string[] {
+  const base = s.trim();
+  return [...new Set([base, deaccent(base)])].filter(Boolean);
+}
+
+/**
+ * Filtro OR multi-campo × multi-variante: acha "café da manhã" buscando
+ * "cafe", em qualquer um dos campos informados. (Resolve a maior parte da
+ * distância até a busca semântica com ~20% do esforço.)
+ * Genérico sobre o WhereInput do modelo — o cast fica encapsulado aqui.
+ */
+function orContains<TWhere>(fields: string[], term: string): { OR: TWhere[] } {
+  const OR: TWhere[] = [];
+  for (const field of fields) {
+    for (const v of searchVariants(term)) {
+      OR.push({ [field]: { contains: v } } as TWhere);
+    }
+  }
+  return { OR };
 }
 
 // Datas vindas de <input type="date"> ("YYYY-MM-DD") recebem T12:00:00Z para
@@ -51,7 +79,17 @@ const REVALIDATE: Record<AIModule, string[]> = {
   VAULT: ["/access"],
   WARDROBE: ["/wardrobe", "/agenda"],
   AGENDA: ["/agenda", "/dashboard"],
+  NUTRITION: ["/health/nutrition", "/health", "/dashboard"],
+  SLEEP: ["/health/sleep", "/health", "/dashboard"],
+  HABITS: ["/health", "/dashboard"],
 };
+
+// Dia local como Date "T12:00:00Z" — convenção do HabitLog (1 log por dia).
+function habitDayKey(d?: Date): Date {
+  const n = d ?? new Date();
+  const iso = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+  return new Date(`${iso}T12:00:00Z`);
+}
 
 function revalidate(module: AIModule) {
   for (const path of REVALIDATE[module]) revalidatePath(path);
@@ -74,7 +112,7 @@ export async function queryModule(userId: string, args: ToolArgs): Promise<Recor
 
   switch (mod) {
     case "FINANCE": {
-      const where = { userId, deletedAt: null, ...(search ? { description: { contains: search } } : {}), ...(args.category ? { category: args.category } : {}) };
+      const where = { userId, deletedAt: null, ...(search ? orContains<Prisma.TransactionWhereInput>(["description", "category"], search) : {}), ...(args.category ? { category: args.category } : {}) };
       const [rows, total] = await Promise.all([
         prisma.transaction.findMany({ where, orderBy: { date: "desc" }, take, skip, select: { id: true, description: true, amount: true, type: true, category: true, date: true } }),
         prisma.transaction.count({ where }),
@@ -85,7 +123,7 @@ export async function queryModule(userId: string, args: ToolArgs): Promise<Recor
       };
     }
     case "TASKS": {
-      const where = { userId, deletedAt: null, ...(search ? { title: { contains: search } } : {}), ...(args.status ? { status: args.status } : {}) };
+      const where = { userId, deletedAt: null, ...(search ? orContains<Prisma.TaskWhereInput>(["title", "description"], search) : {}), ...(args.status ? { status: args.status } : {}) };
       const [rows, total] = await Promise.all([
         prisma.task.findMany({ where, orderBy: [{ isDone: "asc" }, { dueDate: "asc" }], take, skip, select: { id: true, title: true, status: true, priority: true, isDone: true, dueDate: true } }),
         prisma.task.count({ where }),
@@ -96,7 +134,7 @@ export async function queryModule(userId: string, args: ToolArgs): Promise<Recor
       };
     }
     case "PROJECTS": {
-      const where = { userId, deletedAt: null, ...(search ? { title: { contains: search } } : {}), ...(args.status ? { status: args.status } : {}) };
+      const where = { userId, deletedAt: null, ...(search ? orContains<Prisma.ProjectWhereInput>(["title", "description"], search) : {}), ...(args.status ? { status: args.status } : {}) };
       const [rows, total] = await Promise.all([
         prisma.project.findMany({ where, orderBy: { updatedAt: "desc" }, take, skip, select: { id: true, title: true, status: true, _count: { select: { tasks: true } } } }),
         prisma.project.count({ where }),
@@ -107,7 +145,7 @@ export async function queryModule(userId: string, args: ToolArgs): Promise<Recor
       };
     }
     case "HEALTH": {
-      const where = { userId, ...(search ? { title: { contains: search } } : {}) };
+      const where = { userId, ...(search ? orContains<Prisma.WorkoutWhereInput>(["title", "type", "notes"], search) : {}) };
       const [rows, total] = await Promise.all([
         prisma.workout.findMany({ where, orderBy: { date: "desc" }, take, skip, select: { id: true, title: true, type: true, duration: true, date: true } }),
         prisma.workout.count({ where }),
@@ -118,7 +156,13 @@ export async function queryModule(userId: string, args: ToolArgs): Promise<Recor
       };
     }
     case "STUDIES": {
-      const where = { userId, ...(search ? { subject: { title: { contains: search } } } : {}) };
+      // Busca por matéria OU pelas notas da sessão (com variantes sem acento).
+      const where: Prisma.StudySessionWhereInput = {
+        userId,
+        ...(search
+          ? { OR: searchVariants(search).flatMap((v): Prisma.StudySessionWhereInput[] => [{ subject: { title: { contains: v } } }, { notesRaw: { contains: v } }]) }
+          : {}),
+      };
       const [rows, total] = await Promise.all([
         prisma.studySession.findMany({ where, orderBy: { date: "desc" }, take, skip, select: { id: true, durationMinutes: true, focusLevel: true, date: true, subject: { select: { title: true } } } }),
         prisma.studySession.count({ where }),
@@ -129,7 +173,7 @@ export async function queryModule(userId: string, args: ToolArgs): Promise<Recor
       };
     }
     case "ENTERTAINMENT": {
-      const where = { userId, deletedAt: null, ...(search ? { title: { contains: search } } : {}), ...(args.status ? { status: args.status } : {}) };
+      const where = { userId, deletedAt: null, ...(search ? orContains<Prisma.MediaItemWhereInput>(["title", "overview"], search) : {}), ...(args.status ? { status: args.status } : {}) };
       const [rows, total] = await Promise.all([
         prisma.mediaItem.findMany({ where, orderBy: { updatedAt: "desc" }, take, skip, select: { id: true, title: true, type: true, status: true, rating: true } }),
         prisma.mediaItem.count({ where }),
@@ -140,7 +184,7 @@ export async function queryModule(userId: string, args: ToolArgs): Promise<Recor
       };
     }
     case "CRM": {
-      const where = { userId, deletedAt: null, ...(search ? { name: { contains: search } } : {}), ...(args.status ? { status: args.status } : {}) };
+      const where = { userId, deletedAt: null, ...(search ? orContains<Prisma.ClientWhereInput>(["name", "company", "notes"], search) : {}), ...(args.status ? { status: args.status } : {}) };
       const [rows, total] = await Promise.all([
         prisma.client.findMany({ where, orderBy: { updatedAt: "desc" }, take, skip, select: { id: true, name: true, company: true, status: true, phone: true } }),
         prisma.client.count({ where }),
@@ -151,7 +195,7 @@ export async function queryModule(userId: string, args: ToolArgs): Promise<Recor
       };
     }
     case "FRIENDS": {
-      const where = { userId, deletedAt: null, ...(search ? { name: { contains: search } } : {}) };
+      const where = { userId, deletedAt: null, ...(search ? orContains<Prisma.FriendWhereInput>(["name", "company", "notes"], search) : {}) };
       const [rows, total] = await Promise.all([
         prisma.friend.findMany({ where, orderBy: { name: "asc" }, take, skip, select: { id: true, name: true, phone: true, proximity: true, company: true } }),
         prisma.friend.count({ where }),
@@ -163,7 +207,7 @@ export async function queryModule(userId: string, args: ToolArgs): Promise<Recor
     }
     case "VAULT": {
       // NUNCA retornar a senha em leitura.
-      const where = { userId, ...(search ? { title: { contains: search } } : {}) };
+      const where = { userId, ...(search ? orContains<Prisma.AccessItemWhereInput>(["title", "username", "category"], search) : {}) };
       const [rows, total] = await Promise.all([
         prisma.accessItem.findMany({ where, orderBy: { title: "asc" }, take, skip, select: { id: true, title: true, username: true, category: true, url: true } }),
         prisma.accessItem.count({ where }),
@@ -175,7 +219,7 @@ export async function queryModule(userId: string, args: ToolArgs): Promise<Recor
       };
     }
     case "WARDROBE": {
-      const where = { userId, deletedAt: null, ...(search ? { name: { contains: search } } : {}), ...(args.category ? { category: args.category } : {}) };
+      const where = { userId, deletedAt: null, ...(search ? orContains<Prisma.WardrobeItemWhereInput>(["name", "brand", "color"], search) : {}), ...(args.category ? { category: args.category } : {}) };
       const [rows, total] = await Promise.all([
         prisma.wardrobeItem.findMany({ where, orderBy: { updatedAt: "desc" }, take, skip, select: { id: true, name: true, category: true, brand: true, color: true, status: true } }),
         prisma.wardrobeItem.count({ where }),
@@ -186,7 +230,7 @@ export async function queryModule(userId: string, args: ToolArgs): Promise<Recor
       };
     }
     case "AGENDA": {
-      const where = { userId, deletedAt: null, startTime: { gte: new Date() }, ...(search ? { title: { contains: search } } : {}) };
+      const where = { userId, deletedAt: null, startTime: { gte: new Date() }, ...(search ? orContains<Prisma.EventWhereInput>(["title", "location", "description"], search) : {}) };
       const [rows, total] = await Promise.all([
         prisma.event.findMany({ where, orderBy: { startTime: "asc" }, take, skip, select: { id: true, title: true, startTime: true, location: true } }),
         prisma.event.count({ where }),
@@ -194,6 +238,42 @@ export async function queryModule(userId: string, args: ToolArgs): Promise<Recor
       return {
         total, hasMore: skip + rows.length < total,
         eventos: rows.map((e) => ({ id: e.id, titulo: e.title, quando: e.startTime.toISOString().slice(0, 16).replace("T", " "), local: e.location })),
+      };
+    }
+    case "NUTRITION": {
+      const where = { userId, ...(search ? orContains<Prisma.MealWhereInput>(["title", "items"], search) : {}), ...(args.category ? { type: args.category } : {}) };
+      const [rows, total] = await Promise.all([
+        prisma.meal.findMany({ where, orderBy: { date: "desc" }, take, skip, select: { id: true, title: true, type: true, calories: true, protein: true, carbs: true, fat: true, date: true } }),
+        prisma.meal.count({ where }),
+      ]);
+      return {
+        total, hasMore: skip + rows.length < total,
+        refeicoes: rows.map((m) => ({ id: m.id, titulo: m.title, tipo: m.type, kcal: m.calories, proteina_g: m.protein, carbo_g: m.carbs, gordura_g: m.fat, data: m.date.toISOString().slice(0, 10) })),
+      };
+    }
+    case "SLEEP": {
+      const where = { userId, type: "SLEEP" };
+      const [rows, total] = await Promise.all([
+        prisma.healthMetric.findMany({ where, orderBy: { date: "desc" }, take, skip, select: { id: true, value: true, date: true } }),
+        prisma.healthMetric.count({ where }),
+      ]);
+      return {
+        total, hasMore: skip + rows.length < total,
+        noites: rows.map((r) => ({ id: r.id, horas: r.value, data: r.date.toISOString().slice(0, 10) })),
+      };
+    }
+    case "HABITS": {
+      const where = { userId, archived: false, ...(search ? orContains<Prisma.HabitWhereInput>(["name"], search) : {}) };
+      const [rows, total] = await Promise.all([
+        prisma.habit.findMany({
+          where, orderBy: { sortOrder: "asc" }, take, skip,
+          select: { id: true, name: true, icon: true, logs: { where: { date: habitDayKey() }, select: { status: true }, take: 1 } },
+        }),
+        prisma.habit.count({ where }),
+      ]);
+      return {
+        total, hasMore: skip + rows.length < total,
+        habitos: rows.map((h) => ({ id: h.id, nome: h.name, icone: h.icon, hoje: h.logs[0]?.status ?? "PENDENTE" })),
       };
     }
     default:
@@ -279,9 +359,307 @@ async function querySummary(userId: string, module: AIModule): Promise<Record<st
       const proximos = await prisma.event.count({ where: { userId, deletedAt: null, startTime: { gte: now, lte: in7 } } });
       return { eventos_proximos_7_dias: proximos };
     }
+    case "NUTRITION": {
+      const dayStart = new Date();
+      dayStart.setHours(0, 0, 0, 0);
+      const weekStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const [today, week, settings] = await Promise.all([
+        prisma.meal.aggregate({ where: { userId, date: { gte: dayStart } }, _sum: { calories: true, protein: true, carbs: true, fat: true }, _count: { _all: true } }),
+        prisma.meal.aggregate({ where: { userId, date: { gte: weekStart } }, _sum: { calories: true }, _count: { _all: true } }),
+        prisma.settings.findUnique({ where: { userId }, select: { calorieGoalOverride: true } }),
+      ]);
+      return {
+        hoje: {
+          refeicoes: today._count._all,
+          kcal: today._sum.calories ?? 0,
+          proteina_g: today._sum.protein ?? 0,
+          carbo_g: today._sum.carbs ?? 0,
+          gordura_g: today._sum.fat ?? 0,
+        },
+        ultimos_7_dias: { refeicoes: week._count._all, kcal_total: week._sum.calories ?? 0 },
+        meta_kcal_dia: settings?.calorieGoalOverride ?? null,
+      };
+    }
+    case "SLEEP": {
+      const weekStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const [last, week, settings] = await Promise.all([
+        prisma.healthMetric.findFirst({ where: { userId, type: "SLEEP" }, orderBy: { date: "desc" }, select: { value: true, date: true } }),
+        prisma.healthMetric.aggregate({ where: { userId, type: "SLEEP", date: { gte: weekStart } }, _avg: { value: true }, _count: { _all: true } }),
+        prisma.settings.findUnique({ where: { userId }, select: { sleepGoalHours: true } }),
+      ]);
+      return {
+        ultima_noite: last ? { horas: last.value, data: last.date.toISOString().slice(0, 10) } : null,
+        ultimos_7_dias: { registros: week._count._all, media_horas: week._avg.value ? Number(week._avg.value.toFixed(1)) : null },
+        meta_horas: settings?.sleepGoalHours ?? null,
+      };
+    }
+    case "HABITS": {
+      const today = habitDayKey();
+      const [ativos, feitos, falhados] = await Promise.all([
+        prisma.habit.count({ where: { userId, archived: false } }),
+        prisma.habitLog.count({ where: { userId, date: today, status: "DONE" } }),
+        prisma.habitLog.count({ where: { userId, date: today, status: "FAILED" } }),
+      ]);
+      return { habitos_ativos: ativos, feitos_hoje: feitos, falhados_hoje: falhados, pendentes_hoje: Math.max(0, ativos - feitos - falhados) };
+    }
     default:
       return { erro: `Resumo não disponível para ${module}.` };
   }
+}
+
+/* ----------------------------------------------------------------------------
+   ANÁLISE — analyze_system_data (COMPARE / TREND / GROUP)
+   Agregações SQL em UMA chamada — substitui a IA improvisar com vários query
+   (caro e lento). Tudo bounded: janelas de no máx. 90 dias, top-N pequenos.
+   ---------------------------------------------------------------------------- */
+
+interface PeriodRange { start: Date; end: Date; label: string }
+
+/** "YYYY-MM" → intervalo [início do mês, início do mês seguinte). */
+function parseMonth(s?: string): PeriodRange | null {
+  if (!s || !/^\d{4}-\d{2}$/.test(s.trim())) return null;
+  const [y, m] = s.trim().split("-").map(Number);
+  if (m < 1 || m > 12) return null;
+  return { start: new Date(y, m - 1, 1), end: new Date(y, m, 1), label: s.trim() };
+}
+
+/** Valor agregado de uma métrica num intervalo (valor principal + contagem). */
+async function metricAggregate(userId: string, metric: AnalysisMetric, start: Date, end: Date): Promise<{ valor: number; registros: number; unidade: string }> {
+  const dateRange = { gte: start, lt: end };
+  switch (metric) {
+    case "EXPENSE":
+    case "INCOME": {
+      const agg = await prisma.transaction.aggregate({
+        where: { userId, deletedAt: null, type: metric, date: dateRange },
+        _sum: { amount: true }, _count: { _all: true },
+      });
+      return { valor: Number(agg._sum.amount ?? 0), registros: agg._count._all, unidade: "valor" };
+    }
+    case "WEIGHT": {
+      const agg = await prisma.bodyMeasurement.aggregate({
+        where: { userId, date: dateRange }, _avg: { weight: true }, _count: { _all: true },
+      });
+      return { valor: Number((agg._avg.weight ?? 0).toFixed(1)), registros: agg._count._all, unidade: "kg (média)" };
+    }
+    case "SLEEP": {
+      const agg = await prisma.healthMetric.aggregate({
+        where: { userId, type: "SLEEP", date: dateRange }, _avg: { value: true }, _count: { _all: true },
+      });
+      return { valor: Number((agg._avg.value ?? 0).toFixed(1)), registros: agg._count._all, unidade: "horas/noite (média)" };
+    }
+    case "WORKOUTS": {
+      const agg = await prisma.workout.aggregate({
+        where: { userId, date: dateRange }, _sum: { duration: true }, _count: { _all: true },
+      });
+      return { valor: agg._count._all, registros: agg._sum.duration ?? 0, unidade: "treinos (registros=minutos)" };
+    }
+    case "STUDY_MINUTES": {
+      const agg = await prisma.studySession.aggregate({
+        where: { userId, date: dateRange }, _sum: { durationMinutes: true }, _count: { _all: true },
+      });
+      return { valor: agg._sum.durationMinutes ?? 0, registros: agg._count._all, unidade: "minutos" };
+    }
+    case "CALORIES": {
+      const agg = await prisma.meal.aggregate({
+        where: { userId, date: dateRange }, _sum: { calories: true }, _count: { _all: true },
+      });
+      return { valor: agg._sum.calories ?? 0, registros: agg._count._all, unidade: "kcal" };
+    }
+  }
+}
+
+/** Pontos diários (data+valor) de uma métrica — base da série do TREND. */
+async function metricPoints(userId: string, metric: AnalysisMetric, start: Date): Promise<{ date: Date; value: number }[]> {
+  const range = { gte: start };
+  switch (metric) {
+    case "EXPENSE":
+    case "INCOME": {
+      const rows = await prisma.transaction.findMany({
+        where: { userId, deletedAt: null, type: metric, date: range },
+        select: { date: true, amount: true },
+      });
+      return rows.map((r) => ({ date: r.date, value: Number(r.amount) }));
+    }
+    case "WEIGHT": {
+      const rows = await prisma.bodyMeasurement.findMany({ where: { userId, date: range }, select: { date: true, weight: true } });
+      return rows.map((r) => ({ date: r.date, value: r.weight }));
+    }
+    case "SLEEP": {
+      const rows = await prisma.healthMetric.findMany({ where: { userId, type: "SLEEP", date: range }, select: { date: true, value: true } });
+      return rows.map((r) => ({ date: r.date, value: r.value }));
+    }
+    case "WORKOUTS": {
+      const rows = await prisma.workout.findMany({ where: { userId, date: range }, select: { date: true, duration: true } });
+      return rows.map((r) => ({ date: r.date, value: r.duration }));
+    }
+    case "STUDY_MINUTES": {
+      const rows = await prisma.studySession.findMany({ where: { userId, date: range }, select: { date: true, durationMinutes: true } });
+      return rows.map((r) => ({ date: r.date, value: r.durationMinutes }));
+    }
+    case "CALORIES": {
+      const rows = await prisma.meal.findMany({ where: { userId, date: range }, select: { date: true, calories: true } });
+      return rows.map((r) => ({ date: r.date, value: r.calories ?? 0 }));
+    }
+  }
+}
+
+export async function analyzeModule(userId: string, args: ToolArgs): Promise<Record<string, unknown>> {
+  const kind = args.analysis;
+  const metric = args.metric;
+
+  if (kind === "COMPARE") {
+    if (!metric) return { erro: "COMPARE exige metric." };
+    const a = parseMonth(args.periodA);
+    const b = parseMonth(args.periodB);
+    if (!a || !b) return { erro: "COMPARE exige periodA e periodB no formato YYYY-MM (ex.: 2026-05)." };
+    const [ra, rb] = await Promise.all([
+      metricAggregate(userId, metric, a.start, a.end),
+      metricAggregate(userId, metric, b.start, b.end),
+    ]);
+    const abs = Number((rb.valor - ra.valor).toFixed(2));
+    const pct = ra.valor !== 0 ? Number((((rb.valor - ra.valor) / Math.abs(ra.valor)) * 100).toFixed(1)) : null;
+    return {
+      metrica: metric, unidade: ra.unidade,
+      periodo_a: { mes: a.label, valor: ra.valor, registros: ra.registros },
+      periodo_b: { mes: b.label, valor: rb.valor, registros: rb.registros },
+      variacao_b_vs_a: { absoluta: abs, percentual: pct },
+    };
+  }
+
+  if (kind === "TREND") {
+    if (!metric) return { erro: "TREND exige metric." };
+    const days = Math.min(Math.max(Math.floor(args.days ?? 30), 7), 90);
+    const start = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    start.setHours(0, 0, 0, 0);
+    const points = await metricPoints(userId, metric, start);
+
+    // Agrega por dia (soma; para WEIGHT/SLEEP o "ponto do dia" é o último valor).
+    const byDay = new Map<string, number>();
+    const replace = metric === "WEIGHT" || metric === "SLEEP";
+    for (const p of points.sort((x, y) => x.date.getTime() - y.date.getTime())) {
+      const key = p.date.toISOString().slice(0, 10);
+      byDay.set(key, replace ? p.value : (byDay.get(key) ?? 0) + p.value);
+    }
+    const serie = [...byDay.entries()].map(([d, v]) => ({ d: d.slice(5), v: Number(v.toFixed(1)) }));
+    if (serie.length === 0) return { metrica: metric, janela_dias: days, serie: [], resumo: "Sem registros no período." };
+
+    const vals = serie.map((s) => s.v);
+    const media = Number((vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1));
+    // Tendência: média da 2ª metade vs 1ª metade da janela.
+    const half = Math.floor(serie.length / 2);
+    const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
+    const a1 = avg(vals.slice(0, half));
+    const a2 = avg(vals.slice(half));
+    const tendencia = a1 !== 0 ? Number((((a2 - a1) / Math.abs(a1)) * 100).toFixed(1)) : null;
+
+    return {
+      metrica: metric, janela_dias: days,
+      resumo: { dias_com_registro: serie.length, media_diaria: media, minimo: Math.min(...vals), maximo: Math.max(...vals), tendencia_pct: tendencia },
+      serie,
+    };
+  }
+
+  if (kind === "GROUP") {
+    const mod = args.module;
+    if (!mod) return { erro: "GROUP exige module (FINANCE, TASKS, ENTERTAINMENT, NUTRITION, HEALTH, PROJECTS ou WARDROBE)." };
+    const monthStart = startOfThisMonth();
+    switch (mod) {
+      case "FINANCE": {
+        const rows = await prisma.transaction.groupBy({
+          by: ["category"], where: { userId, deletedAt: null, type: "EXPENSE", date: { gte: monthStart } },
+          _sum: { amount: true }, _count: { _all: true }, orderBy: { _sum: { amount: "desc" } }, take: 10,
+        });
+        return { agrupamento: "despesas do mês por categoria", grupos: rows.map((r) => ({ categoria: r.category, total: Number(r._sum.amount ?? 0), lancamentos: r._count._all })) };
+      }
+      case "TASKS": {
+        const rows = await prisma.task.groupBy({ by: ["status"], where: { userId, deletedAt: null }, _count: { _all: true } });
+        return { agrupamento: "tarefas por status", grupos: rows.map((r) => ({ status: r.status, total: r._count._all })) };
+      }
+      case "ENTERTAINMENT": {
+        const rows = await prisma.mediaItem.groupBy({ by: ["status"], where: { userId, deletedAt: null }, _count: { _all: true } });
+        return { agrupamento: "mídias por status", grupos: rows.map((r) => ({ status: r.status, total: r._count._all })) };
+      }
+      case "NUTRITION": {
+        const rows = await prisma.meal.groupBy({
+          by: ["type"], where: { userId, date: { gte: monthStart } }, _sum: { calories: true }, _count: { _all: true },
+        });
+        return { agrupamento: "refeições do mês por tipo", grupos: rows.map((r) => ({ tipo: r.type, kcal_total: r._sum.calories ?? 0, refeicoes: r._count._all })) };
+      }
+      case "HEALTH": {
+        const rows = await prisma.workout.groupBy({
+          by: ["type"], where: { userId, date: { gte: monthStart } }, _sum: { duration: true }, _count: { _all: true },
+        });
+        return { agrupamento: "treinos do mês por tipo", grupos: rows.map((r) => ({ tipo: r.type, treinos: r._count._all, minutos: r._sum.duration ?? 0 })) };
+      }
+      case "PROJECTS": {
+        const rows = await prisma.project.groupBy({ by: ["status"], where: { userId, deletedAt: null }, _count: { _all: true } });
+        return { agrupamento: "projetos por status", grupos: rows.map((r) => ({ status: r.status, total: r._count._all })) };
+      }
+      case "WARDROBE": {
+        const rows = await prisma.wardrobeItem.groupBy({ by: ["category"], where: { userId, deletedAt: null }, _count: { _all: true }, orderBy: { _count: { category: "desc" } }, take: 10 });
+        return { agrupamento: "peças por categoria", grupos: rows.map((r) => ({ categoria: r.category, total: r._count._all })) };
+      }
+      default:
+        return { erro: `GROUP não suportado para ${mod}.` };
+    }
+  }
+
+  return { erro: "Informe analysis: COMPARE, TREND ou GROUP." };
+}
+
+/* ----------------------------------------------------------------------------
+   MEMÓRIA PERSISTENTE — manage_memory (SAVE / LIST / DELETE)
+   Fatos curtos que sobrevivem entre conversas. Injetados no system prompt
+   (por isso o teto: memória é contexto pago em token a cada turno).
+   ---------------------------------------------------------------------------- */
+
+const MEMORY_MAX = 50;          // teto de memórias por usuário
+const MEMORY_MAX_LEN = 280;     // 1 fato = 1 frase curta
+
+export async function manageMemory(userId: string, args: ToolArgs): Promise<Record<string, unknown>> {
+  switch (args.action) {
+    case "SAVE": {
+      const content = args.content?.trim() || args.title?.trim() || args.description?.trim();
+      if (!content) return { ok: false, erro: "SAVE exige o campo content (o fato a lembrar)." };
+      const count = await prisma.aiMemory.count({ where: { userId } });
+      if (count >= MEMORY_MAX) {
+        return { ok: false, erro: `Limite de ${MEMORY_MAX} memórias atingido. Liste (LIST) e apague (DELETE) alguma antes de salvar outra.` };
+      }
+      const m = await prisma.aiMemory.create({ data: { content: content.slice(0, MEMORY_MAX_LEN), userId } });
+      revalidatePath("/settings");
+      return { ok: true, id: m.id, resumo: "Memória salva. Vou lembrar disso nas próximas conversas." };
+    }
+    case "LIST": {
+      const rows = await prisma.aiMemory.findMany({
+        where: { userId }, orderBy: { createdAt: "desc" },
+        select: { id: true, content: true, createdAt: true },
+      });
+      return {
+        total: rows.length,
+        memorias: rows.map((m) => ({ id: m.id, fato: m.content, desde: m.createdAt.toISOString().slice(0, 10) })),
+      };
+    }
+    case "DELETE": {
+      if (!args.id) return { ok: false, erro: "DELETE exige o id da memória (use LIST para encontrá-lo)." };
+      const r = await prisma.aiMemory.deleteMany({ where: { id: args.id, userId } });
+      revalidatePath("/settings");
+      return r.count > 0
+        ? { ok: true, resumo: "Memória apagada." }
+        : { ok: false, erro: `Memória ${args.id} não encontrada.` };
+    }
+    default:
+      return { ok: false, erro: "Ação inválida. Use SAVE, LIST ou DELETE." };
+  }
+}
+
+/** Memórias para injeção no system prompt (mais recentes primeiro, bounded). */
+export async function getMemoriesForPrompt(userId: string, take = 20): Promise<{ id: string; content: string }[]> {
+  return prisma.aiMemory.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    take,
+    select: { id: true, content: true },
+  });
 }
 
 /* ----------------------------------------------------------------------------
@@ -294,6 +672,9 @@ export async function mutateModule(userId: string, args: ToolArgs): Promise<Muta
   if (!action) return { ok: false, summary: "Informe a ação (CREATE, UPDATE ou DELETE)." };
 
   if (action === "DELETE") return handleDelete(userId, args);
+  if (action !== "CREATE" && action !== "UPDATE") {
+    return { ok: false, summary: "Ação inválida para mutate_system_data — use CREATE, UPDATE ou DELETE." };
+  }
 
   const result = action === "CREATE" ? await handleCreate(userId, args) : await handleUpdate(userId, args);
   if (result.ok) revalidate(module);
@@ -338,6 +719,12 @@ async function recordLabel(userId: string, module: AIModule, id: string): Promis
     case "VAULT": return (await prisma.accessItem.findFirst({ where: { id, userId }, select: { title: true } }))?.title ?? null;
     case "WARDROBE": return (await prisma.wardrobeItem.findFirst({ where: { id, userId }, select: { name: true } }))?.name ?? null;
     case "AGENDA": return (await prisma.event.findFirst({ where: { id, userId }, select: { title: true } }))?.title ?? null;
+    case "NUTRITION": return (await prisma.meal.findFirst({ where: { id, userId }, select: { title: true } }))?.title ?? null;
+    case "SLEEP": {
+      const m = await prisma.healthMetric.findFirst({ where: { id, userId, type: "SLEEP" }, select: { value: true } });
+      return m ? `sono de ${m.value}h` : null;
+    }
+    case "HABITS": return (await prisma.habit.findFirst({ where: { id, userId }, select: { name: true } }))?.name ?? null;
     default: return null;
   }
 }
@@ -368,6 +755,9 @@ async function deleteRecord(userId: string, module: AIModule, id: string): Promi
     case "VAULT": await prisma.accessItem.deleteMany({ where: { id, userId } }); return;
     case "WARDROBE": await prisma.wardrobeItem.deleteMany({ where: { id, userId } }); return;
     case "AGENDA": await prisma.event.deleteMany({ where: { id, userId } }); return;
+    case "NUTRITION": await prisma.meal.deleteMany({ where: { id, userId } }); return;
+    case "SLEEP": await prisma.healthMetric.deleteMany({ where: { id, userId, type: "SLEEP" } }); return;
+    case "HABITS": await prisma.habit.deleteMany({ where: { id, userId } }); return; // logs caem em cascata
   }
 }
 
@@ -404,6 +794,18 @@ async function handleCreate(userId: string, args: ToolArgs): Promise<MutationRes
       if (category === "WEIGHT" && value != null) {
         const b = await prisma.bodyMeasurement.create({ data: { weight: value, height: 0, gender: "N/A", userId } });
         return { ok: true, id: b.id, summary: `Peso de ${value}kg registrado.` };
+      }
+      if (category === "ENERGY" && value != null) {
+        // Check-in de energia do dia (1-5) — base do journaling noturno guiado.
+        const energy = Math.min(Math.max(Math.round(value), 1), 5);
+        const day = due ?? new Date();
+        const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+        const c = await prisma.energyCheckin.upsert({
+          where: { userId_date: { userId, date: dayStart } },
+          update: { energy, ...(description != null ? { note: description } : {}) },
+          create: { userId, date: dayStart, energy, note: description ?? null },
+        });
+        return { ok: true, id: c.id, summary: `Check-in registrado: energia ${energy}/5${description ? " com nota" : ""}.` };
       }
       if (!title) return { ok: false, summary: "Treino exige título (ou use category=WEIGHT + value para peso)." };
       const w = await prisma.workout.create({ data: { title, type: category ?? "Geral", duration: value ?? 30, intensity: "MEDIUM", notes: description ?? null, date: due ?? new Date(), userId } });
@@ -462,6 +864,33 @@ async function handleCreate(userId: string, args: ToolArgs): Promise<MutationRes
       const start = due ?? new Date();
       const ev = await prisma.event.create({ data: { title, startTime: start, endTime: new Date(start.getTime() + 60 * 60 * 1000), description: description ?? null, location: category ?? null, userId } });
       return { ok: true, id: ev.id, summary: `Evento "${ev.title}" agendado.` };
+    }
+    case "NUTRITION": {
+      if (!title) return { ok: false, summary: "Refeição exige título (title). value=kcal e category=BREAKFAST|LUNCH|SNACK|DINNER são opcionais." };
+      const mealType = ["BREAKFAST", "LUNCH", "SNACK", "DINNER"].includes(category ?? "") ? category! : "SNACK";
+      const m = await prisma.meal.create({
+        data: { title, items: description ?? "", calories: value != null ? Math.round(value) : null, type: mealType, date: due ?? new Date(), userId },
+      });
+      return { ok: true, id: m.id, summary: `Refeição "${m.title}" registrada (${m.calories ?? "?"} kcal).` };
+    }
+    case "SLEEP": {
+      if (value == null) return { ok: false, summary: "Sono exige value (horas dormidas, ex.: 7.5)." };
+      // 1 registro por dia (mesma regra da tela de Sono): atualiza se já existir.
+      const base = due ?? new Date();
+      const dayStart = new Date(base); dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(base); dayEnd.setHours(23, 59, 59, 999);
+      const existing = await prisma.healthMetric.findFirst({ where: { userId, type: "SLEEP", date: { gte: dayStart, lte: dayEnd } }, select: { id: true } });
+      if (existing) {
+        await prisma.healthMetric.updateMany({ where: { id: existing.id, userId }, data: { value } });
+        return { ok: true, id: existing.id, summary: `Sono do dia atualizado para ${value}h.` };
+      }
+      const s = await prisma.healthMetric.create({ data: { type: "SLEEP", value, date: base, userId } });
+      return { ok: true, id: s.id, summary: `Sono de ${value}h registrado.` };
+    }
+    case "HABITS": {
+      if (!title) return { ok: false, summary: "Hábito exige nome (title)." };
+      const h = await prisma.habit.create({ data: { name: title, userId } });
+      return { ok: true, id: h.id, summary: `Hábito "${h.name}" criado. Marque-o com UPDATE + status=DONE.` };
     }
     default:
       return { ok: false, summary: `CREATE não suportado para ${module}.` };
@@ -575,6 +1004,45 @@ async function handleUpdate(userId: string, args: ToolArgs): Promise<MutationRes
       if (description != null && description !== "") data.password = encrypt(description);
       const r = await prisma.accessItem.updateMany({ where: { id, userId }, data });
       return r.count > 0 ? { ok: true, id, summary: `Acesso ${id} atualizado.` } : { ok: false, summary: `Acesso ${id} não encontrado.` };
+    }
+    case "NUTRITION": {
+      const data: { title?: string; items?: string; calories?: number; type?: string; date?: Date } = {};
+      if (title) data.title = title;
+      if (description != null) data.items = description;
+      if (value != null) data.calories = Math.round(value);
+      if (category && ["BREAKFAST", "LUNCH", "SNACK", "DINNER"].includes(category)) data.type = category;
+      if (due) data.date = due;
+      const r = await prisma.meal.updateMany({ where: { id, userId }, data });
+      return r.count > 0 ? { ok: true, id, summary: `Refeição ${id} atualizada.` } : { ok: false, summary: `Refeição ${id} não encontrada.` };
+    }
+    case "SLEEP": {
+      const data: { value?: number; date?: Date } = {};
+      if (value != null) data.value = value;
+      if (due) data.date = due;
+      const r = await prisma.healthMetric.updateMany({ where: { id, userId, type: "SLEEP" }, data });
+      return r.count > 0 ? { ok: true, id, summary: `Registro de sono ${id} atualizado.` } : { ok: false, summary: `Registro de sono ${id} não encontrado.` };
+    }
+    case "HABITS": {
+      const habit = await prisma.habit.findFirst({ where: { id, userId }, select: { id: true, name: true } });
+      if (!habit) return { ok: false, summary: `Hábito ${id} não encontrado.` };
+
+      // status=DONE|FAILED marca o hábito no dia (upsert do log diário).
+      const st = status?.toUpperCase();
+      if (st === "DONE" || st === "FAILED") {
+        const day = habitDayKey(due);
+        await prisma.habitLog.upsert({
+          where: { habitId_date: { habitId: habit.id, date: day } },
+          update: { status: st },
+          create: { habitId: habit.id, userId, date: day, status: st },
+        });
+        return { ok: true, id, summary: `Hábito "${habit.name}" marcado como ${st === "DONE" ? "FEITO" : "FALHOU"} em ${day.toISOString().slice(0, 10)}.` };
+      }
+
+      if (title) {
+        await prisma.habit.updateMany({ where: { id, userId }, data: { name: title } });
+        return { ok: true, id, summary: `Hábito renomeado para "${title}".` };
+      }
+      return { ok: false, summary: "Para hábitos, envie status=DONE|FAILED (marcar o dia) ou title (renomear)." };
     }
     default:
       return { ok: false, summary: `UPDATE não suportado para ${module}.` };

@@ -14,11 +14,12 @@ interface InvoicesCardProps {
 export function InvoicesCard({ invoices, today, formatCurrency }: InvoicesCardProps) {
   return (
     <Card className="shadow-sm border-border/50">
-      <CardHeader className="flex flex-row items-center justify-between pb-4">
-        <CardTitle className="text-sm flex items-center gap-2">
-          <Landmark className="h-4 w-4 text-muted-foreground" /> Faturas a Receber
+      <CardHeader className="flex flex-row items-center justify-between gap-2 pb-4">
+        <CardTitle className="text-sm flex min-w-0 items-center gap-2">
+          <Landmark className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="truncate">Faturas a Receber</span>
         </CardTitle>
-        <Link href="/business" className="text-xs text-primary hover:underline">Ir para Negócios</Link>
+        <Link href="/business" className="shrink-0 whitespace-nowrap text-xs text-primary hover:underline">Ir para Negócios</Link>
       </CardHeader>
       <CardContent>
         {invoices.length === 0 ? (

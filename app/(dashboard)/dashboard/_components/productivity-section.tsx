@@ -145,7 +145,7 @@ export async function ProductivitySection({ userId }: { userId: string }) {
       <div className="grid gap-6 lg:grid-cols-12 items-stretch">
         
         {/* Bloco Primário: Gráfico (Foco Principal) */}
-        <div className="lg:col-span-7 flex flex-col">
+        <div className="min-w-0 lg:col-span-7 flex flex-col">
           <Card className="shadow-sm flex-1 flex flex-col">
             <CardHeader className="pb-4">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -168,7 +168,7 @@ export async function ProductivitySection({ userId }: { userId: string }) {
         </div>
 
         {/* Bloco Secundário: Projetos (Altura Consistente) */}
-        <div className="lg:col-span-5 flex flex-col">
+        <div className="min-w-0 lg:col-span-5 flex flex-col">
           {!hasProjects ? (
             <Card className="shadow-sm flex-1 flex flex-col justify-center border-dashed">
               <CardContent className="pt-6">

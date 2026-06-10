@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { 
-    Droplets, Plus, Loader2, 
-    CheckCircle2, AlertTriangle, Zap, Waves
+import {
+    Droplets, Plus, Loader2,
+    CheckCircle2, AlertTriangle, Zap, Waves,
 } from "lucide-react";
 import { logMetric } from "@/app/(dashboard)/health/actions";
 import { toast } from "sonner";
@@ -22,16 +22,16 @@ export function HydrationCard({ total, goal = 3000 }: HydrationCardProps) {
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
     const [customAmount, setCustomAmount] = useState<string>("");
-    
+
     const percentage = Math.min((total / goal) * 100, 100);
     const remaining = Math.max(goal - total, 0);
     const isGoalReached = percentage >= 100;
 
-    // --- LOGICA DE STATUS E VISUAL CONDICIONAL ---
-    const status = percentage < 30 ? { label: "Crítico", color: "text-rose-500", icon: AlertTriangle, bg: "bg-rose-500/10" }
-                 : percentage < 70 ? { label: "Baixo Nível", color: "text-amber-500", icon: Zap, bg: "bg-amber-500/10" }
-                 : percentage < 100 ? { label: "Otimizado", color: "text-blue-500", icon: Waves, bg: "bg-blue-500/10" }
-                 : { label: "Alta Performance", color: "text-emerald-500", icon: CheckCircle2, bg: "bg-emerald-500/10" };
+    // Status em linguagem natural, com a paleta suave do sistema.
+    const status = percentage < 30 ? { label: "Bem abaixo da meta", color: "text-rose-500", icon: AlertTriangle }
+                 : percentage < 70 ? { label: "Continue bebendo", color: "text-amber-500", icon: Zap }
+                 : percentage < 100 ? { label: "No ritmo certo", color: "text-blue-500", icon: Waves }
+                 : { label: "Meta batida!", color: "text-emerald-500", icon: CheckCircle2 };
 
     const handleAddWater = async (amount: number) => {
         if (!amount || amount <= 0) return;
@@ -43,106 +43,99 @@ export function HydrationCard({ total, goal = 3000 }: HydrationCardProps) {
                 formData.append("value", amount.toString());
 
                 const result = await logMetric(formData);
-                
+
                 if (result.success) {
-                    toast.success(`+${amount}ml registrados! 🔥`, {
-                        description: "Nível de hidratação atualizado."
-                    });
+                    toast.success(`+${amount}ml registrados! 💧`);
                     setCustomAmount("");
-                    router.refresh(); 
+                    router.refresh();
                 } else {
                     toast.error("Erro ao registrar hidratação.");
                 }
             } catch {
-                toast.error("Falha na sincronização com o banco.");
+                toast.error("Não foi possível salvar agora. Tente de novo.");
             }
         });
     };
 
     return (
-        <Card className="relative overflow-hidden border-border/40 bg-card rounded-[2rem] shadow-2xl h-full flex flex-col group transition-all duration-500 min-h-[360px]">
-            
-            {/* --- EFEITO LÍQUIDO DE FUNDO (PROGRESSO) --- */}
-            <div 
-                className="absolute bottom-0 left-0 right-0 bg-blue-500/5 transition-all duration-1000 ease-in-out pointer-events-none"
+        <Card className="relative flex h-full flex-col overflow-hidden rounded-2xl border-border/40 bg-card shadow-sm transition-all hover:shadow-md">
+
+            {/* Nível "líquido" de fundo acompanha o progresso do dia */}
+            <div
+                className="pointer-events-none absolute bottom-0 left-0 right-0 bg-blue-500/5 transition-all duration-1000 ease-in-out"
                 style={{ height: `${percentage}%` }}
             />
-            
-            <CardHeader className="flex flex-row items-center justify-between pb-3 relative z-10 px-6 pt-6 bg-muted/20 border-b border-border/40">
-                <div className="flex items-center gap-3 min-w-0">
-                    <div className={cn("p-2.5 rounded-2xl border shrink-0 shadow-inner transition-all", status.bg, status.color, "border-current/10")}>
-                        <Droplets className="h-5 w-5 fill-current" />
+
+            <CardHeader className="relative z-10 flex flex-row items-center justify-between gap-2 space-y-0 p-5 pb-3">
+                <div className="flex min-w-0 items-center gap-2.5">
+                    <div className="shrink-0 rounded-xl bg-blue-500/10 p-2 text-blue-500">
+                        <Droplets className="h-4 w-4" />
                     </div>
                     <div className="min-w-0">
-                        <CardTitle className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">Tanque de Hidratação</CardTitle>
-                        <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
-                            <status.icon className={cn("h-3.5 w-3.5 shrink-0", status.color)} />
-                            <span className={cn("text-[10px] font-black uppercase tracking-widest truncate", status.color)}>{status.label}</span>
-                        </div>
+                        <CardTitle className="text-sm font-semibold">Hidratação</CardTitle>
+                        <span className={cn("mt-0.5 flex items-center gap-1 text-[11px] font-medium", status.color)}>
+                            <status.icon className="h-3 w-3 shrink-0" />
+                            <span className="truncate">{status.label}</span>
+                        </span>
                     </div>
                 </div>
-                <div className="text-right shrink-0">
-                    <span className="text-[9px] font-black text-muted-foreground/30 uppercase tracking-[0.1em] block">Objetivo Base</span>
-                    <span className="text-xs font-mono font-bold text-foreground/70">{goal}ml</span>
-                </div>
+                <span className="shrink-0 text-xs text-muted-foreground">Meta {goal}ml</span>
             </CardHeader>
-            
-            <CardContent className="relative z-10 flex-1 flex flex-col gap-6 p-6">
-                
-                {/* --- DISPLAY DE VALORES --- */}
+
+            <CardContent className="relative z-10 flex flex-1 flex-col gap-5 p-5 pt-1">
+
+                {/* Total do dia + anel de progresso */}
                 <div className="flex items-center justify-between gap-4">
-                    <div className="space-y-1 min-w-0 flex-1">
+                    <div className="min-w-0 flex-1">
                         <div className="flex items-baseline gap-1.5">
-                            <span className="text-5xl font-black text-foreground tracking-tighter tabular-nums leading-none">
-                                {total}
-                            </span>
-                            <span className="text-xs font-bold text-muted-foreground uppercase">ml</span>
+                            <span className="text-4xl font-bold tabular-nums leading-none tracking-tight">{total}</span>
+                            <span className="text-xs font-medium text-muted-foreground">ml</span>
                         </div>
-                        <p className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-widest leading-none truncate">
-                            {isGoalReached ? "Meta Batida! Excelente!" : `Faltam ${remaining}ml`}
+                        <p className="mt-1 truncate text-xs text-muted-foreground">
+                            {isGoalReached ? "Meta do dia concluída 🎉" : `Faltam ${remaining}ml para a meta`}
                         </p>
                     </div>
 
-                    {/* % Circular Minimalista */}
-                    <div className="relative h-16 w-16 flex items-center justify-center shrink-0 drop-shadow-lg">
+                    <div className="relative flex h-14 w-14 shrink-0 items-center justify-center">
                         <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36">
-                            <circle className="text-muted/10" stroke="currentColor" strokeWidth="3" fill="none" cx="18" cy="18" r="16" />
-                            <circle 
+                            <circle className="text-muted/20" stroke="currentColor" strokeWidth="3" fill="none" cx="18" cy="18" r="16" />
+                            <circle
                                 className={cn("transition-all duration-1000 ease-in-out", isGoalReached ? "text-emerald-500" : "text-blue-500")}
-                                stroke="currentColor" strokeWidth="3" strokeDasharray={`${percentage}, 100`} strokeLinecap="round" fill="none" cx="18" cy="18" r="16" 
+                                stroke="currentColor" strokeWidth="3" strokeDasharray={`${percentage}, 100`} strokeLinecap="round" fill="none" cx="18" cy="18" r="16"
                             />
                         </svg>
-                        <span className="absolute text-[11px] font-mono font-black text-foreground">{Math.round(percentage)}%</span>
+                        <span className="absolute text-[11px] font-bold tabular-nums">{Math.round(percentage)}%</span>
                     </div>
                 </div>
 
-                {/* --- CONTROLES DE INGESTÃO --- */}
-                <div className="space-y-4">
-                    {/* Presets mais robustos em grid de 2 (melhor para telas menores) */}
-                    <div className="grid grid-cols-2 gap-3">
+                {/* Registrar: presets + valor livre */}
+                <div className="mt-auto space-y-2.5">
+                    <div className="grid grid-cols-2 gap-2">
                         <PresetButton ml={200} label="Copo" onClick={() => handleAddWater(200)} disabled={isPending} />
                         <PresetButton ml={500} label="Garrafa" onClick={() => handleAddWater(500)} disabled={isPending} />
                     </div>
 
-                    {/* Entrada Manual de Alta Precisão */}
-                    <div className="flex gap-3 p-1.5 bg-muted/30 border border-border/40 rounded-2xl shadow-inner group focus-within:ring-2 focus-within:ring-blue-500/20 transition-all">
+                    <div className="flex gap-2">
                         <div className="relative flex-1">
-                            <Input 
-                                type="number" 
-                                placeholder="Dose customizada..." 
+                            <Input
+                                type="number"
+                                inputMode="numeric"
+                                placeholder="Outro valor…"
                                 value={customAmount}
                                 onChange={(e) => setCustomAmount(e.target.value)}
-                                className="h-11 bg-transparent border-none shadow-none font-bold text-sm focus-visible:ring-0 pl-3 tabular-nums placeholder:font-medium placeholder:text-muted-foreground/40"
+                                onKeyDown={(e) => { if (e.key === "Enter") handleAddWater(Number(customAmount)); }}
+                                className="h-10 rounded-xl border-border/40 bg-muted/30 pr-9 text-sm tabular-nums"
                             />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted-foreground/30 uppercase">ML</span>
+                            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-semibold text-muted-foreground/50">ML</span>
                         </div>
-                        <Button 
-                            size="sm" 
+                        <Button
+                            size="icon"
                             disabled={isPending || !customAmount}
                             onClick={() => handleAddWater(Number(customAmount))}
-                            className="bg-foreground text-background hover:bg-primary hover:text-white h-11 w-11 p-0 rounded-xl transition-all shadow-lg shrink-0"
+                            className="h-10 w-10 shrink-0 rounded-xl"
+                            aria-label="Registrar quantidade"
                         >
-                            {isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-5 w-5" />}
+                            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                         </Button>
                     </div>
                 </div>
@@ -163,18 +156,14 @@ interface PresetButtonProps {
 
 function PresetButton({ ml, label, onClick, disabled }: PresetButtonProps) {
     return (
-        <Button 
-            variant="outline" 
-            size="sm" 
+        <Button
+            variant="outline"
             disabled={disabled}
             onClick={onClick}
-            className="h-14 rounded-2xl border-border/60 bg-background/50 hover:bg-blue-500/10 hover:text-blue-600 hover:border-blue-500/30 transition-all flex flex-col gap-0.5 group/btn shadow-sm"
+            className="h-12 flex-col gap-0 rounded-xl border-border/40 transition-colors hover:border-blue-500/30 hover:bg-blue-500/10 hover:text-blue-600"
         >
-            <div className="flex items-baseline gap-1">
-                <Plus className="h-3.5 w-3.5 opacity-40 group-hover/btn:scale-110 transition-transform" />
-                <span className="font-black text-sm tracking-tighter tabular-nums">{ml}ml</span>
-            </div>
-            <span className="font-medium text-[9px] uppercase tracking-widest text-muted-foreground group-hover/btn:text-blue-500 opacity-70 group-hover/btn:opacity-100">{label}</span>
+            <span className="text-sm font-bold tabular-nums">+{ml}ml</span>
+            <span className="text-[10px] font-medium text-muted-foreground">{label}</span>
         </Button>
     );
 }

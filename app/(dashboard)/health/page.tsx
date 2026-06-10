@@ -12,6 +12,7 @@ import { SleepCard } from "@/components/health/sleep-card";
 import { FoodLogger } from "@/components/health/nutrition/food-logger"; 
 import { ActivityFeed } from "@/components/health/activity-feed";
 import { HealthActions } from "@/components/health/health-actions";
+import { AskAiButton } from "@/components/ai/ask-ai-button";
 import { HealthStatCard } from "@/components/health/ui/health-stat-card";
 import { SectionHeader } from "@/components/health/ui/section-header";
 import { getCurrentUserId } from "@/lib/auth";
@@ -57,24 +58,29 @@ export default async function HealthPage() {
                     icon={<Activity className="h-6 w-6" />}
                     title="Saúde & Bem-estar"
                     description="Acompanhe suas métricas corporais, treinos e nutrição."
-                    actions={<HealthActions />}
+                    actions={
+                        <>
+                            <AskAiButton q="Como está minha saúde esta semana? Analise meus treinos, sono, peso e hábitos e me diga o que melhorar." label="Analisar com IA" />
+                            <HealthActions />
+                        </>
+                    }
                 />
 
-                <PageContainer className="space-y-8">
+                <PageContainer className="space-y-6 sm:space-y-8">
 
                     {/* --- GRID 1: MÉTRICAS RÁPIDAS (Overview Diário) --- */}
-                    <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <section className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
                         <HealthStatCard label="Peso Atual" value={weight} unit="kg" icon={Target} color="zinc" />
-                        <HealthStatCard label="Água Consumida" value={waterTotal} unit="ml" icon={Droplets} color="blue" />
-                        <HealthStatCard label="Qualidade do Sono" value={lastSleep?.value || 0} unit="hrs" icon={Moon} color="indigo" />
+                        <HealthStatCard label="Água Hoje" value={waterTotal} unit="ml" icon={Droplets} color="blue" />
+                        <HealthStatCard label="Sono" value={lastSleep?.value || 0} unit="hrs" icon={Moon} color="indigo" />
                         <HealthStatCard label="Refeições Hoje" value={meals.length} unit="logs" icon={Utensils} color="emerald" />
                     </section>
 
                     {/* --- GRID 2: CONTEÚDO PRINCIPAL (Layout 2/3 e 1/3) --- */}
-                    <section className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-                        
+                    <section className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 items-start">
+
                         {/* COLUNA ESQUERDA: Análise Corporal e Histórico de Treinos */}
-                        <div className="lg:col-span-2 space-y-8">
+                        <div className="min-w-0 lg:col-span-2 space-y-6 sm:space-y-8">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <BodySummaryCard
                                     weight={weight}
@@ -104,7 +110,7 @@ export default async function HealthPage() {
                         </div>
 
                         {/* COLUNA DIREITA: Widgets Diários (Água, Sono, Comida) */}
-                        <div className="space-y-6">
+                        <div className="min-w-0 space-y-6">
                             <HydrationCard total={waterTotal} />
                             <SleepCard value={lastSleep?.value || 0} />
                             

@@ -19,7 +19,7 @@ interface RecurringChargesSectionProps {
 
 export function RecurringChargesSection({ charges, totalCharges, clients }: RecurringChargesSectionProps) {
   return (
-    <section className="px-6 md:px-8 py-10 max-w-7xl mx-auto space-y-6">
+    <section id="cobrancas" className="scroll-mt-36 space-y-6">
       <div className="flex items-center justify-between gap-3">
         <h3 className="text-xl font-extrabold text-foreground flex items-center gap-3">
           <div className="p-2 bg-emerald-500/10 rounded-xl"><HandCoins className="h-5 w-5 text-emerald-600" /></div>

@@ -18,13 +18,18 @@ interface AISettingsData {
   googleKey?: string | null;
   deepseekKey?: string | null;
   mistralKey?: string | null;
+  anthropicKey?: string | null;
+  xaiKey?: string | null;
+  openrouterKey?: string | null;
 }
 
 export async function updateAISettings(formData: FormData) {
   const userId = await requireUserId();
 
   const aiProvider = (formData.get("aiProvider") as string) || "ollama";
-  const aiModel = ((formData.get("aiModel") as string) || "").trim() || "llama3";
+  // llama3.1 (não llama3): é a 1ª versão com tool-calling no Ollama — sem isso
+  // o loop agêntico do Cérebro Digital não consegue executar ações.
+  const aiModel = ((formData.get("aiModel") as string) || "").trim() || "llama3.1";
   const aiPersonaRaw = ((formData.get("aiPersona") as string) || "").trim();
 
   const data: AISettingsData = {
@@ -46,6 +51,9 @@ export async function updateAISettings(formData: FormData) {
       case "google": data.googleKey = keyValue; break;
       case "deepseek": data.deepseekKey = keyValue; break;
       case "mistral": data.mistralKey = keyValue; break;
+      case "anthropic": data.anthropicKey = keyValue; break;
+      case "xai": data.xaiKey = keyValue; break;
+      case "openrouter": data.openrouterKey = keyValue; break;
     }
   }
 
@@ -57,6 +65,7 @@ export async function updateAISettings(formData: FormData) {
 
   revalidatePath("/");
   revalidatePath("/settings");
+  revalidatePath("/ai"); // HUD do Cérebro Digital mostra provedor/modelo atuais
   return { success: true };
 }
 

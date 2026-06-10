@@ -4,10 +4,10 @@ import { SerializedChallenge } from "@/components/health/gym/challenges-panel";
 import { Dumbbell } from "lucide-react";
 import { Metadata } from "next";
 import { HealthActions } from "@/components/health/health-actions";
+import { AskAiButton } from "@/components/ai/ask-ai-button";
 import { getCurrentUserId } from "@/lib/auth";
 import { getMuscleRecovery } from "@/app/(dashboard)/health/actions";
 import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
-import { BackLink } from "@/components/ui/back-link";
 import { ErrorState } from "@/components/ui/error-state";
 import { StartLiveButton } from "@/components/health/gym/session/start-live-button";
 import { PendingSessionsSync } from "@/components/health/gym/session/pending-sync";
@@ -164,10 +164,15 @@ export default async function GymPage() {
         icon={<Dumbbell className="h-6 w-6" />}
         title="Treino de Força"
         description="Gestão de sobrecarga progressiva e histórico de sessões."
-        actions={<HealthActions />}
-      >
-        <BackLink href="/health" label="Voltar para Overview" />
-      </PageHeader>
+        backHref="/health"
+        backLabel="Voltar para Overview"
+        actions={
+          <>
+            <AskAiButton q="Analise meus últimos treinos: frequência, tipos e duração. Estou progredindo? O que treinar em seguida?" label="Analisar com IA" />
+            <HealthActions />
+          </>
+        }
+      />
 
       <PageContainer>
         {/* Despacha treinos concluídos offline assim que houver rede. */}

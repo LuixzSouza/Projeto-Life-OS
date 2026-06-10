@@ -17,7 +17,7 @@ interface StatementSectionProps {
 
 export function StatementSection({ transactions, recurring, totalRecurring, accounts }: StatementSectionProps) {
   return (
-    <section className="px-6 md:px-8 py-10 max-w-7xl mx-auto">
+    <section id="extrato" className="scroll-mt-36">
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 items-start">
 
         {/* EXTRATO DE TRANSAÇÕES */}

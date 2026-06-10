@@ -16,15 +16,25 @@ export interface ProviderMeta {
 
 export const AI_PROVIDERS: ProviderMeta[] = [
   { id: "openai", label: "OpenAI (GPT)", keyField: "openaiKey", getKeyUrl: "https://platform.openai.com/api-keys" },
-  { id: "groq", label: "Groq (Llama)", keyField: "groqKey", getKeyUrl: "https://console.groq.com/keys" },
+  { id: "anthropic", label: "Claude (Anthropic)", keyField: "anthropicKey", getKeyUrl: "https://console.anthropic.com/settings/keys" },
   { id: "google", label: "Google Gemini", keyField: "googleKey", getKeyUrl: "https://aistudio.google.com/app/apikey" },
+  { id: "groq", label: "Groq (Llama)", keyField: "groqKey", getKeyUrl: "https://console.groq.com/keys" },
   { id: "deepseek", label: "DeepSeek", keyField: "deepseekKey", getKeyUrl: "https://platform.deepseek.com/api_keys" },
   { id: "mistral", label: "Mistral", keyField: "mistralKey", getKeyUrl: "https://console.mistral.ai/api-keys" },
+  { id: "xai", label: "Grok (xAI)", keyField: "xaiKey", getKeyUrl: "https://console.x.ai/" },
+  { id: "openrouter", label: "OpenRouter (multi)", keyField: "openrouterKey", getKeyUrl: "https://openrouter.ai/settings/keys" },
   { id: "ollama", label: "Ollama (Local)", local: true },
 ];
 
+// Normaliza ids legados: o setup wizard antigo gravava "gemini" em vez de "google".
+export function normalizeProvider(id: string | null | undefined): string {
+  if (id === "gemini") return "google";
+  return id || "ollama";
+}
+
 export function providerMeta(id: string | null | undefined): ProviderMeta {
-  return AI_PROVIDERS.find((p) => p.id === id) ?? AI_PROVIDERS[0];
+  const norm = normalizeProvider(id);
+  return AI_PROVIDERS.find((p) => p.id === norm) ?? AI_PROVIDERS[0];
 }
 
 /* ----------------------------------------------------------------------------
@@ -94,7 +104,7 @@ export const AI_CAPABILITIES: AiCapability[] = [
   { area: "Finanças", icon: "wallet", can: "lançar gastos/receitas, ver saldo e resumo do mês", example: "Registre R$50 de mercado hoje" },
   { area: "Tarefas", icon: "check", can: "criar, concluir e listar tarefas e prazos", example: "Crie a tarefa Pagar aluguel pra sexta" },
   { area: "Agenda", icon: "calendar", can: "agendar e consultar eventos", example: "Agende dentista dia 20 às 15h" },
-  { area: "Saúde", icon: "activity", can: "registrar treinos e peso", example: "Registrei 40min de corrida hoje" },
+  { area: "Saúde", icon: "activity", can: "registrar treinos, peso, refeições, sono e marcar hábitos", example: "Dormi 7h e almocei frango com arroz (600 kcal)" },
   { area: "Estudos", icon: "book", can: "logar sessões e anotações", example: "Estudei 1h de inglês" },
   { area: "Entretenimento", icon: "film", can: "adicionar filmes/séries e status", example: "Adicione o filme Duna como Quero ver" },
   { area: "CRM & Conexões", icon: "users", can: "cadastrar clientes e contatos", example: "Salve o cliente Acme Ltda" },
@@ -116,6 +126,9 @@ const MODULE_INFO: Record<string, { name: string; href: string }> = {
   VAULT: { name: "Acesso", href: "/access" },
   WARDROBE: { name: "Peça", href: "/wardrobe" },
   AGENDA: { name: "Evento", href: "/agenda" },
+  NUTRITION: { name: "Refeição", href: "/health/nutrition" },
+  SLEEP: { name: "Sono", href: "/health/sleep" },
+  HABITS: { name: "Hábito", href: "/health" },
 };
 
 export function moduleInfo(module: string): { name: string; href: string } {
@@ -143,8 +156,12 @@ export interface AIAction {
 
 const PENDING_RE = /<!--LIFEOS_PENDING:([A-Za-z0-9+/=]*)-->/;
 const ACTIONS_RE = /<!--LIFEOS_ACTIONS:([A-Za-z0-9+/=]*)-->/;
+const SUGGEST_RE = /<!--LIFEOS_SUGGEST:([A-Za-z0-9+/=]*)-->/;
+// Marcador CRU que o MODELO escreve no fim da resposta (instruído no system
+// prompt). É extraído no servidor e re-persistido como marcador base64.
+const SUGGEST_RAW_RE = /<!--\s*SUGGEST\s*:\s*(\[[\s\S]*?\])\s*-->/i;
 // Remove qualquer marcador interno (em qualquer posição).
-const MARKER_RE = /\n*<!--LIFEOS_(?:PENDING|ACTIONS):[A-Za-z0-9+/=]*-->/g;
+const MARKER_RE = /\n*<!--LIFEOS_(?:PENDING|ACTIONS|SUGGEST):[A-Za-z0-9+/=]*-->/g;
 
 function toBase64(s: string): string {
   if (typeof Buffer !== "undefined") return Buffer.from(s, "utf8").toString("base64");
@@ -186,7 +203,77 @@ export function extractActions(content: string): AIAction[] {
   }
 }
 
+/* ----------------------------------------------------------------------------
+   SUGESTÕES DE FOLLOW-UP (chips pós-resposta)
+   O modelo encerra a resposta com <!--SUGGEST:["...","..."]-->; o servidor
+   extrai, limpa o texto e persiste como marcador base64 (mesma infra dos
+   marcadores PENDING/ACTIONS). A UI mostra as sugestões como chips clicáveis.
+   ---------------------------------------------------------------------------- */
+
+const MAX_SUGGESTIONS = 3;
+const MAX_SUGGESTION_LEN = 90;
+
+function sanitizeSuggestions(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((s): s is string => typeof s === "string" && s.trim().length > 1)
+    .map((s) => s.trim().replace(/\s+/g, " ").slice(0, MAX_SUGGESTION_LEN))
+    .slice(0, MAX_SUGGESTIONS);
+}
+
+/** Extrai o marcador CRU escrito pelo modelo e devolve o texto limpo. */
+export function extractModelSuggestions(text: string): { text: string; suggestions: string[] } {
+  const m = text.match(SUGGEST_RAW_RE);
+  if (!m) return { text, suggestions: [] };
+  let suggestions: string[] = [];
+  try {
+    suggestions = sanitizeSuggestions(JSON.parse(m[1]));
+  } catch {
+    suggestions = [];
+  }
+  return { text: text.replace(SUGGEST_RAW_RE, "").trimEnd(), suggestions };
+}
+
+export function encodeSuggestions(s: string[]): string {
+  if (!s.length) return "";
+  return `\n\n<!--LIFEOS_SUGGEST:${toBase64(JSON.stringify(s))}-->`;
+}
+
+export function extractSuggestions(content: string): string[] {
+  const m = content.match(SUGGEST_RE);
+  if (!m) return [];
+  try {
+    return sanitizeSuggestions(JSON.parse(fromBase64(m[1])));
+  } catch {
+    return [];
+  }
+}
+
+/* ----------------------------------------------------------------------------
+   ANEXOS DE IMAGEM (visão multimodal)
+   A imagem (data URL comprimida) fica persistida na PRÓPRIA mensagem do
+   usuário como marcador — a UI a renderiza na bolha, mas o histórico enviado
+   ao modelo (stripPending) volta a ser texto puro: a imagem só viaja no turno
+   em que foi anexada (economia de token).
+   ---------------------------------------------------------------------------- */
+
+const IMG_RE = /<!--LIFEOS_IMG:(data:image\/[a-z0-9+.-]+;base64,[A-Za-z0-9+/=]+)-->/i;
+const IMG_RE_GLOBAL = /\n*<!--LIFEOS_IMG:data:image\/[a-z0-9+.-]+;base64,[A-Za-z0-9+/=]+-->/gi;
+
+export function encodeImages(dataUrls: string[]): string {
+  if (!dataUrls.length) return "";
+  return dataUrls.map((u) => `\n\n<!--LIFEOS_IMG:${u}-->`).join("");
+}
+
+export function extractImages(content: string): string[] {
+  const out: string[] = [];
+  const re = new RegExp(IMG_RE.source, "gi");
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(content)) !== null) out.push(m[1]);
+  return out;
+}
+
 // Remove TODOS os marcadores internos — para exibir ao usuário e enviar ao modelo.
 export function stripPending(content: string): string {
-  return content.replace(MARKER_RE, "").trimEnd();
+  return content.replace(MARKER_RE, "").replace(SUGGEST_RAW_RE, "").replace(IMG_RE_GLOBAL, "").trimEnd();
 }

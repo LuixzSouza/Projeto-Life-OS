@@ -16,6 +16,7 @@ import { type SleepEntry, type SleepChartPoint } from "./sleep-types";
 import { computeSleepInsights } from "@/lib/sleep-math";
 import { useSleepGoal } from "./use-sleep-goal";
 import { SleepStats } from "./sleep-stats";
+import { SleepQuickLog } from "./sleep-quick-log";
 import { LogSleepDialog } from "./log-sleep-dialog";
 import { SleepTrendChart } from "./sleep-trend-chart";
 import { SleepInsightCard } from "./sleep-insight-card";
@@ -75,6 +76,9 @@ export function SleepDashboard({ data, initialGoal }: { data: SleepEntry[]; init
           </div>
         </div>
       </div>
+
+      {/* REGISTRO DE 1 TOQUE — primeira coisa da página: zero fricção pra marcar */}
+      <SleepQuickLog data={data} goal={goal} />
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

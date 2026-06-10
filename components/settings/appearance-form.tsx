@@ -12,6 +12,7 @@ import { compressImageFile } from "@/lib/image";
 
 import { THEME_PRESETS } from "@/components/settings/appearance/theme-presets";
 import { ProfileIdentityCard } from "@/components/settings/appearance/profile-identity-card";
+import { ProfileStrengthCard } from "@/components/settings/appearance/profile-strength-card";
 import { ThemePaletteCard } from "@/components/settings/appearance/theme-palette-card";
 import { AppearanceModeCard } from "@/components/settings/appearance/appearance-mode-card";
 import { RegionalCard } from "@/components/settings/appearance/regional-card";
@@ -174,6 +175,14 @@ export default function AppearanceForm({
 
   return (
     <form action={handleSubmit} className="space-y-8 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+
+      <ProfileStrengthCard
+        name={name}
+        avatarUrl={avatarUrl}
+        coverUrl={coverUrl}
+        bio={bio}
+        pixKey={pixKey}
+      />
 
       <ProfileIdentityCard
         name={name}

@@ -1,6 +1,8 @@
 import { prisma } from "./prisma";
 import { getCurrentUserId } from "./auth";
 import { deriveAnchor, asFrequency, occurrencesInRange, periodsBetween } from "./recurrence";
+import { runDueAutomations } from "./ai-automations";
+import { detectAnomalies } from "./ai-insights";
 
 export type NotificationPriority = "LOW" | "NORMAL" | "HIGH";
 
@@ -113,6 +115,21 @@ export async function markAllRead(): Promise<void> {
   const userId = await getCurrentUserId();
   if (!userId) return;
   await prisma.notification.updateMany({ where: { userId, readAt: null }, data: { readAt: new Date() } });
+}
+
+/** Exclui uma notificação do usuário. */
+export async function deleteNotification(id: string): Promise<void> {
+  const userId = await getCurrentUserId();
+  if (!userId) return;
+  await prisma.notification.deleteMany({ where: { id, userId } });
+}
+
+/** Exclui todas as notificações JÁ LIDAS (faxina da caixa). */
+export async function clearReadNotifications(): Promise<number> {
+  const userId = await getCurrentUserId();
+  if (!userId) return 0;
+  const res = await prisma.notification.deleteMany({ where: { userId, readAt: { not: null } } });
+  return res.count;
 }
 
 /**
@@ -247,6 +264,81 @@ export async function generateReminders(): Promise<number> {
       body: [value, e.category].filter(Boolean).join(" · "),
       entityType: "recurringExpense", entityId: `${e.id}:${due.toISOString().slice(0, 10)}`,
       actionUrl: "/finance", priority: diffDays === 0 ? "HIGH" : "NORMAL", dueAt: due,
+    }));
+  }
+
+  // 9. Automações agendadas da IA ("toda sexta, resumo financeiro") — best-effort.
+  try {
+    created += await runDueAutomations(userId);
+  } catch { /* IA indisponível não pode travar os lembretes */ }
+
+  // 10. Detector de anomalias (#16): a IA puxa assunto quando algo foge do
+  //     padrão (gasto 3×, sono caindo, sequência quebrada, amigo distante).
+  try {
+    for (const a of await detectAnomalies(userId)) {
+      bump(await notifyOnce(userId, {
+        type: a.type,
+        title: a.title,
+        body: a.body,
+        entityType: "aiAnomaly",
+        entityId: a.entityId,
+        actionUrl: `/ai?q=${encodeURIComponent(a.askAi)}`,
+        priority: "NORMAL",
+      }));
+    }
+  } catch { /* anomalias são opcionais; nunca travam os lembretes */ }
+
+  // 11b. Check-in noturno guiado (#21): a partir das 20h, se o dia ainda não
+  //      tem EnergyCheckin, a IA convida para o journaling de 3 perguntas.
+  if (now.getHours() >= 20) {
+    const hasCheckin = await prisma.energyCheckin.findFirst({
+      where: { userId, date: { gte: startToday } },
+      select: { id: true },
+    });
+    if (!hasCheckin) {
+      const checkinPrompt =
+        "Faça meu check-in noturno guiado: me pergunte, UMA de cada vez, (1) minha energia de 1 a 5, " +
+        "(2) o destaque do dia, (3) a prioridade de amanhã. Ao final registre a energia com mutate_system_data " +
+        "(HEALTH, category=ENERGY, value=nota, description=resumo do dia) e, se eu quiser, crie a prioridade como tarefa para amanhã.";
+      bump(await notifyOnce(userId, {
+        type: "AI_NIGHT_CHECKIN",
+        title: "🌙 Como foi o seu dia?",
+        body: "3 perguntas rápidas e o dia fica registrado.",
+        entityType: "aiCheckin", entityId: startToday.toISOString().slice(0, 10),
+        actionUrl: `/ai?q=${encodeURIComponent(checkinPrompt)}`,
+      }));
+    }
+  }
+
+  // 11c. Faxina mensal com a IA (#29): dia 1º, a partir das 10h — a IA varre
+  //      e PROPÕE (nunca executa sozinha) a limpeza do sistema.
+  if (now.getDate() === 1 && now.getHours() >= 10) {
+    const monthKey = now.toISOString().slice(0, 7);
+    const cleanupPrompt =
+      "Rode o system_cleanup_scan e me proponha uma faxina item a item (tarefas mortas, projetos zumbis, " +
+      "duplicatas, notas esquecidas, mídia parada). Nada de apagar sem eu confirmar cada item.";
+    bump(await notifyOnce(userId, {
+      type: "AI_MONTHLY_CLEANUP",
+      title: "🧹 Hora da faxina mensal",
+      body: "A IA achou candidatos a arquivar/concluir/apagar — você decide item a item.",
+      entityType: "aiCleanup", entityId: monthKey,
+      actionUrl: `/ai?q=${encodeURIComponent(cleanupPrompt)}`,
+    }));
+  }
+
+  // 11. Retrospectiva semanal com a IA (#18): domingo a partir das 18h.
+  if (now.getDay() === 0 && now.getHours() >= 18) {
+    const weekKey = startToday.toISOString().slice(0, 10);
+    const retroPrompt =
+      "Monte a retrospectiva da minha semana: use analyze_system_data (TREND/COMPARE) e find_correlations para " +
+      "resumir vitórias, derrapadas e o comparativo com a semana anterior. Depois proponha 3 intenções para a " +
+      "próxima semana e pergunte se quer que eu as crie como tarefas.";
+    bump(await notifyOnce(userId, {
+      type: "AI_WEEKLY_RETRO",
+      title: "🧠 Sua retrospectiva da semana está pronta",
+      body: "Vitórias, derrapadas e 3 intenções para a próxima — é só tocar.",
+      entityType: "aiRetro", entityId: weekKey,
+      actionUrl: `/ai?q=${encodeURIComponent(retroPrompt)}`,
     }));
   }
 

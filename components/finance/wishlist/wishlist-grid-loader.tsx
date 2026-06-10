@@ -1,10 +1,17 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { DashboardWishlist } from "@/components/finance/finance-dashboard"; // Importando o tipo que definimos antes
+import type { DashboardWishlist } from "@/components/finance/dashboard/types";
+import type { WishlistAccountOption } from "./wishlist-card";
+
+interface WishlistGridProps {
+  items: DashboardWishlist[];
+  accounts: WishlistAccountOption[];
+  totalBalance: number;
+}
 
 // Carrega o componente de visualização (Grid de Cards) dinamicamente
-const WishlistGrid = dynamic<{ items: DashboardWishlist[] }>(
+const WishlistGrid = dynamic<WishlistGridProps>(
   () => import("./wishlist-card").then((mod) => mod.WishlistGrid),
   {
     ssr: false,
@@ -18,6 +25,6 @@ const WishlistGrid = dynamic<{ items: DashboardWishlist[] }>(
   }
 );
 
-export function WishlistGridLoader({ items }: { items: DashboardWishlist[] }) {
-  return <WishlistGrid items={items} />;
+export function WishlistGridLoader({ items, accounts, totalBalance }: WishlistGridProps) {
+  return <WishlistGrid items={items} accounts={accounts} totalBalance={totalBalance} />;
 }

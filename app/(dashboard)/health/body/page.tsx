@@ -5,9 +5,9 @@ import { Metadata } from "next";
 import { BodyStats, calculateBodyFat } from "@/lib/body-math";
 import type { BodyEvolutionPoint } from "@/components/health/body/body-evolution-chart";
 import { HealthActions } from "@/components/health/health-actions";
+import { AskAiButton } from "@/components/ai/ask-ai-button";
 import { getCurrentUserId } from "@/lib/auth";
 import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
-import { BackLink } from "@/components/ui/back-link";
 import { ErrorState } from "@/components/ui/error-state";
 
 export const metadata: Metadata = {
@@ -127,10 +127,15 @@ export default async function BodyPage() {
         icon={<User className="h-6 w-6" />}
         title="Composição Corporal"
         description="Acompanhamento de medidas, proporções e simetria."
-        actions={<HealthActions />}
-      >
-        <BackLink href="/health" label="Voltar para Overview" />
-      </PageHeader>
+        backHref="/health"
+        backLabel="Voltar para Overview"
+        actions={
+          <>
+            <AskAiButton q="Como está a evolução do meu peso e medidas corporais? Analise a tendência recente." label="Analisar com IA" />
+            <HealthActions />
+          </>
+        }
+      />
 
       <PageContainer>
         <BodyDashboard stats={currentStats!} evolution={evolution} />

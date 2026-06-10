@@ -13,7 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import Image from "next/image";
 
 import type { UserData } from "./sidebar-types";
-import { groupedSidebarItems, mobileNavItems, isActiveRoute } from "./sidebar-config";
+import { groupedSidebarItems, mobileNavItems, isActiveRoute, isItemActive } from "./sidebar-config";
 import { SidebarLink } from "./sidebar-link";
 import { UserProfileSection } from "./user-profile-section";
 import { NotificationBell } from "@/components/notifications/notification-bell";
@@ -170,46 +170,121 @@ export function Sidebar({ user, inbox }: { user?: UserData | null; inbox: Notifi
         />
       </aside>
 
-      {/* --- MOBILE MENU (SHEET) --- */}
+      {/* --- MOBILE MENU (BOTTOM SHEET / APP DRAWER) --- */}
+      {/* Em vez do drawer lateral estreito com lista comprida, um bottom sheet
+          estilo "gaveta de apps": grade de módulos por grupo + chips de atalho
+          para os submódulos. Muito mais rápido de tocar num celular. */}
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent side="left" className="flex w-[284px] flex-col border-r-border/40 bg-background/95 p-0 backdrop-blur-2xl">
-          <SheetHeader className="h-16 flex-row items-center gap-2.5 space-y-0 border-b border-border/50 px-5 text-left">
+        <SheetContent
+          side="bottom"
+          className="flex h-[88dvh] flex-col gap-0 rounded-t-3xl bg-background/95 p-0 backdrop-blur-2xl"
+        >
+          {/* Alça visual de bottom sheet */}
+          <div className="flex justify-center pt-2.5">
+            <span className="h-1 w-10 rounded-full bg-muted-foreground/25" />
+          </div>
+
+          <SheetHeader className="flex-row items-center gap-2.5 space-y-0 px-5 pb-3 pt-1 text-left">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/15">
               <Image width={20} height={20} src="/logo.webp" alt="Logo" className="dark:invert" />
             </div>
             <SheetTitle className="mt-0 text-lg font-extrabold">Life OS</SheetTitle>
-            <div className="ml-auto">
+            {/* mr-10 reserva o canto para o X de fechar do SheetContent */}
+            <div className="ml-auto mr-10">
               <NotificationBell initial={inbox} />
             </div>
           </SheetHeader>
 
-          <ScrollArea className="flex-1 px-3 py-5">
-            <div className="space-y-5">
-              {groupedSidebarItems.map((group) => (
-                <div key={group.groupName} className="space-y-1">
-                  <h3 className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
-                    {group.groupName}
-                  </h3>
-                  {group.items.map((item) => (
-                    <SidebarLink
-                      key={item.href}
-                      item={item}
-                      currentPath={pathname}
-                      onClick={() => setIsSheetOpen(false)}
-                    />
-                  ))}
-                </div>
-              ))}
+          {/* Busca global (abre a command palette) */}
+          <div className="border-b border-border/40 px-4 pb-3">
+            <button
+              type="button"
+              onClick={() => {
+                setIsSheetOpen(false);
+                window.dispatchEvent(new Event("open-command-palette"));
+              }}
+              className="flex w-full items-center gap-2 rounded-xl border border-border/50 bg-muted/40 px-3 py-2.5 text-muted-foreground transition-colors active:bg-muted/70"
+            >
+              <Search className="h-4 w-4 shrink-0" />
+              <span className="text-sm">Buscar em tudo…</span>
+            </button>
+          </div>
+
+          <ScrollArea className="flex-1 px-4">
+            <div className="space-y-6 py-4">
+              {groupedSidebarItems.map((group) => {
+                const subItems = group.items.flatMap((i) => i.subItems ?? []);
+                return (
+                  <div key={group.groupName}>
+                    <h3 className="mb-2 px-1 text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground/50">
+                      {group.groupName}
+                    </h3>
+
+                    {/* Grade de módulos */}
+                    <div className="grid grid-cols-4 gap-2">
+                      {group.items.map((item) => {
+                        const active = isItemActive(pathname, item);
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            onClick={() => setIsSheetOpen(false)}
+                            aria-current={isActiveRoute(pathname, item.href) ? "page" : undefined}
+                            className={cn(
+                              "flex flex-col items-center gap-1.5 rounded-2xl border px-1 py-3 transition-all active:scale-95",
+                              active
+                                ? "border-primary/30 bg-primary/10 text-primary"
+                                : "border-border/40 bg-muted/30 text-muted-foreground"
+                            )}
+                          >
+                            <item.icon className="h-5 w-5" />
+                            <span className="w-full truncate text-center text-[10px] font-semibold leading-none">
+                              {item.label}
+                            </span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+
+                    {/* Atalhos diretos para submódulos (Treino, Investimentos…) */}
+                    {subItems.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {subItems.map((sub) => {
+                          const subActive = isActiveRoute(pathname, sub.href);
+                          return (
+                            <Link
+                              key={sub.href}
+                              href={sub.href}
+                              onClick={() => setIsSheetOpen(false)}
+                              aria-current={subActive ? "page" : undefined}
+                              className={cn(
+                                "rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors active:scale-95",
+                                subActive
+                                  ? "border-primary/30 bg-primary/10 text-primary"
+                                  : "border-border/40 bg-muted/30 text-muted-foreground"
+                              )}
+                            >
+                              {sub.label}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </ScrollArea>
 
-          <UserProfileSection
-            user={user}
-            isCollapsed={false}
-            handleLogout={handleLogout}
-            isLoggingOut={isLoggingOut}
-            initials={initials}
-          />
+          <div className="mt-auto pb-safe">
+            <UserProfileSection
+              user={user}
+              isCollapsed={false}
+              handleLogout={handleLogout}
+              isLoggingOut={isLoggingOut}
+              initials={initials}
+            />
+          </div>
         </SheetContent>
       </Sheet>
 
@@ -222,21 +297,21 @@ export function Sidebar({ user, inbox }: { user?: UserData | null; inbox: Notifi
               <Link
                 key={item.label}
                 href={item.href}
-                className="relative flex flex-1 flex-col items-center justify-center gap-1 active:scale-95"
+                aria-current={isActive ? "page" : undefined}
+                className="flex flex-1 flex-col items-center justify-center gap-0.5 active:scale-95"
               >
+                {/* Pílula no ativo (estilo Material 3) em vez do tracinho no topo */}
                 <span
                   className={cn(
-                    "absolute top-0 h-0.5 w-9 rounded-full bg-primary transition-all duration-300",
-                    isActive ? "opacity-100" : "opacity-0"
+                    "flex h-7 items-center justify-center rounded-full px-4 transition-all duration-300",
+                    isActive ? "bg-primary/10 text-primary" : "text-muted-foreground"
                   )}
-                />
-                <item.icon
-                  size={20}
-                  className={cn("transition-colors", isActive ? "text-primary" : "text-muted-foreground")}
-                />
+                >
+                  <item.icon size={19} />
+                </span>
                 <span
                   className={cn(
-                    "text-[9px] font-bold uppercase tracking-tighter transition-colors",
+                    "text-[10px] font-semibold transition-colors",
                     isActive ? "text-primary" : "text-muted-foreground"
                   )}
                 >
@@ -248,10 +323,13 @@ export function Sidebar({ user, inbox }: { user?: UserData | null; inbox: Notifi
 
           <button
             onClick={() => setIsSheetOpen(true)}
-            className="relative flex flex-1 flex-col items-center justify-center gap-1 text-muted-foreground active:scale-95"
+            aria-label="Abrir menu completo"
+            className="flex flex-1 flex-col items-center justify-center gap-0.5 text-muted-foreground active:scale-95"
           >
-            <Menu size={20} />
-            <span className="text-[9px] font-bold uppercase tracking-tighter">Menu</span>
+            <span className="flex h-7 items-center justify-center rounded-full px-4">
+              <Menu size={19} />
+            </span>
+            <span className="text-[10px] font-semibold">Menu</span>
           </button>
         </div>
       </nav>

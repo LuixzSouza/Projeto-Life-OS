@@ -250,7 +250,9 @@ export async function setupSystem(
     const password = formData.get("password") as string;
     const bio = formData.get("bio") as string;
 
-    const aiProvider = (formData.get("aiProvider") as string) || "ollama";
+    // "gemini" era o id antigo do wizard; o canônico no sistema é "google".
+    const rawProvider = (formData.get("aiProvider") as string) || "ollama";
+    const aiProvider = rawProvider === "gemini" ? "google" : rawProvider;
     const theme = (formData.get("theme") as string) || "system";
     const currency = (formData.get("currency") as string) || "BRL";
     const workStart = (formData.get("workStart") as string) || "09:00";
@@ -274,11 +276,13 @@ export async function setupSystem(
     });
 
     // Modelo padrão por provedor (o usuário pode trocar depois em Configurações).
+    // Todos suportam tool-calling (requisito do loop agêntico do Cérebro Digital).
     const DEFAULT_MODELS: Record<string, string> = {
-      ollama: "llama3",
+      ollama: "llama3.1",
       openai: "gpt-4o",
+      anthropic: "claude-sonnet-4-6",
       groq: "llama-3.3-70b-versatile",
-      gemini: "gemini-1.5-flash",
+      google: "gemini-2.5-flash", // 2.0-flash ficou sem cota no free tier
     };
 
     await tempPrisma.settings.create({

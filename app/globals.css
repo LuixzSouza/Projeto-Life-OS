@@ -340,6 +340,61 @@ body.privacy-mode-active .privacy-blur:hover {
   --ring: oklch(0.70 0.18 350);
 }
 
+/* TEMA TEAL (Spa/Zen) */
+[data-theme="theme-teal"] {
+  --primary: oklch(0.55 0.12 180); /* Verde-água sereno */
+  --ring: oklch(0.55 0.12 180);
+  --sidebar-primary: oklch(0.55 0.12 180);
+}
+.dark [data-theme="theme-teal"] {
+  --primary: oklch(0.70 0.12 180);
+  --ring: oklch(0.70 0.12 180);
+}
+
+/* TEMA CIANO (Sky/Tech) */
+[data-theme="theme-cyan"] {
+  --primary: oklch(0.58 0.14 220); /* Azul-celeste técnico */
+  --ring: oklch(0.58 0.14 220);
+  --sidebar-primary: oklch(0.58 0.14 220);
+}
+.dark [data-theme="theme-cyan"] {
+  --primary: oklch(0.72 0.13 220);
+  --ring: oklch(0.72 0.13 220);
+}
+
+/* TEMA ÂMBAR (Gold/Energy) */
+[data-theme="theme-amber"] {
+  --primary: oklch(0.62 0.15 75); /* Dourado quente */
+  --ring: oklch(0.62 0.15 75);
+  --sidebar-primary: oklch(0.62 0.15 75);
+}
+.dark [data-theme="theme-amber"] {
+  --primary: oklch(0.75 0.15 80);
+  --ring: oklch(0.75 0.15 80);
+}
+
+/* TEMA FÚCSIA (Neon/Bold) */
+[data-theme="theme-fuchsia"] {
+  --primary: oklch(0.55 0.22 320); /* Magenta vibrante */
+  --ring: oklch(0.55 0.22 320);
+  --sidebar-primary: oklch(0.55 0.22 320);
+}
+.dark [data-theme="theme-fuchsia"] {
+  --primary: oklch(0.68 0.20 320);
+  --ring: oklch(0.68 0.20 320);
+}
+
+/* TEMA VERMELHO (Ruby/Intense) */
+[data-theme="theme-red"] {
+  --primary: oklch(0.55 0.20 25); /* Vermelho rubi */
+  --ring: oklch(0.55 0.20 25);
+  --sidebar-primary: oklch(0.55 0.20 25);
+}
+.dark [data-theme="theme-red"] {
+  --primary: oklch(0.65 0.18 25);
+  --ring: oklch(0.65 0.18 25);
+}
+
 
 @layer utilities {
   .perspective-1000 {

@@ -12,7 +12,6 @@ import {
     Image as ImageIcon,
     DollarSign,
     Tag,
-    PiggyBank,
     Flame,
     Scale,
     Snowflake,
@@ -26,7 +25,9 @@ export interface WishlistData {
     id?: string;
     name: string;
     price: number;
-    saved: number;
+    /** Legado do antigo "cofre virtual" — não é mais exibido nem editado. */
+    saved?: number;
+    status?: string;
     imageUrl?: string | null;
     productUrl?: string | null;
     priority: string;
@@ -36,7 +37,6 @@ export function WishlistForm({ item, onClose }: { item?: WishlistData, onClose: 
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [previewUrl, setPreviewUrl] = useState<string>(item?.imageUrl || "");
     const [price, setPrice] = useState<number>(item?.price ?? 0);
-    const [saved, setSaved] = useState<number>(item?.saved ?? 0);
     const [priority, setPriority] = useState<string>(item?.priority || "MEDIUM");
 
     // Campos controlados (para o auto-preenchimento por link funcionar)
@@ -77,7 +77,6 @@ export function WishlistForm({ item, onClose }: { item?: WishlistData, onClose: 
     };
 
     const priceRef = useRef<HTMLInputElement | null>(null);
-    const savedRef = useRef<HTMLInputElement | null>(null);
 
     // Mantém o cursor no final somente se o input suportar setSelectionRange
     useEffect(() => {
@@ -99,24 +98,6 @@ export function WishlistForm({ item, onClose }: { item?: WishlistData, onClose: 
         }, 0);
         return () => clearTimeout(t);
     }, [price]);
-
-    useEffect(() => {
-        const el = savedRef.current;
-        if (!el) return;
-
-        const t = window.setTimeout(() => {
-            try {
-                if (typeof el.setSelectionRange === "function" && el.type !== "number") {
-                    const len = el.value.length;
-                    el.setSelectionRange(len, len);
-                }
-            } catch (err) {
-                 
-                console.debug("Não foi possível ajustar cursor do saved input:", err);
-            }
-        }, 0);
-        return () => clearTimeout(t);
-    }, [saved]);
 
     const handleSubmit = async (formData: FormData) => {
         setIsLoading(true);
@@ -234,42 +215,26 @@ export function WishlistForm({ item, onClose }: { item?: WishlistData, onClose: 
                         </div>
                     </div>
 
-                    {/* Valores */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Valor Total (R$) *</Label>
-                            <div className="relative group">
-                                <DollarSign className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50 group-focus-within:text-primary transition-colors" />
-                                <Input 
-                                    ref={priceRef}
-                                    name="price" 
-                                    type="number" 
-                                    step="0.01" 
-                                    value={price || ""} 
-                                    onChange={(e) => setPrice(Number(e.target.value))} 
-                                    required 
-                                    className="h-12 pl-10 font-mono text-lg font-bold bg-muted/20 border-border/50 rounded-xl focus-visible:ring-primary/30"
-                                    placeholder="0.00"
-                                />
-                            </div>
+                    {/* Preço — o "dá pra comprar?" é calculado contra o saldo real das contas */}
+                    <div className="space-y-2">
+                        <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Valor Total (R$) *</Label>
+                        <div className="relative group">
+                            <DollarSign className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50 group-focus-within:text-primary transition-colors" />
+                            <Input
+                                ref={priceRef}
+                                name="price"
+                                type="number"
+                                step="0.01"
+                                value={price || ""}
+                                onChange={(e) => setPrice(Number(e.target.value))}
+                                required
+                                className="h-12 pl-10 font-mono text-lg font-bold bg-muted/20 border-border/50 rounded-xl focus-visible:ring-primary/30"
+                                placeholder="0.00"
+                            />
                         </div>
-
-                        <div className="space-y-2">
-                            <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">Já Guardado (R$)</Label>
-                            <div className="relative group">
-                                <PiggyBank className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500/50 group-focus-within:text-emerald-500 transition-colors" />
-                                <Input 
-                                    ref={savedRef}
-                                    name="saved" 
-                                    type="number" 
-                                    step="0.01" 
-                                    value={saved || ""} 
-                                    onChange={(e) => setSaved(Number(e.target.value))} 
-                                    className="h-12 pl-10 font-mono text-lg font-bold text-emerald-600 bg-emerald-500/5 border-emerald-500/20 rounded-xl focus-visible:ring-emerald-500/30"
-                                    placeholder="0.00"
-                                />
-                            </div>
-                        </div>
+                        <p className="text-[11px] text-muted-foreground ml-1">
+                            O Life OS compara com o saldo das suas contas e avisa quando já dá pra comprar.
+                        </p>
                     </div>
 
                     {/* Prioridade */}

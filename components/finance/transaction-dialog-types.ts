@@ -19,4 +19,8 @@ export interface TransactionDialogProps {
   accounts?: AccountOption[];
   transaction?: TransactionData | null;
   trigger?: React.ReactNode;
+  /** Modo controlado: um único diálogo fora do .map() em listas grandes
+      (regra do CLAUDE.md — nunca montar Dialog dentro de loop). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }

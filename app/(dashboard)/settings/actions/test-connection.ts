@@ -87,8 +87,34 @@ export async function testApiConnection(input: TestConnectionInput): Promise<Tes
           ? { success: true, message: "Conexão com Gemini validada." }
           : { success: false, message: r.status === 400 || r.status === 403 ? "Chave Gemini inválida." : `Gemini respondeu ${r.status}.` };
       }
+      case "anthropic": {
+        // Endpoint nativo de modelos da Anthropic valida a chave sem custo.
+        const r = await fetchWithTimeout("https://api.anthropic.com/v1/models", {
+          headers: { "x-api-key": key, "anthropic-version": "2023-06-01" },
+        });
+        return r.ok
+          ? { success: true, message: "Conexão com a Anthropic (Claude) validada." }
+          : { success: false, message: r.status === 401 ? "Chave Anthropic inválida." : `Anthropic respondeu ${r.status}.` };
+      }
+      case "xai": {
+        const r = await fetchWithTimeout("https://api.x.ai/v1/models", {
+          headers: { Authorization: `Bearer ${key}` },
+        });
+        return r.ok
+          ? { success: true, message: "Conexão com a xAI (Grok) validada." }
+          : { success: false, message: r.status === 401 ? "Chave xAI inválida." : `xAI respondeu ${r.status}.` };
+      }
+      case "openrouter": {
+        const r = await fetchWithTimeout("https://openrouter.ai/api/v1/key", {
+          headers: { Authorization: `Bearer ${key}` },
+        });
+        return r.ok
+          ? { success: true, message: "Conexão com o OpenRouter validada." }
+          : { success: false, message: r.status === 401 ? "Chave OpenRouter inválida." : `OpenRouter respondeu ${r.status}.` };
+      }
       case "ollama": {
-        const r = await fetchWithTimeout("http://localhost:11434/api/tags", {}, 4000);
+        const base = (process.env.OLLAMA_URL || "http://localhost:11434").replace(/\/$/, "");
+        const r = await fetchWithTimeout(`${base}/api/tags`, {}, 4000);
         return r.ok
           ? { success: true, message: "Ollama está rodando localmente." }
           : { success: false, message: "Ollama respondeu, mas com erro." };

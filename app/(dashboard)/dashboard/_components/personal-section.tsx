@@ -124,7 +124,7 @@ export async function PersonalSection({ userId }: { userId: string }) {
 
       <div className="grid gap-6 lg:grid-cols-12 items-start">
         
-        <div className="lg:col-span-8 flex flex-col gap-6">
+        <div className="min-w-0 lg:col-span-8 flex flex-col gap-6">
           <div className={`transition-all ${hasMedia ? "ring-1 ring-purple-500/20 rounded-xl shadow-sm" : ""}`}>
             {!hasMedia ? (
               <Card className="border-dashed shadow-none">
@@ -156,7 +156,7 @@ export async function PersonalSection({ userId }: { userId: string }) {
           />
         </div>
 
-        <div className="lg:col-span-4 sticky top-24">
+        <div className="min-w-0 lg:col-span-4 sticky top-24">
           <BirthdaysCard birthdays={upcomingBirthdays} />
         </div>
 

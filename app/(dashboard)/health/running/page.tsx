@@ -6,7 +6,6 @@ import { HealthActions } from "@/components/health/health-actions";
 import { getCurrentUserId } from "@/lib/auth";
 import { listShoesWithMileage, type ShoeWithMileage } from "@/app/(dashboard)/health/actions";
 import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
-import { BackLink } from "@/components/ui/back-link";
 import { ErrorState } from "@/components/ui/error-state";
 
 export const metadata: Metadata = {
@@ -91,10 +90,10 @@ export default async function RunningPage() {
         icon={<Footprints className="h-6 w-6" />}
         title="Corrida & Cardio"
         description="Acompanhe seu pace, volume de treinamento e evolução."
+        backHref="/health"
+        backLabel="Voltar para Overview"
         actions={<HealthActions />}
-      >
-        <BackLink href="/health" label="Voltar para Overview" />
-      </PageHeader>
+      />
 
       <PageContainer>
         <RunningDashboard runs={serializedRuns} bodyWeight={bodyWeight} shoes={shoes} />

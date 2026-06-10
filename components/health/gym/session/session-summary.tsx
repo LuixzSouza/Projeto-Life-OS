@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import { Loader2, Save, Star, Trophy, Timer, Layers, Dumbbell, ChevronLeft, Check, Camera, ImagePlus, Share2, X, Gauge, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,16 @@ const FEELINGS = [
   { value: "TIRED", label: "Cansativo", emoji: "😮‍💨" },
   { value: "HARD", label: "Intenso", emoji: "🔥" },
 ];
+
+// Partículas de comemoração do hero — posições determinísticas (índice, não
+// Math.random) para não causar mismatch de hidratação.
+const PARTICLES = Array.from({ length: 14 }, (_, i) => ({
+  left: (7 + i * 37) % 92,            // % horizontal
+  delay: (i % 7) * 0.14,
+  size: 4 + (i % 3) * 2,              // px
+  drift: i % 2 === 0 ? -14 : 12,      // deriva lateral
+  tone: ["bg-white/50", "bg-amber-300/80", "bg-emerald-200/70"][i % 3],
+}));
 
 export function SessionSummary({
   session,
@@ -101,31 +112,74 @@ export function SessionSummary({
         <ChevronLeft className="h-4 w-4" /> Voltar ao treino
       </button>
 
-      <div className="mb-6 flex items-center gap-3">
-        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-500">
-          <Trophy className="h-6 w-6" />
-        </span>
-        <div>
-          <h1 className="text-xl font-bold leading-tight">Treino concluído!</h1>
-          <p className="text-sm text-muted-foreground">{session.title}</p>
+      {/* HERO celebratório: gradiente + troféu com spring + partículas subindo */}
+      <motion.div
+        initial={{ opacity: 0, y: 14, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ type: "spring", duration: 0.6, bounce: 0.3 }}
+        className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 p-5 text-white shadow-lg shadow-emerald-500/20"
+      >
+        {/* Partículas de comemoração (sobem e somem, 2 ciclos) */}
+        {PARTICLES.map((p, i) => (
+          <motion.span
+            key={i}
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: [0, 1, 0], y: -64, x: p.drift }}
+            transition={{ duration: 1.6, delay: 0.25 + p.delay, repeat: 1, repeatDelay: 0.4, ease: "easeOut" }}
+            className={`pointer-events-none absolute bottom-6 rounded-full ${p.tone}`}
+            style={{ left: `${p.left}%`, width: p.size, height: p.size }}
+          />
+        ))}
+
+        <div className="relative flex items-center gap-3">
+          <motion.span
+            initial={{ scale: 0, rotate: -30 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: "spring", delay: 0.15, stiffness: 220, damping: 13 }}
+            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/25"
+          >
+            <Trophy className="h-7 w-7 text-amber-300" />
+          </motion.span>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-black leading-tight tracking-tight">Treino concluído!</h1>
+            <p className="truncate text-sm text-white/85">
+              {session.title} · {new Date(session.startedAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Métricas */}
-      <div className="grid grid-cols-3 gap-3">
-        <Metric icon={Timer} label="Duração" value={`${durationMin} min`} />
-        <Metric icon={Layers} label="Séries" value={`${stats.doneSets}`} />
-        <Metric icon={Dumbbell} label="Volume" value={`${(stats.volume / 1000).toFixed(1)}k kg`} />
-      </div>
+        {/* Métricas integradas (tiles de vidro) */}
+        <div className="relative mt-4 grid grid-cols-3 gap-2">
+          <HeroStat icon={Timer} label="Duração" value={`${durationMin} min`} />
+          <HeroStat icon={Layers} label="Séries" value={`${stats.doneSets}`} />
+          <HeroStat icon={Dumbbell} label="Volume" value={`${(stats.volume / 1000).toFixed(1)}k kg`} />
+        </div>
+      </motion.div>
 
-      {/* Destaques: recordes, ritmo, exercícios completos e local */}
-      {(prs.length > 0 || pace !== null || session.location) && (
+      {/* Recordes de hoje — card dourado dedicado (era um chip apagado no meio dos outros) */}
+      {prs.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="mt-3 rounded-2xl border border-amber-400/40 bg-gradient-to-r from-amber-400/15 via-amber-300/10 to-transparent p-3.5"
+        >
+          <p className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-amber-600">
+            <Trophy className="h-3.5 w-3.5" /> {prs.length === 1 ? "Recorde batido hoje" : `${prs.length} recordes batidos hoje`} 🎉
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {prs.map((name) => (
+              <span key={name} className="inline-flex max-w-full items-center gap-1 rounded-full bg-amber-400/20 px-2.5 py-1 text-xs font-bold text-amber-700 dark:text-amber-400">
+                <span className="truncate">{name}</span>
+              </span>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Destaques: ritmo, exercícios completos e local */}
+      {(pace !== null || session.location || named > 0) && (
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
-          {prs.map((name) => (
-            <span key={name} className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-1 text-[11px] font-bold text-amber-500">
-              <Trophy className="h-3 w-3" /> Recorde: {name}
-            </span>
-          ))}
           {pace !== null && (
             <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary" title="Tempo médio entre séries concluídas">
               <Gauge className="h-3 w-3" /> ~{Math.floor(pace / 60)}:{String(pace % 60).padStart(2, "0")} entre séries
@@ -263,12 +317,13 @@ export function SessionSummary({
   );
 }
 
-function Metric({ icon: Icon, label, value }: { icon: typeof Timer; label: string; value: string }) {
+// Tile de métrica dentro do hero (vidro sobre o gradiente).
+function HeroStat({ icon: Icon, label, value }: { icon: typeof Timer; label: string; value: string }) {
   return (
-    <div className="flex flex-col items-center gap-1 rounded-2xl border border-border/40 bg-card p-4 text-center shadow-sm">
-      <Icon className="h-5 w-5 text-primary" />
-      <span className="text-lg font-bold tabular-nums">{value}</span>
-      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{label}</span>
+    <div className="flex flex-col items-center gap-0.5 rounded-xl bg-white/12 px-2 py-2.5 text-center ring-1 ring-white/15 backdrop-blur-sm">
+      <Icon className="h-4 w-4 text-white/80" />
+      <span className="text-base font-black tabular-nums leading-tight">{value}</span>
+      <span className="text-[9px] font-semibold uppercase tracking-wider text-white/70">{label}</span>
     </div>
   );
 }

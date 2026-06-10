@@ -1,5 +1,7 @@
 // components/layout/page-shell.tsx
 import * as React from "react";
+import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -31,6 +33,11 @@ interface PageHeaderProps {
   description?: React.ReactNode;
   /** Ícone opcional exibido à esquerda do título. */
   icon?: React.ReactNode;
+  /** Rota de "voltar": vira um chevron compacto na própria linha do título
+      (não gasta uma linha inteira com BackLink — essencial no mobile). */
+  backHref?: string;
+  /** Rótulo acessível do botão de voltar. */
+  backLabel?: string;
   /** Ações à direita (botões, badges). */
   actions?: React.ReactNode;
   /** Conteúdo extra abaixo do título (tabs, filtros). */
@@ -42,6 +49,8 @@ export function PageHeader({
   title,
   description,
   icon,
+  backHref,
+  backLabel,
   actions,
   children,
   className,
@@ -58,7 +67,17 @@ export function PageHeader({
     >
       <div className="mx-auto flex max-w-7xl flex-col gap-2.5 px-4 py-2.5 sm:gap-4 sm:px-8 sm:py-5">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-          <div className="flex items-center gap-2.5 min-w-0 sm:gap-3">
+          <div className="flex items-center gap-2 min-w-0 sm:gap-3">
+            {backHref && (
+              <Link
+                href={backHref}
+                aria-label={backLabel ?? "Voltar"}
+                title={backLabel ?? "Voltar"}
+                className="-ml-1.5 flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground sm:size-9"
+              >
+                <ChevronLeft className="size-4 sm:size-5" />
+              </Link>
+            )}
             {icon && (
               <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary sm:size-11 sm:rounded-xl [&_svg]:size-4 sm:[&_svg]:size-5">
                 {icon}
@@ -69,7 +88,9 @@ export function PageHeader({
                 {title}
               </h1>
               {description && (
-                <p className="mt-0 line-clamp-1 text-[11px] text-muted-foreground sm:mt-0.5 sm:line-clamp-2 sm:text-sm">
+                // Escondida no mobile: em tela pequena a descrição só empurra
+                // o conteúdo útil pra baixo — o título já diz onde estamos.
+                <p className="hidden text-muted-foreground sm:mt-0.5 sm:line-clamp-2 sm:block sm:text-sm">
                   {description}
                 </p>
               )}

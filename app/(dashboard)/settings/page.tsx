@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { getStorageStats, getDbStatus } from "./actions";
 import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { Database, Shield, BrainCircuit, User, Plug, Wrench } from "lucide-react";
 import path from "path";
 import { cn } from "@/lib/utils";
@@ -25,8 +26,24 @@ import { SystemInfoCard } from "@/components/settings/system-info-card"; // ✅ 
 import { MaintenancePanel } from "@/components/settings/maintenance-panel"; // ✅ Manutenção (VACUUM)
 import { SelectiveExport } from "@/components/settings/selective-export"; // ✅ Exportação Seletiva
 import { SelectiveDelete } from "@/components/settings/selective-delete"; // ✅ Exclusão Seletiva
+import { AiMemoriesCard } from "@/components/settings/ai-memories-card"; // ✅ Memórias da IA
+import { AiAutomationsCard } from "@/components/settings/ai-automations-card"; // ✅ Automações da IA
+import { AiPrivacyCard } from "@/components/settings/ai-privacy-card"; // ✅ Privacidade/Web da IA
+import { listAiMemories } from "./actions/ai-memories";
+import { listAiAutomations } from "./actions/ai-automations";
 
-export default async function SettingsPage() {
+const SETTINGS_TABS = ["profile", "intelligence", "integrations", "system", "security"] as const;
+type SettingsTab = (typeof SETTINGS_TABS)[number];
+
+export default async function SettingsPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ tab?: string }>;
+}) {
+    // 0. Aba inicial via URL (?tab=integrations) — permite deep-link de outras telas
+    const { tab } = await searchParams;
+    const initialTab: SettingsTab = SETTINGS_TABS.includes(tab as SettingsTab) ? (tab as SettingsTab) : "profile";
+
     // 1. Busca Dados do Usuário logado
     const userId = await getCurrentUserId();
     const user = userId ? await prisma.user.findUnique({ where: { id: userId } }) : null;
@@ -43,6 +60,11 @@ export default async function SettingsPage() {
     // 2b. Status do banco (modo réplica habilita o cartão de sincronização)
     const dbStatus = await getDbStatus();
     
+    // 2c. Memórias e automações da IA (aba Inteligência)
+    const [aiMemories, aiAutomations] = userId
+        ? await Promise.all([listAiMemories(), listAiAutomations()])
+        : [[], []];
+
     // 3. Histórico de Backups
     const backupHistory = await prisma.backupLog.findMany({
         where: { userId },
@@ -82,7 +104,7 @@ export default async function SettingsPage() {
                 <p className="text-muted-foreground">Gerencie suas preferências, dados e integrações.</p>
             </div>
 
-            <Tabs defaultValue="profile" className="w-full space-y-8">
+            <SettingsTabs defaultValue={initialTab} className="w-full space-y-8">
                 
                 {/* BARRA DE NAVEGAÇÃO (TABS) */}
                 <div className="overflow-x-auto pb-2">
@@ -270,10 +292,31 @@ export default async function SettingsPage() {
                             <h3 className="text-lg font-medium text-foreground">Cérebro Digital</h3>
                             <p className="text-sm text-muted-foreground">Personalize o comportamento da IA.</p>
                         </div>
-                        <div className="md:col-span-8">
+                        <div className="md:col-span-8 space-y-6">
                             <Card className="border-border shadow-sm bg-card">
                                 <CardContent className="p-6">
                                     <AIConfigForm settings={settings} />
+                                </CardContent>
+                            </Card>
+                            <Card className="border-border shadow-sm bg-card">
+                                <CardContent className="p-6">
+                                    <AiMemoriesCard initialMemories={aiMemories} />
+                                </CardContent>
+                            </Card>
+                            <Card className="border-border shadow-sm bg-card">
+                                <CardContent className="p-6">
+                                    <AiAutomationsCard initialAutomations={aiAutomations} />
+                                </CardContent>
+                            </Card>
+                            <Card className="border-border shadow-sm bg-card">
+                                <CardContent className="p-6">
+                                    <AiPrivacyCard
+                                        initial={{
+                                            aiWebAccess: settings?.aiWebAccess ?? false,
+                                            aiPrivacyRouting: settings?.aiPrivacyRouting ?? false,
+                                            aiCostRouting: settings?.aiCostRouting ?? false,
+                                        }}
+                                    />
                                 </CardContent>
                             </Card>
                         </div>
@@ -314,7 +357,7 @@ export default async function SettingsPage() {
                     </div>
                 </TabsContent>
 
-            </Tabs>
+            </SettingsTabs>
         </div>
     );
 }

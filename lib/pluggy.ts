@@ -25,6 +25,11 @@ async function getPluggyClient() {
   });
 }
 
+// 0. Verifica se o usuário já cadastrou as credenciais da Pluggy
+export async function isPluggyConfigured(): Promise<boolean> {
+  return (await getPluggyClient()) !== null;
+}
+
 // 1. Criar um "Connect Token" (Sessão para o Widget de Login)
 export async function createConnectToken() {
   const client = await getPluggyClient();
