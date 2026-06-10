@@ -6,6 +6,18 @@ import { groupOfExercise } from "../exercise-db";
 import type { StartOptions } from "./session-types";
 import type { PlanDivision, WorkoutPlan } from "./plan-types";
 
+/** Ficha COMPLETA (todas as divisões de uma vez — ex.: dia de corpo todo). */
+export function planToStart(plan: WorkoutPlan): StartOptions {
+  const parts = plan.divisions.map((d) => divisionToStart(plan, d));
+  return {
+    title: plan.divisions.length > 1 ? `${plan.name} · Completo` : parts[0]?.title ?? plan.name,
+    muscleGroups: Array.from(new Set(parts.flatMap((p) => p.muscleGroups))),
+    // Descanso padrão: o da primeira divisão (overrides por exercício são mantidos).
+    restSeconds: parts[0]?.restSeconds,
+    exercises: parts.flatMap((p) => p.exercises),
+  };
+}
+
 export function divisionToStart(plan: WorkoutPlan, div: PlanDivision): StartOptions {
   const groups = div.muscleGroups.length
     ? div.muscleGroups

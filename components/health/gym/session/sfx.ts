@@ -106,6 +106,43 @@ export function primeAudio(): void {
   audio();
 }
 
+// ---- Voz (Web Speech) — melhor esforço; sem suporte, cai pro beep. ----
+
+function speak(text: string, rate = 1.05): boolean {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return false;
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "pt-BR";
+    u.rate = rate;
+    u.volume = 1;
+    window.speechSynthesis.speak(u);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Contagem regressiva falada ("três… dois… um…") nos últimos segundos do descanso.
+ *  Sem síntese de voz disponível, vira um beep curto por segundo. */
+export function playCountdown(second: number): void {
+  if (isSfxMuted()) return;
+  const words: Record<number, string> = { 3: "três", 2: "dois", 1: "um" };
+  const word = words[second];
+  if (!word || !speak(word, 1.15)) {
+    // Fallback: beep sobe de tom conforme aproxima do fim (3→1).
+    tone(700 + (3 - second) * 120, 120, 0, "square", 0.35);
+  }
+}
+
+/** Lembrete de hidratação (voz + beep suave). */
+export function playWaterReminder(): void {
+  if (isSfxMuted()) return;
+  if (!speak("Hora de beber água", 1)) {
+    tone(587, 140, 0, "sine", 0.18);
+    tone(784, 220, 0.15, "sine", 0.18);
+  }
+}
+
 // ---- Feedback tátil (independe do mudo do som — serve pra academia barulhenta /
 // fone isolando o áudio). Best-effort: navegadores sem suporte ignoram. ----
 

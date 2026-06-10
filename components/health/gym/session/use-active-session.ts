@@ -46,12 +46,17 @@ export function useActiveSession() {
         id: uid("set"), reps: e.reps ?? "", weight: e.weight ?? "", done: false,
       })),
     }));
+    const now = Date.now();
     setSession({
-      startedAt: Date.now(),
+      startedAt: now,
       title: opts.title.trim() || "Treino",
       muscleGroups: opts.muscleGroups,
       exercises: exercises.length ? exercises : [{ id: uid("ex"), name: "", sets: [emptySet()] }],
       restSeconds: opts.restSeconds ?? DEFAULT_REST,
+      // Aquecimento pedido no início: a sessão abre na fase de aquecimento.
+      ...(opts.warmupMinutes && opts.warmupMinutes > 0
+        ? { warmupEndsAt: now + opts.warmupMinutes * 60_000 }
+        : { warmupDone: true }),
     });
   }, []);
 
@@ -72,6 +77,34 @@ export function useActiveSession() {
   // um treino antigo). A própria gravação carimba updatedAt.
   const touch = useCallback(() => {
     setSession((s) => (s ? { ...s, updatedAt: Date.now() } : s));
+  }, []);
+
+  // Pausa/retoma o CRONÔMETRO (congela o tempo decorrido; nada é perdido).
+  const togglePause = useCallback(() => {
+    setSession((s) => {
+      if (!s) return s;
+      if (s.pausedAt) {
+        return { ...s, pausedAt: undefined, pausedMs: (s.pausedMs ?? 0) + (Date.now() - s.pausedAt) };
+      }
+      return { ...s, pausedAt: Date.now() };
+    });
+  }, []);
+
+  // Conclui (ou estende) a fase de aquecimento.
+  const endWarmup = useCallback(() => {
+    setSession((s) => (s ? { ...s, warmupDone: true, warmupEndsAt: undefined } : s));
+  }, []);
+  const extendWarmup = useCallback((extraMinutes: number) => {
+    setSession((s) => {
+      if (!s) return s;
+      const base = Math.max(Date.now(), s.warmupEndsAt ?? Date.now());
+      return { ...s, warmupEndsAt: base + extraMinutes * 60_000 };
+    });
+  }, []);
+
+  // Local do treino (GPS) — anexado às notas no salvamento.
+  const setLocation = useCallback((location: { lat: number; lng: number } | undefined) => {
+    setSession((s) => (s ? { ...s, location } : s));
   }, []);
 
   // Helper para mutar imutavelmente os exercícios.
@@ -138,7 +171,15 @@ export function useActiveSession() {
 
   const toggleSetDone = useCallback((exId: string, setId: string) => {
     mutate((exs) => exs.map((e) =>
-      e.id === exId ? { ...e, sets: e.sets.map((s) => (s.id === setId ? { ...s, done: !s.done } : s)) } : e,
+      e.id === exId
+        ? {
+            ...e,
+            sets: e.sets.map((s) =>
+              // Concluir carimba o instante real (prova de execução); desmarcar limpa.
+              s.id === setId ? { ...s, done: !s.done, doneAt: !s.done ? Date.now() : undefined } : s,
+            ),
+          }
+        : e,
     ));
   }, [mutate]);
 
@@ -151,6 +192,7 @@ export function useActiveSession() {
   return {
     session, hydrated,
     start, cancel, finish, reopen, touch,
+    togglePause, endWarmup, extendWarmup, setLocation,
     setTitle, setRestSeconds,
     addExercise, removeExercise, renameExercise, replaceExercise, setExerciseEquipment, setExerciseNote,
     addSet, removeSet, updateSet, toggleSetDone, setSetType,

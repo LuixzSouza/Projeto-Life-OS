@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Plus, Play, Trash2, X, Dumbbell, Star, Search, ArrowUp, ArrowDown, ClipboardList, Zap, ChevronLeft } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Plus, Play, Trash2, X, Dumbbell, Star, Search, ArrowUp, ArrowDown, ClipboardList, Zap, ChevronLeft, Flame, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -11,7 +11,7 @@ import { ExerciseThumb } from "./exercise-thumb";
 import { EQUIPMENT_META, guessEquipment, type Equipment, type Routine } from "./session-types";
 import { playClick, primeAudio } from "./sfx";
 import { RoutineShareButton, ImportRoutineButton } from "./routine-share-ui";
-import { divisionToStart } from "./plan-start";
+import { divisionToStart, planToStart } from "./plan-start";
 import type { SharedPlan } from "./plan-share";
 import type { PlanDivision, WorkoutPlan } from "./plan-types";
 import type { StartOptions } from "./use-active-session";
@@ -62,6 +62,26 @@ export function SessionSetup({
   const [custom, setCustom] = useState("");
   // Tela inicial: escolher entre treino planejado (rotina salva) ou treino livre.
   const [startMode, setStartMode] = useState<StartMode | null>(null);
+  // Antes de disparar QUALQUER treino, perguntamos do aquecimento (opções aqui).
+  const [pendingStart, setPendingStart] = useState<StartOptions | null>(null);
+
+  // Trocou de tela (inicial ↔ montagem)? Volta o scroll pro topo.
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    rootRef.current?.scrollIntoView({ block: "start" });
+  }, [startMode]);
+
+  // Toda inicialização passa por aqui: guarda as opções e pergunta do aquecimento.
+  const requestStart = (opts: StartOptions) => {
+    primeAudio();
+    playClick();
+    setPendingStart(opts);
+  };
+  const launch = (warmupMinutes?: number) => {
+    if (!pendingStart) return;
+    playClick();
+    onStart(warmupMinutes ? { ...pendingStart, warmupMinutes } : pendingStart);
+  };
 
   // Alterna o grupo e, se o nome ainda for automático, sugere um título (Push/Pull/Legs…).
   const toggleGroup = (g: string) => {
@@ -131,8 +151,7 @@ export function SessionSetup({
   };
 
   const begin = () => {
-    playClick();
-    onStart({
+    requestStart({
       title: title.trim() || (groups.length ? groups.join(" + ") : "Treino"),
       muscleGroups: groups,
       exercises: picked.map((p) => ({ name: p.name, group: p.group, equipment: p.equipment, sets: p.sets, reps: p.reps, weight: p.weight })),
@@ -142,9 +161,7 @@ export function SessionSetup({
 
   // Atalho: escolher uma rotina já dispara o treino (fluxo "planejado").
   const startRoutineNow = (r: Routine) => {
-    primeAudio();
-    playClick();
-    onStart({
+    requestStart({
       title: r.name,
       muscleGroups: r.muscleGroups,
       exercises: r.exercises.map((e) => ({ name: e.name, group: e.group, equipment: guessEquipment(e.name), sets: e.sets, reps: e.reps, weight: e.weight })),
@@ -154,19 +171,49 @@ export function SessionSetup({
 
   // Ficha do banco: escolher a divisão (Treino A/B/C) já inicia, levando as metas.
   const startDivisionNow = (plan: WorkoutPlan, div: PlanDivision) => {
-    primeAudio();
-    playClick();
-    onStart(divisionToStart(plan, div));
+    requestStart(divisionToStart(plan, div));
+  };
+
+  // Ficha COMPLETA: todas as divisões de uma vez (dia de corpo todo).
+  const startPlanNow = (plan: WorkoutPlan) => {
+    requestStart(planToStart(plan));
   };
 
   // Total de opções salvas: cada divisão de ficha conta como um treino pronto.
   const plannedCount = routines.length + plans.reduce((acc, p) => acc + p.divisions.length, 0);
   const hasSaved = plannedCount > 0;
 
+  // ---- Pergunta do aquecimento (overlay único, antes de qualquer treino) ----
+  const warmupPrompt = pendingStart && (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-background/80 px-6 backdrop-blur-sm">
+      <div className="w-full max-w-sm rounded-2xl border border-border/50 bg-card p-5 shadow-xl">
+        <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-orange-500/15 text-orange-500">
+          <Flame className="h-6 w-6" />
+        </span>
+        <h2 className="text-center text-base font-bold">Vai aquecer antes?</h2>
+        <p className="mt-1 text-center text-xs text-muted-foreground">
+          O aquecimento tem timer próprio e sugestões pros grupos de hoje — as séries começam depois.
+        </p>
+        <div className="mt-4 flex flex-col gap-2">
+          <Button onClick={() => launch(5)} className="h-11 gap-2 font-bold">
+            <Flame className="h-4 w-4" /> Aquecer (5 min)
+          </Button>
+          <Button variant="outline" onClick={() => launch()} className="h-11 gap-2">
+            <Play className="h-4 w-4" /> Direto pro treino
+          </Button>
+          <Button variant="ghost" onClick={() => setPendingStart(null)} className="h-9 text-xs text-muted-foreground">
+            Voltar
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+
   // ---- Tela inicial: dois modos de começar ----
   if (startMode === null) {
     return (
-      <div className="mx-auto flex min-h-dvh max-w-2xl flex-col px-4 py-5">
+      <div ref={rootRef} className="mx-auto flex min-h-dvh max-w-2xl flex-col px-4 py-5">
+        {warmupPrompt}
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -226,7 +273,8 @@ export function SessionSetup({
             {onImportRoutines && <ImportRoutineButton onImport={onImportRoutines} onImportPlans={onImportPlans} />}
           </div>
 
-          {/* Fichas do banco: um toque na divisão (Treino A/B/C) já inicia. */}
+          {/* Fichas do banco: um toque na divisão (Treino A/B/C) já inicia;
+              "Treinar tudo" junta todas as divisões numa sessão só (corpo todo). */}
           {plans.map((plan) => (
             <div key={plan.id} className="space-y-1.5">
               <p className="flex items-center gap-1.5 text-xs font-semibold">
@@ -246,6 +294,17 @@ export function SessionSetup({
                     <span className="text-muted-foreground/60">{div.exercises.length} ex.</span>
                   </button>
                 ))}
+                {plan.divisions.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => startPlanNow(plan)}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/5 py-1.5 pl-3 pr-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/10"
+                  >
+                    <Layers className="h-3 w-3" />
+                    Treinar tudo
+                    <span className="text-primary/60">{plan.divisions.reduce((a, d) => a + d.exercises.length, 0)} ex.</span>
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -284,7 +343,8 @@ export function SessionSetup({
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-2xl flex-col px-4 py-5">
+    <div ref={rootRef} className="mx-auto flex min-h-dvh max-w-2xl flex-col px-4 py-5">
+      {warmupPrompt}
       {/* Header */}
       <div className="mb-5 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
@@ -331,6 +391,15 @@ export function SessionSetup({
                         <span className="text-muted-foreground/60">{div.exercises.length} ex.</span>
                       </button>
                     ))}
+                    {plan.divisions.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => startPlanNow(plan)}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/10"
+                      >
+                        <Layers className="h-3 w-3" /> Treinar tudo
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

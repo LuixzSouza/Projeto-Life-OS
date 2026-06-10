@@ -16,7 +16,8 @@ import type { SharedPlan } from "./plan-share";
 import type { WorkoutPlan } from "./plan-types";
 import { enqueueGymSession } from "./mutation-queue";
 import { addGalleryPhotos } from "./gym-gallery";
-import { sessionStats, toStoredExercises, uid, type ExerciseHistoryPoint, type LastPerf, type Routine, type SaveGymSessionInput } from "./session-types";
+import { handleSpotifyCallback } from "./spotify";
+import { sessionStats, toStoredExercises, elapsedSeconds, uid, type ExerciseHistoryPoint, type LastPerf, type Routine, type SaveGymSessionInput } from "./session-types";
 
 // Acima deste tempo sem mexer, um treino em andamento é tratado como "obsoleto"
 // (abandonado) e o app pergunta se quer retomar ou descartar.
@@ -126,6 +127,16 @@ export function LiveSession({
     else toast.error("Não consegui salvar a ficha importada. Verifique a conexão.");
   };
 
+  // Retorno do consentimento do Spotify (?code&state) — troca por token e limpa a URL.
+  useEffect(() => {
+    void handleSpotifyCallback().then((ok) => {
+      if (!ok) return;
+      toast.success("Spotify conectado! Abra o botão de música para controlar. 🎧");
+      router.replace("/health/gym/session");
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Import via LINK (?import=<base64>): amigo manda no WhatsApp e cai direto aqui.
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -164,13 +175,19 @@ export function LiveSession({
   const handleSave = (feeling: string | null, notes: string | null, photos: string[]) => {
     if (!s.session) return;
     const session = s.session;
-    const durationMin = Math.round(((session.finishedAt ?? session.startedAt) - session.startedAt) / 60000);
+    // Duração honesta: desconta o tempo pausado (cronômetro congelado não conta).
+    const durationMin = Math.round(elapsedSeconds(session, session.finishedAt ?? Date.now()) / 60);
+    // Local do treino (GPS) registrado na sessão vira um link de mapa nas notas.
+    const locationLine = session.location
+      ? `📍 Local: https://maps.google.com/?q=${session.location.lat.toFixed(6)},${session.location.lng.toFixed(6)}`
+      : null;
+    const finalNotes = [notes?.trim() || null, locationLine].filter(Boolean).join("\n") || null;
     const input: SaveGymSessionInput = {
       title: session.title,
       muscleGroups: session.muscleGroups,
       durationMin,
       feeling,
-      notes,
+      notes: finalNotes,
       exercises: toStoredExercises(session.exercises),
     };
     // Fotos vão pro BANCO (sincronizam entre aparelhos via Turso). Se a rede falhar,
@@ -281,6 +298,10 @@ export function LiveSession({
           onFinish={s.finish}
           onCancel={() => { s.cancel(); router.push("/health/gym"); }}
           onPause={() => { s.touch(); router.push("/health/gym"); }}
+          onTogglePause={s.togglePause}
+          onEndWarmup={s.endWarmup}
+          onExtendWarmup={s.extendWarmup}
+          onSetLocation={s.setLocation}
         />
       )}
     </div>

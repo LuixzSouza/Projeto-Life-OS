@@ -53,6 +53,7 @@ export interface LiveSet {
   weight: string;
   done: boolean;
   type?: SetType;        // default: "normal"
+  doneAt?: number;       // epoch ms de quando foi concluída (prova de execução real)
 }
 
 /** Meta vinda de uma Ficha, carregada na sessão (fantasma de reps + coloração). */
@@ -88,6 +89,8 @@ export interface StartOptions {
   muscleGroups: string[];
   exercises: StartExerciseInput[];
   restSeconds?: number;
+  /** Minutos de aquecimento antes do treino (a sessão abre na fase de aquecimento). */
+  warmupMinutes?: number;
 }
 
 export interface LiveSession {
@@ -98,6 +101,21 @@ export interface LiveSession {
   exercises: LiveExercise[];
   restSeconds: number;        // descanso padrão entre séries
   finishedAt?: number;        // marca a fase de resumo
+  // --- Pausa real do cronômetro: tempo decorrido = now - startedAt - pausedMs
+  // (- pausa em andamento). Pausar NÃO encerra nada — só congela o relógio.
+  pausedAt?: number;          // epoch ms do início da pausa atual (undefined = rodando)
+  pausedMs?: number;          // total acumulado de pausas anteriores (ms)
+  // --- Aquecimento: fase opcional antes da 1ª série, com timer próprio.
+  warmupEndsAt?: number;      // epoch ms do fim previsto do aquecimento
+  warmupDone?: boolean;       // usuário concluiu/pulou o aquecimento
+  // --- Local do treino (GPS, best-effort) — vira link de mapa nas notas ao salvar.
+  location?: { lat: number; lng: number };
+}
+
+/** Segundos decorridos descontando pausas (cronômetro "honesto"). */
+export function elapsedSeconds(s: Pick<LiveSession, "startedAt" | "pausedAt" | "pausedMs">, now: number): number {
+  const pausedLive = s.pausedAt ? now - s.pausedAt : 0;
+  return Math.max(0, Math.floor((now - s.startedAt - (s.pausedMs ?? 0) - pausedLive) / 1000));
 }
 
 /** Rotina reutilizável (salva no localStorage). */

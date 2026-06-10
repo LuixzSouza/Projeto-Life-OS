@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Check, Plus, Minus, Trash2, X, Timer, ChevronDown, ChevronUp, History, Flag, Trophy,
   List, Target, ChevronLeft, ChevronRight, CircleCheck, Replace, Volume2, VolumeX, AlertTriangle,
-  EyeOff, MoreVertical, Pause, Lock,
+  EyeOff, MoreVertical, Pause, Lock, Play, Droplets, MapPin, Bell, BellOff, LogOut,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -19,13 +19,24 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useWakeLock } from "./use-wake-lock";
-import { sessionStats, estimatedOneRepMax, EQUIPMENT_META, SET_TYPE_META, isWorkingSet, type Equipment, type SetType, type LiveSession, type LastPerf, type ExerciseHistoryPoint, type LiveTarget } from "./session-types";
+import { sessionStats, estimatedOneRepMax, elapsedSeconds, EQUIPMENT_META, SET_TYPE_META, isWorkingSet, type Equipment, type SetType, type LiveSession, type LastPerf, type ExerciseHistoryPoint, type LiveTarget } from "./session-types";
 import { RestOverlay } from "./rest-overlay";
+import { WarmupOverlay } from "./warmup-overlay";
 import { ExerciseDemoModal } from "./exercise-demo-modal";
 import { ExerciseThumb } from "./exercise-thumb";
 import { MusicButton } from "./music-button";
 import { getAllMedia, persistMedia, mediaFor, setVideoFor, type MediaMap } from "./exercise-media";
-import { isSfxMuted, setSfxMuted, playSuccess, playRestEnd, playFinish, primeAudio, hapticTick, hapticExerciseDone, hapticRestEnd } from "./sfx";
+import { isNotifyEnabled, isNotifySupported, setNotifyEnabled, showSessionNotification } from "./session-notify";
+import { isSfxMuted, setSfxMuted, playSuccess, playRestEnd, playFinish, playCountdown, playWaterReminder, primeAudio, hapticTick, hapticExerciseDone, hapticRestEnd, vibrate } from "./sfx";
+
+// Preferência do lembrete de água (minutos; 0 = desligado), persistida localmente.
+const WATER_KEY = "lifeos:gym:water-min";
+const WATER_STEPS = [20, 30, 45, 0] as const;
+function loadWaterMinutes(): number {
+  if (typeof window === "undefined") return 20;
+  const n = parseInt(window.localStorage.getItem(WATER_KEY) ?? "20", 10);
+  return Number.isFinite(n) && n >= 0 ? n : 20;
+}
 
 type Ex = LiveSession["exercises"][number];
 
@@ -118,6 +129,7 @@ const MIN_REST_SECONDS = 15;
 
 export function SessionActive({
   session, lastPerf, volumeHistory, controls, onFinish, onCancel, onPause,
+  onTogglePause, onEndWarmup, onExtendWarmup, onSetLocation,
 }: {
   session: LiveSession;
   lastPerf: Record<string, LastPerf>;
@@ -126,6 +138,10 @@ export function SessionActive({
   onFinish: () => void;
   onCancel: () => void;
   onPause: () => void;
+  onTogglePause: () => void;
+  onEndWarmup: () => void;
+  onExtendWarmup: (minutes: number) => void;
+  onSetLocation: (loc: { lat: number; lng: number } | undefined) => void;
 }) {
   useWakeLock(true);
 
@@ -178,25 +194,111 @@ export function SessionActive({
     setRestEndsAt(end);
   };
 
+  // Contagem regressiva falada: lembra o último segundo anunciado (sem repetir).
+  const countedRef = useRef<number | null>(null);
+  // Lembrete de água: minutos entre avisos (0 = desligado) e o último aviso.
+  const [waterMinutes, setWaterMinutes] = useState(20);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setWaterMinutes(loadWaterMinutes()); }, []);
+  // last = 0 → o primeiro tick adota o "agora" como base (sem Date.now no render).
+  const waterRef = useRef<{ last: number; minutes: number }>({ last: 0, minutes: 20 });
+  useEffect(() => { waterRef.current.minutes = waterMinutes; }, [waterMinutes]);
+  const cycleWater = () => {
+    const i = WATER_STEPS.indexOf(waterMinutes as (typeof WATER_STEPS)[number]);
+    const next = WATER_STEPS[(i + 1) % WATER_STEPS.length];
+    setWaterMinutes(next);
+    waterRef.current.last = Date.now(); // zera a contagem ao mudar
+    try { window.localStorage.setItem(WATER_KEY, String(next)); } catch { /* ignora */ }
+    toast.info(next === 0 ? "Lembrete de água desligado." : `Vou te lembrar de beber água a cada ${next} min. 💧`);
+  };
+
+  const paused = !!session.pausedAt;
+  const inWarmup = !!session.warmupEndsAt && !session.warmupDone;
+
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => {
       const n = Date.now();
       setNow(n);
-      // Dispara mesmo com o descanso minimizado (o timer de A roda em background).
-      if (restEndsRef.current !== null && n >= restEndsRef.current && !buzzed.current) {
-        buzzed.current = true;
-        hapticRestEnd();
-        playRestEnd();
+      if (restEndsRef.current !== null) {
+        // Voz "três, dois, um" nos últimos segundos do descanso (uma vez cada).
+        const remaining = Math.round((restEndsRef.current - n) / 1000);
+        if (remaining >= 1 && remaining <= 3 && countedRef.current !== remaining) {
+          countedRef.current = remaining;
+          playCountdown(remaining);
+        }
+        // Dispara mesmo com o descanso minimizado (o timer de A roda em background).
+        if (n >= restEndsRef.current && !buzzed.current) {
+          buzzed.current = true;
+          countedRef.current = null;
+          hapticRestEnd();
+          playRestEnd();
+        }
+      }
+      // Hidratação: aviso periódico (não atrapalha descanso em tela cheia: toast + voz).
+      const w = waterRef.current;
+      if (w.last === 0) w.last = n;
+      if (w.minutes > 0 && n - w.last >= w.minutes * 60_000) {
+        w.last = n;
+        playWaterReminder();
+        vibrate([120, 80, 120]);
+        toast.info("💧 Hora de beber água!", { duration: 6000 });
       }
     }, 1000);
     return () => clearInterval(t);
   }, []);
 
-  const elapsed = Math.floor((now - session.startedAt) / 1000);
+  const elapsed = elapsedSeconds(session, now);
   const restRemaining = restEndsAt ? Math.round((restEndsAt - now) / 1000) : 0;
+  const warmupRemaining = session.warmupEndsAt ? Math.round((session.warmupEndsAt - now) / 1000) : 0;
+
+  // --- Notificação fora do app: ao esconder a aba/app com treino rolando ---
+  const [notifyOn, setNotifyOn] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setNotifyOn(isNotifyEnabled()); }, []);
+  const sessionRef = useRef(session);
+  useEffect(() => { sessionRef.current = session; }, [session]);
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState !== "hidden") return;
+      const s = sessionRef.current;
+      if (s.finishedAt) return;
+      const stats = sessionStats(s.exercises);
+      showSessionNotification({
+        title: s.title,
+        elapsed: clock(elapsedSeconds(s, Date.now())),
+        doneSets: stats.doneSets,
+        totalSets: stats.totalSets,
+      });
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
+  const toggleNotify = async () => {
+    const on = await setNotifyEnabled(!notifyOn);
+    setNotifyOn(on);
+    if (!on && !notifyOn) toast.error("Permissão de notificação negada pelo navegador.");
+    else toast.info(on ? "Vou mostrar o treino na bandeja quando você sair do app." : "Notificações do treino desligadas.");
+  };
+
+  // --- Local do treino (GPS, opcional) ---
+  const captureLocation = () => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      toast.error("Este aparelho não dá acesso à localização.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        onSetLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        toast.success("📍 Local do treino registrado — vai junto nas notas ao salvar.");
+      },
+      () => toast.error("Não consegui obter a localização (permissão negada?)."),
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 300_000 },
+    );
+  };
 
   const startRest = (exId: string) => {
+    countedRef.current = null; // novo descanso → reanuncia o 3-2-1
     setRestExId(exId);
     setRestMinimized(false);
     // Descanso do exercício, se a ficha definiu um; senão, o padrão da sessão.
@@ -244,11 +346,19 @@ export function SessionActive({
     }
   };
 
-  // Ao concluir o descanso: no modo Foco, avança pro próximo exercício incompleto.
+  // Ao concluir o descanso: no modo Foco, VOLTA pro exercício cujo descanso rodava
+  // se ele ainda tem séries (ex.: fez outro no meio — bi-set/desvio); senão avança
+  // pro próximo incompleto (pulando os já concluídos).
   const handleRestDone = () => {
     setRest(null);
     setRestMinimized(false);
     if (mode === "focus") {
+      const restIdx = restExId ? exercises.findIndex((e) => e.id === restExId) : -1;
+      if (restIdx !== -1 && !allDone(exercises[restIdx]) && restIdx !== focusIdx) {
+        setDir(restIdx > focusIdx ? 1 : -1);
+        setFocusIdx(restIdx);
+        return;
+      }
       const cur = exercises[focusIdx];
       if (cur && allDone(cur)) {
         const next = firstIncomplete(focusIdx + 1);
@@ -295,8 +405,31 @@ export function SessionActive({
   const focusEx = exercises[idx];
   const pct = stats.totalSets > 0 ? Math.round((stats.doneSets / stats.totalSets) * 100) : 0;
 
+  // "Próximo" no Foco pula exercícios já concluídos (sem repetir o que já foi feito);
+  // se só restarem concluídos à frente, anda sequencial mesmo (revisão).
+  const goNext = () => {
+    const next = firstIncomplete(idx + 1);
+    setDir(1);
+    setFocusIdx(next !== -1 ? next : Math.min(exercises.length - 1, idx + 1));
+  };
+
+  // Remove o exercício em Foco e reposiciona no próximo pendente.
+  const removeFocused = () => {
+    if (!focusEx) return;
+    controls.removeExercise(focusEx.id);
+    setFocusIdx((i) => Math.max(0, Math.min(i, exercises.length - 2)));
+    toast.info("Exercício removido do treino.");
+  };
+
+  // Toda troca de tela (Lista↔Foco, navegar exercício) volta o scroll pro topo —
+  // sem isso a nova tela "começa lá embaixo" na posição da anterior.
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    rootRef.current?.scrollIntoView({ block: "start" });
+  }, [mode, idx]);
+
   return (
-    <div className="flex min-h-dvh flex-col bg-background">
+    <div ref={rootRef} className="flex min-h-dvh flex-col bg-background">
       {/* HEADER fixo */}
       <header className="sticky top-0 z-30 border-b border-border/40 bg-background/95 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4">
@@ -320,6 +453,20 @@ export function SessionActive({
               </>
             )}
           </button>
+          {/* Pausar/retomar o cronômetro (congela o tempo; nada se perde) */}
+          <button
+            type="button"
+            onClick={onTogglePause}
+            className={cn(
+              "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-colors",
+              paused ? "border-amber-400 bg-amber-400/15 text-amber-500" : "border-border/50 text-muted-foreground hover:border-primary/40 hover:text-primary",
+            )}
+            aria-label={paused ? "Retomar o cronômetro" : "Pausar o cronômetro"}
+            title={paused ? "Retomar" : "Pausar o cronômetro"}
+          >
+            {paused ? <Play className="h-4 w-4 pl-0.5" /> : <Pause className="h-4 w-4" />}
+          </button>
+
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{session.title}</p>
             <p className="truncate text-[11px] text-muted-foreground">{stats.doneSets}/{stats.totalSets} séries · {stats.volume.toLocaleString("pt-BR")} kg</p>
@@ -330,21 +477,41 @@ export function SessionActive({
             {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
           </Button>
 
-          {/* Menu: pausar (mantém o rascunho) ou descartar */}
+          {/* Menu de opções da sessão. z-[80]: o conteúdo portala pro body com z-50
+              padrão e ficaria ATRÁS do overlay z-[60] da sessão (menu "fantasma"). */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="shrink-0 text-muted-foreground" aria-label="Mais opções">
                 <MoreVertical className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem onClick={onPause} className="gap-2">
-                <Pause className="h-4 w-4" /> Pausar e sair
-                <span className="ml-auto text-[10px] text-muted-foreground">salva o progresso</span>
+            <DropdownMenuContent align="end" className="z-[80] w-64">
+              <DropdownMenuItem onClick={onTogglePause} className="gap-2">
+                {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+                {paused ? "Retomar cronômetro" : "Pausar cronômetro"}
+                <span className="ml-auto text-[10px] text-muted-foreground">congela o tempo</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={cycleWater} className="gap-2">
+                <Droplets className="h-4 w-4" /> Lembrete de água
+                <span className="ml-auto text-[10px] font-semibold text-primary">{waterMinutes === 0 ? "desligado" : `${waterMinutes} min`}</span>
+              </DropdownMenuItem>
+              {isNotifySupported() && (
+                <DropdownMenuItem onClick={() => void toggleNotify()} className="gap-2">
+                  {notifyOn ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />} Notificar fora do app
+                  <span className="ml-auto text-[10px] font-semibold text-primary">{notifyOn ? "ligado" : "desligado"}</span>
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem onClick={captureLocation} className="gap-2">
+                <MapPin className="h-4 w-4" /> {session.location ? "Atualizar local do treino" : "Registrar local do treino"}
+                {session.location && <span className="ml-auto text-[10px] font-semibold text-emerald-600">✓ salvo</span>}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onPause} className="gap-2">
+                <LogOut className="h-4 w-4" /> Pausar e sair
+                <span className="ml-auto text-[10px] text-muted-foreground">salva o progresso</span>
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setDiscardOpen(true)} className="gap-2 text-destructive focus:text-destructive">
-                <Trash2 className="h-4 w-4" /> Descartar treino
+                <Trash2 className="h-4 w-4" /> Cancelar treino…
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -407,12 +574,41 @@ export function SessionActive({
           controls={controls}
           onToggle={handleToggle}
           onOpenDemo={() => focusEx.name.trim() && setDemoFor(focusEx.name)}
+          doneFlags={exercises.map((e) => allDone(e))}
           hasPrev={idx > 0}
           hasNext={idx < exercises.length - 1}
           onPrev={() => { setDir(-1); setFocusIdx(Math.max(0, idx - 1)); }}
-          onNext={() => { setDir(1); setFocusIdx(Math.min(exercises.length - 1, idx + 1)); }}
+          onNext={goNext}
+          onRemove={removeFocused}
         />
       ) : null}
+
+      {/* Fase de aquecimento (antes da 1ª série) — timer próprio + sugestões */}
+      <AnimatePresence>
+        {inWarmup && (
+          <WarmupOverlay
+            remaining={warmupRemaining}
+            muscleGroups={session.muscleGroups}
+            onExtend={onExtendWarmup}
+            onDone={onEndWarmup}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Treino pausado: cobre a tela até retomar (evita marcar série com o relógio parado) */}
+      {paused && (
+        <div className="fixed inset-0 z-[75] flex flex-col items-center justify-center bg-background/95 px-6 backdrop-blur">
+          <span className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-400/15 text-amber-500">
+            <Pause className="h-7 w-7" />
+          </span>
+          <h2 className="text-lg font-bold">Treino pausado</h2>
+          <p className="mt-1 font-mono text-4xl font-bold tabular-nums">{clock(elapsed)}</p>
+          <p className="mt-1 text-xs text-muted-foreground">O cronômetro está congelado — nada foi perdido.</p>
+          <Button onClick={onTogglePause} className="mt-6 h-12 gap-2 px-8 text-base font-bold">
+            <Play className="h-5 w-5" /> Retomar treino
+          </Button>
+        </div>
+      )}
 
       {/* Mini atalho de música (recolhido; some durante o descanso em tela cheia) */}
       {!(restEndsAt !== null && !restMinimized) && <MusicButton />}
@@ -449,18 +645,28 @@ export function SessionActive({
         <ExerciseDemoModal name={demoFor} youtubeId={demoId} onClose={() => setDemoFor(null)} onSave={(id) => saveVideo(demoFor, id)} />
       )}
 
-      {/* Confirmação de descarte (único, controlado por estado) */}
+      {/* Confirmação de cancelamento (único, controlado por estado). Com séries já
+          feitas, oferece salvar PARCIAL — desanimar no meio não apaga o que você fez. */}
       <AlertDialog open={discardOpen} onOpenChange={setDiscardOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Descartar este treino?</AlertDialogTitle>
+            <AlertDialogTitle>Cancelar este treino?</AlertDialogTitle>
             <AlertDialogDescription>
-              Você perderá as séries registradas nesta sessão. Para guardar o progresso sem finalizar, use “Pausar e sair”. Essa ação não pode ser desfeita.
+              {stats.doneSets > 0
+                ? `Você já concluiu ${stats.doneSets} série${stats.doneSets > 1 ? "s" : ""} de verdade nesta sessão. Dá para salvar como treino parcial (conta no histórico) em vez de jogar tudo fora.`
+                : "Você ainda não concluiu nenhuma série — descartar não apaga nada do histórico. Para guardar o rascunho sem finalizar, use “Pausar e sair”."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Continuar treinando</AlertDialogCancel>
-            <AlertDialogAction onClick={onCancel} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Descartar</AlertDialogAction>
+            {stats.doneSets > 0 && (
+              <AlertDialogAction onClick={() => { setDiscardOpen(false); handleFinish(); }}>
+                Salvar parcial
+              </AlertDialogAction>
+            )}
+            <AlertDialogAction onClick={onCancel} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Descartar tudo
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -564,10 +770,13 @@ function SetRows({ ex, controls, onToggle, big = false, last }: {
   last?: LastPerf;
 }) {
   const perHand = ex.equipment === "dumbbell";
+  // Peso corporal: a carga vira "extra opcional" (colete/anilha) — não faz sentido
+  // exigir peso; a coluna muda de rótulo e o fantasma fica vazio.
+  const bodyweight = ex.equipment === "bodyweight";
   const target = ex.target;
   const targetReps = target ? (target.minReps === target.maxReps ? `${target.minReps}` : `${target.minReps}-${target.maxReps}`) : null;
   // Alvo-fantasma: última execução; sem histórico, cai pra meta da ficha.
-  const ghostW = last?.weight && last.weight !== "0" ? last.weight : "0";
+  const ghostW = bodyweight ? "—" : last?.weight && last.weight !== "0" ? last.weight : "0";
   const ghostR = last?.reps && last.reps !== "0" ? last.reps : targetReps ?? "0";
   // Série ATUAL = primeira não-concluída. Só ela é editável (foco numa série por vez):
   // as anteriores ficam travadas mas podem ser reabertas pelo "Ok"; as próximas ficam
@@ -583,7 +792,7 @@ function SetRows({ ex, controls, onToggle, big = false, last }: {
       )}
       <div className="grid grid-cols-[1.75rem_1.4fr_1fr_2.5rem_1.75rem] items-center gap-1.5 px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
         <span className="text-center">Tipo</span>
-        <span className="text-center">{perHand ? "Carga/mão" : "Carga (kg)"}</span>
+        <span className="text-center">{perHand ? "Carga/mão" : bodyweight ? "+kg (opcional)" : "Carga (kg)"}</span>
         <span className="text-center">Reps</span>
         <span className="text-center">Ok</span>
         <span />
@@ -766,11 +975,12 @@ const focusVariants = {
 };
 
 // ---- Modo Foco: um exercício por vez ----
-function FocusView({ ex, dir, index, total, last, youtubeId, controls, onToggle, onOpenDemo, hasPrev, hasNext, onPrev, onNext }: {
+function FocusView({ ex, dir, index, total, doneFlags, last, youtubeId, controls, onToggle, onOpenDemo, hasPrev, hasNext, onPrev, onNext, onRemove }: {
   ex: Ex;
   dir: number;
   index: number;
   total: number;
+  doneFlags: boolean[];
   last?: LastPerf;
   youtubeId?: string;
   controls: SessionControls;
@@ -780,6 +990,7 @@ function FocusView({ ex, dir, index, total, last, youtubeId, controls, onToggle,
   hasNext: boolean;
   onPrev: () => void;
   onNext: () => void;
+  onRemove: () => void;
 }) {
   const done = allDone(ex);
   const pr = isPR(ex, last);
@@ -812,12 +1023,24 @@ function FocusView({ ex, dir, index, total, last, youtubeId, controls, onToggle,
       transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
       className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-4 pb-28"
     >
-      {/* Progresso */}
+      {/* Progresso: bolinhas preenchidas de verde nos exercícios já concluídos */}
       <div className="mb-3 flex items-center justify-between">
-        <span className="text-xs font-semibold text-muted-foreground">Exercício {index + 1} de {total}</span>
+        <span className="text-xs font-semibold text-muted-foreground">
+          Exercício {index + 1} de {total}
+          {doneFlags.filter(Boolean).length > 0 && (
+            <span className="text-emerald-600"> · {doneFlags.filter(Boolean).length} feito{doneFlags.filter(Boolean).length > 1 ? "s" : ""}</span>
+          )}
+        </span>
         <div className="flex items-center gap-1">
           {Array.from({ length: total }).map((_, i) => (
-            <span key={i} className={cn("h-1.5 rounded-full transition-all", i === index ? "w-5 bg-primary" : "w-1.5 bg-muted")} />
+            <span
+              key={i}
+              className={cn(
+                "h-1.5 rounded-full transition-all",
+                i === index ? "w-5" : "w-1.5",
+                doneFlags[i] ? "bg-emerald-500" : i === index ? "bg-primary" : "bg-muted",
+              )}
+            />
           ))}
         </div>
       </div>
@@ -835,7 +1058,14 @@ function FocusView({ ex, dir, index, total, last, youtubeId, controls, onToggle,
           )}
           <div className="mt-1"><LastAndPR last={last} pr={pr} orm={orm} /></div>
         </div>
-        {ex.name && <div className="shrink-0 pt-1"><SwapControl ex={ex} controls={controls} /></div>}
+        {ex.name && (
+          <div className="flex shrink-0 items-center gap-2.5 pt-1">
+            <SwapControl ex={ex} controls={controls} />
+            <button type="button" onClick={onRemove} className="text-muted-foreground hover:text-destructive" aria-label="Remover exercício do treino" title="Remover exercício">
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Equipamento */}
