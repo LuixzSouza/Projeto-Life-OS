@@ -24,20 +24,21 @@ const kpiStyles: Record<KpiColor, { border: string; icon: string }> = {
   slate: { border: "border-l-slate-400", icon: "text-slate-400" },
 };
 
+// Compacto no mobile (entram 2 por linha num iPhone SE) e espaçoso no desktop.
 function KpiCard({ title, value, subtitle, icon: Icon, color }: { title: string; value: string | number; subtitle?: string; icon: ElementType; color: KpiColor }) {
   const styles = kpiStyles[color] || kpiStyles.slate;
-  
+
   return (
     <Card className={`border-l-4 ${styles.border} shadow-sm transition-all hover:shadow-md`}>
-      <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        <div className={`p-2 rounded-full bg-background/50 ${styles.icon} bg-opacity-10`}>
-          <Icon className="h-4 w-4" />
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 sm:p-6 sm:pb-2">
+        <CardTitle className="truncate text-xs font-medium text-muted-foreground sm:text-sm">{title}</CardTitle>
+        <div className={`shrink-0 p-1.5 sm:p-2 rounded-full bg-background/50 ${styles.icon} bg-opacity-10`}>
+          <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold tracking-tight">{value}</div>
-        {subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}
+      <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+        <div className="truncate text-base font-bold tracking-tight sm:text-2xl">{value}</div>
+        {subtitle && <p className="mt-0.5 hidden text-xs text-muted-foreground sm:mt-1 sm:block">{subtitle}</p>}
       </CardContent>
     </Card>
   );
@@ -99,8 +100,8 @@ export async function FinanceSection({ userId, currency }: { userId: string, cur
   return (
     <div className="space-y-6">
       
-      {/* KPIs Financeiros Padronizados */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* KPIs Financeiros Padronizados (2 por linha já no mobile — sem torre de cards) */}
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">
         <KpiCard title="Saldo Total" value={formatCurrency(totalBalance)} icon={Wallet} color="blue" subtitle="Em todas as contas" />
         <KpiCard title="Entradas (Mês)" value={formatCurrency(income)} icon={TrendingUp} color="emerald" />
         <KpiCard title="Saídas (Mês)" value={formatCurrency(expense)} icon={TrendingDown} color="rose" />
@@ -114,17 +115,18 @@ export async function FinanceSection({ userId, currency }: { userId: string, cur
         <div className="xl:col-span-8 flex flex-col gap-6">
           
           <Card className="shadow-sm flex-1">
-            <CardHeader className="pb-4">
+            <CardHeader className="p-4 pb-2 sm:p-6 sm:pb-4">
               <CardTitle className="text-base font-semibold">Fluxo de Caixa</CardTitle>
               <CardDescription>Balanço consolidado do mês atual</CardDescription>
             </CardHeader>
-            <CardContent className="h-full min-h-[250px]">
+            <CardContent className="h-full min-h-[250px] p-4 pt-0 sm:p-6 sm:pt-0">
               {finance === null ? (
                 <EmptyState icon={Activity} title="Erro ao carregar" description="Não foi possível carregar os dados do gráfico." />
               ) : !hasChartData ? (
                 <EmptyState icon={TrendingUp} title="Sem fluxo no período" description="Nenhuma entrada ou saída registrada neste mês." />
               ) : (
-                <FinanceChart data={chartData} />
+                // title="" — o card acima já é o título; evita o cabeçalho duplicado.
+                <FinanceChart data={chartData} title="" />
               )}
             </CardContent>
           </Card>

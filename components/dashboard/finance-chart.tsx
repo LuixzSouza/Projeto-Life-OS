@@ -83,12 +83,13 @@ function FinanceChartContent({ data, title = "Fluxo de Caixa", className }: { da
   }
 
   return (
-    <div className={cn("w-full space-y-6", className)}>
-      <div className="flex items-center justify-between px-2">
-        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{title}</h4>
-        <div className="flex gap-4 text-[9px] font-black uppercase tracking-widest">
-          <span className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" /> Entradas</span>
-          <span className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-[0_0_8px_#f43f5e]" /> Saídas</span>
+    <div className={cn("w-full space-y-3 sm:space-y-6", className)}>
+      {/* Sem título quando o Card pai já o exibe (title="") — só a legenda. */}
+      <div className={cn("flex flex-wrap items-center gap-2 px-2", title ? "justify-between" : "justify-end")}>
+        {title && <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{title}</h4>}
+        <div className="flex gap-3 sm:gap-4 text-[9px] font-black uppercase tracking-widest">
+          <span className="flex items-center gap-1.5 sm:gap-2"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]" /> Entradas</span>
+          <span className="flex items-center gap-1.5 sm:gap-2"><span className="w-1.5 h-1.5 rounded-full bg-rose-500 shadow-[0_0_8px_#f43f5e]" /> Saídas</span>
         </div>
       </div>
 
@@ -108,7 +109,9 @@ function FinanceChartContent({ data, title = "Fluxo de Caixa", className }: { da
             <CartesianGrid strokeDasharray="4 4" vertical={false} className="stroke-muted/30" />
             <XAxis dataKey="name" tick={{ fill: 'currentColor', fontSize: 10, fontWeight: 900 }} tickLine={false} axisLine={false} tickMargin={15} className="text-muted-foreground uppercase tracking-tighter" />
             <YAxis tick={{ fill: 'currentColor', fontSize: 10, fontFamily: 'monospace' }} tickLine={false} axisLine={false} tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} className="text-muted-foreground" />
-            <Tooltip content={<CustomTooltip />} cursor={<CustomCursor />} animationDuration={300} isAnimationActive={true} allowEscapeViewBox={{ x: true, y: true }} />
+            {/* allowEscapeViewBox desligado: o tooltip vazando da viewport criava
+                scroll horizontal fantasma no celular. */}
+            <Tooltip content={<CustomTooltip />} cursor={<CustomCursor />} animationDuration={300} isAnimationActive={true} />
             <ReferenceLine y={0} stroke="currentColor" className="text-border" />
             <Bar dataKey="total" radius={[6, 6, 2, 2]} barSize={35} animationDuration={1500} animationEasing="ease-out">
               {data.map((entry, index) => (
@@ -131,8 +134,8 @@ function FinanceChartContent({ data, title = "Fluxo de Caixa", className }: { da
 const FinanceChartDynamic = dynamic(() => Promise.resolve(FinanceChartContent), {
   ssr: false,
   loading: () => (
-    <div className="h-[250px] w-full bg-muted/5 animate-pulse rounded-[2rem] border border-border/40 flex items-center justify-center">
-      <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/30">Carregando Módulo_Financeiro...</span>
+    <div className="h-[250px] w-full bg-muted/5 animate-pulse rounded-2xl border border-border/40 flex items-center justify-center">
+      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/30">Carregando…</span>
     </div>
   ),
 });

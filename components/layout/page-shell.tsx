@@ -46,6 +46,9 @@ export function PageHeader({
   children,
   className,
 }: PageHeaderProps) {
+  // Mobile-first COMPACTO (iPhone SE etc.): paddings/título/ícone menores, a
+  // descrição cabe em UMA linha e as ações rolam na horizontal em vez de
+  // empilhar — o header não pode comer meia tela de um celular pequeno.
   return (
     <header
       className={cn(
@@ -53,27 +56,29 @@ export function PageHeader({
         className
       )}
     >
-      <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-8 sm:py-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mx-auto flex max-w-7xl flex-col gap-2.5 px-4 py-2.5 sm:gap-4 sm:px-8 sm:py-5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <div className="flex items-center gap-2.5 min-w-0 sm:gap-3">
             {icon && (
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary sm:size-11">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary sm:size-11 sm:rounded-xl [&_svg]:size-4 sm:[&_svg]:size-5">
                 {icon}
               </div>
             )}
             <div className="min-w-0">
-              <h1 className="truncate text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+              <h1 className="truncate text-base font-bold tracking-tight text-foreground sm:text-2xl">
                 {title}
               </h1>
               {description && (
-                <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground sm:text-sm">
+                <p className="mt-0 line-clamp-1 text-[11px] text-muted-foreground sm:mt-0.5 sm:line-clamp-2 sm:text-sm">
                   {description}
                 </p>
               )}
             </div>
           </div>
           {actions && (
-            <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
+            <div className="flex shrink-0 items-center gap-2 overflow-x-auto pb-0.5 scrollbar-hide sm:flex-wrap sm:overflow-visible sm:pb-0">
+              {actions}
+            </div>
           )}
         </div>
         {children}

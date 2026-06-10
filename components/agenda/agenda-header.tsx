@@ -28,16 +28,18 @@ export function AgendaHeader({ date }: AgendaHeaderProps) {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
 
+  // Compacto no mobile (iPhone SE): saudação some, título menor e controles
+  // numa linha só — o header não pode comer meia tela do celular.
   return (
-    <header className="sticky top-0 z-40 w-full bg-background/90 backdrop-blur-md border-b border-border/40 px-6 py-4 shadow-sm">
-      <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
-        
+    <header className="sticky top-0 z-40 w-full bg-background/90 backdrop-blur-md border-b border-border/40 px-4 py-2.5 sm:px-6 sm:py-4 shadow-sm">
+      <div className="max-w-[1600px] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-2.5 sm:gap-4">
+
         {/* BLOCO ESQUERDO: Saudação e Data */}
-        <div>
-          <h2 className="text-[10px] font-black text-primary uppercase tracking-[0.2em] flex items-center gap-1.5 mb-1">
+        <div className="min-w-0">
+          <h2 className="hidden sm:flex text-[10px] font-black text-primary uppercase tracking-[0.2em] items-center gap-1.5 mb-1">
             <Clock className="h-3 w-3" /> {greeting}, Comandante.
           </h2>
-          <h1 className="text-2xl font-black tracking-tighter text-foreground capitalize flex items-center gap-2">
+          <h1 className="text-lg sm:text-2xl font-black tracking-tighter text-foreground capitalize flex flex-wrap items-center gap-x-2">
             {format(date, "EEEE", { locale: ptBR })}
             <span className="text-muted-foreground/50 font-medium">
               {format(date, "d 'de' MMMM", { locale: ptBR })}
@@ -46,7 +48,7 @@ export function AgendaHeader({ date }: AgendaHeaderProps) {
         </div>
 
         {/* BLOCO DIREITO: Controles */}
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           
           {/* Navegador de Dias (Control Group) */}
           <div className="flex items-center bg-muted/30 p-1 rounded-xl border border-border/40 shadow-inner">
@@ -73,7 +75,7 @@ export function AgendaHeader({ date }: AgendaHeaderProps) {
           {/* Botão de Ação Primária */}
           <Dialog>
             <DialogTrigger asChild>
-              <Button className="h-10 rounded-xl px-5 bg-foreground text-background hover:bg-primary hover:text-white shadow-lg font-black uppercase tracking-widest text-[10px] transition-all active:scale-95">
+              <Button className="h-9 sm:h-10 rounded-xl px-4 sm:px-5 bg-foreground text-background hover:bg-primary hover:text-white shadow-lg font-black uppercase tracking-widest text-[10px] transition-all active:scale-95">
                 <Plus className="h-4 w-4 mr-1.5 stroke-[3]" /> Registrar
               </Button>
             </DialogTrigger>

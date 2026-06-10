@@ -8,14 +8,16 @@ interface DashboardHeaderProps {
 }
 
 export function DashboardHeader({ greeting, userName, productivityScore }: DashboardHeaderProps) {
+  // Compacto no mobile: título e data menores (em celular pequeno o header não
+  // pode empurrar o conteúdo útil pra fora da primeira dobra).
   return (
-    <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-4 border-b border-border/40">
+    <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 pb-3 sm:gap-4 sm:pb-4 border-b border-border/40">
       <div className="min-w-0">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight flex flex-wrap items-center gap-x-2 text-foreground">
+        <h1 className="text-lg sm:text-3xl font-bold tracking-tight flex flex-wrap items-center gap-x-2 text-foreground">
           {greeting}, <span className="text-primary">{userName}</span>
         </h1>
-        <p className="text-muted-foreground flex items-center gap-2 mt-1.5 text-sm">
-          <CalendarIcon className="h-4 w-4" />
+        <p className="text-muted-foreground flex items-center gap-1.5 sm:gap-2 mt-1 sm:mt-1.5 text-xs sm:text-sm">
+          <CalendarIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
           <span className="capitalize">
             {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
           </span>
