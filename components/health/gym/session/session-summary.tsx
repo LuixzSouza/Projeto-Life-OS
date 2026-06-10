@@ -1,12 +1,12 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { Loader2, Save, Star, Trophy, Timer, Layers, Dumbbell, ChevronLeft, Check, Camera, ImagePlus, Share2, X } from "lucide-react";
+import { Loader2, Save, Star, Trophy, Timer, Layers, Dumbbell, ChevronLeft, Check, Camera, ImagePlus, Share2, X, Gauge, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { sessionStats, type LiveSession } from "./session-types";
+import { sessionStats, elapsedSeconds, isExercisePR, volumeByGroup, averageSetGapSeconds, type LastPerf, type LiveSession } from "./session-types";
 import { compressToDataUrl } from "./gym-gallery";
 import { shareWorkoutCard } from "./gym-share";
 
@@ -18,12 +18,14 @@ const FEELINGS = [
 
 export function SessionSummary({
   session,
+  lastPerf = {},
   saving,
   onSave,
   onSaveRoutine,
   onBack,
 }: {
   session: LiveSession;
+  lastPerf?: Record<string, LastPerf>;
   saving: boolean;
   onSave: (feeling: string | null, notes: string | null, photos: string[]) => void;
   onSaveRoutine: (name: string) => void;
@@ -39,9 +41,23 @@ export function SessionSummary({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const stats = useMemo(() => sessionStats(session.exercises), [session.exercises]);
-  // Na fase de resumo, finishedAt sempre existe; startedAt é o fallback seguro.
-  const durationMin = Math.max(1, Math.round(((session.finishedAt ?? session.startedAt) - session.startedAt) / 60000));
+  // Duração HONESTA: desconta as pausas do cronômetro (mesma conta do salvamento).
+  const durationMin = Math.max(1, Math.round(elapsedSeconds(session, session.finishedAt ?? session.startedAt) / 60));
   const named = session.exercises.filter((e) => e.name.trim()).length;
+
+  // ---- Destaques da sessão ----
+  // Recordes batidos hoje (vs. última execução de cada exercício).
+  const prs = useMemo(
+    () => session.exercises.filter((ex) => ex.name.trim() && isExercisePR(ex, lastPerf[ex.name.toLowerCase()])).map((ex) => ex.name.trim()),
+    [session.exercises, lastPerf],
+  );
+  // Volume por grupo muscular (onde o trabalho de hoje foi parar).
+  const groups = useMemo(() => volumeByGroup(session.exercises), [session.exercises]);
+  const maxGroupVolume = groups[0]?.volume ?? 0;
+  // Ritmo médio entre séries (carimbos doneAt de quando cada série foi concluída).
+  const pace = useMemo(() => averageSetGapSeconds(session.exercises), [session.exercises]);
+  // Exercícios totalmente concluídos vs. iniciados.
+  const completedEx = session.exercises.filter((e) => e.name.trim() && e.sets.length > 0 && e.sets.every((s) => s.done)).length;
 
   const saveRoutine = () => {
     const name = routineName.trim();
@@ -101,6 +117,50 @@ export function SessionSummary({
         <Metric icon={Layers} label="Séries" value={`${stats.doneSets}`} />
         <Metric icon={Dumbbell} label="Volume" value={`${(stats.volume / 1000).toFixed(1)}k kg`} />
       </div>
+
+      {/* Destaques: recordes, ritmo, exercícios completos e local */}
+      {(prs.length > 0 || pace !== null || session.location) && (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          {prs.map((name) => (
+            <span key={name} className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-1 text-[11px] font-bold text-amber-500">
+              <Trophy className="h-3 w-3" /> Recorde: {name}
+            </span>
+          ))}
+          {pace !== null && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary" title="Tempo médio entre séries concluídas">
+              <Gauge className="h-3 w-3" /> ~{Math.floor(pace / 60)}:{String(pace % 60).padStart(2, "0")} entre séries
+            </span>
+          )}
+          <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+            <Check className="h-3 w-3 text-emerald-500" /> {completedEx}/{named} exercícios completos
+          </span>
+          {session.location && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold text-emerald-600">
+              <MapPin className="h-3 w-3" /> Local registrado
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Volume por grupo muscular (onde o trabalho foi parar) */}
+      {groups.length > 1 && (
+        <div className="mt-4 rounded-2xl border border-border/40 bg-card p-3.5 shadow-sm">
+          <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Volume por grupo</p>
+          <div className="space-y-2">
+            {groups.slice(0, 5).map((g) => (
+              <div key={g.group} className="flex items-center gap-2.5">
+                <span className="w-20 shrink-0 truncate text-xs font-medium">{g.group}</span>
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted/50">
+                  <div className="h-full rounded-full bg-primary/70" style={{ width: `${Math.max(6, Math.round((g.volume / maxGroupVolume) * 100))}%` }} />
+                </div>
+                <span className="w-16 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground">
+                  {g.volume.toLocaleString("pt-BR")} kg
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="mt-6 flex-1 space-y-6">
         {/* Fotos do dia + compartilhar */}

@@ -284,6 +284,7 @@ export function LiveSession({
       ) : s.session.finishedAt ? (
         <SessionSummary
           session={s.session}
+          lastPerf={lastPerfMap}
           saving={saving}
           onSave={handleSave}
           onSaveRoutine={handleSaveRoutine}

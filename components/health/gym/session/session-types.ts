@@ -204,6 +204,47 @@ export function sessionStats(exercises: LiveExercise[]): { doneSets: number; tot
   return { doneSets, totalSets, volume: Math.round(volume) };
 }
 
+/** Recorde: alguma série de TRABALHO feita supera a "última vez" (mais carga, ou
+ *  mesma carga e mais reps). Aquecimento nunca vira recorde. */
+export function isExercisePR(ex: LiveExercise, last?: LastPerf): boolean {
+  if (!last) return false;
+  const lastW = num(last.weight);
+  const lastR = num(last.reps);
+  let best: { w: number; r: number } | null = null;
+  for (const s of ex.sets) {
+    if (!s.done || !isWorkingSet(s)) continue;
+    const w = num(s.weight), r = num(s.reps);
+    if (!best || w > best.w || (w === best.w && r > best.r)) best = { w, r };
+  }
+  if (!best || best.w === 0) return false;
+  return best.w > lastW || (best.w === lastW && best.r > lastR);
+}
+
+/** Volume das séries de trabalho concluídas por GRUPO muscular (resumo da sessão). */
+export function volumeByGroup(exercises: LiveExercise[]): { group: string; volume: number }[] {
+  const map = new Map<string, number>();
+  for (const ex of exercises) {
+    const vol = ex.sets.filter((s) => s.done && isWorkingSet(s)).reduce((acc, s) => acc + setVolume(s, ex.equipment), 0);
+    if (vol <= 0) continue;
+    const g = ex.group?.trim() || "Outros";
+    map.set(g, (map.get(g) ?? 0) + vol);
+  }
+  return Array.from(map, ([group, volume]) => ({ group, volume: Math.round(volume) })).sort((a, b) => b.volume - a.volume);
+}
+
+/** Ritmo médio entre séries concluídas (s), via carimbos doneAt. Null sem dados.
+ *  Ignora intervalos < 5s (cliques em sequência) e > 15 min (pausa/abandono). */
+export function averageSetGapSeconds(exercises: LiveExercise[]): number | null {
+  const stamps = exercises.flatMap((e) => e.sets.filter((s) => s.done && s.doneAt).map((s) => s.doneAt as number)).sort((a, b) => a - b);
+  const gaps: number[] = [];
+  for (let i = 1; i < stamps.length; i++) {
+    const gap = (stamps[i] - stamps[i - 1]) / 1000;
+    if (gap >= 5 && gap <= 900) gaps.push(gap);
+  }
+  if (gaps.length === 0) return null;
+  return Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length);
+}
+
 /** Estimativa de 1RM (Epley) da MELHOR série de trabalho concluída. 0 se não houver. */
 export function estimatedOneRepMax(ex: LiveExercise): number {
   let best = 0;

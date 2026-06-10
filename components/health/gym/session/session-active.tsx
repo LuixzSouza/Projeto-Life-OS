@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useWakeLock } from "./use-wake-lock";
-import { sessionStats, estimatedOneRepMax, elapsedSeconds, EQUIPMENT_META, SET_TYPE_META, isWorkingSet, type Equipment, type SetType, type LiveSession, type LastPerf, type ExerciseHistoryPoint, type LiveTarget } from "./session-types";
+import { sessionStats, estimatedOneRepMax, elapsedSeconds, isExercisePR, EQUIPMENT_META, SET_TYPE_META, type Equipment, type SetType, type LiveSession, type LastPerf, type ExerciseHistoryPoint, type LiveTarget } from "./session-types";
 import { RestOverlay } from "./rest-overlay";
 import { WarmupOverlay } from "./warmup-overlay";
 import { ExerciseDemoModal } from "./exercise-demo-modal";
@@ -86,20 +86,8 @@ function supersetPartner(exercises: Ex[], restExId: string | null): Ex | undefin
 
 const numOf = (v: string) => parseFloat((v || "").replace(",", ".")) || 0;
 
-// Recorde: alguma série feita supera a "última vez" (mais carga, ou mesma carga e mais reps).
-function isPR(ex: Ex, last?: LastPerf): boolean {
-  if (!last) return false;
-  const lastW = numOf(last.weight);
-  const lastR = numOf(last.reps);
-  let best: { w: number; r: number } | null = null;
-  for (const s of ex.sets) {
-    if (!s.done || !isWorkingSet(s)) continue; // aquecimento não vira recorde
-    const w = numOf(s.weight), r = numOf(s.reps);
-    if (!best || w > best.w || (w === best.w && r > best.r)) best = { w, r };
-  }
-  if (!best || best.w === 0) return false;
-  return best.w > lastW || (best.w === lastW && best.r > lastR);
-}
+// Recorde (helper puro compartilhado com o resumo da sessão).
+const isPR = isExercisePR;
 
 const allDone = (ex: Ex) => ex.sets.length > 0 && ex.sets.every((s) => s.done);
 
@@ -782,12 +770,24 @@ function SetRows({ ex, controls, onToggle, big = false, last }: {
   // as anteriores ficam travadas mas podem ser reabertas pelo "Ok"; as próximas ficam
   // bloqueadas até chegar a vez. Evita preencher o treino todo de uma vez e quebrar o ritmo.
   const activeIdx = ex.sets.findIndex((s) => !s.done);
+  // Sobrecarga progressiva: bateu o teto de reps na última vez → sugere subir a carga.
+  // Só aparece enquanto nenhuma série foi concluída (depois vira ruído).
+  const lastW = numOf(last?.weight ?? "");
+  const lastR = numOf(last?.reps ?? "");
+  const suggestKg = !bodyweight && lastW > 0 && lastR >= (target?.maxReps ?? 12) && !ex.sets.some((s) => s.done)
+    ? Math.round((lastW + 2.5) * 100) / 100
+    : null;
   return (
     <>
       {target && (
         <div className="mb-1.5 flex items-center gap-1.5 rounded-lg bg-primary/5 px-2 py-1 text-[11px] font-medium text-primary">
           <Target className="h-3 w-3" /> Meta: {ex.sets.length} × {targetReps} reps
           {target.intensity && <span className="text-primary/70">· {target.intensity.type} {target.intensity.value}</span>}
+        </div>
+      )}
+      {suggestKg !== null && (
+        <div className="mb-1.5 flex items-center gap-1.5 rounded-lg bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold text-emerald-600">
+          <Trophy className="h-3 w-3" /> Você fechou {lastR} reps com {last?.weight}kg — tente {suggestKg}{perHand ? "kg/mão" : "kg"} hoje!
         </div>
       )}
       <div className="grid grid-cols-[1.75rem_1.4fr_1fr_2.5rem_1.75rem] items-center gap-1.5 px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
