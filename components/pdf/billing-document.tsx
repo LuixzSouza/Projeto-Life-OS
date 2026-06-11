@@ -2,7 +2,7 @@
 // enviar ao cliente. Valores chegam JÁ formatados (a moeda vem do
 // CurrencyProvider do app — o PDF não decide formatação).
 import React from "react";
-import { StyleSheet } from "@react-pdf/renderer";
+import { StyleSheet, Image } from "@react-pdf/renderer";
 import {
   Document, View, Text, BrandedPage, PageTitle, Kpi, SectionTitle, Pill,
   pdf as base, pdfTheme, type PillTone,
@@ -23,6 +23,10 @@ export interface BillingDocumentProps {
   clientDocument: string | null;
   businessName: string | null;
   pixKey: string | null;
+  /** QR Code do PIX (data URL PNG) — gerado no cliente a partir do payload. */
+  pixQrDataUrl?: string | null;
+  /** Payload PIX "copia e cola" (BR Code) — sai impresso e selecionável. */
+  pixPayload?: string | null;
   generatedAt: string;
   totals: { total: string; paid: string; open: string };
   invoices: BillingPdfInvoice[];
@@ -69,17 +73,32 @@ const s = StyleSheet.create({
   cellValue: { width: 90, fontSize: 9.5, fontFamily: "Geist Mono", fontWeight: 600, color: pdfTheme.ink, textAlign: "right" },
   cellStatus: { width: 76, alignItems: "flex-end" },
 
-  // Caixa do PIX (destaque suave da marca)
+  // Caixa do PIX (destaque suave da marca, com QR Code para pagar na hora)
   pixBox: {
     borderWidth: 1,
     borderColor: "#C7D2FE",
     borderRadius: 10,
     backgroundColor: pdfTheme.primarySoft,
     padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
   },
+  pixInfo: { flex: 1 },
   pixLabel: { fontSize: 7, fontWeight: 600, color: pdfTheme.primaryDark, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 5 },
-  pixKey: { fontSize: 12, fontFamily: "Geist Mono", fontWeight: 600, color: pdfTheme.primaryDark },
-  pixHint: { fontSize: 7.5, color: pdfTheme.muted, marginTop: 5 },
+  pixKey: { fontSize: 11.5, fontFamily: "Geist Mono", fontWeight: 600, color: pdfTheme.primaryDark },
+  pixHint: { fontSize: 7.5, color: pdfTheme.muted, marginTop: 5, lineHeight: 1.5 },
+  pixCopiaLabel: { fontSize: 6.5, fontWeight: 600, color: pdfTheme.muted, textTransform: "uppercase", letterSpacing: 0.7, marginTop: 9, marginBottom: 3 },
+  pixCopia: { fontSize: 6, fontFamily: "Geist Mono", color: pdfTheme.muted, lineHeight: 1.5 },
+  pixQrCard: {
+    backgroundColor: pdfTheme.white,
+    borderWidth: 1,
+    borderColor: "#C7D2FE",
+    borderRadius: 10,
+    padding: 7,
+  },
+  pixQr: { width: 92, height: 92 },
+  pixQrCaption: { fontSize: 6.5, color: pdfTheme.muted, textAlign: "center", marginTop: 4 },
 
   notesText: { fontSize: 9.5, color: pdfTheme.body, lineHeight: 1.6 },
   signText: { fontSize: 9.5, color: pdfTheme.muted, marginTop: 26, lineHeight: 1.6 },
@@ -87,13 +106,19 @@ const s = StyleSheet.create({
 
 export function BillingDocument({
   billingTitle, clientName, clientCompany, clientDocument, businessName,
-  pixKey, generatedAt, totals, invoices, notes,
+  pixKey, pixQrDataUrl, pixPayload, generatedAt, totals, invoices, notes,
 }: BillingDocumentProps) {
   const clientLine = [clientName, clientCompany, clientDocument].filter(Boolean).join(" · ");
 
   return (
     <Document title={`Cobrança — ${billingTitle}`} author={businessName ?? "Life OS"}>
-      <BrandedPage docTitle="Resumo de Cobrança" headerMeta={businessName ?? undefined} footerNote={`Gerado em ${generatedAt}`}>
+      {/* Documento vai para o CLIENTE: o topo é o negócio do usuário, não o Life OS. */}
+      <BrandedPage
+        docTitle="Resumo de Cobrança"
+        headerMeta={generatedAt}
+        brand={{ name: businessName ?? clientName, tagline: businessName ? "Documento de cobrança" : undefined }}
+        footerNote={`Gerado em ${generatedAt}`}
+      >
         <PageTitle title={billingTitle} subtitle={`Cliente: ${clientLine}`} />
 
         <View style={base.kpiRow}>
@@ -125,11 +150,34 @@ export function BillingDocument({
         </View>
 
         {pixKey ? (
-          <View style={s.section}>
+          <View style={s.section} wrap={false}>
             <View style={s.pixBox}>
-              <Text style={s.pixLabel}>Pagamento via PIX</Text>
-              <Text style={s.pixKey}>{pixKey}</Text>
-              <Text style={s.pixHint}>Copie a chave acima no app do seu banco.</Text>
+              <View style={s.pixInfo}>
+                <Text style={s.pixLabel}>Pagamento via PIX</Text>
+                <Text style={s.pixKey}>{pixKey}</Text>
+                <Text style={s.pixHint}>
+                  {pixQrDataUrl
+                    ? "Aponte a câmera do app do seu banco para o QR Code ao lado — o valor em aberto já vai preenchido."
+                    : "Copie a chave acima no app do seu banco."}
+                </Text>
+                {pixPayload ? (
+                  <>
+                    <Text style={s.pixCopiaLabel}>PIX copia e cola</Text>
+                    {/* Quebra manual em linhas: o wrap automático injeta hífen
+                        na quebra e corromperia o código ao copiar do PDF. */}
+                    {(pixPayload.match(/.{1,52}/g) ?? []).map((chunk, i) => (
+                      <Text key={i} style={s.pixCopia}>{chunk}</Text>
+                    ))}
+                  </>
+                ) : null}
+              </View>
+              {pixQrDataUrl ? (
+                <View style={s.pixQrCard}>
+                  {/* eslint-disable-next-line jsx-a11y/alt-text -- Image do react-pdf não possui prop alt */}
+                  <Image style={s.pixQr} src={pixQrDataUrl} />
+                  <Text style={s.pixQrCaption}>Pagar com PIX</Text>
+                </View>
+              ) : null}
             </View>
           </View>
         ) : null}

@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { useFormatCurrency } from "@/components/providers/currency-provider";
 
 import { deleteClient, deleteBilling, deleteInvoice } from "@/app/(dashboard)/business/actions";
+import { buildPixPayload } from "@/lib/pix-payload";
 import type { AccountOption, ActionResponse, BillingData, ClientData, DeleteTarget, FriendOption, InvoiceData } from "./business-types";
 import { clearMask, generateChargeMessage, maskPhone } from "./business-helpers";
 import { ContractsList } from "./business-contracts";
@@ -89,6 +90,20 @@ export function ClientDetailView({ client, accounts, friends, pixKey, businessNa
       const paidSum = relevant.filter((i) => i.status === "PAID").reduce((s, i) => s + i.value, 0);
       const openSum = relevant.filter((i) => i.status !== "PAID").reduce((s, i) => s + i.value, 0);
 
+      // PIX com QR Code: payload BR Code com o valor EM ABERTO já preenchido
+      // (sem valor se está tudo pago — o pagador digita se quiser).
+      let pixPayload: string | null = null;
+      let pixQrDataUrl: string | null = null;
+      if (pixKey) {
+        pixPayload = buildPixPayload({
+          key: pixKey,
+          merchantName: businessName ?? client.name,
+          amount: openSum > 0 ? openSum : undefined,
+        });
+        const QRCode = (await import("qrcode")).default;
+        pixQrDataUrl = await QRCode.toDataURL(pixPayload, { margin: 1, width: 320, errorCorrectionLevel: "M" });
+      }
+
       const [{ pdf: renderPdf }, { BillingDocument }] = await Promise.all([
         import("@react-pdf/renderer"),
         import("@/components/pdf/billing-document"),
@@ -101,6 +116,8 @@ export function ClientDetailView({ client, accounts, friends, pixKey, businessNa
           clientDocument={client.document ?? null}
           businessName={businessName ?? null}
           pixKey={pixKey ?? null}
+          pixPayload={pixPayload}
+          pixQrDataUrl={pixQrDataUrl}
           generatedAt={now.toLocaleString("pt-BR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
           totals={{
             total: formatCurrency(billing.totalValue),

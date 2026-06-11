@@ -209,8 +209,8 @@ function GradientSquare({ size, radius, id }: { size: number; radius: number; id
   );
 }
 
-/** Logo da marca: quadrado gradiente com o "L" branco. */
-export function BrandMark({ size = 24 }: { size?: number }) {
+/** Logo da marca: quadrado gradiente com a inicial em branco. */
+export function BrandMark({ size = 24, initial = "L" }: { size?: number; initial?: string }) {
   return (
     <View style={{ width: size, height: size, position: "relative" }}>
       <GradientSquare size={size} radius={size * 0.3} id="lifeosMark" />
@@ -220,7 +220,7 @@ export function BrandMark({ size = 24 }: { size?: number }) {
           alignItems: "center", justifyContent: "center",
         }}
       >
-        <Text style={{ color: pdfTheme.white, fontWeight: 700, fontSize: size * 0.54 }}>L</Text>
+        <Text style={{ color: pdfTheme.white, fontWeight: 700, fontSize: size * 0.54 }}>{initial}</Text>
       </View>
     </View>
   );
@@ -230,15 +230,25 @@ export function BrandMark({ size = 24 }: { size?: number }) {
    BLOCO DE MARCA (header/rodapé/título)
    ---------------------------------------------------------------------------- */
 
-export function BrandHeader({ docTitle, meta }: { docTitle: string; meta?: string }) {
+/** Identidade no topo do documento. Sem override = marca Life OS. Documentos
+ *  voltados a TERCEIROS (ex.: cobrança p/ cliente) passam o negócio do usuário. */
+export interface HeaderBrand {
+  name: string;
+  tagline?: string;
+}
+
+export function BrandHeader({ docTitle, meta, brand }: { docTitle: string; meta?: string; brand?: HeaderBrand }) {
+  const name = brand?.name ?? "Life OS";
+  const tagline = brand ? brand.tagline : "Seu segundo cérebro pessoal";
+  const initial = (name.trim().charAt(0) || "L").toUpperCase();
   return (
     <View style={pdf.header} fixed>
       <View style={pdf.headerInner}>
         <View style={pdf.brandRow}>
-          <BrandMark size={24} />
+          <BrandMark size={24} initial={initial} />
           <View style={pdf.brandTextCol}>
-            <Text style={pdf.brandName}>Life OS</Text>
-            <Text style={pdf.brandTagline}>Seu segundo cérebro pessoal</Text>
+            <Text style={pdf.brandName}>{name}</Text>
+            {tagline ? <Text style={pdf.brandTagline}>{tagline}</Text> : null}
           </View>
         </View>
         <View style={pdf.headerRight}>
@@ -338,16 +348,19 @@ export function BrandedPage({
   docTitle,
   headerMeta,
   footerNote,
+  brand,
   children,
 }: {
   docTitle: string;
   headerMeta?: string;
   footerNote?: string;
+  /** Identidade do topo (default: Life OS). Use p/ documentos enviados a terceiros. */
+  brand?: HeaderBrand;
   children: React.ReactNode;
 }) {
   return (
     <Page size="A4" style={pdf.page} wrap>
-      <BrandHeader docTitle={docTitle} meta={headerMeta} />
+      <BrandHeader docTitle={docTitle} meta={headerMeta} brand={brand} />
       {children}
       <BrandFooter note={footerNote} />
     </Page>

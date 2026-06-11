@@ -4,12 +4,20 @@
 import React from "react";
 import { mkdirSync } from "node:fs";
 import { renderToFile } from "@react-pdf/renderer";
+import QRCode from "qrcode";
 import { BillingDocument } from "../components/pdf/billing-document";
 import { MeetingDocument } from "../components/pdf/meeting-document";
+import { buildPixPayload } from "../lib/pix-payload";
 
 mkdirSync("logs", { recursive: true });
 
-const billing = (
+const pixPayload = buildPixPayload({
+  key: "luiz.antoniodesouza003@gmail.com",
+  merchantName: "LuixzSouza Desenvolvimento",
+  amount: 5000,
+});
+
+const billing = async () => (
   <BillingDocument
     billingTitle="Desenvolvimento do E-commerce"
     clientName="Maria Fernanda"
@@ -17,6 +25,8 @@ const billing = (
     clientDocument="12.345.678/0001-90"
     businessName="LuixzSouza · Desenvolvimento Web"
     pixKey="luiz.antoniodesouza003@gmail.com"
+    pixPayload={pixPayload}
+    pixQrDataUrl={await QRCode.toDataURL(pixPayload, { margin: 1, width: 320, errorCorrectionLevel: "M" })}
     generatedAt="11 de junho de 2026, 16:45"
     totals={{ total: "R$ 7.500,00", paid: "R$ 2.500,00", open: "R$ 5.000,00" }}
     invoices={[
@@ -48,7 +58,7 @@ const meeting = (
 );
 
 async function main() {
-  await renderToFile(billing, "logs/pdf-smoke-billing.pdf");
+  await renderToFile(await billing(), "logs/pdf-smoke-billing.pdf");
   await renderToFile(meeting, "logs/pdf-smoke-meeting.pdf");
   console.log("ok: logs/pdf-smoke-billing.pdf e logs/pdf-smoke-meeting.pdf");
 }
