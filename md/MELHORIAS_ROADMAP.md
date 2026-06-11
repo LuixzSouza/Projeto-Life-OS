@@ -210,6 +210,22 @@ A visão: o computador é o servidor da casa. Celular e outros aparelhos são s�
       gap: lixeira cobre os 12 models com deletedAt; Shoe/Habit/UserStats têm UI.
       *(11/jun/2026)*
 
+- [x] **Redesign de TODOS os PDFs (identidade da marca)** — pdf-kit reescrito:
+      fonte Geist local (public/fonts, woff), paleta zinc do app, header limpo
+      com fio gradiente índigo→violeta→rosa (SVG), logo gradiente, SectionTitle
+      com bullet, Pill de status, tabelas em card, números em Geist Mono; 5
+      documentos restilizados. Cobrança virou documento DO NEGÓCIO do usuário
+      (brand override no header) com **QR Code PIX** (lib/pix-payload.ts — BR
+      Code EMV + CRC16; valor em aberto preenchido) + copia-e-cola em linhas
+      manuais (wrap injetava hífen). Smoke visual: `npx tsx scripts/pdf-smoke.tsx`.
+      *(11/jun/2026)*
+- [x] **Deploy Vercel + higiene do repositório** — push de deploy-prep e main
+      (0ca3d8f→9005168); GH013 do push protection pegou chaves de API no
+      backup automático → `/prisma/backups/`, `/dist/` e `/release/` no
+      .gitignore e fora do commit. Fix: npm install poda
+      node_modules/@lifeos/client-postgres (regenerar com
+      `prisma generate --schema prisma/schema.postgres.prisma`). *(11/jun/2026)*
+
 ## 6. Distribuição para amigos
 
 Plano completo em **[DISTRIBUICAO.md](./DISTRIBUICAO.md)**: instalador Windows
