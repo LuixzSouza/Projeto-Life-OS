@@ -84,10 +84,15 @@ async function restoreTransaction(userId: string, id: string) {
     select: { id: true, isConnected: true, balance: true },
   });
   if (account && !account.isConnected) {
-    const newBalance = t.type === "INCOME"
-      ? Number(account.balance) + Number(t.amount)
-      : Number(account.balance) - Number(t.amount);
-    ops.push(prisma.account.update({ where: { id: account.id }, data: { balance: newBalance }, select: { id: true } }));
+    ops.push(prisma.account.update({
+      where: { id: account.id },
+      data: {
+        balance: t.type === "INCOME"
+          ? { increment: Number(t.amount) }
+          : { decrement: Number(t.amount) },
+      },
+      select: { id: true },
+    }));
   }
   ops.push(prisma.transaction.updateMany({ where: { id, userId }, data: { deletedAt: null } }));
   await prisma.$transaction(ops);

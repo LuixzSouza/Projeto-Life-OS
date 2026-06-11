@@ -5,7 +5,28 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { decrypt, encrypt } from "@/lib/crypto";
 import { requireUserId } from "@/lib/auth";
+import { logActivity } from "@/lib/activity";
 import { calculateStrength } from "@/components/access/access-helpers";
+
+// Consulta HIBP (k-anonymity) para UMA senha — usada ao salvar credencial nova.
+// Best-effort com timeout curto: rede fora do ar NUNCA impede o salvamento.
+async function pwnedCount(plain: string): Promise<number> {
+  try {
+    const hash = crypto.createHash("sha1").update(plain).digest("hex").toUpperCase();
+    const res = await fetch(`https://api.pwnedpasswords.com/range/${hash.slice(0, 5)}`, {
+      headers: { "Add-Padding": "true" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) return 0;
+    const body = await res.text();
+    const suffix = hash.slice(5);
+    const line = body.split("\n").find((l) => l.split(":")[0]?.trim().toUpperCase() === suffix);
+    return line ? parseInt(line.split(":")[1]?.trim() || "0", 10) : 0;
+  } catch {
+    return 0;
+  }
+}
 
 // --- AUDITORIA DE SEGURANÇA DO COFRE ---
 // Decifra as senhas APENAS no servidor para medir força e detectar reuso.
@@ -173,7 +194,8 @@ export async function createAccess(formData: FormData) {
     });
 
     revalidatePath("/access");
-    return { success: true };
+    // Aviso pós-salvamento: a senha nova já aparece em vazamentos públicos?
+    return { success: true, breachCount: await pwnedCount(password) };
 
   } catch (error) {
     console.error("Erro ao criar:", error);
@@ -198,7 +220,8 @@ export async function updateAccess(formData: FormData) {
 
     // Verifica se precisa re-criptografar a senha
     let finalPassword = currentItem.password;
-    if (submittedPassword && submittedPassword !== currentItem.password) {
+    const passwordChanged = !!submittedPassword && submittedPassword !== currentItem.password;
+    if (passwordChanged) {
         finalPassword = encrypt(submittedPassword);
     }
 
@@ -218,7 +241,8 @@ export async function updateAccess(formData: FormData) {
     });
 
     revalidatePath("/access");
-    return { success: true };
+    // Só consulta vazamentos quando a senha realmente mudou.
+    return { success: true, breachCount: passwordChanged ? await pwnedCount(submittedPassword) : 0 };
 
   } catch (error) {
     console.error("Erro ao atualizar:", error);
@@ -244,13 +268,22 @@ export async function revealPassword(id: string) {
     const userId = await requireUserId();
     const item = await prisma.accessItem.findFirst({
         where: { id, userId },
-        select: { password: true }
+        select: { password: true, title: true }
     });
 
     if (!item?.password) throw new Error("Senha não encontrada.");
 
     try {
-        return decrypt(item.password);
+        const plain = decrypt(item.password);
+        // Trilha de auditoria: cada decifração fica na Linha do Tempo (sem a senha).
+        await logActivity({
+            action: "REVEAL",
+            module: "access",
+            entityType: "access",
+            entityId: id,
+            summary: `Acessou a senha de "${item.title}"`,
+        });
+        return plain;
     } catch {
         return "Erro de Descriptografia";
     }

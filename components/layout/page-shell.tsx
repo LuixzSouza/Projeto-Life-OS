@@ -97,7 +97,10 @@ export function PageHeader({
             </div>
           </div>
           {actions && (
-            <div className="flex shrink-0 items-center gap-2 overflow-x-auto pb-0.5 scrollbar-hide sm:flex-wrap sm:overflow-visible sm:pb-0">
+            // sm+: precisa poder ENCOLHER (sm:shrink + min-w-0) para o
+            // flex-wrap agir — com shrink-0 o wrap nunca acontecia e páginas
+            // com muitas ações (Financeiro) estouravam para fora do header.
+            <div className="flex shrink-0 items-center gap-2 overflow-x-auto pb-0.5 scrollbar-hide sm:min-w-0 sm:shrink sm:flex-wrap sm:justify-end sm:overflow-visible sm:pb-0">
               {actions}
             </div>
           )}

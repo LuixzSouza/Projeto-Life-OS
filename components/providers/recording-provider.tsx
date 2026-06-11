@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useRef, useState, useCallback, type ReactNode } from "react";
 import { toast } from "sonner";
-import { Mic, Square, Loader2, Pause, Play, AlertTriangle, X } from "lucide-react";
+import { Mic, Square, Loader2, Pause, Play, AlertTriangle, X, Monitor } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { appendMeetingTranscript, summarizeMeeting } from "@/app/(dashboard)/projects/actions";
 
@@ -19,13 +19,30 @@ interface RecordingContextValue {
   // Disparado quando o resumo automático (ao parar) termina — o editor aberto
   // reage e recarrega notas/resumo.
   summaryEvent: { id: string; at: number } | null;
+  // true quando o áudio do computador (chamada/aba) está entrando na gravação.
+  systemAudio: boolean;
   startSession: (meetingId: string, title: string, prompt?: string) => Promise<void>;
   stopSession: () => void;
   pauseSession: () => void;
   resumeSession: () => void;
+  // (Re)abre o seletor de compartilhamento p/ somar o áudio do PC a uma
+  // gravação em andamento — recuperação sem precisar parar a reunião.
+  addSystemAudio: () => Promise<void>;
   subscribe: (meetingId: string, cb: Subscriber) => () => void;
   getLevel: () => number;
 }
+
+// Opções do getDisplayMedia que o Chrome entende mas o TS DOM ainda não tipa.
+// `systemAudio: "include"` é o que faz a caixinha "compartilhar áudio do
+// sistema" aparecer ao escolher a tela inteira no Windows.
+interface ExtendedDisplayMediaOptions extends DisplayMediaStreamOptions {
+  systemAudio?: "include" | "exclude";
+  selfBrowserSurface?: "include" | "exclude";
+  monitorTypeSurfaces?: "include" | "exclude";
+}
+
+const SYS_SHARE_HINT =
+  "No seletor, escolha “Tela inteira” e MARQUE “Compartilhar áudio do sistema” (ou compartilhe a guia da chamada com “Compartilhar áudio da guia”).";
 
 const RecordingContext = createContext<RecordingContextValue | null>(null);
 
@@ -38,9 +55,18 @@ export function useRecording() {
 // Duração de cada bloco. Blocos completos (webm independentes) são transcritos
 // um a um — assim reuniões longas não estouram o limite de tamanho do Whisper.
 const SEGMENT_MS = 45000;
+// Depois dos 45s, espera ATÉ este tempo por um respiro (silêncio curto) para
+// fechar o bloco — cortar no meio de uma palavra era a maior fonte de erros
+// de transcrição nas emendas entre blocos.
+const CUT_GRACE_MS = 6000;
+// Nível abaixo do qual consideramos "respiro" para o corte gracioso.
+const CUT_LEVEL = 0.02;
 // Abaixo deste pico de amplitude o bloco é considerado silêncio e não é enviado
 // (evita gasto de API e a alucinação do Whisper em trechos mudos).
 const SILENCE_LEVEL = 0.015;
+// Cauda da última transcrição usada como contexto do próximo trecho (uso
+// canônico do `prompt` do Whisper: continuidade de nomes, jargões e pontuação).
+const TAIL_CHARS = 240;
 // Falhas seguidas antes de parar sozinho (ex.: chave de API inválida/ausente).
 const MAX_FAIL_STREAK = 3;
 // Marca a gravação ativa no localStorage para detectar interrupções (reload/crash).
@@ -59,12 +85,17 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
   const [transcribing, setTranscribing] = useState(false);
   const [pending, setPending] = useState(0);
   const [summaryEvent, setSummaryEvent] = useState<{ id: string; at: number } | null>(null);
+  const [systemAudio, setSystemAudio] = useState(false);
   // Gravação interrompida por reload/crash detectada ao montar.
   const [interrupted, setInterrupted] = useState<{ title: string; at: number } | null>(null);
 
   const streamsRef = useRef<MediaStream[]>([]);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const destRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+  // Barramento de mistura onde mic e áudio do PC se conectam — fontes novas
+  // podem entrar no MEIO da gravação (addSystemAudio).
+  const mixBusRef = useRef<GainNode | null>(null);
+  const sysActiveRef = useRef(false);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -85,6 +116,9 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
   const failStreakRef = useRef(0);
   const gotTranscriptRef = useRef(false);
   const beforeUnloadRef = useRef<((e: BeforeUnloadEvent) => void) | null>(null);
+  // Corte gracioso do bloco (espera um respiro) + contexto rolante p/ o Whisper.
+  const cutTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastTailRef = useRef("");
 
   const subscribe = useCallback((meetingId: string, cb: Subscriber) => {
     subsRef.current.set(meetingId, cb);
@@ -153,12 +187,19 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
       setTranscribing(true);
       const fd = new FormData();
       fd.append("audio", blob, "segmento.webm");
-      if (promptRef.current) fd.append("prompt", promptRef.current);
+      // Contexto = vocabulário fixo (participantes/tags) + cauda do trecho
+      // anterior. A fila é serializada, então a cauda chega na ordem certa.
+      const context = [promptRef.current, lastTailRef.current].filter(Boolean).join("\n");
+      if (context) fd.append("prompt", context);
       const res = await fetch("/api/transcribe", { method: "POST", body: fd });
       const data = await res.json();
       if (data.success) {
         failStreakRef.current = 0;
-        if (data.transcript?.trim()) routeTranscript(meetingId, data.transcript.trim(), atSec);
+        const text = (data.transcript as string | undefined)?.trim();
+        if (text) {
+          lastTailRef.current = text.slice(-TAIL_CHARS);
+          routeTranscript(meetingId, text, atSec);
+        }
       } else {
         failStreakRef.current++;
         toast.error(data.message || "Falha ao transcrever um trecho.");
@@ -180,10 +221,98 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
     uploadChainRef.current = uploadChainRef.current.then(() => uploadSegment(blob, meetingId, atSec));
   };
 
+  // ---------- Captura do áudio do COMPUTADOR (a voz dos outros na chamada) ----------
+
+  /**
+   * Abre o seletor de compartilhamento pedindo áudio do sistema.
+   * Distingue os 3 desfechos que antes eram tratados igual (e por isso a
+   * gravação "parecia" incluir o PC sem incluir):
+   * - ok: stream com trilha de áudio de verdade;
+   * - "no-audio": o usuário compartilhou mas SEM marcar a caixinha de áudio
+   *   (ou escolheu uma janela, que não tem áudio) — o caso silencioso clássico;
+   * - "denied": cancelou/negou o seletor.
+   */
+  const captureSystemAudio = async (): Promise<{ stream: MediaStream } | { error: "no-audio" | "denied" }> => {
+    let stream: MediaStream;
+    try {
+      const options: ExtendedDisplayMediaOptions = {
+        video: true,
+        // Áudio do sistema é sinal digital limpo: processamento de voz (AEC/
+        // supressão) aqui só degrada — música e vozes distantes saíam mastigadas.
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+        systemAudio: "include", // Chrome: oferece "compartilhar áudio do sistema" na tela inteira
+        selfBrowserSurface: "exclude", // esconde a própria aba do Life OS do seletor
+        monitorTypeSurfaces: "include",
+      };
+      stream = await navigator.mediaDevices.getDisplayMedia(options);
+    } catch {
+      return { error: "denied" };
+    }
+    if (stream.getAudioTracks().length === 0) {
+      stream.getTracks().forEach((t) => t.stop());
+      return { error: "no-audio" };
+    }
+    // NÃO parar a trilha de vídeo: em vários navegadores encerrar o vídeo
+    // derruba a sessão de captura INTEIRA (áudio junto) — era uma das causas
+    // de "não gravou o som do PC". Desabilitar mantém a sessão viva sem
+    // gravar imagem (o MediaRecorder só recebe o destino de áudio).
+    stream.getVideoTracks().forEach((t) => { t.enabled = false; });
+    return { stream };
+  };
+
+  /** Liga o stream do sistema no barramento da gravação e monitora a vida dele. */
+  const attachSystemStream = (stream: MediaStream) => {
+    const ctx = audioCtxRef.current;
+    const bus = mixBusRef.current;
+    if (!ctx || !bus) {
+      stream.getTracks().forEach((t) => t.stop());
+      return;
+    }
+    streamsRef.current.push(stream);
+    ctx.createMediaStreamSource(stream).connect(bus);
+    sysActiveRef.current = true;
+    setSystemAudio(true);
+    const track = stream.getAudioTracks()[0];
+    // "Parar compartilhamento" na barra do navegador matava o áudio do PC em
+    // silêncio. Agora avisa e oferece religar sem parar a gravação.
+    track.onended = () => {
+      sysActiveRef.current = false;
+      setSystemAudio(false);
+      if (activeRef.current) {
+        toast.warning("O áudio do PC parou de ser compartilhado — gravando só o microfone.", {
+          duration: 15000,
+          action: { label: "Religar", onClick: () => { void addSystemAudio(); } },
+        });
+      }
+    };
+  };
+
+  const addSystemAudio = useCallback(async () => {
+    if (!activeRef.current || sysActiveRef.current) return;
+    const result = await captureSystemAudio();
+    if ("stream" in result) {
+      attachSystemStream(result.stream);
+      toast.success("Áudio do PC adicionado à gravação.");
+    } else if (result.error === "no-audio") {
+      toast.error(`O compartilhamento veio SEM áudio. ${SYS_SHARE_HINT}`, { duration: 15000 });
+    }
+    // "denied": o usuário cancelou de propósito — sem toast.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const clearCutTimer = () => {
+    if (cutTimerRef.current) { clearInterval(cutTimerRef.current); cutTimerRef.current = null; }
+  };
+
   const startSegment = () => {
     if (!activeRef.current || pausedRef.current || !destRef.current) return;
     const mime = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
-    const mr = new MediaRecorder(destRef.current.stream, mime ? { mimeType: mime } : undefined);
+    // 128 kbps explícitos: o default do navegador pode comprimir demais a voz —
+    // áudio melhor entra, transcrição melhor sai.
+    const mr = new MediaRecorder(destRef.current.stream, {
+      ...(mime ? { mimeType: mime } : {}),
+      audioBitsPerSecond: 128_000,
+    });
     chunksRef.current = [];
     segMaxRef.current = 0;
     segStartRef.current = elapsedRef.current;
@@ -198,13 +327,28 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
     };
     mr.start();
     recorderRef.current = mr;
-    segTimerRef.current = setTimeout(() => { try { mr.stop(); } catch {} }, SEGMENT_MS);
+    // Corte GRACIOSO: nos 45s o bloco não fecha na hora — espera um respiro
+    // (~300ms de silêncio) por até CUT_GRACE_MS, para nunca cortar palavra ao
+    // meio (era a maior fonte de palavras trocadas nas emendas).
+    segTimerRef.current = setTimeout(() => {
+      const deadline = Date.now() + CUT_GRACE_MS;
+      let quietStreak = 0;
+      clearCutTimer();
+      cutTimerRef.current = setInterval(() => {
+        quietStreak = levelRef.current < CUT_LEVEL ? quietStreak + 1 : 0;
+        if (quietStreak >= 3 || Date.now() >= deadline || !activeRef.current || pausedRef.current) {
+          clearCutTimer();
+          try { mr.stop(); } catch {}
+        }
+      }, 100);
+    }, SEGMENT_MS);
   };
 
   // Solta câmera/mic/contexto de áudio. Roda com atraso após o stop para o último
   // bloco terminar de ser empacotado.
   const cleanupStreams = () => {
     stopMeter();
+    clearCutTimer();
     if (segTimerRef.current) { clearTimeout(segTimerRef.current); segTimerRef.current = null; }
     streamsRef.current.forEach((s) => s.getTracks().forEach((t) => t.stop()));
     streamsRef.current = [];
@@ -212,6 +356,9 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
     destRef.current = null;
     analyserRef.current = null;
     recorderRef.current = null;
+    mixBusRef.current = null;
+    sysActiveRef.current = false;
+    setSystemAudio(false);
   };
 
   // Encerra a sessão (parada manual ou automática por falha).
@@ -220,6 +367,7 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
     activeRef.current = false;
     pausedRef.current = false;
     try { localStorage.removeItem(LS_ACTIVE_KEY); } catch {}
+    clearCutTimer();
     if (segTimerRef.current) { clearTimeout(segTimerRef.current); segTimerRef.current = null; }
     try { recorderRef.current?.stop(); } catch {} // dispara onstop → último upload (sem reiniciar)
     if (elapsedTimerRef.current) { clearInterval(elapsedTimerRef.current); elapsedTimerRef.current = null; }
@@ -239,18 +387,12 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
   const startSession = useCallback(async (meetingId: string, title: string, prompt?: string) => {
     if (activeRef.current) { toast.message("Já existe uma gravação em andamento."); return; }
     try {
-      const micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Constraints de qualidade p/ transcrição: cancela eco (voz do PC voltando
+      // pelo alto-falante), suprime ruído de fundo e normaliza o ganho do mic.
+      const micStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+      });
       streamsRef.current.push(micStream);
-
-      // Áudio do computador (aba/tela) — exige marcar "compartilhar áudio".
-      let sysStream: MediaStream | null = null;
-      try {
-        sysStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-        streamsRef.current.push(sysStream);
-        sysStream.getVideoTracks().forEach((t) => t.stop());
-      } catch {
-        toast.message("Gravando só o microfone (áudio do PC não compartilhado).");
-      }
 
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const ctx = new AudioCtx();
@@ -261,13 +403,52 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
       analyser.fftSize = 1024;
       analyserRef.current = analyser;
 
-      const micSrc = ctx.createMediaStreamSource(micStream);
-      micSrc.connect(dest);
-      micSrc.connect(analyser);
-      if (sysStream && sysStream.getAudioTracks().length > 0) {
-        const sysSrc = ctx.createMediaStreamSource(sysStream);
-        sysSrc.connect(dest);
-        sysSrc.connect(analyser);
+      // Barramento de mistura: as fontes entram aqui. O medidor/detecção de
+      // silêncio lê o sinal CRU (pré-compressor) — o compressor do Chrome tem
+      // makeup gain automático que descalibraria SILENCE_LEVEL/CUT_LEVEL.
+      const bus = ctx.createGain();
+      bus.gain.value = 1;
+      bus.connect(analyser);
+      mixBusRef.current = bus;
+
+      // Compressor SUAVE só no caminho da GRAVAÇÃO: o mic (perto, alto) e a
+      // voz do outro lado da chamada (longe, baixa) chegam em volumes muito
+      // diferentes — nivelar é o que evita o Whisper "perder" a fala baixinha.
+      // Ratio 4:1 é transparente, não distorce.
+      const comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -24;
+      comp.knee.value = 30;
+      comp.ratio.value = 4;
+      comp.attack.value = 0.003;
+      comp.release.value = 0.25;
+      bus.connect(comp);
+      comp.connect(dest);
+
+      ctx.createMediaStreamSource(micStream).connect(bus);
+      const micTrack = micStream.getAudioTracks()[0];
+      if (micTrack) {
+        micTrack.onended = () => {
+          if (activeRef.current) toast.error("O microfone foi desconectado — verifique o dispositivo de áudio.");
+        };
+      }
+
+      // Áudio do computador (a voz dos OUTROS sai pela caixa de som — sem isso
+      // a transcrição só pega o SEU lado da conversa).
+      sysActiveRef.current = false;
+      setSystemAudio(false);
+      const sys = await captureSystemAudio();
+      if ("stream" in sys) {
+        attachSystemStream(sys.stream);
+      } else if (sys.error === "no-audio") {
+        // O caso que antes passava em silêncio: compartilhou, mas sem áudio.
+        toast.error(`O compartilhamento veio SEM áudio — gravando só o microfone. ${SYS_SHARE_HINT}`, {
+          duration: 20000,
+          action: { label: "Tentar de novo", onClick: () => { void addSystemAudio(); } },
+        });
+      } else {
+        toast.message("Gravando só o microfone (áudio do PC não compartilhado).", {
+          description: "Dá para adicionar depois pelo botão “+ Áudio do PC” no painel da gravação.",
+        });
       }
 
       setInterrupted(null); // inicia nova sessão → descarta aviso de interrupção
@@ -279,6 +460,7 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
       // Whisper alucina repetindo o prompt — era a origem do "11h30 11h30 11h30...".
       // Só um prompt explícito (nomes/jargões da reunião) entra como contexto.
       promptRef.current = (prompt || "").slice(0, 800);
+      lastTailRef.current = ""; // contexto rolante zera a cada sessão
       activeRef.current = true;
       pausedRef.current = false;
       failStreakRef.current = 0;
@@ -301,7 +483,11 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
       }, 1000);
       startMeter();
       startSegment();
-      toast.success("Gravação iniciada.");
+      toast.success(
+        sysActiveRef.current
+          ? "Gravação iniciada: microfone + áudio do PC."
+          : "Gravação iniciada (só microfone).",
+      );
     } catch (e) {
       console.error(e);
       toast.error("Não foi possível acessar o microfone.");
@@ -325,6 +511,7 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
     if (!activeRef.current || pausedRef.current) return;
     pausedRef.current = true;
     setIsPaused(true);
+    clearCutTimer();
     if (segTimerRef.current) { clearTimeout(segTimerRef.current); segTimerRef.current = null; }
     if (elapsedTimerRef.current) { clearInterval(elapsedTimerRef.current); elapsedTimerRef.current = null; }
     stopMeter();
@@ -369,7 +556,7 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
     <RecordingContext.Provider
       value={{
         isRecording, isPaused, activeMeetingId, activeTitle, elapsed, transcribing, pending, summaryEvent,
-        startSession, stopSession, pauseSession, resumeSession, subscribe, getLevel,
+        systemAudio, startSession, stopSession, pauseSession, resumeSession, addSystemAudio, subscribe, getLevel,
       }}
     >
       {children}
@@ -391,6 +578,27 @@ export function RecordingProvider({ children }: { children: ReactNode }) {
 
           <div className="mt-2.5">
             <AudioMeter getLevel={getLevel} active={isRecording && !isPaused} />
+          </div>
+
+          {/* Fontes ao vivo: transparência total sobre O QUE está sendo gravado —
+              a falta disso escondia gravações só-mic que pareciam completas. */}
+          <div className="mt-2 flex items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+              <Mic className="h-2.5 w-2.5" /> Microfone
+            </span>
+            {systemAudio ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                <Monitor className="h-2.5 w-2.5" /> Áudio do PC
+              </span>
+            ) : (
+              <button
+                onClick={() => void addSystemAudio()}
+                className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2 py-0.5 text-[10px] font-bold text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
+                title="Compartilhar o áudio do computador (a voz dos outros na chamada)"
+              >
+                <Monitor className="h-2.5 w-2.5" /> + Áudio do PC
+              </button>
+            )}
           </div>
 
           <div className="mt-3 flex items-center justify-between gap-2">

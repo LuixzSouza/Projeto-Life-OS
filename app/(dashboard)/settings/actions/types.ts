@@ -16,7 +16,7 @@ export type ChallengeJSON = Partial<Challenge> & { checkins?: Partial<ChallengeC
 export type DeckJSON = Partial<FlashcardDeck> & { cards?: Partial<Flashcard>[]; category?: string };
 
 export interface BackupData {
-  meta?: { system: string; version?: string; date?: string };
+  meta?: { system: string; version?: string; date?: string; schemaVersion?: number };
   user?: Partial<User>;
   settings?: Partial<Settings>;
   accounts?: AccountJSON[];

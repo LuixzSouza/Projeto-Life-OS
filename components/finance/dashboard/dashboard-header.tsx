@@ -19,11 +19,14 @@ export function FinanceHeaderActions({ accounts }: { accounts: DashboardAccount[
   const [importOpen, setImportOpen] = useState(false);
 
   return (
-    <div className="flex items-center gap-2">
+    // Fragment de propósito: os botões entram DIRETO no flex do PageHeader,
+    // que cuida do scroll horizontal (mobile) e do wrap (desktop). Um <div>
+    // agrupador vira uma linha única inquebrável e estoura o header.
+    <>
       <AskAiButton
         q="Analise minhas finanças do mês: receitas, despesas, principais categorias de gasto e onde posso economizar."
         label="Analisar com IA"
-        className="h-9"
+        className="h-9 shrink-0"
       />
 
       {/* Importar extrato: o caminho GRATUITO de trazer dados do banco
@@ -83,6 +86,6 @@ export function FinanceHeaderActions({ accounts }: { accounts: DashboardAccount[
           }
         />
       </div>
-    </div>
+    </>
   );
 }

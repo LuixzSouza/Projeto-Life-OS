@@ -34,7 +34,7 @@ async function collectDayData(userId: string) {
   const dayStart = new Date(now); dayStart.setHours(0, 0, 0, 0);
   const dayEnd = new Date(now); dayEnd.setHours(23, 59, 59, 999);
 
-  const [settings, accounts, events, criticalTasks, overdueCount, habits, doneToday, lastSleep] = await Promise.all([
+  const [settings, accounts, events, criticalTasks, overdueCount, habits, doneToday, lastSleep, wishPlan] = await Promise.all([
     prisma.settings.findUnique({ where: { userId }, select: { currency: true } }),
     prisma.account.findMany({ where: { userId }, select: { balance: true } }),
     prisma.event.findMany({
@@ -44,19 +44,25 @@ async function collectDayData(userId: string) {
     }),
     prisma.task.findMany({
       where: { userId, deletedAt: null, isDone: false, OR: [{ priority: "HIGH" }, { dueDate: { lte: dayEnd } }] },
-      orderBy: [{ dueDate: "asc" }], take: 5,
+      orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }], take: 5,
       select: { title: true, priority: true, dueDate: true },
     }),
     prisma.task.count({ where: { userId, deletedAt: null, isDone: false, dueDate: { lt: dayStart } } }),
     prisma.habit.count({ where: { userId, archived: false } }),
     prisma.habitLog.count({ where: { userId, status: "DONE", date: { gte: dayStart, lte: dayEnd } } }),
     prisma.healthMetric.findFirst({ where: { userId, type: "SLEEP" }, orderBy: { date: "desc" }, select: { value: true, date: true } }),
+    // #26 — plano de compra ativo (tarefa criada pela wishlist) acompanha no briefing.
+    prisma.task.findFirst({
+      where: { userId, deletedAt: null, isDone: false, title: { startsWith: "💰 Juntar para" } },
+      orderBy: { dueDate: { sort: "asc", nulls: "last" } },
+      select: { title: true, dueDate: true },
+    }),
   ]);
 
   const currency = settings?.currency || "R$";
   const saldo = accounts.reduce((acc, a) => acc + Number(a.balance), 0);
 
-  return { currency, saldo, events, criticalTasks, overdueCount, habits, doneToday, lastSleep };
+  return { currency, saldo, events, criticalTasks, overdueCount, habits, doneToday, lastSleep, wishPlan };
 }
 
 type DayData = Awaited<ReturnType<typeof collectDayData>>;
@@ -88,6 +94,11 @@ function localBriefing(d: DayData): string {
   if (d.lastSleep) {
     lines.push(`😴 Última noite registrada: ${d.lastSleep.value}h de sono.`);
   }
+  if (d.wishPlan) {
+    const weeks = d.wishPlan.dueDate ? Math.max(0, Math.ceil((d.wishPlan.dueDate.getTime() - Date.now()) / (7 * 864e5))) : null;
+    const when = weeks !== null ? ` — faltam ~${weeks} semana${weeks === 1 ? "" : "s"}` : "";
+    lines.push(`🎯 ${d.wishPlan.title}${when}.`);
+  }
   return lines.join("\n\n");
 }
 
@@ -111,6 +122,9 @@ function aiPrompt(d: DayData): { system: string; user: string } {
   if (d.overdueCount > 0) parts.push(`Tarefas atrasadas: ${d.overdueCount}`);
   if (d.habits > 0) parts.push(`Hábitos: ${d.doneToday}/${d.habits} concluídos hoje`);
   if (d.lastSleep) parts.push(`Sono da última noite registrada: ${d.lastSleep.value}h`);
+  if (d.wishPlan) {
+    parts.push(`Plano de compra ativo: ${d.wishPlan.title}${d.wishPlan.dueDate ? ` (previsto para ${format(d.wishPlan.dueDate, "dd/MM")})` : ""}`);
+  }
 
   return { system, user: parts.join("\n") };
 }

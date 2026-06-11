@@ -113,13 +113,23 @@ export function AccessForm({ item, onClose }: AccessFormProps) {
     if (accessType === "PERSONAL") formData.delete("client");
 
     try {
+      let breachCount = 0;
       if (item?.id) {
         formData.append("id", item.id);
-        await updateAccess(formData);
+        const res = await updateAccess(formData);
+        breachCount = res.breachCount ?? 0;
         toast.success("Credencial atualizada.");
       } else {
-        await createAccess(formData);
+        const res = await createAccess(formData);
+        breachCount = res.breachCount ?? 0;
         toast.success("Nova chave gravada no cofre.");
+      }
+      // A senha foi salva, mas já circula em vazamentos públicos: avisa na hora.
+      if (breachCount > 0) {
+        toast.warning(
+          `Atenção: esta senha aparece em ${breachCount.toLocaleString("pt-BR")} vazamento(s) público(s). Considere trocá-la.`,
+          { duration: 8000 },
+        );
       }
       onClose();
     } catch (error) {

@@ -20,21 +20,29 @@ export async function getUserContext(): Promise<string> {
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
     if (!user) return "Sistema não configurado (usuário não encontrado).";
 
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
     // Tudo em paralelo, sempre contagens/limites pequenos (bounded).
     const [
         settings, accounts, pendingCount, criticalTasks, nextEvent, eventsTodayCount,
+        budgetRows, monthSpendByCat,
     ] = await Promise.all([
         prisma.settings.findUnique({ where: { userId }, select: { currency: true } }),
         prisma.account.findMany({ where: { userId }, select: { balance: true } }),
         prisma.task.count({ where: { userId, deletedAt: null, isDone: false } }),
         prisma.task.findMany({
             where: { userId, deletedAt: null, isDone: false, OR: [{ priority: "HIGH" }, { dueDate: { lte: in7, gte: startOfToday } }] },
-            orderBy: { dueDate: "asc" },
+            // nulls last: HIGH sem prazo entra, mas depois das datadas — mesma
+            // ordem em SQLite e Postgres (pegadinha de dialeto).
+            orderBy: { dueDate: { sort: "asc", nulls: "last" } },
             take: 3,
             select: { title: true, priority: true, dueDate: true },
         }),
         prisma.event.findFirst({ where: { userId, deletedAt: null, startTime: { gte: now } }, orderBy: { startTime: "asc" }, select: { title: true, startTime: true } }),
         prisma.event.count({ where: { userId, deletedAt: null, startTime: { gte: startOfToday, lte: endOfToday } } }),
+        // Tetos de gasto por categoria (bounded: só nomes+limites; gasto vem agregado).
+        prisma.category.findMany({ where: { userId, type: "EXPENSE", monthlyBudget: { not: null } }, select: { name: true, monthlyBudget: true } }),
+        prisma.transaction.groupBy({ by: ["category"], where: { userId, deletedAt: null, type: "EXPENSE", date: { gte: monthStart } }, _sum: { amount: true } }),
     ]);
 
     const currency = settings?.currency || "R$";
@@ -56,6 +64,33 @@ export async function getUserContext(): Promise<string> {
     }
     if (nextEvent) {
         lines.push(`Próximo evento: ${nextEvent.title} em ${format(nextEvent.startTime, "dd/MM HH:mm")}`);
+    }
+
+    // Tetos de gasto: 1 linha compacta, e só os que merecem atenção (bounded).
+    if (budgetRows.length > 0) {
+        const spentByCat = new Map(
+            monthSpendByCat.map((c) => [(c.category ?? "").trim(), Number(c._sum.amount ?? 0)]),
+        );
+        const flagged = budgetRows
+            .map((r) => {
+                const teto = Number(r.monthlyBudget);
+                const gasto = spentByCat.get(r.name) ?? 0;
+                const pct = teto > 0 ? Math.round((gasto / teto) * 100) : 0;
+                return { name: r.name, teto, gasto, pct };
+            })
+            .filter((b) => b.pct >= 80)
+            .sort((a, b) => b.pct - a.pct)
+            .slice(0, 4);
+        if (flagged.length > 0) {
+            const parts = flagged.map((b) =>
+                b.gasto > b.teto
+                    ? `${b.name} ESTOUROU (${b.pct}% do teto)`
+                    : `${b.name} em ${b.pct}% do teto`,
+            );
+            lines.push(`Tetos de gasto do mês: ${parts.join("; ")} (detalhes via query_system_data FINANCE summary).`);
+        } else {
+            lines.push(`Tetos de gasto do mês: ${budgetRows.length} definidos, todos abaixo de 80%.`);
+        }
     }
 
     lines.push(`(Para qualquer detalhe além disto, use as ferramentas: query_system_data para ler, mutate_system_data para criar/editar/apagar.)`);

@@ -317,7 +317,7 @@ export async function receiveInvoicePayment(formData: FormData) {
         }),
         prisma.account.update({
           where: { id: account.id },
-          data: { balance: Number(account.balance) + value },
+          data: { balance: { increment: value } },
           select: { id: true },
         }),
       )
@@ -387,15 +387,19 @@ export async function updateInvoice(formData: FormData) {
     if (!existingInvoice) return { success: false, message: "Fatura não encontrada." }
     const billingId = existingInvoice.billingId
 
+    // Link de pagamento (boleto/checkout) — campo opcional, vazio limpa.
+    const linkUrlRaw = (formData.get("linkUrl") as string | null)?.trim()
+
     // 🟢 Sem "any": tipo exato dos campos atualizados
     const dataToUpdate: {
       title: string;
       value: number;
       dueDate: Date;
       status: string;
+      linkUrl: string | null;
       paidAt?: Date | null;
       transactionId?: string | null;
-    } = { title, value, dueDate, status }
+    } = { title, value, dueDate, status, linkUrl: linkUrlRaw || null }
 
     if (status === "PAID") {
       // Se já estava paga, NÃO toca no paidAt (mantém a data original); senão, hoje.
@@ -422,7 +426,7 @@ export async function updateInvoice(formData: FormData) {
           if (account && !account.isConnected) {
             ops.push(prisma.account.update({
               where: { id: account.id },
-              data: { balance: Number(account.balance) - Number(linkedTx.amount) },
+              data: { balance: { decrement: Number(linkedTx.amount) } },
               select: { id: true },
             }))
           }
@@ -439,7 +443,7 @@ export async function updateInvoice(formData: FormData) {
         if (account && !account.isConnected) {
           ops.push(prisma.account.update({
             where: { id: account.id },
-            data: { balance: Number(account.balance) + delta },
+            data: { balance: { increment: delta } },
             select: { id: true },
           }))
         }
@@ -509,7 +513,7 @@ export async function deleteInvoice(invoiceId: string) {
         if (account && !account.isConnected) {
           ops.push(prisma.account.update({
             where: { id: account.id },
-            data: { balance: Number(account.balance) - Number(linkedTx.amount) },
+            data: { balance: { decrement: Number(linkedTx.amount) } },
             select: { id: true },
           }))
         }

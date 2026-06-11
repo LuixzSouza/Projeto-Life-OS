@@ -6,8 +6,12 @@ import { GoalsClient } from "@/components/goals/goals-client";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Metas de Aprendizado | Life OS" };
 
-export default async function GoalsPage() {
-  const [goals, subjects] = await Promise.all([getGoals(), getGoalSubjects()]);
+export default async function GoalsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ goal?: string }>;
+}) {
+  const [goals, subjects, params] = await Promise.all([getGoals(), getGoalSubjects(), searchParams]);
 
   return (
     <PageShell>
@@ -17,7 +21,7 @@ export default async function GoalsPage() {
         description="Defina objetivos, quebre em passos e acompanhe o progresso — conectado ao resto do Life OS."
       />
       <PageContainer>
-        <GoalsClient initialGoals={goals} subjects={subjects} />
+        <GoalsClient initialGoals={goals} subjects={subjects} initialOpenId={params.goal ?? null} />
       </PageContainer>
     </PageShell>
   );

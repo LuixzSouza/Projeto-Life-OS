@@ -6,6 +6,29 @@ import { requireUserId, hashPassword } from "@/lib/auth";
 import { generateSlug } from "./helpers";
 import { BackupData } from "./types";
 import { factoryReset } from "./security";
+import {
+  importFullBackup,
+  wipeUserData,
+  summarizeBackup,
+  FullBackupFile,
+  BackupSummary,
+} from "@/lib/full-backup";
+
+// ============================================================================
+// VALIDAÇÃO DE BACKUP (dry-run) — lê o arquivo e devolve contagens SEM importar.
+// "Backup que nunca foi testado não é backup."
+// ============================================================================
+export async function validateBackupFile(formData: FormData): Promise<BackupSummary> {
+  await requireUserId();
+  const file = formData.get("file") as File;
+  if (!file) throw new Error("Nenhum arquivo enviado");
+
+  try {
+    return summarizeBackup(JSON.parse(await file.text()));
+  } catch {
+    throw new Error("Arquivo JSON inválido.");
+  }
+}
 
 // ============================================================================
 // IMPORTAÇÃO JSON (ANTIGO restoreBackup)
@@ -24,6 +47,20 @@ export async function importJsonData(formData: FormData) {
 
   if (data.meta?.system !== "Life OS") {
     throw new Error("Este backup não pertence ao Life OS.");
+  }
+
+  // --- Formato v3 (schemaVersion >= 3): fidelidade total, IDs preservados ---
+  if ((data.meta.schemaVersion ?? 0) >= 3) {
+    const userId = await requireUserId();
+    try {
+      await wipeUserData(userId);
+      const summary = await importFullBackup(userId, data as unknown as FullBackupFile);
+      revalidatePath("/");
+      return { success: true, total: summary.total };
+    } catch (error) {
+      console.error("Erro na importação v3:", error);
+      throw new Error("Erro ao importar o backup completo.");
+    }
   }
 
   const sessionUserId = await requireUserId();

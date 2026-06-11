@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { getCurrentUserId } from "@/lib/auth";
 import { logActivity } from "@/lib/activity";
+import { CONTACT_ACTION, CONTACT_MODULE } from "@/lib/social-contact";
 
 // --- HELPERS DE FORMATAÇÃO ---
 
@@ -124,6 +125,65 @@ export async function updateFriend(formData: FormData) {
   }
 }
 
+
+// --- MANTER CONTATO (sem schema: o registro vive no ActivityLog) ---
+
+/**
+ * Registra "falei com fulano hoje" — 1 clique no card. Vira um ActivityLog
+ * (action CONTACT), então aparece também na Linha do Tempo.
+ */
+export async function registerContact(friendId: string): Promise<{ success: boolean; message: string; when: string | null }> {
+  try {
+    const userId = await getAuthenticatedUserId();
+    if (!userId) return { success: false, message: "Sessão expirada. Autentique-se novamente.", when: null };
+
+    const friend = await prisma.friend.findFirst({
+      where: { id: friendId, userId, deletedAt: null },
+      select: { name: true },
+    });
+    if (!friend) return { success: false, message: "Contato não encontrado.", when: null };
+
+    const now = new Date();
+    await logActivity({
+      action: CONTACT_ACTION,
+      module: CONTACT_MODULE,
+      entityType: "friend",
+      entityId: friendId,
+      summary: `Conversou com "${friend.name}"`,
+    });
+
+    revalidatePath("/social");
+    return { success: true, message: `Contato com ${friend.name} registrado. 👋`, when: now.toISOString() };
+  } catch (error) {
+    console.error("Erro ao registrar contato:", error);
+    return { success: false, message: "Falha ao registrar o contato.", when: null };
+  }
+}
+
+/**
+ * Último contato registrado por amigo (friendId → ISO). Derivado do ActivityLog,
+ * reduzido em JS (sem _max de DateTime — quebra no libSQL/réplica).
+ */
+export async function getLastContacts(): Promise<Record<string, string>> {
+  try {
+    const userId = await getAuthenticatedUserId();
+    if (!userId) return {};
+    const logs = await prisma.activityLog.findMany({
+      where: { userId, module: CONTACT_MODULE, action: CONTACT_ACTION, entityId: { not: null } },
+      orderBy: { createdAt: "desc" },
+      take: 1000,
+      select: { entityId: true, createdAt: true },
+    });
+    const map: Record<string, string> = {};
+    for (const log of logs) {
+      if (log.entityId && !map[log.entityId]) map[log.entityId] = log.createdAt.toISOString();
+    }
+    return map;
+  } catch (error) {
+    console.error("Erro ao buscar últimos contatos:", error);
+    return {};
+  }
+}
 
 // --- 3. DELETE (DELETAR) ---
 

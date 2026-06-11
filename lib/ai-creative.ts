@@ -69,6 +69,7 @@ export async function generateFlashcards(userId: string, noteId: string, count =
   return {
     ok: true,
     deck: deckTitle,
+    deck_id: deck.id,
     cards_criados: cards.length,
     exemplo: cards[0],
     dica: "Os cards já estão na fila de revisão em /flashcards.",

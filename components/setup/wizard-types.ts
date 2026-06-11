@@ -44,6 +44,8 @@ export interface SetupFormData {
   storagePath: string;
   tursoUrl: string;
   tursoToken: string;
+  // Connection string do PostgreSQL/Supabase (postgresql://user:senha@host/db).
+  pgUrl: string;
 }
 
 export interface WizardStep {
@@ -118,21 +120,21 @@ export const DB_PROVIDERS: DbProviderMeta[] = [
     name: "PostgreSQL",
     tagline: "Banco relacional robusto",
     description:
-      "O banco relacional open-source mais popular do mundo. Ótimo para grandes volumes e consultas complexas.",
+      "O banco relacional open-source mais popular do mundo. Cobre Neon, Railway, RDS e self-hosted — basta a connection string (postgresql://...).",
     icon: Server,
-    available: false,
-    badge: "Em breve",
+    available: true,
+    badge: "Novo",
     accent: "text-indigo-500",
   },
   {
     id: "supabase",
     name: "Supabase",
-    tagline: "Postgres gerenciado + Auth",
+    tagline: "Postgres gerenciado grátis",
     description:
-      "Plataforma open-source sobre Postgres, com painel, backups e API automática. Integração planejada.",
+      "Plataforma open-source sobre Postgres, com painel e plano grátis. Use a connection string do banco (Settings → Database) — em serverless, a do pooler (porta 6543).",
     icon: Leaf,
-    available: false,
-    badge: "Em breve",
+    available: true,
+    badge: "Novo",
     accent: "text-green-500",
   },
   {

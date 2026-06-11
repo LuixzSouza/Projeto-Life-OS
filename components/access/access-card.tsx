@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Pencil, Trash2, Briefcase, ExternalLink, MoreHorizontal, CalendarClock,
-  ShieldAlert, Repeat2, ShieldX,
+  ShieldAlert, Repeat2, ShieldX, History,
 } from "lucide-react";
 import { toast } from "sonner";
 import { deleteAccess } from "@/app/(dashboard)/access/actions";
@@ -35,6 +35,8 @@ export function AccessCard({ item, strength, reused = false, breachCount }: { it
   // Flags de segurança vindas da auditoria do servidor (sem revelar a senha).
   const isWeak = typeof strength === "number" && strength < 50;
   const isBreached = typeof breachCount === "number" && breachCount > 0;
+  // Sem alteração há +1 ano: lembrete de rotação (updatedAt é a melhor proxy sem schema novo).
+  const isStale = Date.now() - new Date(item.updatedAt).getTime() > 365 * 864e5;
 
   // --- Configs de Categoria ---
   const categoryKey = (Object.keys(CATEGORY_CONFIG).includes(item.category)
@@ -166,6 +168,14 @@ export function AccessCard({ item, strength, reused = false, breachCount }: { it
               <span className="flex items-center gap-1 bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded-md border border-amber-500/20" title="Senha reutilizada em outra credencial">
                 <Repeat2 className="h-2.5 w-2.5" />
                 <span className="text-[8px] font-black uppercase tracking-widest">Repetida</span>
+              </span>
+            )}
+
+            {/* Selo: credencial sem alteração há mais de 1 ano (rotação) */}
+            {isStale && !isBreached && !isWeak && (
+              <span className="flex items-center gap-1 bg-zinc-500/10 text-zinc-500 px-2 py-0.5 rounded-md border border-zinc-500/20" title="Sem alteração há mais de 1 ano — considere rotacionar a senha">
+                <History className="h-2.5 w-2.5" />
+                <span className="text-[8px] font-black uppercase tracking-widest">Antiga</span>
               </span>
             )}
 

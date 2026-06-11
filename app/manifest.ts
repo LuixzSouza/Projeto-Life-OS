@@ -17,9 +17,16 @@ export default function manifest(): MetadataRoute.Manifest {
       { src: "/icon-512-maskable.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
     shortcuts: [
+      { name: "Captura rápida", url: "/dashboard?capture=1", description: "Anote algo — a IA transforma em tarefa, nota ou evento" },
       { name: "Treinar agora", url: "/health/gym/session", description: "Inicia a sessão de treino ao vivo" },
       { name: "Finanças", url: "/finance", description: "Contas, lançamentos e faturas" },
       { name: "Agenda", url: "/agenda", description: "Calendário unificado" },
     ],
+    // Web Share Target: compartilhar link/texto de outro app cai na Inbox Mágica.
+    share_target: {
+      action: "/share",
+      method: "GET",
+      params: { title: "title", text: "text", url: "url" },
+    },
   };
 }

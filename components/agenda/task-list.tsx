@@ -208,7 +208,7 @@ function TaskRow({ task, isLate }: { task: TaskWithProject; isLate: boolean }) {
         type="button"
         onClick={() => startTransition(() => toggleTaskDone(task.id))}
         title="Concluir tarefa"
-        className="relative shrink-0 z-10 mt-0.5 flex h-7 w-7 items-center justify-center rounded-lg border border-border/60 text-muted-foreground/50 transition-all hover:border-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-500 group/btn"
+        className="relative shrink-0 z-10 mt-0.5 flex h-9 w-9 md:h-7 md:w-7 items-center justify-center rounded-lg border border-border/60 text-muted-foreground/50 transition-all hover:border-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-500 group/btn"
       >
         {isPending ? (
           <Loader2 className="h-4 w-4 animate-spin" />

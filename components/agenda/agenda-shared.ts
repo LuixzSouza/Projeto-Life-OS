@@ -1,6 +1,27 @@
 // Tipos e metadados compartilhados da Agenda unificada.
 // Sem imports de servidor (pode ser usado no cliente).
 
+// Abas da Agenda (módulo neutro: usável no servidor E no cliente — funções de
+// arquivos "use client" não podem ser chamadas em Server Components).
+export const AGENDA_TABS = ["today", "calendar", "blocks", "planner", "focus", "tasks", "routine"] as const;
+export type AgendaTab = (typeof AGENDA_TABS)[number];
+
+export function isAgendaTab(v: string | undefined): v is AgendaTab {
+  return !!v && (AGENDA_TABS as readonly string[]).includes(v);
+}
+
+/**
+ * Monta a URL da agenda trocando a data mas PRESERVANDO os demais parâmetros
+ * (ex.: ?tab=blocks). Sem isso, navegar de dia jogava o usuário de volta
+ * para a primeira aba (D5 do AGENDA_ROADMAP).
+ */
+export function agendaUrl(dateYmd: string): string {
+  if (typeof window === "undefined") return `/agenda?date=${dateYmd}`;
+  const params = new URLSearchParams(window.location.search);
+  params.set("date", dateYmd);
+  return `/agenda?${params.toString()}`;
+}
+
 export type AgendaSource =
   | "event"
   | "meal"
@@ -70,6 +91,13 @@ export interface AgendaItem {
   time: string | null;  // "HH:mm" ou null (dia inteiro)
   color: string;        // hex (pode sobrescrever a cor da categoria)
 }
+
+// Fontes que representam algo a FAZER/honrar (plano), não diário do passado
+// (refeição comida, treino feito...). Usado pela tela "Hoje" e pelo feed iCal.
+export const PLAN_SOURCES: ReadonlySet<AgendaSource> = new Set<AgendaSource>([
+  "event", "task", "meeting", "challenge", "invoice", "recurring", "charge",
+  "review", "goal", "birthday", "holiday",
+]);
 
 // A ordem define a exibição dos chips de filtro.
 export const SOURCE_ORDER: AgendaSource[] = [

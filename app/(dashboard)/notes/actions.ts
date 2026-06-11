@@ -299,6 +299,52 @@ export async function uploadNoteImage(
   }
 }
 
+export interface NoteFlashcardsResult {
+  success: boolean;
+  message: string;
+  /** Deck onde os cards entraram (deep-link p/ estudar na hora). */
+  deckId: string | null;
+  created: number;
+}
+
+/**
+ * Gera flashcards desta nota com a IA (mesmo motor do chat, generateFlashcards)
+ * e devolve o deck para o editor oferecer "Estudar agora". Sem IA configurada,
+ * a mensagem orienta — nada quebra.
+ */
+export async function generateNoteFlashcards(noteId: string): Promise<NoteFlashcardsResult> {
+  try {
+    const userId = await requireUserId();
+    const { generateFlashcards } = await import("@/lib/ai-creative");
+    const res = await generateFlashcards(userId, noteId, 8);
+
+    if (typeof res.erro === "string") {
+      return { success: false, message: res.erro, deckId: null, created: 0 };
+    }
+    const created = typeof res.cards_criados === "number" ? res.cards_criados : 0;
+    const deckId = typeof res.deck_id === "string" ? res.deck_id : null;
+
+    await logActivity({
+      action: "CREATE",
+      module: "studies",
+      entityType: "flashcard-deck",
+      entityId: deckId ?? noteId,
+      summary: `Gerou ${created} flashcards a partir de uma nota`,
+    });
+
+    revalidatePath("/flashcards");
+    return {
+      success: true,
+      message: `${created} flashcard${created > 1 ? "s" : ""} criado${created > 1 ? "s" : ""} no deck "${String(res.deck ?? "")}".`,
+      deckId,
+      created,
+    };
+  } catch (error) {
+    console.error("Erro ao gerar flashcards da nota:", error);
+    return { success: false, message: "Falha ao gerar os flashcards.", deckId: null, created: 0 };
+  }
+}
+
 /**
  * Reincorpora as imagens (/api/note-image/{id}) como data:base64 no conteúdo.
  * Usado na exportação Markdown, para o arquivo ser portátil fora do app.

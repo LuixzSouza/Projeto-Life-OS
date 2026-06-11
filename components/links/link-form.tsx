@@ -35,11 +35,15 @@ export function LinkForm({ onClose, initialData }: { onClose: () => void, initia
     category: initialData?.category || ""
   });
 
-  const handleFetchMeta = async () => {
-    if (!formData.url) return toast.error("Digite uma URL primeiro.");
-    
+  // Busca metadados de uma URL e preenche o que estiver vazio.
+  // `silent` é o modo do auto-preenchimento ao colar (não reclama em falha).
+  const autoFill = async (url: string, opts?: { silent?: boolean }) => {
+    if (!url) {
+      if (!opts?.silent) toast.error("Digite uma URL primeiro.");
+      return;
+    }
     setFetching(true);
-    const res = await fetchMetadata(formData.url);
+    const res = await fetchMetadata(url);
     setFetching(false);
 
     if (res.success && res.data) {
@@ -50,9 +54,24 @@ export function LinkForm({ onClose, initialData }: { onClose: () => void, initia
         imageUrl: res.data!.image || prev.imageUrl
       }));
       toast.success("Dados preenchidos automaticamente!");
-    } else {
+    } else if (!opts?.silent) {
       toast.error("Não foi possível buscar dados. Preencha manualmente.");
     }
+  };
+
+  const handleFetchMeta = () => autoFill(formData.url);
+
+  // Colou uma URL com o título ainda vazio? Busca os metadados sozinho —
+  // o fluxo comum (copiar do navegador → colar → salvar) vira 1 passo.
+  const handleUrlPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    if (initialData || formData.title) return;
+    const pasted = e.clipboardData.getData("text").trim();
+    try {
+      new URL(pasted.startsWith("http") ? pasted : `https://${pasted}`);
+    } catch {
+      return;
+    }
+    void autoFill(pasted, { silent: true });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -89,12 +108,13 @@ export function LinkForm({ onClose, initialData }: { onClose: () => void, initia
         <div className="flex gap-2">
           <div className="relative flex-1">
             <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input 
-              name="url" 
-              placeholder="https://..." 
-              className="pl-9" 
+            <Input
+              name="url"
+              placeholder="https://... (cole e o resto se preenche sozinho)"
+              className="pl-9"
               value={formData.url}
               onChange={e => setFormData({...formData, url: e.target.value})}
+              onPaste={handleUrlPaste}
               required
             />
           </div>

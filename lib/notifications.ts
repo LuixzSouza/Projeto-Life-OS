@@ -2,7 +2,10 @@ import { prisma } from "./prisma";
 import { getCurrentUserId } from "./auth";
 import { deriveAnchor, asFrequency, occurrencesInRange, periodsBetween } from "./recurrence";
 import { runDueAutomations } from "./ai-automations";
+import { runAutoBackupIfDue } from "./auto-backup";
+import { runIntegrityCheckIfDue } from "./integrity-watch";
 import { detectAnomalies } from "./ai-insights";
+import { CONTACT_ACTION, CONTACT_MODULE, daysSinceContact, reconnectAfterDays } from "./social-contact";
 
 export type NotificationPriority = "LOW" | "NORMAL" | "HIGH";
 
@@ -195,6 +198,43 @@ export async function generateReminders(): Promise<number> {
     }
   }
 
+  // 3.5 Reconectar (manter contato): amigos com cadência vencida — só quem JÁ tem
+  // contato registrado (opt-in pelo uso, sem ruído). 1 resumo por semana.
+  {
+    const contactLogs = await prisma.activityLog.findMany({
+      where: { userId, module: CONTACT_MODULE, action: CONTACT_ACTION, entityId: { not: null } },
+      orderBy: { createdAt: "desc" },
+      take: 1000,
+      select: { entityId: true, createdAt: true },
+    });
+    if (contactLogs.length > 0) {
+      const lastByFriend = new Map<string, Date>();
+      for (const log of contactLogs) {
+        if (log.entityId && !lastByFriend.has(log.entityId)) lastByFriend.set(log.entityId, log.createdAt);
+      }
+      const tracked = await prisma.friend.findMany({
+        where: { userId, deletedAt: null, id: { in: Array.from(lastByFriend.keys()) } },
+        select: { id: true, name: true, proximity: true },
+      });
+      const due = tracked
+        .map((f) => ({ name: f.name, days: daysSinceContact(lastByFriend.get(f.id)) ?? 0, limit: reconnectAfterDays(f.proximity) }))
+        .filter((f) => f.days > f.limit)
+        .sort((a, b) => b.days / b.limit - a.days / a.limit);
+      if (due.length > 0) {
+        const startYear = new Date(now.getFullYear(), 0, 1);
+        const week = Math.floor((now.getTime() - startYear.getTime()) / (7 * 864e5));
+        const names = due.slice(0, 3).map((f) => `${f.name} (${f.days}d)`).join(", ");
+        bump(await notifyOnce(userId, {
+          type: "RECONNECT",
+          title: `Hora de reconectar com ${due.length} pessoa${due.length > 1 ? "s" : ""}`,
+          body: names + (due.length > 3 ? "…" : ""),
+          entityType: "friend", entityId: `reconnect:${now.getFullYear()}-W${week}`,
+          actionUrl: "/social",
+        }));
+      }
+    }
+  }
+
   // 4. Tarefas atrasadas (vencidas e não concluídas)
   const tasks = await prisma.task.findMany({
     where: { userId, isDone: false, deletedAt: null, dueDate: { lt: now } },
@@ -267,10 +307,63 @@ export async function generateReminders(): Promise<number> {
     }));
   }
 
+  // 8.5 Tetos por categoria: avisa ao cruzar 80% e ao estourar — 1x por
+  //     categoria/mês cada (entityId carrega mês + limiar; notifyOnce deduplica).
+  const budgetRows = await prisma.category.findMany({
+    where: { userId, type: "EXPENSE", monthlyBudget: { not: null } },
+    select: { name: true, monthlyBudget: true },
+  });
+  if (budgetRows.length > 0) {
+    const monthSpendTxs = await prisma.transaction.findMany({
+      where: { userId, deletedAt: null, type: { not: "INCOME" }, date: { gte: monthStart } },
+      select: { amount: true, category: true },
+    });
+    const spentByCat = new Map<string, number>();
+    for (const tx of monthSpendTxs) {
+      const cat = (tx.category || "").trim();
+      if (!cat) continue;
+      spentByCat.set(cat, (spentByCat.get(cat) ?? 0) + Math.abs(Number(tx.amount)));
+    }
+    const ymKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const fmtBrl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    for (const row of budgetRows) {
+      const budget = Number(row.monthlyBudget);
+      if (budget <= 0) continue;
+      const used = spentByCat.get(row.name) ?? 0;
+      if (used > budget) {
+        bump(await notifyOnce(userId, {
+          type: "BUDGET_OVER",
+          title: `Teto estourado: ${row.name}`,
+          body: `${fmtBrl(used)} de ${fmtBrl(budget)} — ${fmtBrl(used - budget)} acima do limite.`,
+          entityType: "categoryBudget", entityId: `${row.name}:${ymKey}:100`,
+          actionUrl: "/finance#orcamento", priority: "HIGH",
+        }));
+      } else if (used >= budget * 0.8) {
+        bump(await notifyOnce(userId, {
+          type: "BUDGET_WARN",
+          title: `Teto quase no limite: ${row.name}`,
+          body: `${fmtBrl(used)} de ${fmtBrl(budget)} (${Math.round((used / budget) * 100)}%).`,
+          entityType: "categoryBudget", entityId: `${row.name}:${ymKey}:80`,
+          actionUrl: "/finance#orcamento",
+        }));
+      }
+    }
+  }
+
   // 9. Automações agendadas da IA ("toda sexta, resumo financeiro") — best-effort.
   try {
     created += await runDueAutomations(userId);
   } catch { /* IA indisponível não pode travar os lembretes */ }
+
+  // 9.5 Backup automático diário (snapshot .db + JSON com rotação) — best-effort.
+  try {
+    await runAutoBackupIfDue(userId);
+  } catch (e) { console.warn("[auto-backup] falhou (segue a vida):", e); }
+
+  // 9.6 Verificação de integridade semanal (PRAGMA integrity_check) — best-effort.
+  try {
+    await runIntegrityCheckIfDue(userId);
+  } catch (e) { console.warn("[integrity] falhou (segue a vida):", e); }
 
   // 10. Detector de anomalias (#16): a IA puxa assunto quando algo foge do
   //     padrão (gasto 3×, sono caindo, sequência quebrada, amigo distante).

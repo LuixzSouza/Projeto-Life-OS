@@ -329,6 +329,16 @@ function capturePending(name: string, resultJson: string, current: PendingAction
 /* ============================================================================
    GEMINI (Google) — loop agêntico
    ============================================================================ */
+
+// Fallback quando o Gemini devolve candidato vazio 2× seguidas: conta ao usuário
+// o que JÁ foi executado (as ações não se perdem) em vez de um erro críptico.
+function emptyGeminiFallback(actions: AIAction[]): string {
+  if (actions.length > 0) {
+    const done = actions.map((a) => `- ${a.label}`).join("\n");
+    return `Executei o que você pediu:\n${done}\n\n(O Gemini não devolveu o texto final — falha esporádica do provedor. As ações acima foram concluídas; se faltou algo, é só pedir.)`;
+  }
+  return "O Gemini devolveu uma resposta vazia (falha esporádica do provedor — acontece de vez em quando no free tier). Clique em Regenerar ou reformule a pergunta.";
+}
 async function handleGeminiProvider(modelConfig: string, systemPrompt: string, userMessage: string, history: ChatHistoryItem[], apiKey: string, attachments: ChatAttachment[] = [], emit?: StreamEmitter): Promise<AIResponse> {
   // Fallback 2.5: o free tier do Google zerou a cota do 2.0-flash ("limit: 0").
   const model = modelConfig || "gemini-2.5-flash";
@@ -359,6 +369,11 @@ async function handleGeminiProvider(modelConfig: string, systemPrompt: string, u
   let pending: PendingAction | null = null;
   const actions: AIAction[] = [];
   let usage: TokenUsage = ZERO_USAGE;
+  // O Gemini às vezes devolve candidato VAZIO (finishReason MALFORMED_FUNCTION_CALL/
+  // SAFETY/etc.), principalmente após rodadas de ferramenta. Uma repetição costuma
+  // resolver; se persistir, devolvemos um fallback honesto (com o que JÁ foi feito)
+  // em vez do críptico "Sem resposta válida do Gemini.".
+  let retriedEmpty = false;
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const requestBody = { systemInstruction, contents, tools: geminiTools };
@@ -370,7 +385,16 @@ async function handleGeminiProvider(modelConfig: string, systemPrompt: string, u
     usage = addUsage(usage, data);
 
     const parts: GeminiPart[] | undefined = data.candidates?.[0]?.content?.parts;
-    if (!parts || parts.length === 0) return { text: "Sem resposta válida do Gemini.", pending, actions, usage };
+    if (!parts || parts.length === 0) {
+      const reason = (data.candidates?.[0] as { finishReason?: string } | undefined)?.finishReason ?? "sem candidato";
+      console.warn(`[GEMINI] candidato vazio (${reason}) no passo ${step + 1} — ${retriedEmpty ? "desistindo" : "tentando de novo"}.`);
+      if (!retriedEmpty) {
+        retriedEmpty = true;
+        emit?.({ type: "status", label: "Resposta vazia do Gemini — tentando de novo..." });
+        continue;
+      }
+      return { text: emptyGeminiFallback(actions), pending, actions, usage };
+    }
 
     const fnCalls = parts.filter((p) => p.functionCall);
     if (fnCalls.length === 0) {

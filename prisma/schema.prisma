@@ -24,6 +24,11 @@ model User {
   role String @default("USER")
   // -----------------------------
 
+  // Versão do token de sessão: JWTs carregam `tv` e só valem se bater com este
+  // valor. "Desconectar outros dispositivos" (aba Segurança) incrementa aqui e
+  // reemite apenas o cookie do dispositivo atual.
+  tokenVersion Int @default(0)
+
   avatarUrl String?
   coverUrl  String?
   bio       String?
@@ -681,6 +686,10 @@ model Project {
   // null = ainda não classificado (compatível com dados existentes).
   paraType String?
 
+  // Prazo do PROJETO (≠ prazo de tarefa): countdown no card/board e presença
+  // na Agenda via lib/agenda-aggregator.ts. null = sem prazo.
+  dueDate DateTime?
+
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -744,6 +753,10 @@ model Task {
   twoMin        Boolean   @default(false) // "faça agora (2 min)" — Regra dos 2 minutos (#1)
   progress      Int       @default(0)
   estimatedTime Int? // em minutos
+  // Checklist/subtarefas dentro da tarefa — JSON '[{ id, text, done }]'
+  // (mesmo padrão de WorkoutPlan.content: editada como um todo no cliente,
+  // tipada em TS — normalizar em tabela só adicionaria upsert/ordenação).
+  checklist     String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @default(now()) @updatedAt
   order         Float     @default(0)
@@ -1138,7 +1151,19 @@ model Event {
 
   location   String?
   color      String? @default("#6366f1")
+  // emailAlert = "Lembrete local" (#12 do AGENDA_ROADMAP): nome legado mantido
+  // por compatibilidade de dados/réplica; nada envia e-mail — é o gate do
+  // poller in-app (reminder-actions.ts) e do toast/notificação do navegador.
   emailAlert Boolean @default(true)
+
+  // Recorrência (#2 do AGENDA_ROADMAP) — reusa o motor de lib/recurrence.ts.
+  // frequency: WEEKLY | MONTHLY | QUARTERLY | SEMIANNUAL | ANNUAL (null = não repete).
+  // recurrenceEnd: última data da série (null = sem fim). A âncora é o startTime.
+  // recurrenceExceptions: JSON '["yyyy-MM-dd", …]' — ocorrências puladas ou
+  // desvinculadas ("só esta ocorrência"); o agregador não expande essas datas.
+  frequency            String?
+  recurrenceEnd        DateTime?
+  recurrenceExceptions String?
 
   projectId String?
   project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)

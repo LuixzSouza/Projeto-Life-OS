@@ -1,5 +1,5 @@
 // types/ai.ts
-import type { AIAction } from "@/lib/ai-help";
+import type { AIAction, ClarifyRequest, NavSuggestion } from "@/lib/ai-help";
 
 export type MessageResponse = {
     id: string;
@@ -11,6 +11,10 @@ export type MessageResponse = {
     actions?: AIAction[];
     // Sugestões de continuação (chips clicáveis sob a última resposta).
     suggestions?: string[];
+    // Pergunta de esclarecimento ("falta info essencial") com respostas de 1 toque.
+    clarify?: ClarifyRequest;
+    // Atalhos de navegação para as páginas citadas na resposta.
+    nav?: NavSuggestion[];
     // Imagens anexadas à mensagem (data URLs — renderizadas na bolha).
     images?: string[];
 };

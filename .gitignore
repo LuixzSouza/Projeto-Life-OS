@@ -68,3 +68,13 @@ life-os-config.json.bak
 
 # log do dev server (artefato local)
 .next-dev*.log
+
+# certificados HTTPS locais (chaves privadas - nunca versionar)
+/certs/
+
+# build do instalador desktop (standalone + setup) — artefatos, nunca versionar
+/dist/
+/release/
+
+# backups automaticos do banco (contem dados pessoais e chaves) - NUNCA versionar
+/prisma/backups/

@@ -58,7 +58,7 @@ export const LIFEOS_MANUAL: FeatureDoc[] = [
     area: "ia",
     nome: "Cérebro Digital (IA)",
     rota: "/ai",
-    oQueFaz: "Chat com 9 provedores (inclui Ollama local), streaming em tempo real, memória persistente, anexos com visão, voz, busca semântica e ferramentas que leem/criam registros em 14 módulos.",
+    oQueFaz: "Chat com 9 provedores (inclui Ollama local), streaming em tempo real, memória persistente, anexos com visão, voz, busca semântica e ferramentas que leem/criam registros em 20 módulos (até vagas, links, notas, tags e configurações). Quando falta um dado essencial ela pergunta com opções de 1 toque, e oferece atalhos para as páginas que citar.",
     comoUsar: "Configure a chave em Configurações → IA. Diga 'lembre que...' para memórias; anexe um recibo para virar lançamento; ative voz no microfone do chat. Privacidade: memórias e acesso à web são controláveis nas Configurações.",
   },
   {
@@ -97,11 +97,46 @@ export const LIFEOS_MANUAL: FeatureDoc[] = [
     comoUsar: "A IA pode guardar acessos, mas NUNCA lê senhas de volta — leitura só pela tela do cofre.",
   },
   {
+    area: "vagas",
+    nome: "Vagas (candidaturas)",
+    rota: "/jobs",
+    oQueFaz: "Funil de candidaturas a emprego: Inscrito → Triagem → Teste → Entrevista → Proposta → Contratado/Encerrado, com timeline por estágio, carta de apresentação e análise de compatibilidade geradas por IA a partir do seu portfólio.",
+    comoUsar: "Cadastre a vaga (ou peça à IA: 'adiciona a vaga de dev na Acme') e mova o estágio em 1 clique. Os botões de IA usam seu currículo/portfólio — mantenha-o atualizado em Projetos.",
+  },
+  {
+    area: "links",
+    nome: "Links & Apps",
+    rota: "/links",
+    oQueFaz: "Biblioteca de links, sites e apps salvos com categorias, favoritos e taxonomia PARA.",
+    comoUsar: "Salve manualmente ou peça à IA ('salva o link do Figma'). Excluir manda pra Lixeira — dá pra restaurar.",
+  },
+  {
+    area: "notas",
+    nome: "Notas",
+    rota: "/notes",
+    oQueFaz: "Cadernos e notas com editor rico, versões, tags, mapa/grafo de conexões e diário.",
+    comoUsar: "Notas criadas pela IA caem na Entrada para você organizar. Editar conteúdo guarda a versão anterior no histórico.",
+  },
+  {
+    area: "sites",
+    nome: "Sites & CMS",
+    rota: "/cms",
+    oQueFaz: "Conteúdo gerenciado para sites externos: cada site tem páginas editáveis servidas por API key.",
+    comoUsar: "Edite páginas na tela /cms; a IA só lista (a chave de API de cada site é sensível).",
+  },
+  {
+    area: "tags",
+    nome: "Tags & Anexos (tecido conectivo)",
+    rota: "/connect",
+    oQueFaz: "Tags coloridas que conectam qualquer registro (tarefa, nota, gasto...) + anexos e conexões entre entidades.",
+    comoUsar: "Use o card 'Conexões' dentro de cada item para taggear/anexar/ligar. A IA cria e renomeia tags ('cria a tag Viagem 2026').",
+  },
+  {
     area: "configuracoes",
     nome: "Configurações",
     rota: "/settings",
     oQueFaz: "Perfil, IA (chaves, persona, memórias, automações, privacidade), integrações, sistema (banco, backups) e segurança.",
-    comoUsar: "Tudo da IA vive na aba Inteligência Artificial — incluindo o que ela lembra de você (e o botão de apagar).",
+    comoUsar: "Tudo da IA vive na aba Inteligência Artificial — incluindo o que ela lembra de você (e o botão de apagar). A própria IA ajusta preferências seguras pelo chat ('mude minha meta de sono pra 8h'); chaves de API e banco, só aqui.",
   },
 ];
 

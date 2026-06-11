@@ -4,9 +4,49 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import fs from 'fs';
 import path from 'path';
-import { getDatabasePath, getDbProfile } from "@/lib/db-config";
+import { getDatabasePath, getDbProfile, setAutoBackupConfig } from "@/lib/db-config";
 import { requireUserId } from "@/lib/auth";
 import { formatBytes } from "./helpers";
+import { runAutoBackupIfDue, getAutoBackupStatus, AutoBackupStatus } from "@/lib/auto-backup";
+
+// ============================================================================
+// BACKUP AUTOMÁTICO (diário, com rotação) — config da máquina
+// ============================================================================
+
+export async function fetchAutoBackupStatus(): Promise<AutoBackupStatus> {
+  const userId = await requireUserId();
+  return getAutoBackupStatus(userId);
+}
+
+export async function updateAutoBackupSettings(input: {
+  enabled?: boolean;
+  dir?: string;
+  keep?: number;
+}): Promise<AutoBackupStatus> {
+  const userId = await requireUserId();
+  setAutoBackupConfig({
+    ...(input.enabled !== undefined && { enabled: input.enabled }),
+    ...(input.dir !== undefined && { dir: input.dir }),
+    ...(input.keep !== undefined && { keep: input.keep }),
+  });
+  revalidatePath("/settings");
+  return getAutoBackupStatus(userId);
+}
+
+/** Dispara o backup do dia agora (se o de hoje já existe, apenas informa). */
+export async function runAutoBackupNow(): Promise<{ success: boolean; message: string }> {
+  const userId = await requireUserId();
+  try {
+    const ran = await runAutoBackupIfDue(userId);
+    revalidatePath("/settings");
+    return ran
+      ? { success: true, message: "Backup automático gerado agora." }
+      : { success: true, message: "O backup de hoje já existe (1 por dia)." };
+  } catch (error) {
+    console.error("Erro no backup automático manual:", error);
+    return { success: false, message: "Falha ao gerar o backup automático." };
+  }
+}
 
 // ============================================================================
 // SNAPSHOTS LOCAIS (SISTEMA DE BACKUP FÍSICO)

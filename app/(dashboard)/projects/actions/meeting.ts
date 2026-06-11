@@ -3,12 +3,11 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireUserId } from "@/lib/auth";
-import { decryptKey } from "@/lib/settings-crypto";
 import { parseMeetingImages, serializeMeetingImages, type MeetingImage } from "@/lib/meeting-images";
 import { parseActionItems } from "@/lib/meeting-summary";
 import { parseStringList, serializeStringList } from "@/lib/meeting-meta";
 import { callAIProvider } from "@/app/(dashboard)/ai/actions/providers";
-import type { AIKeys } from "@/app/(dashboard)/ai/actions/types";
+import { getAiCallConfig } from "@/app/(dashboard)/ai/actions/oneshot";
 
 // Resolve o projeto garantindo que pertence ao usuário (senão fica sem projeto = Inbox).
 async function resolveProjectId(projectId: string | null | undefined, userId: string): Promise<string | null> {
@@ -75,6 +74,74 @@ export async function updateMeeting(input: {
   }
 }
 
+/** Nomes das Conexões (CRM social) — autocomplete dos participantes da reunião. */
+export async function getConnectionNames(): Promise<string[]> {
+  try {
+    const userId = await requireUserId();
+    const friends = await prisma.friend.findMany({
+      where: { userId, deletedAt: null },
+      select: { name: true },
+      orderBy: { name: "asc" },
+      take: 300,
+    });
+    return friends.map((f) => f.name).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Polimento da transcrição: a IA corrige pontuação, capitalização e erros
+ * ÓBVIOS de transcrição pelo contexto — preservando os carimbos [mm:ss] e sem
+ * resumir nem inventar. As notas são substituídas (o chamador oferece desfazer).
+ */
+export async function polishMeetingTranscript(id: string) {
+  try {
+    const userId = await requireUserId();
+    const meeting = await prisma.meeting.findFirst({ where: { id, userId } });
+    if (!meeting) return { success: false as const, message: "Reunião não encontrada." };
+    const notes = meeting.rawNotes.trim();
+    if (!notes) return { success: false as const, message: "Não há notas para polir." };
+    if (notes.length > 28000) {
+      return { success: false as const, message: "Notas longas demais para polir de uma vez (limite ~28k caracteres)." };
+    }
+
+    const config = await getAiCallConfig(userId);
+    if (!config.configured) return { success: false as const, message: config.error ?? "IA não configurada." };
+
+    const participants = parseStringList(meeting.participants);
+    const systemPrompt = `Você revisa transcrições automáticas de reunião em português.
+Corrija APENAS: pontuação, capitalização, palavras claramente mal transcritas (deduzíveis pelo contexto) e quebras de parágrafo.
+PRESERVE: os carimbos de tempo [mm:ss] exatamente onde estão, a ordem das falas, gírias e o conteúdo integral — NÃO resuma, NÃO omita, NÃO invente.
+${participants.length ? `Nomes citados na reunião (grafia correta): ${participants.join(", ")}.` : ""}
+Responda SOMENTE com o texto corrigido, sem comentários.`;
+
+    const { text: polished } = await callAIProvider(
+      config.provider,
+      config.model,
+      systemPrompt,
+      notes,
+      [],
+      config.keys,
+    );
+
+    const clean = polished?.trim();
+    if (!clean) return { success: false as const, message: "A IA não devolveu o texto polido." };
+    // Guarda-corpo: se o resultado encolheu demais, a IA resumiu — rejeita.
+    if (clean.length < notes.length * 0.55) {
+      return { success: false as const, message: "O polimento encurtou demais o texto — mantive o original." };
+    }
+
+    await prisma.meeting.updateMany({ where: { id, userId }, data: { rawNotes: clean } });
+    revalidatePath("/projects");
+    return { success: true as const, message: "Transcrição polida!", polished: clean, previous: meeting.rawNotes };
+  } catch (error) {
+    console.error("Erro ao polir transcrição:", error);
+    const message = error instanceof Error ? error.message : "Falha ao polir a transcrição.";
+    return { success: false as const, message };
+  }
+}
+
 export async function deleteMeeting(id: string) {
   try {
     const userId = await requireUserId();
@@ -136,16 +203,8 @@ export async function summarizeMeeting(id: string) {
     if (!meeting) return { success: false, message: "Reunião não encontrada." };
     if (!meeting.rawNotes.trim()) return { success: false, message: "Escreva as notas antes de resumir." };
 
-    const settings = await prisma.settings.findUnique({ where: { userId } });
-    const provider = settings?.aiProvider || "openai";
-    const s = settings as unknown as Record<string, string | null | undefined>;
-    const keys: AIKeys = {
-      openai: decryptKey(s?.openaiKey),
-      groq: decryptKey(s?.groqKey),
-      google: decryptKey(s?.googleKey),
-      deepseek: decryptKey(s?.deepseekKey),
-      mistral: decryptKey(s?.mistralKey),
-    };
+    const config = await getAiCallConfig(userId);
+    if (!config.configured) return { success: false, message: config.error ?? "IA não configurada." };
 
     const systemPrompt = `Você é um assistente que organiza notas de reunião do Life OS.
 Receba as anotações cruas e produza, em português:
@@ -167,12 +226,12 @@ Não invente informações que não estejam nas notas. Não use ferramentas.`;
     }
 
     const { text: summary } = await callAIProvider(
-      provider,
-      settings?.aiModel || "",
+      config.provider,
+      config.model,
       systemPrompt,
       `Notas da reunião "${meeting.title}":\n\n${notesForAI}`,
       [],
-      keys,
+      config.keys,
     );
 
     await prisma.meeting.updateMany({ where: { id, userId }, data: { summary } });

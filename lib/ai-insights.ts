@@ -406,3 +406,77 @@ export async function projectFuture(userId: string, metric: ProjectionMetric, ho
     }
   }
 }
+
+/* ============================================================================
+   #18 — RETROSPECTIVA SEMANAL (Coach): semana atual vs anterior, em 1 chamada
+   ============================================================================ */
+
+interface WeekSlice {
+  treinos: number;
+  minutos_treino: number;
+  minutos_estudo: number;
+  minutos_foco: number;
+  gasto: number;
+  receita: number;
+  tarefas_concluidas: number;
+  sono_medio_h: number | null;
+  energia_media: number | null;
+  habitos_cumpridos: number;
+}
+
+async function weekSlice(userId: string, start: Date, end: Date): Promise<WeekSlice> {
+  const range = { gte: start, lt: end };
+  const [workouts, study, focus, txs, tasksDone, sleep, energy, habits] = await Promise.all([
+    prisma.workout.findMany({ where: { userId, date: range }, select: { duration: true } }),
+    prisma.studySession.aggregate({ where: { userId, date: range }, _sum: { durationMinutes: true } }),
+    prisma.focusSession.aggregate({ where: { userId, endedAt: range }, _sum: { minutes: true } }),
+    prisma.transaction.groupBy({
+      by: ["type"],
+      where: { userId, deletedAt: null, date: range },
+      _sum: { amount: true },
+    }),
+    // Aproximação honesta: tarefa concluída cujo último toque caiu na janela.
+    prisma.task.count({ where: { userId, deletedAt: null, isDone: true, updatedAt: range } }),
+    prisma.healthMetric.aggregate({ where: { userId, type: "SLEEP", date: range }, _avg: { value: true }, _count: { _all: true } }),
+    prisma.energyCheckin.aggregate({ where: { userId, date: range }, _avg: { energy: true }, _count: { _all: true } }),
+    prisma.habitLog.count({ where: { userId, status: "DONE", date: range } }),
+  ]);
+  return {
+    treinos: workouts.length,
+    minutos_treino: workouts.reduce((a, w) => a + (w.duration ?? 0), 0),
+    minutos_estudo: study._sum.durationMinutes ?? 0,
+    minutos_foco: focus._sum.minutes ?? 0,
+    gasto: Number(txs.find((t) => t.type === "EXPENSE")?._sum.amount ?? 0),
+    receita: Number(txs.find((t) => t.type === "INCOME")?._sum.amount ?? 0),
+    tarefas_concluidas: tasksDone,
+    sono_medio_h: sleep._count._all > 0 ? Number((sleep._avg.value ?? 0).toFixed(1)) : null,
+    energia_media: energy._count._all > 0 ? Number((energy._avg.energy ?? 0).toFixed(1)) : null,
+    habitos_cumpridos: habits,
+  };
+}
+
+/**
+ * Retrospectiva da semana (#18): números prontos de 7 dias vs os 7 anteriores.
+ * A IA NARRA vitórias e derrapadas a partir disso e propõe até 3 intenções —
+ * que viram tarefas via mutate_system_data se o usuário aceitar.
+ */
+export async function weeklyRetro(userId: string): Promise<Record<string, unknown>> {
+  const now = new Date();
+  const todayEnd = new Date(now);
+  todayEnd.setHours(23, 59, 59, 999);
+  const weekStart = new Date(now.getTime() - 6 * DAY_MS);
+  weekStart.setHours(0, 0, 0, 0);
+  const prevStart = new Date(weekStart.getTime() - 7 * DAY_MS);
+
+  const [atual, anterior] = await Promise.all([
+    weekSlice(userId, weekStart, todayEnd),
+    weekSlice(userId, prevStart, weekStart),
+  ]);
+
+  return {
+    premissa: "semana = últimos 7 dias (inclui hoje) vs os 7 dias anteriores; tarefas concluídas são aproximadas pela data da última edição",
+    semana_atual: atual,
+    semana_anterior: anterior,
+    instrucao: "Narre 2-3 vitórias e 1-2 derrapadas COMPARANDO as semanas (só o que os números sustentam). Feche propondo até 3 intenções concretas para a próxima semana e ofereça criar como tarefas.",
+  };
+}

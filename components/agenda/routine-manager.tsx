@@ -68,9 +68,11 @@ export function RoutineManager({ items }: { items: RoutineItem[] }) {
   };
 
   return (
-    <div className="flex flex-col h-[700px] w-full animate-in fade-in duration-500">
-      {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/40 pb-6 shrink-0">
+    // G4: sem altura fixa — preenche a TabsContent (que já rola) em qualquer tela.
+    <div className="flex min-h-0 w-full flex-1 flex-col animate-in fade-in duration-500">
+      {/* HEADER — sticky (G17): rolar a lista não some com o contexto/ações.
+          -mx/-mt compensam o p-6 da TabsContent p/ o blur cobrir borda a borda. */}
+      <div className="sticky top-0 z-20 -mx-6 -mt-6 flex shrink-0 flex-col justify-between gap-4 border-b border-border/40 bg-background/95 px-6 pb-4 pt-6 backdrop-blur sm:flex-row sm:items-center">
         <div className="flex items-center gap-3">
           <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner border border-primary/20">
             <LayoutGrid className="h-6 w-6" />

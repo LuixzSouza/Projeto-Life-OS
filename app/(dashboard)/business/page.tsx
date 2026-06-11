@@ -8,6 +8,7 @@ import { Wallet, Users, AlertCircle, TrendingUp, Briefcase, Landmark } from "luc
 import { getCurrentUserId } from "@/lib/auth"
 import { syncRecurringChargeInvoices } from "@/lib/notifications"
 import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell"
+import { AskAiButton } from "@/components/ai/ask-ai-button"
 
 export const metadata: Metadata = {
   title: "Gestão de Negócios | Life OS",
@@ -119,6 +120,7 @@ export default async function BusinessPage() {
         icon={<Briefcase className="h-6 w-6" />}
         title="Negócios & Clientes"
         description="Gestão financeira de clientes, cobranças e contratos."
+        actions={<AskAiButton q="Como estão meus clientes? Alguma fatura vencida ou cobrança pendente?" label="Analisar com IA" />}
       />
 
       <PageContainer className="space-y-8">

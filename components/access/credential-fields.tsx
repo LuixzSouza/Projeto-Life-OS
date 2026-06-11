@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AccessItem } from "@prisma/client";
 import { Button } from "@/components/ui/button";
 import { Copy, Eye, EyeOff, Key, Check, User, LockOpen, Loader2 } from "lucide-react";
@@ -8,6 +8,25 @@ import { toast } from "sonner";
 import { revealPassword } from "@/app/(dashboard)/access/actions";
 import { calculateStrength } from "./access-helpers";
 import { cn } from "@/lib/utils";
+
+/** Senha revelada volta a se esconder sozinha depois disso. */
+const AUTO_HIDE_MS = 30_000;
+/** Senha copiada sai do clipboard depois disso (padrão de gerenciadores de senha). */
+const CLIPBOARD_TTL_MS = 35_000;
+
+// Limpa o clipboard após o TTL — só se ele ainda contiver a senha copiada
+// (não atropela algo que o usuário copiou depois). Sem permissão de leitura,
+// não dá para conferir: aí não mexe (melhor que apagar conteúdo alheio).
+function scheduleClipboardClear(secret: string): void {
+  setTimeout(async () => {
+    try {
+      const current = await navigator.clipboard.readText();
+      if (current === secret) await navigator.clipboard.writeText("");
+    } catch {
+      // Leitura negada/aba sem foco: não arrisca sobrescrever o clipboard.
+    }
+  }, CLIPBOARD_TTL_MS);
+}
 
 // Campos de identificação + chave de acesso, com lógica de revelar/copiar autocontida.
 export function CredentialFields({ item }: { item: AccessItem }) {
@@ -17,6 +36,18 @@ export function CredentialFields({ item }: { item: AccessItem }) {
   const [password, setPassword] = useState<string | null>(null);
   const [copiedUser, setCopiedUser] = useState(false);
   const [copiedPass, setCopiedPass] = useState(false);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Auto-ocultar: além de esconder, descarta a senha decifrada da memória.
+  useEffect(() => {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    if (!visible) return;
+    hideTimer.current = setTimeout(() => {
+      setVisible(false);
+      setPassword(null);
+    }, AUTO_HIDE_MS);
+    return () => { if (hideTimer.current) clearTimeout(hideTimer.current); };
+  }, [visible]);
 
   // Garante a senha decifrada em memória (sem necessariamente exibir na tela).
   const ensurePassword = async (): Promise<string | null> => {
@@ -48,9 +79,10 @@ export function CredentialFields({ item }: { item: AccessItem }) {
       const pwd = await ensurePassword();
       if (!pwd) return toast.info("Senha vazia");
       await navigator.clipboard.writeText(pwd);
+      scheduleClipboardClear(pwd);
       setCopiedPass(true);
       setTimeout(() => setCopiedPass(false), 2000);
-      toast.success("Senha copiada!", { duration: 1500 });
+      toast.success("Senha copiada — o clipboard se limpa em 35s.", { duration: 2500 });
     } catch {
       toast.error("Falha ao copiar a senha.");
     } finally {

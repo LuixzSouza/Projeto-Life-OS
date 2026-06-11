@@ -12,6 +12,7 @@ import { StatementSection } from "@/components/finance/dashboard/statement-secti
 import { RecurringChargesSection } from "@/components/finance/dashboard/recurring-charges-section";
 import { WishlistSection } from "@/components/finance/dashboard/wishlist-section";
 import { BudgetSection } from "@/components/finance/dashboard/budget-section";
+import { CategoryBudgetsCard, type CategoryBudgetItem } from "@/components/finance/dashboard/category-budgets-card";
 import type { BudgetSnapshot } from "@/lib/budget-buckets";
 
 // Re-export dos tipos (mantém compatibilidade com imports existentes)
@@ -51,6 +52,10 @@ interface FinanceDashboardProps {
   monthExpense: number;
   /** Orçamento 75/10/15 do mês (calculado no servidor). */
   budget: BudgetSnapshot;
+  /** Tetos por categoria (Category.monthlyBudget) com o gasto do mês. */
+  categoryBudgets: CategoryBudgetItem[];
+  /** Categorias recentes do extrato sem teto (sugestões do formulário). */
+  budgetCategoryOptions: string[];
 }
 
 export function FinanceDashboard({
@@ -69,7 +74,9 @@ export function FinanceDashboard({
   monthlyFlow,
   monthIncome,
   monthExpense,
-  budget
+  budget,
+  categoryBudgets,
+  budgetCategoryOptions
 }: FinanceDashboardProps) {
   return (
     <PageShell>
@@ -120,6 +127,9 @@ export function FinanceDashboard({
 
         {/* ORÇAMENTO 75/10/15 + PROJEÇÃO (some sem renda-base) */}
         <BudgetSection budget={budget} monthlyFlow={monthlyFlow} wishlist={wishlist} totalBalance={totalBalance} />
+
+        {/* TETOS POR CATEGORIA (independe de renda-base) */}
+        <CategoryBudgetsCard items={categoryBudgets} options={budgetCategoryOptions} />
 
         {/* CARTEIRAS */}
         <AccountsSection accounts={accounts} />

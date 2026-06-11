@@ -1,9 +1,10 @@
 // Documento PDF de uma Reunião do Life OS.
 // Inclui resumo da IA, itens de ação, notas completas (transcrição) e anexos.
 import React from "react";
-import { StyleSheet, Image } from "@react-pdf/renderer";
+import { StyleSheet, Image, Svg, Path } from "@react-pdf/renderer";
 import {
-  Document, View, Text, BrandedPage, PageTitle, Kpi, pdf as base, pdfTheme,
+  Document, View, Text, BrandedPage, PageTitle, Kpi, SectionTitle, Pill,
+  pdf as base, pdfTheme,
 } from "./pdf-kit";
 
 export interface MeetingPdfImage {
@@ -25,51 +26,55 @@ export interface MeetingDocumentProps {
 }
 
 const s = StyleSheet.create({
-  section: { marginBottom: 18 },
+  section: { marginBottom: 20 },
   summaryBox: {
     borderWidth: 1,
-    borderColor: pdfTheme.border,
-    borderRadius: 8,
+    borderColor: "#C7D2FE",
+    borderRadius: 10,
     backgroundColor: pdfTheme.primarySoft,
-    padding: 12,
+    padding: 13,
   },
-  summaryText: { fontSize: 10, color: pdfTheme.body, lineHeight: 1.6 },
+  summaryText: { fontSize: 9.5, color: pdfTheme.body, lineHeight: 1.65 },
 
-  actionRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 6 },
-  actionBullet: {
-    width: 14,
-    fontSize: 10,
-    fontFamily: "Helvetica-Bold",
-    color: pdfTheme.primary,
+  actionRow: { flexDirection: "row", alignItems: "flex-start", marginBottom: 7 },
+  actionBadge: {
+    width: 15, height: 15, borderRadius: 5,
+    backgroundColor: pdfTheme.primarySoft,
+    alignItems: "center", justifyContent: "center",
+    marginRight: 8, marginTop: 0.5,
   },
-  actionText: { flex: 1, fontSize: 10, color: pdfTheme.body, lineHeight: 1.5 },
+  actionBadgeText: { fontSize: 8, fontWeight: 700, color: pdfTheme.primaryDark },
+  actionText: { flex: 1, fontSize: 9.5, color: pdfTheme.body, lineHeight: 1.55 },
 
-  noteParagraph: { fontSize: 9.5, color: pdfTheme.body, lineHeight: 1.6, marginBottom: 4 },
-  emptyText: { fontSize: 9.5, color: pdfTheme.faint, fontStyle: "italic" },
+  decisionBadge: {
+    width: 15, height: 15, borderRadius: 99,
+    backgroundColor: pdfTheme.successSoft,
+    alignItems: "center", justifyContent: "center",
+    marginRight: 8, marginTop: 0.5,
+  },
+
+  noteParagraph: { fontSize: 9.5, color: pdfTheme.body, lineHeight: 1.65, marginBottom: 4.5 },
+  emptyText: { fontSize: 9.5, color: pdfTheme.faint },
 
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 5 },
-  chip: {
-    fontSize: 8.5,
-    color: pdfTheme.primary,
-    backgroundColor: pdfTheme.primarySoft,
-    borderRadius: 10,
-    paddingVertical: 3,
-    paddingHorizontal: 8,
+  metaLabel: {
+    fontSize: 7, fontWeight: 600, color: pdfTheme.muted,
+    textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 5,
   },
-  metaLabel: { fontSize: 8, color: pdfTheme.muted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 },
-  metaBlock: { marginBottom: 10 },
+  metaBlock: { marginBottom: 11 },
 
   imageGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-start", gap: 8 },
   imageCard: {
     width: "31.5%",
     borderWidth: 1,
     borderColor: pdfTheme.border,
-    borderRadius: 8,
+    borderRadius: 10,
     overflow: "hidden",
     marginBottom: 8,
+    backgroundColor: pdfTheme.bgSoft,
   },
   image: { width: "100%", height: 90, objectFit: "cover" },
-  caption: { fontSize: 7.5, color: pdfTheme.muted, paddingVertical: 3, paddingHorizontal: 5 },
+  caption: { fontSize: 7.5, color: pdfTheme.muted, paddingVertical: 4, paddingHorizontal: 6 },
 });
 
 export function MeetingDocument({
@@ -84,7 +89,7 @@ export function MeetingDocument({
 
         <View style={base.kpiRow}>
           <Kpi label="Anexos" value={String(images.length)} />
-          <Kpi label="Itens de ação" value={String(actionItems.length)} accent={actionItems.length ? pdfTheme.primary : undefined} />
+          <Kpi label="Itens de ação" value={String(actionItems.length)} accent={actionItems.length ? pdfTheme.primaryDark : undefined} />
           <Kpi label="Caracteres" value={notes.length.toLocaleString("pt-BR")} />
         </View>
 
@@ -94,7 +99,7 @@ export function MeetingDocument({
               <View style={s.metaBlock}>
                 <Text style={s.metaLabel}>Participantes</Text>
                 <View style={s.chipRow}>
-                  {participants.map((p, i) => <Text key={i} style={s.chip}>{p}</Text>)}
+                  {participants.map((p, i) => <Pill key={i} tone="primary">{p}</Pill>)}
                 </View>
               </View>
             ) : null}
@@ -102,7 +107,7 @@ export function MeetingDocument({
               <View style={s.metaBlock}>
                 <Text style={s.metaLabel}>Tags</Text>
                 <View style={s.chipRow}>
-                  {tags.map((t, i) => <Text key={i} style={s.chip}>{t}</Text>)}
+                  {tags.map((t, i) => <Pill key={i} tone="neutral">{t}</Pill>)}
                 </View>
               </View>
             ) : null}
@@ -111,7 +116,7 @@ export function MeetingDocument({
 
         {summary ? (
           <View style={s.section}>
-            <Text style={base.sectionTitle}>Resumo</Text>
+            <SectionTitle>Resumo</SectionTitle>
             <View style={s.summaryBox}>
               <Text style={s.summaryText}>{summary}</Text>
             </View>
@@ -120,10 +125,10 @@ export function MeetingDocument({
 
         {actionItems.length > 0 ? (
           <View style={s.section}>
-            <Text style={base.sectionTitle}>Itens de ação</Text>
+            <SectionTitle>Itens de ação</SectionTitle>
             {actionItems.map((item, i) => (
               <View key={i} style={s.actionRow} wrap={false}>
-                <Text style={s.actionBullet}>{i + 1}.</Text>
+                <View style={s.actionBadge}><Text style={s.actionBadgeText}>{i + 1}</Text></View>
                 <Text style={s.actionText}>{item}</Text>
               </View>
             ))}
@@ -132,10 +137,15 @@ export function MeetingDocument({
 
         {decisions.length > 0 ? (
           <View style={s.section}>
-            <Text style={base.sectionTitle}>Decisões</Text>
+            <SectionTitle>Decisões</SectionTitle>
             {decisions.map((d, i) => (
               <View key={i} style={s.actionRow} wrap={false}>
-                <Text style={s.actionBullet}>✓</Text>
+                <View style={s.decisionBadge}>
+                  {/* Check desenhado em SVG — a Geist não possui o glifo "✓". */}
+                  <Svg viewBox="0 0 24 24" style={{ width: 8, height: 8 }}>
+                    <Path d="M20 6L9 17l-5-5" stroke={pdfTheme.success} strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                  </Svg>
+                </View>
                 <Text style={s.actionText}>{d}</Text>
               </View>
             ))}
@@ -143,7 +153,7 @@ export function MeetingDocument({
         ) : null}
 
         <View style={s.section}>
-          <Text style={base.sectionTitle}>Notas / Transcrição</Text>
+          <SectionTitle>Notas / Transcrição</SectionTitle>
           {noteLines.length > 0 ? (
             noteLines.map((line, i) => <Text key={i} style={s.noteParagraph}>{line}</Text>)
           ) : (
@@ -153,7 +163,7 @@ export function MeetingDocument({
 
         {images.length > 0 ? (
           <View style={s.section}>
-            <Text style={base.sectionTitle}>Anexos</Text>
+            <SectionTitle>Anexos</SectionTitle>
             <View style={s.imageGrid}>
               {images.map((img, i) => (
                 <View key={i} style={s.imageCard} wrap={false}>

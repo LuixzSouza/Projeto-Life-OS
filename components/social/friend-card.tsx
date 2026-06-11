@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Instagram, Linkedin, Briefcase, Cake, MoreVertical, Pencil, Trash2, MessageCircle, Tag as TagIcon, Mail, ArrowUpRight } from "lucide-react";
+import { Instagram, Linkedin, Briefcase, Cake, MoreVertical, Pencil, Trash2, MessageCircle, Tag as TagIcon, Mail, ArrowUpRight, Handshake } from "lucide-react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,20 +12,27 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { getBirthdayInfo, getProximityBadge, calculateAge, safelyParseDate, openWhatsApp } from "./friend-helpers";
+import { daysSinceContact, isReconnectDue } from "@/lib/social-contact";
 import type { FriendData } from "./add-friend-dialog";
 
 interface FriendCardProps {
   friend: FriendData;
+  /** ISO do último contato registrado (null = nunca registrou). */
+  lastContactAt?: string | null;
+  /** Registrar "falei hoje" (botão 🤝 no rodapé). */
+  onContact: (friend: FriendData) => void;
   onSelect: (friend: FriendData) => void;
   onEdit: (friend: FriendData) => void;
   onDelete: (target: { id: string; name: string }) => void;
   onConnections: (target: { id: string; name: string }) => void;
 }
 
-export function FriendCard({ friend, onSelect, onEdit, onDelete, onConnections }: FriendCardProps) {
+export function FriendCard({ friend, lastContactAt, onContact, onSelect, onEdit, onDelete, onConnections }: FriendCardProps) {
   const bdayInfo = getBirthdayInfo(friend.birthday);
   const bdayDate = safelyParseDate(friend.birthday);
   const age = calculateAge(friend.birthday);
+  const contactDays = daysSinceContact(lastContactAt);
+  const reconnectDue = isReconnectDue(lastContactAt, friend.proximity);
   const initials = friend.name ? friend.name.substring(0, 2).toUpperCase() : "??";
   const tagList = friend.tags ? friend.tags.split(",").map(t => t.trim()).filter(Boolean) : [];
   const linkedClient = friend.clients && friend.clients.length > 0 ? friend.clients[0] : null;
@@ -123,6 +130,22 @@ export function FriendCard({ friend, onSelect, onEdit, onDelete, onConnections }
             </p>
           ) : null}
 
+          {/* ÚLTIMO CONTATO: vencido grita (rose); em dia é linha sutil. Sem registro = silêncio. */}
+          {contactDays !== null && (
+            reconnectDue ? (
+              <div className="mt-2">
+                <Badge variant="secondary" className="bg-rose-500/10 text-rose-600 border-none px-2 py-0.5 gap-1.5 text-[10px] font-bold shadow-none">
+                  <Handshake className="w-3 h-3" /> Sem contato há {contactDays}d — reconectar?
+                </Badge>
+              </div>
+            ) : (
+              <p className="mt-2 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <Handshake className="h-3 w-3 shrink-0 opacity-60" />
+                {contactDays === 0 ? "Contato hoje" : `Último contato há ${contactDays}d`}
+              </p>
+            )
+          )}
+
           {/* TAGS */}
           {tagList.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-4">
@@ -154,6 +177,24 @@ export function FriendCard({ friend, onSelect, onEdit, onDelete, onConnections }
         ) : (
           <span className="text-[10px] text-muted-foreground/60 italic my-auto px-2 w-full text-center">Sem contato direto</span>
         )}
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              variant="ghost"
+              disabled={contactDays === 0}
+              className={cn(
+                "h-8 w-8",
+                reconnectDue ? "text-rose-600 hover:bg-rose-500/10" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              )}
+              onClick={() => onContact(friend)}
+            >
+              <Handshake className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{contactDays === 0 ? "Contato registrado hoje" : "Falei com essa pessoa hoje"}</TooltipContent>
+        </Tooltip>
 
         {friend.instagram && (
           <Tooltip>

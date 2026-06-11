@@ -2,7 +2,7 @@
 import React from "react";
 import { StyleSheet } from "@react-pdf/renderer";
 import {
-  Document, View, Text, BrandedPage, PageTitle, Kpi, pdf as base, pdfTheme,
+  Document, View, Text, BrandedPage, PageTitle, Kpi, SectionTitle, pdf as base, pdfTheme,
 } from "./pdf-kit";
 
 export interface MealPlanPdfDay {
@@ -30,7 +30,7 @@ const s = StyleSheet.create({
     width: "48.5%",
     borderWidth: 1,
     borderColor: pdfTheme.border,
-    borderRadius: 8,
+    borderRadius: 10,
     marginBottom: 12,
     overflow: "hidden",
   },
@@ -38,50 +38,51 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingVertical: 7,
+    paddingHorizontal: 11,
     backgroundColor: pdfTheme.bgSoft,
     borderBottomWidth: 1,
-    borderBottomColor: pdfTheme.line,
+    borderBottomColor: pdfTheme.border,
   },
-  dayName: { fontSize: 11, fontFamily: "Helvetica-Bold", color: pdfTheme.ink },
+  dayName: { fontSize: 10.5, fontWeight: 600, color: pdfTheme.ink },
   kcalBadge: {
-    fontSize: 8,
-    fontFamily: "Helvetica-Bold",
-    color: pdfTheme.primary,
+    fontSize: 7.5,
+    fontWeight: 600,
+    fontFamily: "Geist Mono",
+    color: pdfTheme.primaryDark,
     backgroundColor: pdfTheme.primarySoft,
-    paddingVertical: 2,
-    paddingHorizontal: 6,
-    borderRadius: 10,
+    paddingVertical: 2.5,
+    paddingHorizontal: 7,
+    borderRadius: 99,
   },
-  kcalBadgeOver: { color: pdfTheme.danger, backgroundColor: "#FDECEC" },
+  kcalBadgeOver: { color: pdfTheme.danger, backgroundColor: pdfTheme.dangerSoft },
 
-  dayBody: { paddingHorizontal: 10, paddingVertical: 6 },
-  mealRow: { paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: pdfTheme.line },
+  dayBody: { paddingHorizontal: 11, paddingVertical: 6 },
+  mealRow: { paddingVertical: 5.5, borderBottomWidth: 1, borderBottomColor: pdfTheme.line },
   mealRowLast: { borderBottomWidth: 0 },
-  mealLabel: { fontSize: 7, color: pdfTheme.muted, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 },
+  mealLabel: { fontSize: 6.5, fontWeight: 600, color: pdfTheme.muted, textTransform: "uppercase", letterSpacing: 0.7, marginBottom: 2.5 },
   mealTitleRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  mealTitle: { fontSize: 9.5, fontFamily: "Helvetica-Bold", color: pdfTheme.ink, flex: 1, paddingRight: 6 },
-  mealCal: { fontSize: 8, color: pdfTheme.primary, fontFamily: "Helvetica-Bold" },
-  mealItems: { fontSize: 8, color: pdfTheme.muted, marginTop: 2, lineHeight: 1.3 },
+  mealTitle: { fontSize: 9.5, fontWeight: 600, color: pdfTheme.ink, flex: 1, paddingRight: 6 },
+  mealCal: { fontSize: 8, color: pdfTheme.primaryDark, fontFamily: "Geist Mono", fontWeight: 600 },
+  mealItems: { fontSize: 8, color: pdfTheme.muted, marginTop: 2.5, lineHeight: 1.4 },
   mealEmpty: { fontSize: 8.5, color: pdfTheme.faint },
 
   // Lista de compras
   shopGrid: { flexDirection: "row", flexWrap: "wrap" },
-  shopItem: { width: "33.33%", flexDirection: "row", alignItems: "center", paddingVertical: 4, paddingRight: 8 },
-  shopBox: { width: 9, height: 9, borderWidth: 1, borderColor: pdfTheme.faint, borderRadius: 2, marginRight: 6 },
-  shopQty: { fontSize: 8.5, fontFamily: "Helvetica-Bold", color: pdfTheme.primary, marginRight: 4 },
+  shopItem: { width: "33.33%", flexDirection: "row", alignItems: "center", paddingVertical: 4.5, paddingRight: 8 },
+  shopBox: { width: 9, height: 9, borderWidth: 1.2, borderColor: pdfTheme.faint, borderRadius: 3, marginRight: 6 },
+  shopQty: { fontSize: 8.5, fontFamily: "Geist Mono", fontWeight: 600, color: pdfTheme.primaryDark, marginRight: 4 },
   shopName: { fontSize: 9, color: pdfTheme.body, flex: 1 },
   emptyNote: { fontSize: 9, color: pdfTheme.faint },
 
   goalHint: {
     fontSize: 8,
-    color: pdfTheme.muted,
+    color: pdfTheme.primaryDark,
     marginBottom: 14,
-    paddingVertical: 5,
-    paddingHorizontal: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     backgroundColor: pdfTheme.primarySoft,
-    borderRadius: 6,
+    borderRadius: 8,
   },
 });
 
@@ -114,7 +115,7 @@ export function MealPlanDocument({
         </View>
 
         {/* Plano por dia */}
-        <Text style={base.sectionTitle}>Plano por dia</Text>
+        <SectionTitle>Plano por dia</SectionTitle>
         <View style={s.dayGrid}>
           {days.map((day) => (
             <View key={day.name} style={s.dayCard} wrap={false}>

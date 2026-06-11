@@ -3,13 +3,15 @@
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, CalendarClock, Sparkles, Loader2, FileText, Search, Users, Paperclip, Tag, X } from "lucide-react";
+import { Plus, CalendarClock, Sparkles, Loader2, FileText, Search, Users, Paperclip, Tag, X, Gavel, ListChecks, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { createMeeting } from "@/app/(dashboard)/projects/actions";
+import { parseActionItems } from "@/lib/meeting-summary";
+import { useRecording } from "@/components/providers/recording-provider";
 import { MeetingEditor, type MeetingData } from "./meeting-editor";
 
 interface MeetingBoardProps {
@@ -21,6 +23,7 @@ type QuickFilter = "all" | "summarized" | "attachments";
 
 export function MeetingBoard({ meetings, projectId }: MeetingBoardProps) {
   const router = useRouter();
+  const rec = useRecording();
   const [selected, setSelected] = useState<MeetingData | null>(null);
   const [creating, setCreating] = useState(false);
   const [query, setQuery] = useState("");
@@ -86,7 +89,14 @@ export function MeetingBoard({ meetings, projectId }: MeetingBoardProps) {
             <CalendarClock className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-sm font-black uppercase tracking-widest">Reuniões</h3>
+            <h3 className="flex items-center gap-2 text-sm font-black uppercase tracking-widest">
+              Reuniões
+              {meetings.length > 0 && (
+                <span className="rounded-md bg-muted/60 px-1.5 py-0.5 text-[10px] font-bold normal-case tracking-normal text-muted-foreground tabular-nums">
+                  {meetings.length} · {meetings.filter((m) => m.summary).length} resumida{meetings.filter((m) => m.summary).length === 1 ? "" : "s"}
+                </span>
+              )}
+            </h3>
             <p className="text-[10px] font-bold text-muted-foreground uppercase">Anote rápido e deixe a IA virar checklist</p>
           </div>
         </div>
@@ -158,44 +168,71 @@ export function MeetingBoard({ meetings, projectId }: MeetingBoardProps) {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((m) => (
-            <button
-              key={m.id}
-              onClick={() => setSelected(m)}
-              className="text-left rounded-2xl border border-border/50 bg-card p-4 shadow-sm hover:shadow-md hover:border-primary/30 transition-all"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <h4 className="font-bold text-sm line-clamp-2">{m.title}</h4>
-                {m.summary && (
-                  <Badge variant="secondary" className="shrink-0 bg-primary/10 text-primary border-none text-[9px] gap-1">
-                    <Sparkles className="h-2.5 w-2.5" /> Resumida
-                  </Badge>
+          {filtered.map((m) => {
+            const isLive = rec.isRecording && rec.activeMeetingId === m.id;
+            const actionCount = parseActionItems(m.summary).length;
+            return (
+              <button
+                key={m.id}
+                onClick={() => setSelected(m)}
+                className={cn(
+                  "text-left rounded-2xl border bg-card p-4 shadow-sm transition-all hover:shadow-md",
+                  isLive ? "border-rose-500/40 ring-1 ring-rose-500/20" : "border-border/50 hover:border-primary/30",
                 )}
-              </div>
-              <p className="text-xs text-muted-foreground mt-2 line-clamp-3 whitespace-pre-wrap">
-                {m.rawNotes || <span className="italic opacity-60">Sem notas ainda.</span>}
-              </p>
-
-              {m.tags?.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-2.5">
-                  {m.tags.slice(0, 4).map((t) => (
-                    <span key={t} className="rounded-md bg-primary/10 text-primary px-1.5 py-0.5 text-[9px] font-medium">{t}</span>
-                  ))}
-                  {m.tags.length > 4 && <span className="text-[9px] text-muted-foreground/60 px-1 py-0.5">+{m.tags.length - 4}</span>}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <h4 className="font-bold text-sm line-clamp-2">{m.title}</h4>
+                  {isLive ? (
+                    <Badge variant="secondary" className="shrink-0 gap-1 border-none bg-rose-500/10 text-[9px] text-rose-500">
+                      <Mic className="h-2.5 w-2.5 animate-pulse" /> Gravando
+                    </Badge>
+                  ) : m.summary ? (
+                    <Badge variant="secondary" className="shrink-0 bg-primary/10 text-primary border-none text-[9px] gap-1">
+                      <Sparkles className="h-2.5 w-2.5" /> Resumida
+                    </Badge>
+                  ) : null}
                 </div>
-              )}
 
-              <div className="flex items-center gap-3 mt-3 text-[10px] text-muted-foreground/60 font-medium">
-                <span>{new Date(m.createdAt).toLocaleDateString("pt-BR")}</span>
-                {m.participants?.length > 0 && (
-                  <span className="flex items-center gap-1"><Users className="h-3 w-3" /> {m.participants.length}</span>
+                {/* Preview: o RESUMO conta a história melhor que as notas cruas */}
+                <p className="text-xs text-muted-foreground mt-2 line-clamp-3 whitespace-pre-wrap">
+                  {m.summary || m.rawNotes || <span className="italic opacity-60">Sem notas ainda.</span>}
+                </p>
+
+                {m.tags?.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2.5">
+                    {m.tags.slice(0, 4).map((t) => (
+                      <span key={t} className="rounded-md bg-primary/10 text-primary px-1.5 py-0.5 text-[9px] font-medium">{t}</span>
+                    ))}
+                    {m.tags.length > 4 && <span className="text-[9px] text-muted-foreground/60 px-1 py-0.5">+{m.tags.length - 4}</span>}
+                  </div>
                 )}
-                {m.images?.length > 0 && (
-                  <span className="flex items-center gap-1"><Paperclip className="h-3 w-3" /> {m.images.length}</span>
-                )}
-              </div>
-            </button>
-          ))}
+
+                <div className="flex flex-wrap items-center gap-3 mt-3 text-[10px] text-muted-foreground/60 font-medium">
+                  <span className="capitalize">
+                    {new Date(m.createdAt).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short" })}
+                    {" · "}
+                    {new Date(m.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                  {m.participants?.length > 0 && (
+                    <span className="flex items-center gap-1"><Users className="h-3 w-3" /> {m.participants.length}</span>
+                  )}
+                  {(m.decisions?.length ?? 0) > 0 && (
+                    <span className="flex items-center gap-1 text-amber-600/80" title={`${m.decisions.length} decisão(ões) registrada(s)`}>
+                      <Gavel className="h-3 w-3" /> {m.decisions.length}
+                    </span>
+                  )}
+                  {actionCount > 0 && (
+                    <span className="flex items-center gap-1 text-primary/70" title={`${actionCount} item(ns) de ação no resumo`}>
+                      <ListChecks className="h-3 w-3" /> {actionCount}
+                    </span>
+                  )}
+                  {m.images?.length > 0 && (
+                    <span className="flex items-center gap-1"><Paperclip className="h-3 w-3" /> {m.images.length}</span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
 

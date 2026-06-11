@@ -5,13 +5,13 @@ import { requireUserId } from "@/lib/auth";
 import { queryModule, mutateModule, manageMemory, analyzeModule } from "@/lib/ai-data";
 import { semanticSearch } from "@/lib/ai-embeddings";
 import { isWebEnabled, readUrl, webSearch, WEB_DISABLED_MSG } from "@/lib/ai-web";
-import { findCorrelations, projectFuture } from "@/lib/ai-insights";
+import { findCorrelations, projectFuture, weeklyRetro } from "@/lib/ai-insights";
 import { generateFlashcards, expertCouncil, curateMedia, gameMasterData } from "@/lib/ai-creative";
 import { auditSubscriptions, cleanupScan } from "@/lib/ai-maintenance";
 import { explainFeature } from "@/lib/lifeos-manual";
 import { ToolArgs } from "./types";
 
-const MODULES = ["FINANCE", "HEALTH", "TASKS", "PROJECTS", "STUDIES", "ENTERTAINMENT", "CRM", "FRIENDS", "VAULT", "WARDROBE", "AGENDA", "NUTRITION", "SLEEP", "HABITS"] as const;
+const MODULES = ["FINANCE", "HEALTH", "TASKS", "PROJECTS", "STUDIES", "ENTERTAINMENT", "CRM", "FRIENDS", "VAULT", "WARDROBE", "AGENDA", "NUTRITION", "SLEEP", "HABITS", "JOBS", "GOALS", "LINKS", "NOTES", "SITES", "TAGS", "SETTINGS"] as const;
 
 /* ============================================================================
    FERRAMENTAS (2 tools = menos schema = menos token)
@@ -26,7 +26,7 @@ export const tools = [
       parameters: {
         type: "object",
         properties: {
-          module: { type: "string", enum: MODULES, description: "Área a consultar. AGENDA=eventos futuros · NUTRITION=refeições/calorias · SLEEP=noites de sono · HABITS=hábitos (status de hoje)." },
+          module: { type: "string", enum: MODULES, description: "Área a consultar. AGENDA=eventos futuros · HEALTH=treinos (com category=WEIGHT lista as medições corporais — peso/medidas — com id p/ apagar) · NUTRITION=refeições/calorias · SLEEP=noites de sono · HABITS=hábitos (status de hoje) · JOBS=candidaturas a vagas · GOALS=metas de aprendizado (progresso dos passos) · LINKS=links/apps salvos · NOTES=notas dos cadernos · SITES=sites & CMS · TAGS=tags · SETTINGS=configurações seguras (preferências/metas; nunca expõe chaves)." },
           mode: { type: "string", enum: ["list", "summary"], description: "summary = contagens/somatórios (barato). list = registros." },
           search: { type: "string", description: "Filtro de texto (nome/título/descrição). Use para achar um registro específico." },
           status: { type: "string", description: "Filtro por status (ex: TODO, DONE, ACTIVE, COMPLETED)." },
@@ -43,7 +43,7 @@ export const tools = [
     function: {
       name: "mutate_system_data",
       description:
-        "CRIA, ATUALIZA ou APAGA registros. UPDATE/DELETE exigem 'id' (busque antes com query_system_data). DELETE é em 2 passos: chame sem confirm para ver o que será apagado e peça confirmação ao usuário; só apague com confirm=true. Mapeamento por módulo: TASKS(title, description, category=prioridade, status, date=vencimento) · FINANCE(title=descrição, value, category=INCOME|EXPENSE, description=categoria, date) · HEALTH(title, value=minutos, category=tipo; ou category=WEIGHT+value=kg; ou category=ENERGY+value=1-5+description=nota p/ check-in do dia) · STUDIES(value=minutos+category=matéria para sessão; ou title+description para anotação) · ENTERTAINMENT(title, category=tipo, status, value=nota) · AGENDA(title, date, category=local) · CRM/FRIENDS(title=nome, category=empresa, description=notas) · PROJECTS(title, description, status) · VAULT(title, category=usuário, description=senha) · WARDROBE(title=nome, category, description=marca) · NUTRITION(title=refeição, value=kcal, category=BREAKFAST|LUNCH|SNACK|DINNER, description=itens, date) · SLEEP(value=horas dormidas, date; 1 registro por dia) · HABITS(CREATE: title=nome do hábito; UPDATE com status=DONE|FAILED marca o hábito no dia).",
+        "CRIA, ATUALIZA ou APAGA registros. UPDATE/DELETE exigem 'id' (busque antes com query_system_data). DELETE é em 2 passos: chame sem confirm para ver o que será apagado e peça confirmação ao usuário; só apague com confirm=true. Mapeamento por módulo: TASKS(title, description, category=prioridade, status, date=vencimento) · FINANCE(title=descrição, value=R$ OBRIGATÓRIO >0 — sem ele NÃO crie: pergunte ao usuário, category=INCOME|EXPENSE, description=categoria, date) · HEALTH(title, value=minutos, category=tipo; ou category=WEIGHT+value=kg; ou category=ENERGY+value=1-5+description=nota p/ check-in do dia) · STUDIES(value=minutos+category=matéria para sessão; ou title+description para anotação) · ENTERTAINMENT(title, category=tipo, status, value=nota) · AGENDA(title, date=dia E hora OBRIGATÓRIOS em ISO (ex.: 2026-06-20T15:00) — sem eles NÃO crie: pergunte, category=local) ·CRM/FRIENDS(title=nome, category=empresa, description=notas) · PROJECTS(title, description, status) · VAULT(title, category=usuário, description=senha) · WARDROBE(title=nome, category, description=marca) · NUTRITION(title=refeição, description=itens, value=kcal — se o usuário não disser, ESTIME pelas porções típicas dos alimentos citados (NUNCA deixe vazio nem 0), protein/carbs/fat=gramas estimadas dos macros (sempre estime junto), category=BREAKFAST(café da manhã)|LUNCH(almoço)|SNACK(lanche)|DINNER(janta/jantar), date) · SLEEP(value=horas dormidas, date; 1 registro por dia) · HABITS(CREATE: title=nome do hábito; UPDATE com status=DONE|FAILED marca o hábito no dia) · JOBS(title=cargo, category=empresa, status=APPLIED|SCREENING|TEST|INTERVIEW|OFFER|ACTIVE|REJECTED, description=requisitos/notas, date=follow-up) · LINKS(title=nome, description=URL, category=categoria) · NOTES(title=título, description=conteúdo da nota) · TAGS(title=nome, description=cor hex opcional) · SETTINGS(só UPDATE, sem id: category=campo [currency|theme|workStart|workEnd|reminderLeadMinutes|sleepGoalHours|calorieGoalOverride|aiPersona|foodApiEnabled|autoLockMinutes], value=número ou description=texto/true/false; chaves de API e banco NUNCA — mande o usuário a /settings) · SITES é só leitura.",
       parameters: {
         type: "object",
         properties: {
@@ -53,10 +53,13 @@ export const tools = [
           confirm: { type: "boolean", description: "Só para DELETE: true confirma a exclusão após o usuário aprovar." },
           title: { type: "string", description: "Título/nome principal." },
           description: { type: "string", description: "Notas, detalhes ou senha (ver mapeamento)." },
-          value: { type: "number", description: "Número (R$, minutos, kg, nota...)." },
+          value: { type: "number", description: "Número (R$, minutos, kg, nota, kcal...)." },
           category: { type: "string", description: "Categoria, tipo, prioridade ou matéria (ver mapeamento)." },
           status: { type: "string", description: "Status do registro." },
           date: { type: "string", description: "Data ISO (YYYY-MM-DD)." },
+          protein: { type: "number", description: "Só NUTRITION: proteína estimada em gramas." },
+          carbs: { type: "number", description: "Só NUTRITION: carboidratos estimados em gramas." },
+          fat: { type: "number", description: "Só NUTRITION: gordura estimada em gramas." },
         },
         required: ["module", "action"],
       },
@@ -121,6 +124,15 @@ export const tools = [
         },
         required: ["projection"],
       },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "weekly_retro",
+      description:
+        "RETROSPECTIVA DA SEMANA (Coach): devolve numa chamada os números dos últimos 7 dias vs os 7 anteriores (treinos, estudo, foco, gasto/receita, tarefas, sono, energia, hábitos). Use quando o usuário pedir 'como foi minha semana?' ou na retro de domingo. Narre vitórias e derrapadas com os números e proponha até 3 intenções — crie como tarefas SÓ se o usuário aceitar.",
+      parameters: { type: "object", properties: {}, required: [] },
     },
   },
   {
@@ -276,6 +288,9 @@ export async function executeTool(name: string, args: ToolArgs): Promise<string>
     if (name === "project_future") {
       if (!args.projection) return JSON.stringify({ erro: "Informe projection: EXPENSE, WEIGHT ou WISHLIST." });
       return JSON.stringify(await projectFuture(userId, args.projection, args.days));
+    }
+    if (name === "weekly_retro") {
+      return JSON.stringify(await weeklyRetro(userId));
     }
     if (name === "generate_flashcards") {
       if (!args.noteId) return JSON.stringify({ erro: "Informe o noteId (busque a nota em STUDIES antes)." });

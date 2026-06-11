@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Trash2, ExternalLink, Target, Pencil, Wallet, Trophy, Check, AlertCircle, Loader2, Flame, Scale, Snowflake, Sparkles, ShoppingCart, BadgeCheck, ShoppingBag, type LucideIcon } from "lucide-react";
-import { buyWishlistItem, deleteWishlist } from "@/app/(dashboard)/finance/actions";
+import { buyWishlistItem, deleteWishlist, planWishlistGoal } from "@/app/(dashboard)/finance/actions";
 import { Dialog, DialogContent, DialogHeader, DialogBody, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -220,6 +220,47 @@ function BuyDialog({ item, accounts, affordable }: { item: WishlistData; account
 }
 
 /* -------------------------------------------------------------------------- */
+/* PLANO DE COMPRA — wishlist→meta com 1 clique (#26 do IA_ROADMAP)           */
+/* -------------------------------------------------------------------------- */
+
+function PlanButton({ item }: { item: WishlistData }) {
+    const router = useRouter();
+    const [loading, setLoading] = useState(false);
+
+    const handlePlan = async () => {
+        if (loading || !item.id) return;
+        setLoading(true);
+        try {
+            const res = await planWishlistGoal(item.id);
+            if (res.success) {
+                toast.success(res.message);
+                router.refresh();
+            } else {
+                toast.info(res.message);
+            }
+        } catch {
+            toast.error("Erro ao montar o plano de compra.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Button
+            variant="ghost"
+            onClick={handlePlan}
+            disabled={loading}
+            title="Calcula o prazo realista pela sua sobra mensal real e cria uma tarefa-plano com a data prevista"
+            className="w-full h-9 rounded-xl text-xs font-bold text-muted-foreground hover:text-primary"
+        >
+            {loading
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <><Target className="h-3.5 w-3.5 mr-1.5" /> Montar plano de compra</>}
+        </Button>
+    );
+}
+
+/* -------------------------------------------------------------------------- */
 /* CARD DE DESEJO                                                             */
 /* -------------------------------------------------------------------------- */
 
@@ -420,13 +461,16 @@ function WishlistCard({ item, accounts, totalBalance }: { item: WishlistData; ac
             </CardContent>
 
             {/* AÇÃO */}
-            <div className="px-5 pb-5">
+            <div className="px-5 pb-5 space-y-2">
                 {bought ? (
                     <Button variant="outline" className="w-full h-11 rounded-xl border-emerald-500/25 bg-emerald-500/5 font-semibold text-emerald-600 hover:bg-emerald-500/10 cursor-default">
                         <Check className="h-4 w-4 mr-2" /> Comprado!
                     </Button>
                 ) : (
-                    <BuyDialog item={item} accounts={accounts} affordable={affordable} />
+                    <>
+                        <BuyDialog item={item} accounts={accounts} affordable={affordable} />
+                        {!affordable && <PlanButton item={item} />}
+                    </>
                 )}
             </div>
         </Card>

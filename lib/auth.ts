@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { cookies } from "next/headers";
+import { cache } from "react";
 import bcrypt from "bcryptjs";
 import { getOrCreateSecret } from "./db-config";
 
@@ -16,7 +17,31 @@ function getKey(): Uint8Array {
 interface SessionPayload extends JWTPayload {
   userId: string;
   expires: Date;
+  /** Versão do token (User.tokenVersion). Ausente em sessões antigas = 0. */
+  tv?: number;
 }
+
+/**
+ * tokenVersion atual do usuário, 1 consulta por request (React cache dedupe).
+ * Import dinâmico do prisma: o proxy.ts importa decrypt() deste módulo e não
+ * deve carregar o client do banco junto.
+ * Retornos: número = versão atual; "gone" = usuário apagado (rejeitar);
+ * "unavailable" = banco fora do ar (degradar aceitando o token assinado).
+ */
+const getDbTokenVersion = cache(
+  async (userId: string): Promise<number | "gone" | "unavailable"> => {
+    try {
+      const { prisma } = await import("./prisma");
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { tokenVersion: true },
+      });
+      return user ? user.tokenVersion : "gone";
+    } catch {
+      return "unavailable";
+    }
+  }
+);
 
 export async function encrypt(payload: SessionPayload) {
   return await new SignJWT(payload)
@@ -59,9 +84,15 @@ export async function verifyPassword(plain: string, hash: string): Promise<boole
 
 export async function login(userId: string) {
   const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 dias
-  
-  // Agora o objeto corresponde à interface SessionPayload
-  const session = await encrypt({ userId, expires });
+
+  // Embute a versão atual do token: "Desconectar outros dispositivos"
+  // incrementa User.tokenVersion e invalida todo cookie com `tv` antigo.
+  const { prisma } = await import("./prisma");
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { tokenVersion: true },
+  });
+  const session = await encrypt({ userId, expires, tv: user?.tokenVersion ?? 0 });
 
   // Salva o cookie
   (await cookies()).set("session", session, { expires, httpOnly: true });
@@ -75,7 +106,15 @@ export async function getSession(): Promise<SessionPayload | null> {
   const session = (await cookies()).get("session")?.value;
   if (!session) return null;
   try {
-    return await decrypt(session);
+    const payload = await decrypt(session);
+
+    // Revogação de sessões: o token só vale se a versão embutida (`tv`) bater
+    // com User.tokenVersion. Sessões antigas sem `tv` contam como versão 0.
+    const dbVersion = await getDbTokenVersion(payload.userId);
+    if (dbVersion === "gone") return null;
+    if (dbVersion !== "unavailable" && (payload.tv ?? 0) !== dbVersion) return null;
+
+    return payload;
   } catch {
     return null;
   }

@@ -37,6 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SubjectCombobox } from "./subject-combobox";
 
 interface Subject {
   id: string;
@@ -244,19 +245,14 @@ export function SubjectFormDialog({
               <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                 <FolderTree className="h-3.5 w-3.5" /> Pertence a...
               </Label>
-              <Select value={parentId} onValueChange={(v) => setParentId(v)}>
-                <SelectTrigger className="bg-muted/20 h-10">
-                  <SelectValue placeholder="-- Raiz principal --" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="root" className="font-semibold text-primary">-- Raiz principal --</SelectItem>
-                  {availableParents.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.icon ? `${p.icon} ` : ""}{p.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* Combobox com busca: com muitas matérias raiz, achar o pai é digitar */}
+              <SubjectCombobox
+                subjects={availableParents}
+                value={parentId}
+                onChange={setParentId}
+                allowRoot
+                className="h-10 bg-muted/20"
+              />
             </div>
 
             <div className="space-y-2">

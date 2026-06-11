@@ -21,7 +21,8 @@ import { reviewFlashcard } from "@/app/(dashboard)/flashcards/actions"; // O ser
 /* -------------------------------------------------------------------------- */
 
 interface StudySessionProps {
-  deck: FlashcardDeck;
+  /** Só o título é usado — permite sessões sintéticas (ex.: Revisão Geral). */
+  deck: Pick<FlashcardDeck, "title">;
   cards: Flashcard[];
 }
 

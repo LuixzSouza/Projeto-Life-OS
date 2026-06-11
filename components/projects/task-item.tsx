@@ -8,6 +8,7 @@ import {
   toggleTaskPin,
   toggleTaskStar,
   updateTaskProgress,
+  updateTaskStatus,
 } from '@/app/(dashboard)/projects/actions';
 import { isPast, isToday } from 'date-fns';
 import { toast } from 'sonner';
@@ -19,7 +20,8 @@ import { TaskCompactItem } from './task/task-compact-item';
 import { EditModal } from './task/edit-modal';
 
 // Types
-import type { TaskItemProps } from '@/types/task-types';
+import type { TaskItemProps, TaskStatus } from '@/types/task-types';
+import { normalizeStatus } from './task/status-stepper';
 import { CheckedState } from '@radix-ui/react-checkbox';
 
 export function TaskItem({ task, viewMode }: TaskItemProps) {
@@ -32,6 +34,7 @@ export function TaskItem({ task, viewMode }: TaskItemProps) {
   const [isPinned, setIsPinned] = useState(task.isPinned || false);
   const [isStarred, setIsStarred] = useState(task.isStarred || false);
   const [isDone, setIsDone] = useState(task.isDone || false);
+  const [status, setStatus] = useState<TaskStatus>(normalizeStatus(task.status));
   const [progress, setProgress] = useState(task.progress || 0);
   const [estimatedTime, setEstimatedTime] = useState(task.estimatedTime || 60);
 
@@ -42,6 +45,7 @@ export function TaskItem({ task, viewMode }: TaskItemProps) {
     setIsPinned(task.isPinned || false);
     setIsStarred(task.isStarred || false);
     setIsDone(task.isDone || false);
+    setStatus(normalizeStatus(task.status));
     setProgress(task.progress || 0);
     setEstimatedTime(task.estimatedTime || 60);
     setImageContent(task.image);
@@ -52,7 +56,9 @@ export function TaskItem({ task, viewMode }: TaskItemProps) {
   const handleToggle = useCallback((checked: CheckedState) => {
     const next = checked === true;
     // Optimistic UI: reflete a marcação na hora; o servidor revalida em segundo plano.
+    // O status acompanha (toggleTask grava DONE/TODO no servidor).
     setIsDone(next);
+    setStatus(next ? 'DONE' : 'TODO');
     setProgress(next ? 100 : 0);
     startTransition(async () => {
       try {
@@ -60,11 +66,31 @@ export function TaskItem({ task, viewMode }: TaskItemProps) {
       } catch {
         // Reverte se o servidor falhar.
         setIsDone(!next);
+        setStatus(!next ? 'DONE' : 'TODO');
         setProgress(!next ? 100 : 0);
         toast.error('Falha ao atualizar a tarefa.');
       }
     });
   }, [task.id]);
+
+  // Clique no StatusStepper: avança no pipeline (DONE sincroniza o checkbox).
+  const handleStatusChange = useCallback((next: TaskStatus) => {
+    const prev = { status, isDone, progress };
+    setStatus(next);
+    setIsDone(next === 'DONE');
+    if (next === 'DONE') setProgress(100);
+    else if (next === 'TODO') setProgress(0);
+    startTransition(async () => {
+      try {
+        await updateTaskStatus(task.id, next);
+      } catch {
+        setStatus(prev.status);
+        setIsDone(prev.isDone);
+        setProgress(prev.progress);
+        toast.error('Falha ao mudar o status.');
+      }
+    });
+  }, [task.id, status, isDone, progress]);
 
   const handleTogglePin = useCallback(async () => {
     const next = !isPinned;
@@ -194,9 +220,11 @@ export function TaskItem({ task, viewMode }: TaskItemProps) {
     isPinned,
     isStarred,
     isDone,
+    status,
     progress,
     estimatedTime,
     onToggle: handleToggle,
+    onStatusChange: handleStatusChange,
     onToggleStar: handleToggleStar,
     onTogglePin: handleTogglePin,
     onOpenModal: () => setIsOpen(true)

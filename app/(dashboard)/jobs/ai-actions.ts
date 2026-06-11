@@ -3,9 +3,8 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireUserId } from "@/lib/auth";
-import { decryptKey } from "@/lib/settings-crypto";
 import { callAIProvider } from "@/app/(dashboard)/ai/actions/providers";
-import { AIKeys } from "@/app/(dashboard)/ai/actions/types";
+import { getAiCallConfig } from "@/app/(dashboard)/ai/actions/oneshot";
 import { getPortfolio } from "@/app/(dashboard)/projects/actions";
 import { PortfolioData } from "@/types/portfolio";
 
@@ -41,20 +40,6 @@ function summarizePortfolio(p: PortfolioData): string {
   ].join("\n");
 }
 
-// Carrega settings + chaves descifradas do usuário (mesmo padrão do chat de IA).
-async function loadAIConfig(userId: string) {
-  const settings = await prisma.settings.findUnique({ where: { userId } });
-  const s = settings as unknown as Record<string, string | null | undefined>;
-  const keys: AIKeys = {
-    openai: decryptKey(s?.openaiKey),
-    groq: decryptKey(s?.groqKey),
-    google: decryptKey(s?.googleKey),
-    deepseek: decryptKey(s?.deepseekKey),
-    mistral: decryptKey(s?.mistralKey),
-  };
-  return { provider: settings?.aiProvider || "openai", model: settings?.aiModel || "", keys };
-}
-
 async function runForJob(jobId: string, buildPrompts: (job: { company: string; role: string; requirements: string | null; location: string | null }, portfolio: string) => { system: string; user: string }): Promise<AIResult> {
   try {
     const userId = await requireUserId();
@@ -62,10 +47,11 @@ async function runForJob(jobId: string, buildPrompts: (job: { company: string; r
     const [job, portfolioData, config] = await Promise.all([
       prisma.jobApplication.findFirst({ where: { id: jobId, userId } }),
       getPortfolio(),
-      loadAIConfig(userId),
+      getAiCallConfig(userId),
     ]);
 
     if (!job) return { success: false, error: "Vaga não encontrada." };
+    if (!config.configured) return { success: false, error: config.error ?? "IA não configurada." };
 
     const { system, user } = buildPrompts(job, summarizePortfolio(portfolioData));
     const { text } = await callAIProvider(config.provider, config.model, system, user, [], config.keys);

@@ -76,6 +76,68 @@ export function ClientDetailView({ client, accounts, friends, pixKey, businessNa
     else toast.warning("Copiado — mas configure sua chave PIX em Configurações › Perfil › Cobrança.");
   };
 
+  // Gera o PDF da cobrança (contrato + parcelas) para enviar ao cliente.
+  // Lazy-load: a lib de PDF só entra no bundle quando o botão é usado.
+  const [pdfBusyId, setPdfBusyId] = useState<string | null>(null);
+  const handleBillingPdf = async (billing: BillingData) => {
+    setPdfBusyId(billing.id);
+    try {
+      const now = new Date();
+      const relevant = billing.invoices
+        .filter((i) => i.status !== "CANCELED")
+        .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+      const paidSum = relevant.filter((i) => i.status === "PAID").reduce((s, i) => s + i.value, 0);
+      const openSum = relevant.filter((i) => i.status !== "PAID").reduce((s, i) => s + i.value, 0);
+
+      const [{ pdf: renderPdf }, { BillingDocument }] = await Promise.all([
+        import("@react-pdf/renderer"),
+        import("@/components/pdf/billing-document"),
+      ]);
+      const blob = await renderPdf(
+        <BillingDocument
+          billingTitle={billing.title}
+          clientName={client.name}
+          clientCompany={client.company ?? null}
+          clientDocument={client.document ?? null}
+          businessName={businessName ?? null}
+          pixKey={pixKey ?? null}
+          generatedAt={now.toLocaleString("pt-BR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+          totals={{
+            total: formatCurrency(billing.totalValue),
+            paid: formatCurrency(paidSum),
+            open: formatCurrency(openSum),
+          }}
+          invoices={relevant.map((inv) => {
+            const isPaid = inv.status === "PAID";
+            const isLate = !isPaid && new Date(inv.dueDate) < now;
+            return {
+              label: inv.title,
+              value: formatCurrency(inv.value),
+              due: new Date(inv.dueDate).toLocaleDateString("pt-BR", { timeZone: "UTC" }),
+              statusLabel: isPaid ? "Paga" : isLate ? "Vencida" : "Pendente",
+              tone: (isPaid ? "paid" : isLate ? "late" : "open") as "paid" | "late" | "open",
+            };
+          })}
+        />,
+      ).toBlob();
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const safe = billing.title.trim().replace(/[^\p{L}\p{N}\- ]/gu, "").slice(0, 60) || "cobranca";
+      a.href = url;
+      a.download = `cobranca-${safe}.pdf`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      toast.success("PDF da cobrança gerado.");
+      if (!pixKey) toast.warning("Dica: configure sua chave PIX em Configurações › Perfil › Cobrança para ela sair no PDF.");
+    } catch (error) {
+      console.error("Erro ao gerar PDF da cobrança:", error);
+      toast.error("Não foi possível gerar o PDF.");
+    } finally {
+      setPdfBusyId(null);
+    }
+  };
+
   const handleCopyPhone = () => {
     if (!client.phone) return;
     navigator.clipboard.writeText(clearMask(client.phone));
@@ -222,6 +284,8 @@ export function ClientDetailView({ client, accounts, friends, pixKey, businessNa
             onWhatsapp={handleWhatsappCharge}
             onDeleteTarget={setDeleteTarget}
             onAddInvoice={setAddingInvoiceTo}
+            onPdf={handleBillingPdf}
+            pdfBusyId={pdfBusyId}
           />
         </div>
 

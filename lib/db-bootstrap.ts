@@ -1,12 +1,18 @@
 import fs from "fs";
 import path from "path";
 import type { PrismaClient } from "@prisma/client";
+import type { DbDialect } from "./db-dialect";
 
-// SQL baseline gerado a partir do schema (`npm run db:baseline`).
+// SQL baseline gerado a partir do schema (`npm run db:baseline` / derivados).
 // Aplicá-lo via Prisma `$executeRawUnsafe` permite criar todas as tabelas
 // em runtime SEM depender do CLI do Prisma (`npx prisma db push`), o que é
 // essencial para um build desktop empacotado onde o npx não existe.
-const BASELINE_PATH = path.join(process.cwd(), "prisma", "baseline.sql");
+// Cada dialeto tem o SEU baseline (a regra de ouro do DATABASE_ROADMAP:
+// schema canônico → schemas derivados → baselines andam juntos).
+const BASELINE_BY_DIALECT: Partial<Record<DbDialect, string>> = {
+  sqlite: path.join(process.cwd(), "prisma", "baseline.sql"),
+  postgres: path.join(process.cwd(), "prisma", "baseline.postgres.sql"),
+};
 
 /**
  * Divide o arquivo SQL em statements individuais.
@@ -88,11 +94,30 @@ function parsedColumnPush(
  * sobre `deletedAt` falharia com "no such column" e a migração quebraria.
  * Best-effort: nunca derruba o fluxo por uma coluna individual.
  */
-async function reconcileColumns(client: PrismaClient, tables: ParsedTable[]): Promise<void> {
+/** Colunas existentes de uma tabela, no SQL de inspeção certo do dialeto. */
+async function listColumns(
+  client: PrismaClient,
+  table: string,
+  dialect: DbDialect
+): Promise<{ name: string }[]> {
+  if (dialect === "postgres") {
+    return client.$queryRawUnsafe<{ name: string }[]>(
+      `SELECT column_name AS name FROM information_schema.columns WHERE table_name = '${table.replace(/'/g, "''")}' AND table_schema = current_schema()`
+    );
+  }
+  // SQLite/libSQL: PRAGMA (gate de dialeto — não existe fora da família SQLite).
+  return client.$queryRawUnsafe<{ name: string }[]>(`PRAGMA table_info("${table}")`);
+}
+
+async function reconcileColumns(
+  client: PrismaClient,
+  tables: ParsedTable[],
+  dialect: DbDialect
+): Promise<void> {
   for (const { table, columns } of tables) {
     let info: { name: string }[];
     try {
-      info = await client.$queryRawUnsafe<{ name: string }[]>(`PRAGMA table_info("${table}")`);
+      info = await listColumns(client, table, dialect);
     } catch {
       continue; // não conseguiu inspecionar — segue (CREATE TABLE cuida do resto)
     }
@@ -123,14 +148,23 @@ async function reconcileColumns(client: PrismaClient, tables: ParsedTable[]): Pr
  * Lança em erros de SQL inesperados na criação de tabelas; falhas de índice
  * são toleradas (índice ausente é perf, não correção).
  */
-export async function ensureSchema(client: PrismaClient): Promise<void> {
-  if (!fs.existsSync(BASELINE_PATH)) {
+export async function ensureSchema(
+  client: PrismaClient,
+  dialect: DbDialect = "sqlite"
+): Promise<void> {
+  const baselinePath = BASELINE_BY_DIALECT[dialect];
+  if (!baselinePath) {
     throw new Error(
-      `Baseline SQL não encontrado em ${BASELINE_PATH}. Rode \`npm run db:baseline\`.`
+      `ensureSchema ainda não suporta o dialeto "${dialect}" (sem baseline derivado).`
+    );
+  }
+  if (!fs.existsSync(baselinePath)) {
+    throw new Error(
+      `Baseline SQL não encontrado em ${baselinePath}. Rode \`npm run db:baseline\` (ou db:baseline:all).`
     );
   }
 
-  const sql = fs.readFileSync(BASELINE_PATH, "utf-8");
+  const sql = fs.readFileSync(baselinePath, "utf-8");
   const statements = splitStatements(sql);
   const isCreateTable = (s: string) => /^\s*CREATE TABLE/i.test(s);
 
@@ -145,7 +179,7 @@ export async function ensureSchema(client: PrismaClient): Promise<void> {
   }
 
   // 2. Colunas faltantes (schema antigo → atual, aditivo).
-  await reconcileColumns(client, parseTables(statements.filter(isCreateTable)));
+  await reconcileColumns(client, parseTables(statements.filter(isCreateTable)), dialect);
 
   // 3. Índices e demais statements (CREATE INDEX IF NOT EXISTS — silencioso).
   // Falha de índice é tolerada (índice ausente é perf, não correção).

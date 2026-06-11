@@ -1,10 +1,11 @@
 "use server";
 
-import { prisma, reconnectPrisma, syncReplica, isReplicaActive, buildAdapterClient } from "@/lib/prisma";
+import { prisma, reconnectPrisma, syncReplica, isReplicaActive, buildAdapterClient, getReplicaSyncInfo } from "@/lib/prisma";
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { getDatabasePath, getDbProfile, setDatabasePath, setDbProfile } from "@/lib/db-config";
+import { getDialect } from "@/lib/db-dialect";
 import { ensureSchema } from "@/lib/db-bootstrap";
 import { mergeSqliteIntoTurso } from "@/lib/db-migrate";
 import { requireUserId } from "@/lib/auth";
@@ -153,17 +154,92 @@ export interface DbStatus {
   /** URL do Turso espelho quando em modo réplica. */
   syncUrl: string | null;
   databasePath: string | null;
+  /** Watchdog do sync (réplica): epoch ms do último pull ok / último erro. */
+  lastSyncAt: number | null;
+  lastSyncError: string | null;
+  /** Latência de um SELECT 1 medida agora (ms); null se o banco não respondeu. */
+  latencyMs: number | null;
+  /** Tamanho do banco em bytes, medido pelo dialeto certo (null = não medível). */
+  sizeBytes: number | null;
+  /** Cota do plano grátis do provedor (null = sem cota conhecida/self-host). */
+  sizeLimitBytes: number | null;
+}
+
+// Cotas de STORAGE dos planos grátis (avisos proativos — UX §4 do roadmap).
+// São as cotas publicadas em jun/2026; servem de régua, não de contrato.
+const FREE_TIER_STORAGE_BYTES: Partial<Record<string, number>> = {
+  turso: 5 * 1024 ** 3, // 5 GB
+  supabase: 500 * 1024 ** 2, // 500 MB de database
+};
+
+/**
+ * Mede o tamanho do banco falando o dialeto certo (Performance §5: nada de
+ * carregar linhas para "pesar"): arquivo local via fs; Postgres via
+ * pg_database_size; Turso via PRAGMA (best-effort — nem todo transporte aceita).
+ */
+async function measureDbSize(): Promise<number | null> {
+  const dbPath = getDatabasePath();
+  if (dbPath && fs.existsSync(dbPath)) {
+    try {
+      return fs.statSync(dbPath).size;
+    } catch {
+      return null;
+    }
+  }
+  try {
+    const dialect = getDialect();
+    if (dialect === "postgres") {
+      const rows = await prisma.$queryRawUnsafe<{ size: bigint | number }[]>(
+        "SELECT pg_database_size(current_database()) AS size",
+      );
+      const size = rows[0]?.size;
+      return size == null ? null : Number(size);
+    }
+    if (dialect === "sqlite") {
+      // Turso (nuvem pura): page_count * page_size. Alguns transportes não
+      // aceitam PRAGMA — aí devolvemos null e o card mostra "—".
+      const count = await prisma.$queryRawUnsafe<{ page_count: bigint | number }[]>("PRAGMA page_count");
+      const size = await prisma.$queryRawUnsafe<{ page_size: bigint | number }[]>("PRAGMA page_size");
+      const pages = Number(count[0]?.page_count ?? 0);
+      const pageSize = Number(size[0]?.page_size ?? 0);
+      return pages > 0 && pageSize > 0 ? pages * pageSize : null;
+    }
+  } catch {
+    /* medição é informativa — nunca derruba a página */
+  }
+  return null;
 }
 
 /** Lê o perfil de banco ativo (para a UI de Configurações exibir o modo/sync). */
 export async function getDbStatus(): Promise<DbStatus> {
   await requireUserId();
   const profile = getDbProfile();
+  const sync = profile?.mode === "replica"
+    ? getReplicaSyncInfo()
+    : { lastSyncAt: null, lastSyncError: null };
+
+  // Latência medida na hora (card "Seu banco"): arquivo local ≈ 0ms; nuvem
+  // depende da internet — é o número que explica uma página lenta.
+  let latencyMs: number | null = null;
+  try {
+    const t0 = Date.now();
+    await prisma.$queryRawUnsafe("SELECT 1");
+    latencyMs = Date.now() - t0;
+  } catch { /* banco fora do ar — o banner global avisa */ }
+
+  const sizeBytes = latencyMs == null ? null : await measureDbSize();
+  const sizeLimitBytes =
+    profile?.mode === "cloud" ? FREE_TIER_STORAGE_BYTES[profile.provider] ?? null : null;
+
   return {
     mode: profile?.mode ?? null,
     isReplica: profile?.mode === "replica",
     syncUrl: profile?.mode === "replica" ? profile.syncUrl : null,
     databasePath: getDatabasePath(),
+    latencyMs,
+    sizeBytes,
+    sizeLimitBytes,
+    ...sync,
   };
 }
 

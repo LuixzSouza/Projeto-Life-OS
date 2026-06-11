@@ -5,11 +5,13 @@ import { getCurrentUserId } from "@/lib/auth";
 
 import { StudyTimer } from "@/components/studies/study-timer";
 import { StudySessionList } from "@/components/studies/study-session-list";
+import { SessionHistoryDialog } from "@/components/studies/session-history-dialog";
 import { SubjectGrid } from "@/components/studies/subject-grid";
 import { GamificationHero } from "@/components/studies/gamification-hero";
 import { StudyAnalytics } from "@/components/studies/study-analytics";
-import { XP_PER_LEVEL, formatHours, safePercent } from "@/components/studies/studies-helpers";
+import { formatHours } from "@/components/studies/studies-helpers";
 import { buildDailyActivity, computeStudyStats, type SessionLite, type DailyPoint, type StudyStats } from "@/lib/studies-math";
+import { computeElo, sessionsToDays, type EloResult } from "@/lib/studies-elo";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -52,10 +54,7 @@ export default async function StudiesPage() {
 
   // gamification
   let totalXP = 0;
-  let currentLevel = 1;
-  let xpCurrentLevel = 0;
-  const xpNextLevel = XP_PER_LEVEL;
-  let progressPercentage = 0;
+  let elo: EloResult = computeElo([]);
 
   let totalHours = "0.0";
   let hasActivity = false;
@@ -76,7 +75,7 @@ export default async function StudiesPage() {
     activityWindowStart.setHours(0, 0, 0, 0);
 
     // Carrega em paralelo: matérias, sessões recentes, estatísticas, tempo agrupado e atividade.
-    const [subjectsData, recentSessionsData, statsData, aggregatedTimeData, lastStudiedData, activitySessions] =
+    const [subjectsData, recentSessionsData, statsData, aggregatedTimeData, lastStudiedData, activitySessions, eloSessions] =
       await Promise.all([
         prisma.studySubject.findMany({
           where: { userId },
@@ -121,6 +120,15 @@ export default async function StudiesPage() {
           where: { userId, date: { gte: activityWindowStart } },
           select: { date: true, durationMinutes: true, focusLevel: true },
         }),
+
+        // Histórico COMPLETO (2 campos) p/ o ELO: o decaimento precisa replay
+        // da temporada inteira. Escala pessoal: milhares de linhas, ok.
+        prisma.studySession.findMany({
+          where: { userId },
+          select: { date: true, durationMinutes: true },
+          orderBy: { date: "asc" },
+          take: 20000,
+        }),
       ]);
 
     // Mapa subjectId → última data estudada (substitui o _max do groupBy).
@@ -133,11 +141,10 @@ export default async function StudiesPage() {
     totalMinutes = statsData._sum.durationMinutes ?? 0;
     totalSessions = statsData._count.id ?? 0;
 
-    // XP e nível (10 XP por minuto)
+    // XP (10 por minuto) continua como métrica acumulada; a progressão visível
+    // agora é o ELO (PDL com decaimento — lib/studies-elo.ts).
     totalXP = totalMinutes * 10;
-    currentLevel = Math.floor(totalXP / XP_PER_LEVEL) + 1;
-    xpCurrentLevel = totalXP % XP_PER_LEVEL;
-    progressPercentage = safePercent((xpCurrentLevel / XP_PER_LEVEL) * 100);
+    elo = computeElo(sessionsToDays(eloSessions ?? []));
 
     totalHours = formatHours(totalMinutes);
     hasActivity = totalSessions > 0;
@@ -208,13 +215,10 @@ export default async function StudiesPage() {
       />
 
       <PageContainer className="space-y-8">
-        {/* PROGRESSO (enxuto) */}
+        {/* ELO DE ESTUDOS (PDL + decaimento — substitui o antigo Nível) */}
         <GamificationHero
-          currentLevel={currentLevel}
+          elo={elo}
           totalXP={totalXP}
-          xpCurrentLevel={xpCurrentLevel}
-          xpNextLevel={xpNextLevel}
-          progressPercentage={progressPercentage}
           totalHours={totalHours}
           totalSessions={totalSessions}
         />
@@ -249,10 +253,14 @@ export default async function StudiesPage() {
           {/* SIDEBAR: Histórico recente */}
           <Card className="h-fit border-border/50 bg-card shadow-sm lg:sticky lg:top-6">
             <CardHeader className="border-b border-border/40 pb-4">
-              <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                <History className="h-4 w-4 text-primary" />
-                Histórico recente
-              </CardTitle>
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                  <History className="h-4 w-4 text-primary" />
+                  Histórico recente
+                </CardTitle>
+                {/* Histórico completo: busca + paginação (escala p/ anos de sessões) */}
+                <SessionHistoryDialog totalSessions={totalSessions} />
+              </div>
             </CardHeader>
 
             <CardContent className="px-2 pt-4">

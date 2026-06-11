@@ -9,19 +9,19 @@ import {
     ArrowUp, ArrowDown, Bot, Sparkles, Zap, Cloud, HardDrive,
     LucideIcon, Wallet, TrendingUp, CheckCircle2, Cpu,
     AlertTriangle, Settings, ExternalLink, Calendar, BookOpen, Film, Users, Box, Activity,
-    Plus, Pencil, Trash2, ArrowRight, Copy, Check, Brain, Wind, Asterisk, Orbit, Network, RotateCcw, X,
-    Mic, Volume2, VolumeX, Paperclip
+    Plus, Pencil, Trash2, ArrowRight, Copy, Check, Brain, Wind, Asterisk, Orbit, Network, RotateCcw, X, Circle,
+    Mic, Volume2, VolumeX, Paperclip, Download, NotebookPen, Loader2, MessageCircleQuestion
 } from "lucide-react";
 import { useSpeechInput, useVoiceReply, speakText, stopSpeaking, formatListenClock } from "@/components/ai/voice";
 import { compressImageFile } from "@/lib/image";
 import Link from "next/link";
-import { sendMessage, regenerateResponse, editLastMessage } from "@/app/(dashboard)/ai/actions";
+import { sendMessage, regenerateResponse, editLastMessage, saveMessageAsNote } from "@/app/(dashboard)/ai/actions";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { cn } from "@/lib/utils";
 import { MessageResponse, SendMessageResult } from "@/types/ai";
-import { AI_CAPABILITIES, moduleInfo, type AiStatus } from "@/lib/ai-help";
+import { AI_CAPABILITIES, moduleInfo, type AiStatus, type ClarifyRequest } from "@/lib/ai-help";
 
 /* -------------------------------------------------------------------------------------------------
  * STREAMING SSE (com fallback automático para a Server Action)
@@ -217,7 +217,7 @@ function CodeBlock({ children, ...props }: React.HTMLAttributes<HTMLPreElement>)
                 type="button"
                 onClick={copy}
                 title="Copiar código"
-                className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-lg border border-zinc-700/60 bg-zinc-900/90 text-zinc-400 opacity-0 transition-opacity hover:text-zinc-100 group-hover/code:opacity-100"
+                className="absolute right-2 top-2 z-10 flex h-9 w-9 md:h-7 md:w-7 items-center justify-center rounded-lg border border-zinc-700/60 bg-zinc-900/90 text-zinc-400 transition-opacity hover:text-zinc-100 md:opacity-0 md:group-hover/code:opacity-100"
             >
                 {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
             </button>
@@ -236,7 +236,8 @@ function UserBubbleActions({ text, onEdit }: { text: string; onEdit?: () => void
             setTimeout(() => setCopied(false), 1500);
         }).catch(() => {});
     };
-    const btnCls = "flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground/50 transition hover:bg-muted hover:text-foreground";
+    // Mobile: alvo de toque ≥36px (sem hover); desktop volta ao tamanho discreto.
+    const btnCls = "flex h-9 w-9 md:h-6 md:w-6 items-center justify-center rounded-md text-muted-foreground/50 transition hover:bg-muted hover:text-foreground";
     return (
         <div className="absolute right-full top-1/2 z-10 mr-1 flex -translate-y-1/2 flex-col items-center gap-0.5 transition-opacity md:opacity-0 md:group-hover/msg:opacity-100">
             {onEdit && (
@@ -272,6 +273,238 @@ const QUICK_PROMPTS = [
     { label: "Análise de Saúde", icon: TrendingUp, prompt: "Analise meu último peso e treino. Estou no caminho certo?", color: "text-rose-500 bg-rose-500/10" },
     { label: "Planejar Rotina", icon: Sparkles, prompt: "Crie um plano para meu dia considerando minha agenda.", color: "text-amber-500 bg-amber-500/10" },
 ];
+
+/* -------------------------------------------------------------------------------------------------
+ * ARTEFATOS LEVES (#9): respostas estruturadas (tabela/plano/lista grande) ganham
+ * uma barra com "Exportar .md" e "Salvar como nota" (cai na Entrada das Notas).
+ * -----------------------------------------------------------------------------------------------*/
+function isArtifact(text: string): boolean {
+    if (!text) return false;
+    const tableRows = (text.match(/^\|.*\|\s*$/gm) ?? []).length;
+    if (tableRows >= 3) return true;
+    const listItems = (text.match(/^\s*(?:[-*+]|\d+[.)])\s+/gm) ?? []).length;
+    if (listItems >= 6) return true;
+    return /^#{1,4}\s+/m.test(text) && text.length > 900;
+}
+
+/** Título do artefato: 1º heading do markdown, senão a 1ª linha não vazia. */
+function artifactTitle(text: string): string {
+    const heading = text.match(/^#{1,4}\s+(.+)$/m)?.[1];
+    const firstLine = text.split("\n").find((l) => l.trim());
+    return (heading || firstLine || "Resposta da IA").replace(/[*_#`]/g, "").trim().slice(0, 80);
+}
+
+function ArtifactBar({ text }: { text: string }) {
+    const [saving, setSaving] = useState(false);
+    const [savedId, setSavedId] = useState<string | null>(null);
+
+    const exportMd = () => {
+        const slug = artifactTitle(text)
+            .toLowerCase()
+            .normalize("NFD").replace(/[̀-ͯ]/g, "")
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/(^-|-$)/g, "") || "artefato";
+        const blob = new Blob([text], { type: "text/markdown;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `${slug}.md`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success("Artefato exportado em Markdown.");
+    };
+
+    const saveNote = async () => {
+        if (saving) return;
+        if (savedId) { window.open(`/notes/${savedId}`, "_self"); return; }
+        setSaving(true);
+        try {
+            const res = await saveMessageAsNote(artifactTitle(text), text);
+            if (res.success) {
+                setSavedId(res.id);
+                toast.success("Nota criada na Entrada.", {
+                    action: { label: "Abrir", onClick: () => { window.location.href = `/notes/${res.id}`; } },
+                });
+            } else {
+                toast.error(res.error ?? "Falha ao salvar a nota.");
+            }
+        } catch {
+            toast.error("Falha ao salvar a nota.");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const chipCls = "flex items-center gap-1.5 rounded-full border border-border/50 bg-card/70 px-3 py-1.5 text-[11px] font-bold text-muted-foreground transition-all hover:border-primary/40 hover:bg-primary/5 hover:text-primary disabled:opacity-60";
+    return (
+        <div className="mt-3 flex flex-wrap gap-1.5 animate-in fade-in duration-300">
+            <button type="button" onClick={exportMd} className={chipCls} title="Baixar só esta resposta como arquivo .md">
+                <Download className="h-3 w-3" /> Exportar .md
+            </button>
+            <button type="button" onClick={saveNote} disabled={saving} className={chipCls} title="Salvar esta resposta na Entrada das Notas">
+                {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <NotebookPen className="h-3 w-3" />}
+                {savedId ? "Abrir nota" : "Salvar como nota"}
+            </button>
+        </div>
+    );
+}
+
+/* -------------------------------------------------------------------------------------------------
+ * PAINEL DE RESPOSTAS (clarify) — ancorado ACIMA do composer, estilo "pergunta
+ * com opções" de assistente de código: a IA travou numa informação essencial e
+ * o usuário responde com 1 toque (ou digita livre). Suporta várias perguntas no
+ * mesmo turno, dica por opção (hint), múltipla escolha (multi) e atalho Alt+nº.
+ * Montado com key = id da mensagem → o estado interno zera a cada nova pergunta.
+ * -----------------------------------------------------------------------------------------------*/
+function ClarifyPanel({
+    clarify, accent, onAnswer, onFreeText, onDismiss,
+}: {
+    clarify: ClarifyRequest;
+    /** Classe de cor do provedor atual (ex.: "text-emerald-600 dark:text-emerald-400"). */
+    accent: string;
+    /** Envia o texto como mensagem do usuário. */
+    onAnswer: (text: string) => void;
+    /** "Outro…": foca o composer para resposta livre. */
+    onFreeText: () => void;
+    onDismiss: () => void;
+}) {
+    const questions = clarify.questions;
+    const multiStep = questions.length > 1 || questions.some((q) => q.multi);
+    // Respostas escolhidas por pergunta (índice → labels marcadas).
+    const [picked, setPicked] = useState<Record<number, string[]>>({});
+
+    const toggle = (qi: number, label: string, multi: boolean) => {
+        // Fast path: pergunta única de escolha única responde no clique.
+        if (!multiStep) { onAnswer(label); return; }
+        setPicked((prev) => {
+            const cur = prev[qi] ?? [];
+            const next = multi
+                ? (cur.includes(label) ? cur.filter((l) => l !== label) : [...cur, label])
+                : [label];
+            return { ...prev, [qi]: next };
+        });
+    };
+
+    const answeredCount = questions.filter((_, i) => (picked[i] ?? []).length > 0).length;
+    const allAnswered = answeredCount === questions.length;
+
+    const submit = () => {
+        if (!allAnswered) return;
+        // "Pergunta resposta" por linha — formato que a diretriz #10 manda o modelo aceitar.
+        const text = questions
+            .map((q, i) => (questions.length > 1 ? `${q.question} ${picked[i]!.join(", ")}` : picked[i]!.join(", ")))
+            .join("\n");
+        onAnswer(text);
+    };
+
+    // Atalho Alt+1..4: marca a opção correspondente da primeira pergunta sem resposta.
+    useEffect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (!e.altKey || e.ctrlKey || e.metaKey) return;
+            const n = Number(e.key);
+            if (!Number.isInteger(n) || n < 1) return;
+            const qi = questions.findIndex((_, i) => (picked[i] ?? []).length === 0);
+            const q = questions[qi === -1 ? questions.length - 1 : qi];
+            const opt = q?.options[n - 1];
+            if (!q || !opt) return;
+            e.preventDefault();
+            toggle(qi === -1 ? questions.length - 1 : qi, opt.label, q.multi === true);
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [questions, picked, multiStep]);
+
+    return (
+        <div className="mb-2 overflow-hidden rounded-2xl border border-primary/25 bg-card/95 shadow-xl backdrop-blur-md animate-in fade-in slide-in-from-bottom-2 duration-300">
+            {/* Cabeçalho */}
+            <div className="flex items-center justify-between gap-2 border-b border-border/40 bg-primary/5 px-3.5 py-2">
+                <span className={cn("flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest", accent)}>
+                    <MessageCircleQuestion className="h-3.5 w-3.5" />
+                    Falta um detalhe pra eu executar
+                    {questions.length > 1 && (
+                        <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold normal-case tracking-normal text-primary">
+                            {answeredCount}/{questions.length}
+                        </span>
+                    )}
+                </span>
+                <button
+                    type="button"
+                    onClick={onDismiss}
+                    title="Ignorar a pergunta (você pode responder digitando)"
+                    className="rounded-md p-1 text-muted-foreground/60 transition hover:bg-muted hover:text-foreground"
+                >
+                    <X className="h-3.5 w-3.5" />
+                </button>
+            </div>
+
+            {/* Perguntas */}
+            <div className="space-y-3.5 px-3.5 py-3">
+                {questions.map((q, qi) => (
+                    <div key={qi}>
+                        <p className="text-xs font-bold text-foreground">
+                            {q.question}
+                            {q.multi && <span className="ml-1.5 text-[10px] font-medium text-muted-foreground">(marque quantas quiser)</span>}
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                            {q.options.map((opt, oi) => {
+                                const selected = (picked[qi] ?? []).includes(opt.label);
+                                return (
+                                    <button
+                                        key={oi}
+                                        type="button"
+                                        onClick={() => toggle(qi, opt.label, q.multi === true)}
+                                        title={opt.hint}
+                                        className={cn(
+                                            "group/opt flex flex-col items-start rounded-xl border px-3 py-1.5 text-left transition-all",
+                                            selected
+                                                ? "border-primary bg-primary/10 shadow-sm"
+                                                : "border-border/50 bg-background/60 hover:border-primary/50 hover:bg-primary/5"
+                                        )}
+                                        style={{ animationDelay: `${oi * 60}ms` }}
+                                    >
+                                        <span className={cn("flex items-center gap-1.5 text-[11px] font-bold", selected ? "text-primary" : "text-foreground")}>
+                                            {selected && <Check className="h-3 w-3" />}
+                                            {opt.label}
+                                            {/* Atalho de teclado (só desktop, só na 1ª pergunta aberta) */}
+                                            {qi === questions.findIndex((_, i) => (picked[i] ?? []).length === 0) && (
+                                                <kbd className="hidden rounded border border-border/50 bg-muted/50 px-1 text-[8px] font-semibold text-muted-foreground md:inline">Alt+{oi + 1}</kbd>
+                                            )}
+                                        </span>
+                                        {opt.hint && (
+                                            <span className="mt-0.5 text-[10px] leading-tight text-muted-foreground">{opt.hint}</span>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Rodapé: enviar combinado (multi/multi-pergunta) + resposta livre */}
+            <div className="flex items-center justify-between gap-2 border-t border-border/40 px-3.5 py-2">
+                <button
+                    type="button"
+                    onClick={onFreeText}
+                    className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground transition hover:text-foreground"
+                >
+                    Outro… digitar resposta
+                </button>
+                {multiStep && (
+                    <Button
+                        size="sm"
+                        onClick={submit}
+                        disabled={!allAnswered}
+                        className="h-7 rounded-full px-4 text-[11px] font-bold"
+                    >
+                        Responder <ArrowUp className="ml-1 h-3 w-3" />
+                    </Button>
+                )}
+            </div>
+        </div>
+    );
+}
 
 /* -------------------------------------------------------------------------------------------------
  * CONTEÚDO DA RESPOSTA DO ASSISTENTE (com efeito de digitação)
@@ -325,6 +558,8 @@ function AssistantContent({
     const showCards = done && message.actions && message.actions.length > 0;
     // Chips de continuação: só na última resposta (onSuggest) e após a digitação.
     const showSuggestions = done && !!onSuggest && !!message.suggestions && message.suggestions.length > 0;
+    // Atalhos de navegação: úteis em QUALQUER mensagem (link continua válido no histórico).
+    const showNav = done && !!message.nav && message.nav.length > 0;
 
     const [copied, setCopied] = useState(false);
     const copy = useCallback(() => {
@@ -344,7 +579,7 @@ function AssistantContent({
                             type="button"
                             onClick={onRegenerate}
                             title="Regenerar resposta"
-                            className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground/50 transition-colors hover:bg-muted hover:text-foreground"
+                            className="flex h-9 w-9 md:h-6 md:w-6 items-center justify-center rounded-md text-muted-foreground/50 transition-colors hover:bg-muted hover:text-foreground"
                         >
                             <RotateCcw className="h-3 w-3" />
                         </button>
@@ -353,7 +588,7 @@ function AssistantContent({
                         type="button"
                         onClick={copy}
                         title="Copiar resposta"
-                        className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground/50 transition-colors hover:bg-muted hover:text-foreground"
+                        className="flex h-9 w-9 md:h-6 md:w-6 items-center justify-center rounded-md text-muted-foreground/50 transition-colors hover:bg-muted hover:text-foreground"
                     >
                         {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
                     </button>
@@ -368,6 +603,8 @@ function AssistantContent({
                     "prose-code:text-primary prose-code:bg-primary/10 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded-md prose-code:before:content-none prose-code:after:content-none",
                     "prose-strong:font-black",
                     "prose-table:text-xs prose-th:bg-muted/50 prose-td:border-border/40 prose-th:border-border/40",
+                    // Plano explícito (#12): checklist GFM sem bullets, alinhado com os ícones
+                    "[&_ul.contains-task-list]:list-none [&_ul.contains-task-list]:pl-1 [&_li.task-list-item]:my-1",
                     `prose-headings:${style.color.split(" ")[0]} dark:prose-headings:${style.color.split(" ")[1]}`
                 )}>
                     <ReactMarkdown
@@ -379,6 +616,15 @@ function AssistantContent({
                                 </a>
                             ),
                             pre: CodeBlock,
+                            // Checklist do plano (#12): - [x]/- [ ] viram ícones de progresso.
+                            input: (props) =>
+                                props.type === "checkbox" ? (
+                                    props.checked
+                                        ? <CheckCircle2 className="mr-1.5 -mt-0.5 inline h-4 w-4 text-emerald-500" />
+                                        : <Circle className="mr-1.5 -mt-0.5 inline h-4 w-4 text-muted-foreground/40" />
+                                ) : (
+                                    <input {...props} />
+                                ),
                         }}
                     >
                         {visible}
@@ -420,6 +666,23 @@ function AssistantContent({
                 </div>
             )}
 
+            {/* Atalhos de navegação: a IA te leva à página do que acabou de falar. */}
+            {showNav && (
+                <div className={cn("flex flex-wrap gap-1.5", (visible || showCards) && "mt-3")}>
+                    {message.nav!.map((n, i) => (
+                        <Link
+                            key={i}
+                            href={n.href}
+                            className="group/nav inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-3 py-1.5 text-[11px] font-bold text-primary no-underline transition-all hover:border-primary hover:bg-primary/10 animate-in fade-in slide-in-from-bottom-1 duration-300"
+                            style={{ animationDelay: `${i * 80}ms` }}
+                        >
+                            {n.label}
+                            <ArrowRight className="h-3 w-3 transition-transform group-hover/nav:translate-x-0.5" />
+                        </Link>
+                    ))}
+                </div>
+            )}
+
             {/* Chips de follow-up: continuações de 1 toque sugeridas pela IA. */}
             {showSuggestions && (
                 <div className={cn("flex flex-wrap gap-1.5", (visible || showCards) && "mt-3")}>
@@ -436,6 +699,9 @@ function AssistantContent({
                     ))}
                 </div>
             )}
+
+            {/* Artefato leve (#9): tabela/plano/lista grande → exportar/salvar */}
+            {done && isArtifact(text) && <ArtifactBar text={text} />}
         </>
     );
 }
@@ -533,6 +799,16 @@ export function ChatInterface({
     const lastAssistantId = [...messages].reverse().find(m => m.role === "assistant" && m.provider !== "system")?.id;
     // Última mensagem do usuário — a única editável (edita & reenvia).
     const lastUserId = [...messages].reverse().find(m => m.role === "user")?.id;
+
+    // Pergunta de esclarecimento pendente (painel acima do composer): só a da
+    // ÚLTIMA mensagem vale — respondida ou ignorada (X), some.
+    const [clarifyDismissedId, setClarifyDismissedId] = useState<string | null>(null);
+    const lastMsg = messages[messages.length - 1];
+    const pendingClarify =
+        !isLoading && !editing && lastMsg?.role === "assistant" && lastMsg.id === lastAssistantId
+        && lastMsg.clarify && clarifyDismissedId !== lastMsg.id && animatingId !== lastMsg.id
+            ? lastMsg
+            : null;
 
     const scrollRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -1089,7 +1365,20 @@ export function ChatInterface({
                     </button>
                 )}
                 <div className="relative p-4 md:p-6 pt-3 max-w-3xl mx-auto">
-                    
+
+                    {/* Painel de respostas: a IA travou num dado essencial — responda
+                        com 1 toque (key = id da msg zera a seleção a cada pergunta). */}
+                    {pendingClarify?.clarify && (
+                        <ClarifyPanel
+                            key={pendingClarify.id}
+                            clarify={pendingClarify.clarify}
+                            accent={currentStyle.color}
+                            onAnswer={(t) => void handleSend(t)}
+                            onFreeText={() => textareaRef.current?.focus()}
+                            onDismiss={() => setClarifyDismissedId(pendingClarify.id)}
+                        />
+                    )}
+
                     {/* Banner do modo edição */}
                     {editing && (
                         <div className="mb-2 flex items-center justify-between gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 animate-in fade-in slide-in-from-bottom-1">

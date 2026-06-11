@@ -4,12 +4,15 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { syncDatabaseNow } from "@/app/(dashboard)/settings/actions";
 import { toast } from "sonner";
-import { RefreshCw, Cloud, CheckCircle2 } from "lucide-react";
+import { RefreshCw, Cloud, CheckCircle2, AlertTriangle } from "lucide-react";
 
 interface DbSyncCardProps {
   /** URL do Turso espelho (apenas exibição). */
   syncUrl: string | null;
   databasePath: string | null;
+  /** Watchdog do sync: epoch ms do último pull ok / último erro (lib/prisma). */
+  lastSyncAt?: number | null;
+  lastSyncError?: string | null;
 }
 
 /**
@@ -17,7 +20,7 @@ interface DbSyncCardProps {
  * O sync periódico já roda em background (syncInterval); este botão força um
  * PULL imediato do que mudou em outro dispositivo (ex.: o celular via nuvem).
  */
-export function DbSyncCard({ syncUrl, databasePath }: DbSyncCardProps) {
+export function DbSyncCard({ syncUrl, databasePath, lastSyncAt, lastSyncError }: DbSyncCardProps) {
   const [isPending, startTransition] = useTransition();
   const [lastSync, setLastSync] = useState<string | null>(null);
 
@@ -74,10 +77,27 @@ export function DbSyncCard({ syncUrl, databasePath }: DbSyncCardProps) {
           {isPending ? "Sincronizando..." : "Sincronizar agora"}
         </Button>
       </div>
-      {lastSync && (
-        <p className="text-[11px] text-emerald-600 flex items-center gap-1.5 pt-3 mt-3 border-t border-cyan-500/15">
-          <CheckCircle2 className="h-3.5 w-3.5" /> Última sincronização manual: {lastSync}
-        </p>
+      {(lastSync || lastSyncAt || lastSyncError) && (
+        <div className="space-y-1 pt-3 mt-3 border-t border-cyan-500/15">
+          {lastSyncError ? (
+            <p className="text-[11px] text-rose-600 flex items-start gap-1.5">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              <span>
+                Último sync falhou: <span className="font-mono break-all">{lastSyncError}</span>
+              </span>
+            </p>
+          ) : lastSyncAt ? (
+            <p className="text-[11px] text-emerald-600 flex items-center gap-1.5">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Último sync com o espelho:{" "}
+              {new Date(lastSyncAt).toLocaleString()}
+            </p>
+          ) : null}
+          {lastSync && (
+            <p className="text-[11px] text-emerald-600 flex items-center gap-1.5">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Última sincronização manual: {lastSync}
+            </p>
+          )}
+        </div>
       )}
     </div>
   );

@@ -17,21 +17,28 @@ import {
   Type,
   CalendarCheck,
   CheckCircle,
+  Repeat,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format, addHours } from "date-fns";
 import { cn } from "@/lib/utils";
+import { FREQUENCIES, FREQUENCY_LABEL, type Frequency } from "@/lib/recurrence";
 
 export interface EventFormData {
   id?: string;
   title: string;
   description?: string | null;
   startTime: Date;
-  endTime?: Date | null; 
+  endTime?: Date | null;
   location?: string | null;
   color?: string | null;
   projectId?: string | null;
+  isAllDay?: boolean;
+  frequency?: string | null;
+  recurrenceEnd?: Date | null;
+  /** Lembrete local (#12): o campo legado `emailAlert` é o gate do poller in-app. */
+  emailAlert?: boolean;
 }
 
 const PRESET_COLORS = [
@@ -68,6 +75,12 @@ export function EventForm({
   const [selectedColor, setSelectedColor] = useState(
     initialData?.color || "#3B82F6"
   );
+
+  // D2: "dia inteiro" esconde os horários (inputs desabilitados não validam nem
+  // são enviados — o servidor ancora o evento ao meio-dia local).
+  const [isAllDay, setIsAllDay] = useState(initialData?.isAllDay ?? false);
+  // #2: recorrência ("" = não repete) + fim opcional da série.
+  const [frequency, setFrequency] = useState<string>(initialData?.frequency ?? "");
 
   const urlDate = searchParams.get("date");
   const defaultDate = initialData
@@ -170,7 +183,21 @@ export function EventForm({
               </div>
             </div>
 
-            <div className="sm:col-span-6 space-y-2">
+            {/* D2: Dia inteiro — sem horários, entra na seção "Dia inteiro" da visão Dia */}
+            <div className="sm:col-span-12 flex items-center gap-2.5">
+              <Checkbox
+                id="isAllDay"
+                name="isAllDay"
+                checked={isAllDay}
+                onCheckedChange={(v) => setIsAllDay(v === true)}
+                className="h-4 w-4 border-2 border-primary/50 data-[state=checked]:bg-primary data-[state=checked]:border-primary rounded"
+              />
+              <Label htmlFor="isAllDay" className="cursor-pointer select-none text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                Dia inteiro (sem horário)
+              </Label>
+            </div>
+
+            <div className={cn("sm:col-span-6 space-y-2", isAllDay && "hidden")}>
               <Label htmlFor="time" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                 <Clock className="h-3 w-3" /> Início
               </Label>
@@ -179,12 +206,13 @@ export function EventForm({
                 name="time"
                 type="time"
                 required
+                disabled={isAllDay}
                 defaultValue={defaultStartTime}
                 className="h-11 bg-background border-border/40 focus-visible:ring-primary/30 transition-all rounded-xl font-mono font-bold text-sm text-center"
               />
             </div>
-            
-            <div className="sm:col-span-6 space-y-2">
+
+            <div className={cn("sm:col-span-6 space-y-2", isAllDay && "hidden")}>
               <Label htmlFor="endTime" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
                 <Clock className="h-3 w-3" /> Fim
               </Label>
@@ -193,10 +221,45 @@ export function EventForm({
                 name="endTime"
                 type="time"
                 required
+                disabled={isAllDay}
                 defaultValue={defaultEndTime}
                 className="h-11 bg-background border-border/40 focus-visible:ring-primary/30 transition-all rounded-xl font-mono font-bold text-sm text-center"
               />
             </div>
+
+            {/* #2: Recorrência ("toda segunda, 7h, academia") — motor de lib/recurrence.ts */}
+            <div className="sm:col-span-6 space-y-2">
+              <Label htmlFor="frequency" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <Repeat className="h-3 w-3" /> Repetir
+              </Label>
+              <select
+                id="frequency"
+                name="frequency"
+                value={frequency}
+                onChange={(e) => setFrequency(e.target.value)}
+                className="h-11 w-full rounded-xl border border-border/40 bg-background px-3 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <option value="">Não repete</option>
+                {FREQUENCIES.map((f: Frequency) => (
+                  <option key={f} value={f}>{FREQUENCY_LABEL[f]}</option>
+                ))}
+              </select>
+            </div>
+
+            {frequency && (
+              <div className="sm:col-span-6 space-y-2">
+                <Label htmlFor="recurrenceEnd" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                  <CalendarCheck className="h-3 w-3" /> Repetir até <span className="normal-case font-medium">(opcional)</span>
+                </Label>
+                <Input
+                  id="recurrenceEnd"
+                  name="recurrenceEnd"
+                  type="date"
+                  defaultValue={initialData?.recurrenceEnd ? format(new Date(initialData.recurrenceEnd), "yyyy-MM-dd") : ""}
+                  className="h-11 bg-background border-border/40 focus-visible:ring-primary/30 transition-all rounded-xl font-mono font-bold text-sm"
+                />
+              </div>
+            )}
           </div>
 
           {/* Localização */}
@@ -261,11 +324,15 @@ export function EventForm({
               <Checkbox
                 id="notification"
                 name="notification"
-                defaultChecked
+                defaultChecked={initialData ? initialData.emailAlert !== false : true}
                 className="h-5 w-5 border-2 border-primary/50 data-[state=checked]:bg-primary data-[state=checked]:border-primary transition-all rounded-md"
               />
-              <Label htmlFor="notification" className="text-xs font-bold uppercase tracking-wider text-foreground cursor-pointer select-none flex items-center gap-2">
-                <Bell className="h-3.5 w-3.5 text-primary" /> Alerta (-30 min)
+              <Label
+                htmlFor="notification"
+                title="Aviso no app antes de começar (antecedência nas Configurações → Rotina)"
+                className="text-xs font-bold uppercase tracking-wider text-foreground cursor-pointer select-none flex items-center gap-2"
+              >
+                <Bell className="h-3.5 w-3.5 text-primary" /> Lembrete local
               </Label>
             </div>
           </div>

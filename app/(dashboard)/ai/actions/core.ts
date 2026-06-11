@@ -7,7 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { getUserContext } from "@/lib/ai-context";
 import { revalidatePath } from "next/cache";
 import { decryptKey } from "@/lib/settings-crypto";
-import { getAiStatus, providerMeta, normalizeProvider, setupMessage, extractPending, stripPending, encodePending, encodeActions, extractModelSuggestions, encodeSuggestions, encodeImages } from "@/lib/ai-help";
+import { getAiStatus, providerMeta, normalizeProvider, setupMessage, extractPending, stripPending, encodePending, encodeActions, extractModelSuggestions, encodeSuggestions, extractModelClarify, encodeClarify, extractModelNav, encodeNav, encodeImages } from "@/lib/ai-help";
 import { isEphemeralServerless } from "@/lib/db-config";
 import { callAIProvider } from "./providers";
 import { AIKeys, ChatHistoryItem, ChatAttachment, StreamEmitter } from "./types";
@@ -187,14 +187,16 @@ ${systemContext}
 ${memoryBlock}
 [DIRETRIZES ESTRITAS DE SISTEMA - NÃO IGNORE]
 1. DADOS SOB DEMANDA: o snapshot acima é só um resumo. Para qualquer detalhe, use 'query_system_data'. Prefira mode='summary' para "quanto/quantos/resumo" (é barato) e search+limit para achar um registro específico — NUNCA peça listas enormes. Para COMPARAR meses, ver TENDÊNCIA ou AGRUPAR dados, use 'analyze_system_data' (1 chamada agregada) em vez de vários query.
-2. EXECUÇÃO: para criar, editar ou apagar algo use 'mutate_system_data'. UPDATE/DELETE exigem o 'id' — busque o registro com query antes.
+2. EXECUÇÃO: para criar, editar ou apagar algo use 'mutate_system_data'. UPDATE/DELETE exigem o 'id' — busque o registro com query antes. Crie SOMENTE o que o usuário pediu NESTE turno — nunca registre dados por iniciativa própria (peso, medição, refeição, gasto...) ao responder uma pergunta, e nunca crie o mesmo registro duas vezes: se a ferramenta já confirmou (ok=true), NÃO repita a chamada.
 3. EXCLUSÃO SEGURA: para apagar, chame DELETE sem confirm primeiro, mostre ao usuário o que será apagado e PEÇA CONFIRMAÇÃO. Só apague de fato com confirm=true depois do "sim".
 4. AÇÃO ENCADEADA: você pode usar ferramentas em vários passos (ler → agir → confirmar) antes de responder. Aja, não só descreva.
 5. CONCISÃO E TOM: responda curto e útil, usando ${settings?.currency || "R$"} para valores, mantendo a [IDENTIDADE E PERSONALIDADE].
 6. ARGUMENTOS LIMPOS NAS FERRAMENTAS: mantenha cada campo curto e em uma única linha; NUNCA cole textos enormes ou com muitas quebras de linha no campo 'description' (resuma). Para listas/checklists, salve um resumo enxuto — isso evita falhas de formatação na chamada da ferramenta.
 7. SUGESTÕES DE CONTINUAÇÃO: encerre TODA resposta com a linha <!--SUGGEST:["...","..."]--> contendo 2 a 3 continuações CURTAS (máx. 7 palavras cada), escritas na voz do usuário (ex.: "E comparado ao mês passado?", "Registra isso pra mim"). Devem ser o próximo passo natural da conversa, ancoradas no que acabou de ser dito. É um marcador invisível: nunca o mencione nem o formate como código.
 8. MEMÓRIA: quando o usuário pedir "lembre que..." (ou revelar preferência durável importante), salve com manage_memory action=SAVE. Quando pedir para esquecer, use LIST para achar o id e DELETE. As memórias atuais já estão no bloco [MEMÓRIAS DO USUÁRIO] acima — não chame LIST só para conferi-las.
-9. PEDIDOS COMPOSTOS (planejamento explícito): quando o pedido tiver várias partes ("organize minha semana", "registre X, Y e Z"), comece a resposta com um mini-plano em checklist (- [x] item feito · - [ ] item pendente) e execute as ações na MESMA resposta, marcando cada item conforme conclui. Se algo não couber nos passos disponíveis, deixe o item desmarcado e diga o porquê.
+9. PEDIDOS COMPOSTOS (planejamento explícito): quando o pedido tiver várias partes ("organize minha semana", "registre X, Y e Z"), comece a resposta com um mini-plano em checklist (- [x] item feito · - [ ] item pendente) e execute as ações na MESMA resposta, marcando cada item conforme conclui. Se algo não couber nos passos disponíveis, deixe o item desmarcado e diga o porquê. RETOMADA: se sobrar item desmarcado (- [ ]), a PRIMEIRA sugestão do SUGGEST deve ser "Continue o plano" — ao recebê-la, releia o último checklist da conversa e execute SÓ os itens ainda abertos, repetindo o checklist atualizado.
+10. PERGUNTE ANTES DE CHUTAR: se faltar informação ESSENCIAL para executar o pedido, NÃO invente nem registre pela metade — explique em 1 frase o que falta e encerre a resposta com a linha <!--ASK:[{"question":"pergunta curta?","options":["resposta provável",{"label":"outra","hint":"contexto curto"}]}]--> (a UI vira um painel de respostas de 1 toque). NUNCA se chuta: valor de gasto/receita (jamais crie com 0 e corrija depois), dia/hora de evento, qual registro quando a busca achar vários, empresa de uma vaga, URL de um link. Se uma ferramenta retornar erro dizendo que falta um dado, NÃO repita a chamada com um valor inventado — pergunte com ASK. EXEMPLO: usuário diz "registra um gasto de mercado" → NÃO chame mutate ainda; responda "Quanto ficou o mercado?" e encerre com <!--ASK:[{"question":"Quanto ficou o mercado?","options":["R$ 50","R$ 100","R$ 200","R$ 300"]}]-->. Regras do ASK: 1 a 3 perguntas, cada uma com 2 a 4 opções CURTAS (máx. 5 palavras, na voz do usuário); "hint" é opcional (contexto de até 8 palavras); use "multi":true quando várias opções puderem valer ao mesmo tempo. Se faltarem DOIS dados (ex.: valor E conta), prefira UMA chamada com as duas perguntas a dois turnos. O usuário também pode digitar livremente. Não pergunte o que dá para estimar bem (ex.: kcal de uma refeição descrita) nem detalhes opcionais. Ao usar ASK, não execute a ação ainda, não use SUGGEST nesse turno e nunca mencione o marcador. Quando a resposta chegar (pode vir como "Pergunta: resposta" por linha), execute direto sem perguntar de novo.
+11. NAVEGAÇÃO: quando a resposta falar de uma área do app (ou o usuário perguntar "onde vejo/fica X"), ofereça atalhos encerrando com <!--GOTO:[{"label":"Ver meu funil de vagas","href":"/jobs"}]--> — 1 a 3 atalhos, label curto em voz de convite ("Abrir...", "Ver..."). Rotas válidas: /dashboard · /agenda · /finance (lançamentos: /finance/transactions · investimentos: /finance/investments) · /projects (tarefas/projetos) · /jobs (vagas) · /business (CRM) · /social (conexões) · /notes (notas) · /studies (estudos) · /flashcards · /goals (metas) · /health (saúde; /health/nutrition · /health/sleep · /health/body · /health/gym) · /entertainment · /wardrobe (closet) · /links · /access (cofre) · /cms (sites) · /connect (tags) · /timeline · /settings (configurações) · /trash (lixeira). Query/deep-link é permitido (ex.: /settings?tab=intelligence). Use só quando agregar — não em toda resposta. É um marcador invisível: nunca o mencione.
 ${pendingBlock}    `;
 
     // --- Roteadores opt-in (#27 privacidade · #28 custo) ---
@@ -213,16 +215,25 @@ ${pendingBlock}    `;
     }
 
     const aiResponse = await callAIProvider(callProvider, callModel, fullSystemPrompt, userMessage, history, keys, attachments, emit);
-    // O modelo encerra com <!--SUGGEST:[...]--> (diretriz 7): extrai os chips
-    // de continuação e limpa o texto antes de persistir/exibir.
-    const { text: cleanText, suggestions } = extractModelSuggestions(aiResponse.text);
+    // O modelo encerra com <!--SUGGEST:[...]--> (diretriz 7), <!--ASK:{...}-->
+    // (diretriz 10) e/ou <!--GOTO:[...]--> (diretriz 11): extrai os chips de
+    // continuação, a pergunta de esclarecimento e os atalhos de navegação,
+    // limpando o texto antes de persistir/exibir.
+    const { text: withoutSuggest, suggestions: rawSuggestions } = extractModelSuggestions(aiResponse.text);
+    const { text: withoutClarify, clarify } = extractModelClarify(withoutSuggest);
+    const { text: cleanText, nav } = extractModelNav(withoutClarify);
+    // Pergunta pendente domina o turno: os chips de continuação dariam dois
+    // grupos de botões com papéis diferentes — fica só a pergunta.
+    const suggestions = clarify ? [] : rawSuggestions;
     // Persiste marcadores invisíveis: ações concluídas (cards) + sugestões de
-    // continuação + ação pendente (confirmação de DELETE no próximo turno).
-    // Todos são removidos na exibição.
+    // continuação + pergunta de esclarecimento + atalhos de navegação + ação
+    // pendente (confirmação de DELETE no próximo turno). Removidos na exibição.
     const storedContent =
       cleanText +
       encodeActions(aiResponse.actions) +
       encodeSuggestions(suggestions) +
+      encodeClarify(clarify) +
+      encodeNav(nav) +
       (aiResponse.pending ? encodePending(aiResponse.pending) : "");
 
     const aiMsg = await prisma.aiMessage.create({
@@ -247,7 +258,7 @@ ${pendingBlock}    `;
     revalidatePath("/ai");
     // Devolve a mensagem ao client SEM marcadores, com as ações p/ render dos
     // cards e as sugestões p/ os chips de continuação.
-    return { success: true, chatId: currentChatId, message: { ...aiMsg, role: "assistant", content: stripPending(aiMsg.content), actions: aiResponse.actions, suggestions } };
+    return { success: true, chatId: currentChatId, message: { ...aiMsg, role: "assistant", content: stripPending(aiMsg.content), actions: aiResponse.actions, suggestions, clarify: clarify ?? undefined, nav } };
 
   } catch (error: unknown) {
     const errMessage = error instanceof Error ? error.message : "Falha nos sistemas centrais.";

@@ -3,7 +3,7 @@
 import React from "react";
 import { StyleSheet, Image } from "@react-pdf/renderer";
 import {
-  Document, View, Text, BrandedPage, PageTitle, Kpi, pdf as base, pdfTheme,
+  Document, View, Text, BrandedPage, PageTitle, Kpi, Pill, pdf as base, pdfTheme,
 } from "./pdf-kit";
 
 export interface NoteDocumentProps {
@@ -67,14 +67,15 @@ function parseInline(input: string): Seg[] {
 }
 
 // Renderiza texto com formatação inline dentro de um <Text> base.
+// Geist não tem itálico: ênfase vira peso 500 + tom levemente apagado.
 function Inline({ text }: { text: string }) {
   return (
     <>
       {parseInline(text).map((seg, i) => {
         const style: Record<string, string | number> = {};
-        if (seg.bold) style.fontFamily = "Helvetica-Bold";
-        else if (seg.italic) style.fontFamily = "Helvetica-Oblique";
-        if (seg.code) { style.fontFamily = "Courier"; style.color = pdfTheme.primary; }
+        if (seg.bold) { style.fontWeight = 700; style.color = pdfTheme.ink; }
+        else if (seg.italic) { style.fontWeight = 500; style.color = pdfTheme.muted; }
+        if (seg.code) { style.fontFamily = "Geist Mono"; style.fontSize = 9; style.color = pdfTheme.primaryDark; }
         if (seg.strike) style.textDecoration = "line-through";
         return <Text key={i} style={style}>{seg.text}</Text>;
       })}
@@ -136,33 +137,33 @@ function isRenderableImage(src: string): boolean {
 }
 
 const s = StyleSheet.create({
-  h1: { fontSize: 17, fontFamily: "Helvetica-Bold", color: pdfTheme.ink, marginTop: 12, marginBottom: 6 },
-  h2: { fontSize: 14, fontFamily: "Helvetica-Bold", color: pdfTheme.ink, marginTop: 10, marginBottom: 5 },
-  h3: { fontSize: 12, fontFamily: "Helvetica-Bold", color: pdfTheme.ink, marginTop: 8, marginBottom: 4 },
-  p: { fontSize: 10, color: pdfTheme.body, lineHeight: 1.6, marginBottom: 6 },
-  li: { flexDirection: "row", marginBottom: 3, paddingLeft: 6 },
-  liBullet: { width: 14, fontSize: 10, color: pdfTheme.primary },
-  liText: { flex: 1, fontSize: 10, color: pdfTheme.body, lineHeight: 1.5 },
+  h1: { fontSize: 16.5, fontWeight: 700, color: pdfTheme.ink, letterSpacing: -0.3, marginTop: 14, marginBottom: 6 },
+  h2: { fontSize: 13.5, fontWeight: 700, color: pdfTheme.ink, letterSpacing: -0.2, marginTop: 12, marginBottom: 5 },
+  h3: { fontSize: 11.5, fontWeight: 600, color: pdfTheme.ink, marginTop: 9, marginBottom: 4 },
+  p: { fontSize: 10, color: pdfTheme.body, lineHeight: 1.65, marginBottom: 6 },
+  li: { flexDirection: "row", marginBottom: 3.5, paddingLeft: 6 },
+  liBullet: { width: 15, fontSize: 10, fontWeight: 600, color: pdfTheme.primary },
+  liText: { flex: 1, fontSize: 10, color: pdfTheme.body, lineHeight: 1.55 },
   quote: {
-    borderLeftWidth: 3, borderLeftColor: pdfTheme.primary, backgroundColor: pdfTheme.bgSoft,
-    paddingVertical: 6, paddingHorizontal: 10, marginBottom: 6,
+    borderLeftWidth: 3, borderLeftColor: pdfTheme.brandB, backgroundColor: pdfTheme.bgSoft,
+    borderTopRightRadius: 8, borderBottomRightRadius: 8,
+    paddingVertical: 7, paddingHorizontal: 11, marginBottom: 7,
   },
-  quoteText: { fontSize: 10, color: pdfTheme.muted, fontStyle: "italic", lineHeight: 1.5 },
+  quoteText: { fontSize: 9.5, fontWeight: 500, color: pdfTheme.muted, lineHeight: 1.55 },
   code: {
-    backgroundColor: "#0F172A", color: "#E2E8F0", borderRadius: 6, padding: 10,
-    fontFamily: "Courier", fontSize: 9, lineHeight: 1.5, marginBottom: 8,
+    backgroundColor: "#18181B", color: "#E4E4E7", borderRadius: 8, padding: 11,
+    fontFamily: "Geist Mono", fontSize: 8.5, lineHeight: 1.55, marginBottom: 8,
   },
-  hr: { borderBottomWidth: 1, borderBottomColor: pdfTheme.border, marginVertical: 10 },
-  image: { width: "100%", borderRadius: 6, marginBottom: 8, objectFit: "contain" },
+  hr: { borderBottomWidth: 1, borderBottomColor: pdfTheme.border, marginVertical: 12 },
+  image: { width: "100%", borderRadius: 8, marginBottom: 8, objectFit: "contain" },
   imageCaption: { fontSize: 7.5, color: pdfTheme.faint, marginBottom: 8 },
-  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 5, marginBottom: 12 },
-  chip: { fontSize: 8.5, color: pdfTheme.primary, backgroundColor: pdfTheme.primarySoft, borderRadius: 10, paddingVertical: 3, paddingHorizontal: 8 },
+  chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 5, marginBottom: 14 },
 
-  table: { borderWidth: 1, borderColor: pdfTheme.border, borderRadius: 6, marginBottom: 10, overflow: "hidden" },
+  table: { borderWidth: 1, borderColor: pdfTheme.border, borderRadius: 10, marginBottom: 10, overflow: "hidden" },
   tableRow: { flexDirection: "row" },
   tableHeadRow: { flexDirection: "row", backgroundColor: pdfTheme.bgSoft },
-  tableCell: { flex: 1, fontSize: 9, color: pdfTheme.body, paddingVertical: 5, paddingHorizontal: 7, borderRightWidth: 1, borderRightColor: pdfTheme.line, lineHeight: 1.4 },
-  tableCellHead: { fontFamily: "Helvetica-Bold", color: pdfTheme.ink },
+  tableCell: { flex: 1, fontSize: 9, color: pdfTheme.body, paddingVertical: 5.5, paddingHorizontal: 8, borderRightWidth: 1, borderRightColor: pdfTheme.line, lineHeight: 1.4 },
+  tableCellHead: { fontWeight: 600, color: pdfTheme.ink, fontSize: 8 },
   tableRowBorder: { borderTopWidth: 1, borderTopColor: pdfTheme.line },
 });
 
@@ -187,7 +188,7 @@ export function NoteDocument({ title, generatedAt, content, notebook, project, t
 
         {tags.length > 0 ? (
           <View style={s.chipRow}>
-            {tags.map((t, i) => <Text key={i} style={s.chip}>{t}</Text>)}
+            {tags.map((t, i) => <Pill key={i} tone="primary">{t}</Pill>)}
           </View>
         ) : null}
 

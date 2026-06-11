@@ -47,12 +47,11 @@ export async function createTransaction(formData: FormData) {
   // Só atualizamos saldo manualmente se a conta NÃO for automática (Pluggy)
   // Se for automática, o saldo virá da sincronização oficial
   if (!account.isConnected) {
-    const currentBalance = Number(account.balance);
-    const newBalance = type === 'INCOME' ? currentBalance + amount : currentBalance - amount;
-
+    // Update ATÔMICO (increment/decrement): dois dispositivos lançando ao
+    // mesmo tempo não perdem um o saldo do outro (read-modify-write perdia).
     ops.push(prisma.account.update({
       where: { id: accountId },
-      data: { balance: newBalance },
+      data: { balance: type === "INCOME" ? { increment: amount } : { decrement: amount } },
       select: { id: true },
     }));
   }
@@ -94,20 +93,16 @@ export async function updateTransaction(formData: FormData) {
   });
   if (!account) throw new Error("Conta não encontrada");
 
-  // 1. Reverter o impacto da transação antiga no saldo
-  let tempBalance = Number(account.balance);
-  if (oldTx.type === 'INCOME') tempBalance -= Number(oldTx.amount);
-  else tempBalance += Number(oldTx.amount);
+  // Delta líquido (reverter a antiga + aplicar a nova) num increment ATÔMICO:
+  // não perde escrita concorrente de outro dispositivo.
+  const oldEffect = oldTx.type === "INCOME" ? Number(oldTx.amount) : -Number(oldTx.amount);
+  const newEffect = newType === "INCOME" ? newAmount : -newAmount;
+  const delta = newEffect - oldEffect;
 
-  // 2. Aplicar o impacto da nova transação
-  if (newType === 'INCOME') tempBalance += newAmount;
-  else tempBalance -= newAmount;
-
-  // 3 e 4. Atualiza conta e transação no mesmo lote atômico
   await prisma.$transaction([
     prisma.account.update({
       where: { id: account.id },
-      data: { balance: tempBalance },
+      data: { balance: { increment: delta } },
       select: { id: true },
     }),
     prisma.transaction.update({
@@ -140,13 +135,13 @@ export async function deleteTransaction(id: string) {
       select: { id: true, isConnected: true, balance: true },
     });
     if (account && !account.isConnected) {
-      const reversedBalance = transaction.type === 'INCOME'
-        ? Number(account.balance) - Number(transaction.amount)
-        : Number(account.balance) + Number(transaction.amount);
-
       ops.push(prisma.account.update({
         where: { id: transaction.accountId },
-        data: { balance: reversedBalance },
+        data: {
+          balance: transaction.type === "INCOME"
+            ? { decrement: Number(transaction.amount) }
+            : { increment: Number(transaction.amount) },
+        },
         select: { id: true },
       }));
     }

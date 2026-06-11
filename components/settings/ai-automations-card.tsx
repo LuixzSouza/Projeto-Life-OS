@@ -16,6 +16,35 @@ import {
 
 const WEEKDAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 
+// Modelos prontos (1 clique preenche o formulário): retro semanal (#18) e
+// check-in noturno guiado (#21) — os dois rituais do Coach.
+interface AutomationTemplate {
+  label: string;
+  title: string;
+  prompt: string;
+  kind: "DAILY" | "WEEKLY" | "MONTHLY";
+  weekday?: number;
+  hour: number;
+}
+
+const TEMPLATES: AutomationTemplate[] = [
+  {
+    label: "🏁 Retro da semana (dom 20h)",
+    title: "Retrospectiva da semana",
+    prompt: "Faça minha retrospectiva da semana: vitórias, derrapadas e comparação com a semana anterior. Proponha 3 intenções para a próxima semana.",
+    kind: "WEEKLY",
+    weekday: 0,
+    hour: 20,
+  },
+  {
+    label: "🌙 Check-in noturno (20h)",
+    title: "Check-in noturno",
+    prompt: "Faça meu check-in noturno: me pergunte (1) como está minha energia de 1 a 5, (2) o destaque do dia e (3) a prioridade de amanhã. Depois registre o check-in de energia com a nota e crie a prioridade como tarefa de amanhã se eu confirmar.",
+    kind: "DAILY",
+    hour: 20,
+  },
+];
+
 function scheduleLabel(schedule: string, hour: number): string {
   const [kind, arg] = schedule.split(":");
   const h = `${String(hour).padStart(2, "0")}h`;
@@ -92,6 +121,25 @@ export function AiAutomationsCard({ initialAutomations }: { initialAutomations: 
 
       {open && (
         <div className="space-y-3 rounded-xl border border-border/50 bg-muted/20 p-4 animate-in fade-in slide-in-from-top-1">
+          {/* Modelos prontos: preenchem o formulário, o usuário revisa e cria */}
+          <div className="flex flex-wrap gap-2">
+            {TEMPLATES.map((t) => (
+              <button
+                key={t.label}
+                type="button"
+                onClick={() => {
+                  setTitle(t.title);
+                  setPrompt(t.prompt);
+                  setKind(t.kind);
+                  if (t.weekday !== undefined) setWeekday(t.weekday);
+                  setHour(t.hour);
+                }}
+                className="rounded-full border border-primary/25 bg-primary/5 px-2.5 py-1 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/10"
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Nome (ex.: Resumo financeiro da semana)" maxLength={60} className="text-sm" />
           <Input value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="O que pedir à IA (ex.: Resuma meus gastos da semana e o saldo)" maxLength={500} className="text-sm" />
           <div className="flex flex-wrap items-center gap-2">

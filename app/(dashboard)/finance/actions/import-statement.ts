@@ -71,7 +71,7 @@ export async function importTransactions(accountId: string, items: ParsedTransac
     if (imported > 0 && !account.isConnected) {
       ops.push(prisma.account.update({
         where: { id: accountId },
-        data: { balance: Number(account.balance) + balanceDelta },
+        data: { balance: { increment: balanceDelta } },
         select: { id: true },
       }));
     }

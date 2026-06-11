@@ -5,8 +5,20 @@ import { revalidatePath } from "next/cache";
 import { requireUserId, getCurrentUserId } from "@/lib/auth";
 import { logActivity } from "@/lib/activity";
 import { notify } from "@/lib/notifications";
+import { FREQUENCIES } from "@/lib/recurrence";
 
 // --- EVENTOS (Agora com suporte a Timeblocking real) ---
+
+/** Campos de recorrência (#2) e dia inteiro (D2) compartilhados por criar/editar. */
+function parseEventExtras(formData: FormData) {
+  const isAllDay = formData.get("isAllDay") === "on";
+  const frequencyRaw = (formData.get("frequency") as string) || "";
+  const frequency = (FREQUENCIES as readonly string[]).includes(frequencyRaw) ? frequencyRaw : null;
+  const recurrenceEndStr = (formData.get("recurrenceEnd") as string) || "";
+  // T12:00:00Z: regra de ouro de <input type="date"> (bug do "dia anterior").
+  const recurrenceEnd = frequency && recurrenceEndStr ? new Date(`${recurrenceEndStr}T12:00:00Z`) : null;
+  return { isAllDay, frequency, recurrenceEnd };
+}
 
 export async function createEvent(formData: FormData) {
   const title = formData.get("title") as string;
@@ -18,17 +30,21 @@ export async function createEvent(formData: FormData) {
   const color = formData.get("color") as string;
   const notification = formData.get("notification") === "on";
   const taskIdRaw = (formData.get("taskId") as string) || ""; // bloco agendado a partir de uma tarefa
+  const { isAllDay, frequency, recurrenceEnd } = parseEventExtras(formData);
 
-  if (!title || !dateStr || !timeStr) {
+  if (!title || !dateStr || (!timeStr && !isAllDay)) {
     throw new Error("Preencha os campos obrigatórios (Título, Data e Hora).");
   }
 
-  // Combina data e hora de início
-  const startTime = new Date(`${dateStr}T${timeStr}:00`);
-  
+  // Dia inteiro: ancora ao meio-dia local (sem horário visível) e sem hora de fim.
+  // Com horário: combina data + hora de início.
+  const startTime = isAllDay ? new Date(`${dateStr}T12:00:00`) : new Date(`${dateStr}T${timeStr}:00`);
+
   // 🟢 NOVO: Combina data e hora de fim (se não enviar, assume +1 hora)
-  let endTime = new Date(startTime);
-  if (endTimeStr) {
+  let endTime: Date | null = new Date(startTime);
+  if (isAllDay) {
+      endTime = null;
+  } else if (endTimeStr) {
       endTime = new Date(`${dateStr}T${endTimeStr}:00`);
       if (endTime <= startTime) throw new Error("A hora final deve ser maior que a inicial.");
   } else {
@@ -53,6 +69,9 @@ export async function createEvent(formData: FormData) {
       location: location || null,
       color: color || "#3B82F6", // Default Blue (Google Calendar vibe)
       emailAlert: notification,
+      isAllDay,
+      frequency,
+      recurrenceEnd,
       taskId,
       userId,
     },
@@ -93,15 +112,19 @@ export async function updateEvent(formData: FormData) {
   const endTimeStr = formData.get("endTime") as string; // 🟢 NOVO
   const location = formData.get("location") as string;
   const color = formData.get("color") as string;
+  const notification = formData.get("notification") === "on"; // lembrete local (#12)
+  const { isAllDay, frequency, recurrenceEnd } = parseEventExtras(formData);
 
-  if (!id || !title || !dateStr || !timeStr) {
+  if (!id || !title || !dateStr || (!timeStr && !isAllDay)) {
      throw new Error("Dados inválidos.");
   }
 
-  const startTime = new Date(`${dateStr}T${timeStr}:00`);
-  
-  let endTime = new Date(startTime);
-  if (endTimeStr) {
+  const startTime = isAllDay ? new Date(`${dateStr}T12:00:00`) : new Date(`${dateStr}T${timeStr}:00`);
+
+  let endTime: Date | null = new Date(startTime);
+  if (isAllDay) {
+      endTime = null;
+  } else if (endTimeStr) {
       endTime = new Date(`${dateStr}T${endTimeStr}:00`);
   } else {
       endTime.setHours(endTime.getHours() + 1);
@@ -109,6 +132,8 @@ export async function updateEvent(formData: FormData) {
 
   const userId = await requireUserId();
 
+  // Editar um evento recorrente edita a SÉRIE (a âncora). "Só esta ocorrência"
+  // fica para uma próxima rodada (exigiria materializar exceções).
   await prisma.event.updateMany({
     where: { id, userId },
     data: {
@@ -118,10 +143,150 @@ export async function updateEvent(formData: FormData) {
       endTime,
       location: location || null,
       color: color || "#3B82F6",
+      emailAlert: notification,
+      isAllDay,
+      frequency,
+      recurrenceEnd,
     },
   });
 
   revalidatePath("/agenda");
+}
+
+// Reagendamento por arraste (#3 do AGENDA_ROADMAP): muda SÓ os horários.
+// Recebe ISO strings (o arraste já calculou início/fim com snap de 15min).
+export async function moveEvent(eventId: string, startISO: string, endISO: string) {
+  const userId = await requireUserId();
+  const startTime = new Date(startISO);
+  const endTime = new Date(endISO);
+  if (Number.isNaN(startTime.getTime()) || Number.isNaN(endTime.getTime()) || endTime <= startTime) {
+    throw new Error("Horário inválido.");
+  }
+  await prisma.event.updateMany({
+    where: { id: eventId, userId, deletedAt: null },
+    data: { startTime, endTime },
+  });
+  revalidatePath("/agenda");
+}
+
+// --- "SÓ ESTA OCORRÊNCIA" (exceções de recorrência) ---
+
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Lê o JSON de exceções defensivamente (campo novo, dados antigos = null). */
+function parseExceptions(raw: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const arr = JSON.parse(raw) as unknown;
+    return Array.isArray(arr) ? arr.filter((d): d is string => typeof d === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Pula UMA ocorrência da série (a data entra nas exceções; a série continua). */
+export async function skipEventOccurrence(eventId: string, dateKey: string): Promise<{ success: boolean; message: string }> {
+  if (!DATE_KEY_RE.test(dateKey)) return { success: false, message: "Data inválida." };
+  const userId = await requireUserId();
+  const event = await prisma.event.findFirst({
+    where: { id: eventId, userId, deletedAt: null, frequency: { not: null } },
+    select: { title: true, recurrenceExceptions: true },
+  });
+  if (!event) return { success: false, message: "Evento recorrente não encontrado." };
+
+  const exceptions = new Set(parseExceptions(event.recurrenceExceptions));
+  exceptions.add(dateKey);
+  await prisma.event.updateMany({
+    where: { id: eventId, userId },
+    data: { recurrenceExceptions: JSON.stringify([...exceptions]) },
+  });
+
+  revalidatePath("/agenda");
+  return { success: true, message: `Ocorrência de "${event.title}" pulada — a série continua.` };
+}
+
+export interface DetachedOccurrence {
+  success: boolean;
+  message: string;
+  /** Evento independente recém-criado (serializado p/ abrir o diálogo de edição). */
+  event?: {
+    id: string; title: string; description: string | null;
+    startTime: string; endTime: string | null; location: string | null;
+    color: string | null; isAllDay: boolean; frequency: string | null; recurrenceEnd: string | null;
+    emailAlert: boolean;
+  };
+}
+
+/**
+ * Desvincula UMA ocorrência da série ("editar só esta"): cria um evento
+ * independente naquela data (mesmos dados, sem recorrência) e adiciona a data
+ * às exceções da âncora. O chamador abre o diálogo de edição do novo evento.
+ */
+export async function detachEventOccurrence(eventId: string, dateKey: string): Promise<DetachedOccurrence> {
+  if (!DATE_KEY_RE.test(dateKey)) return { success: false, message: "Data inválida." };
+  const userId = await requireUserId();
+  const anchor = await prisma.event.findFirst({
+    where: { id: eventId, userId, deletedAt: null, frequency: { not: null } },
+  });
+  if (!anchor) return { success: false, message: "Evento recorrente não encontrado." };
+
+  // Horário da ocorrência = data pedida + hora da âncora (dia inteiro segue ao meio-dia).
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const startTime = new Date(y, m - 1, d, anchor.startTime.getHours(), anchor.startTime.getMinutes(), 0, 0);
+  const durationMs = anchor.endTime ? anchor.endTime.getTime() - anchor.startTime.getTime() : 3_600_000;
+  const endTime = anchor.isAllDay ? null : new Date(startTime.getTime() + durationMs);
+
+  const exceptions = new Set(parseExceptions(anchor.recurrenceExceptions));
+  exceptions.add(dateKey);
+
+  // ⚠️ Réplica: leituras já feitas acima; escrita em lote com select {id}.
+  const [created] = await prisma.$transaction([
+    prisma.event.create({
+      data: {
+        title: anchor.title,
+        description: anchor.description,
+        startTime,
+        endTime,
+        location: anchor.location,
+        color: anchor.color,
+        isAllDay: anchor.isAllDay,
+        emailAlert: anchor.emailAlert,
+        userId,
+      },
+      select: { id: true },
+    }),
+    prisma.event.updateMany({
+      where: { id: eventId, userId },
+      data: { recurrenceExceptions: JSON.stringify([...exceptions]) },
+    }),
+  ]);
+
+  await logActivity({
+    action: "CREATE",
+    module: "agenda",
+    entityType: "event",
+    entityId: created.id,
+    summary: `Desvinculou a ocorrência de "${anchor.title}" em ${dateKey}`,
+  });
+
+  revalidatePath("/agenda");
+  return {
+    success: true,
+    message: "Ocorrência desvinculada — edite à vontade, a série não muda.",
+    event: {
+      id: created.id,
+      title: anchor.title,
+      description: anchor.description,
+      startTime: startTime.toISOString(),
+      endTime: endTime ? endTime.toISOString() : null,
+      location: anchor.location,
+      color: anchor.color,
+      isAllDay: anchor.isAllDay,
+      frequency: null,
+      recurrenceEnd: null,
+      emailAlert: anchor.emailAlert,
+    },
+  };
 }
 
 // Soft-delete: o evento vai para a Lixeira (deletedAt) e some das listagens.

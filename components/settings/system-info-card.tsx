@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Terminal, Cpu, Box, Activity, Copy, Check, Clock } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { UpdateCheck } from "./update-check";
 
 interface SystemInfo {
     cwd: string;
@@ -11,6 +12,8 @@ interface SystemInfo {
     nodeVersion: string;
     memory: string;
     uptime: string;
+    /** Versão do Life OS (package.json) — o "Sobre" do app. */
+    version?: string;
 }
 
 export function SystemInfoCard({ info }: { info: SystemInfo }) {
@@ -100,11 +103,21 @@ export function SystemInfoCard({ info }: { info: SystemInfo }) {
                         <span className="text-[10px] font-medium text-muted-foreground">Online</span>
                     </div>
                     
-                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-mono">
-                        <Clock className="h-3 w-3" />
-                        UP: {info.uptime}
+                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-mono">
+                        {info.version && info.version !== "?" && (
+                            <span className="rounded bg-primary/10 px-1.5 py-0.5 font-semibold text-primary">
+                                v{info.version}
+                            </span>
+                        )}
+                        <span className="flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            UP: {info.uptime}
+                        </span>
                     </div>
                 </div>
+
+                {/* Aviso discreto de nova versão (DISTRIBUICAO Fase 2) */}
+                <UpdateCheck />
 
             </CardContent>
         </Card>

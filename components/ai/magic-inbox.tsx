@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Mic, Sparkles, X, Check, Loader2, Wallet, CalendarDays, CheckCircle2, BookOpen, Utensils, Dumbbell, ArrowRight } from "lucide-react";
+import { Mic, Sparkles, X, Check, Loader2, Wallet, CalendarDays, CheckCircle2, BookOpen, Utensils, Dumbbell, ArrowRight, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,7 @@ const MODULE_META: Record<MagicItem["module"], { label: string; icon: typeof Wal
   STUDIES: { label: "Nota", icon: BookOpen, cls: "bg-amber-500/10 text-amber-600" },
   NUTRITION: { label: "Refeição", icon: Utensils, cls: "bg-rose-500/10 text-rose-500" },
   HEALTH: { label: "Treino", icon: Dumbbell, cls: "bg-orange-500/10 text-orange-600" },
+  LINKS: { label: "Link", icon: Link2, cls: "bg-sky-500/10 text-sky-600" },
 };
 
 export function MagicInbox() {
@@ -76,6 +77,23 @@ export function MagicInbox() {
       window.removeEventListener("keydown", down);
       window.removeEventListener(MAGIC_INBOX_OPEN_EVENT, openFromDock);
     };
+  }, []);
+
+  // Abertura via URL: ?capture=1 (atalho do ícone PWA) com ?text= opcional
+  // (Web Share Target — conteúdo compartilhado de outro app cai aqui).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("capture") !== "1") return;
+    const shared = [params.get("title"), params.get("text"), params.get("url")]
+      .filter(Boolean)
+      .join("\n")
+      .slice(0, INBOX_CHAR_LIMIT);
+    if (shared) setText(shared);
+    setOpen(true);
+    // Limpa os params da URL (evita reabrir num refresh).
+    params.delete("capture"); params.delete("title"); params.delete("text"); params.delete("url");
+    const rest = params.toString();
+    window.history.replaceState(null, "", window.location.pathname + (rest ? `?${rest}` : ""));
   }, []);
 
   // Fechar NÃO apaga o texto: o rascunho fica salvo para a próxima abertura.

@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   Bell, Check, CheckCheck, RefreshCw, Calendar, Cake, Receipt, ListTodo, Layers,
-  Inbox, BadgeCheck, HandCoins, CalendarClock, X, Trash2,
+  Inbox, BadgeCheck, HandCoins, CalendarClock, X, Trash2, Gauge, Handshake,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -30,6 +30,9 @@ const ICONS: Record<string, React.ElementType> = {
   BIRTHDAY: Cake,
   TASK_DUE: ListTodo,
   FLASHCARD_REVIEW: Layers,
+  BUDGET_WARN: Gauge,
+  BUDGET_OVER: Gauge,
+  RECONNECT: Handshake,
   SYSTEM: Bell,
 };
 

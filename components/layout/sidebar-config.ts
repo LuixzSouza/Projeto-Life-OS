@@ -1,7 +1,8 @@
 import {
   LayoutDashboard, Wallet, BookOpen, Dumbbell, Briefcase, Calendar,
   Globe, Settings, BrainCircuit, Lock, Bookmark, Film, Users, Shirt, Home,
-  BriefcaseBusiness, ClipboardList, History, Trash2, Network, NotebookPen
+  BriefcaseBusiness, ClipboardList, History, Trash2, Network, NotebookPen,
+  CalendarRange
 } from "lucide-react";
 import type { SidebarGroup, SidebarItem } from "./sidebar-types";
 
@@ -28,6 +29,7 @@ export const groupedSidebarItems: SidebarGroup[] = [
       { label: "Visão Geral", icon: LayoutDashboard, href: "/dashboard" },
       { label: "Agenda", icon: Calendar, href: "/agenda" },
       { label: "Linha do Tempo", icon: History, href: "/timeline" },
+      { label: "Retrospectiva", icon: CalendarRange, href: "/review" },
       { label: "Tags & Anexos", icon: Network, href: "/connect" },
       { label: "Assistente IA", icon: BrainCircuit, href: "/ai" },
     ]

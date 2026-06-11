@@ -393,3 +393,98 @@ Espelho de receita do `RecurringExpense`: **modelo `RecurringCharge`** (`amount`
   Clientes**. Actions em `app/(dashboard)/finance/actions/recurring-charge.ts`.
 - **Calendário:** ocorrência mensal no agregador como `source: "charge"`.
 - **Futuro (não feito):** soft-delete/lixeira da cobrança; escolher Conexão (Friend) sem cliente.
+---
+
+## PostgreSQL / Supabase (multi-banco — Fase 1, 11/jun/2026)
+
+O Life OS agora conecta em **Postgres genérico** (Neon, Railway, RDS, self-hosted)
+e **Supabase** — modo `cloud`, `provider: "postgres" | "supabase"`.
+
+### Arquitetura (multi-client gerado)
+O client do Prisma é gerado por dialeto. O canônico continua sqlite
+(`prisma/schema.prisma`); o derivado é gerado por `scripts/derive-schemas.mjs`:
+
+| Artefato | Caminho | Gerado por |
+|---|---|---|
+| Schema derivado | `prisma/schema.postgres.prisma` | `npm run db:derive` |
+| Client derivado | `node_modules/@lifeos/client-postgres` | `npm run db:generate:all` (e no postinstall) |
+| Baseline SQL | `prisma/baseline.postgres.sql` | `npm run db:baseline:postgres` |
+
+**Regra de ouro:** mudou o schema canônico → rode `npm run db:baseline:all`
+(deriva + gera clients + regenera os DOIS baselines).
+
+- Conexão: `@prisma/adapter-pg` + `pg` (pool: `max 1` em serverless, `5` no desktop),
+  carregados em runtime fora do bundle (`serverExternalPackages`), igual ao libsql nativo.
+- `ensureSchema(client, "postgres")` usa o baseline certo e inspeciona colunas via
+  `information_schema` (PRAGMA é família SQLite — ver `lib/db-dialect.ts`).
+- O modo **réplica é exclusivo do libSQL** — Postgres é só `cloud`.
+
+### Como conectar (wizard /setup)
+1. Card **PostgreSQL** ou **Supabase** → colar a connection string
+   (`postgresql://usuario:senha@host:porta/banco`).
+2. SSL: em host remoto o app adiciona `sslmode=require` sozinho se faltar.
+   Self-hosted local sem TLS: use `?sslmode=disable` (tráfego em claro).
+3. **Supabase:** Settings → Database → Connection string (URI). Para deploy
+   serverless (Vercel) use a string do **pooler/Supavisor em transaction mode
+   (porta 6543)**; conexão direta (5432) é para desktop. NUNCA cole a
+   `service_role` key (JWT `eyJ…`) — o wizard recusa.
+4. Diagnóstico em camadas: `npm run db:probe:postgres -- "postgresql://..."`
+   (DNS → TCP/auth/SSL → query → schema → escrita).
+
+### Env vars (Vercel)
+`DATABASE_URL=postgresql://...` (detectado por `getEnvProfile`; host
+`*.supabase.co` vira provider `supabase`) + `JWT_SECRET` + `ENCRYPTION_KEY`.
+
+### Segurança
+- `maskDbUrl()` mascara a senha da URL em todo log/erro (lib/db-config.ts).
+- O `life-os-config.json` agora **cifra** authToken/URL-com-senha com a
+  `ENCRYPTION_KEY` (keyring de `lib/crypto.ts`); texto puro legado é lido
+  normalmente e regravado cifrado na próxima escrita de perfil.
+- RLS (Supabase): o Prisma conecta como owner e IGNORA Row Level Security.
+  O isolamento multi-usuário do Life OS é por `userId` no app — RLS não
+  protege nem atrapalha; o aviso do painel do Supabase pode ser ignorado.
+- Menor privilégio: o app precisa de DDL (ensureSchema) + DML; não precisa
+  de SUPERUSER/replication.
+
+### Pegadinhas de dialeto (conferidas na Fase 0; vigiar no smoke test)
+- `contains` é case-insensitive no SQLite e **case-sensitive no Postgres**;
+- NULLs ordenam primeiro no SQLite e por último no Postgres;
+- `Decimal` vira `numeric` real (sem arredondamento silencioso);
+- os workarounds do libSQL (DateTime em `_max`/`$transaction`) NÃO se aplicam
+  ao Postgres — gate central em `usesLibsqlAdapter()` (lib/db-dialect.ts).
+
+### Decisão de versão do Prisma (Fase 0.5)
+Ficamos **pinados no Prisma 5.22** + `@prisma/adapter-pg@5.22` (mesma major do
+adapter-libsql; o combo da réplica `@libsql/client@0.17.3`/`libsql@0.5.29` foi
+calibrado à mão). Upgrade para 6.x fica adiado até haver tempo de re-testar
+sync/cloud/local da réplica — os adapters 6.x são melhores, mas não valem
+quebrar o modo híbrido.
+
+### Smoke test com banco vivo (rodado em 11/jun/2026)
+```
+docker run -d --name lifeos-pg-smoke -e POSTGRES_PASSWORD=lifeos `
+  -e POSTGRES_DB=lifeos -p 55432:5432 postgres:16-alpine
+npm run db:smoke:postgres -- "postgresql://postgres:lifeos@localhost:55432/lifeos"
+```
+Aplica o baseline, faz CRUD com o client derivado e confere round-trips de
+Decimal, DateTime com fuso e texto longo/JSON-string (195 KB). Passou inteiro.
+
+## Mudar de banco pela UI (Fase 3, 11/jun/2026)
+
+Configurações → Dados & Sistema → **Migração de Dados → "Mudar de banco"**:
+copia a instância INTEIRA (todos os usuários e os 67 models) para outro banco
+e troca o perfil a quente — destino Turso, Postgres/Supabase ou arquivo local.
+
+1. **Testar destino** — conecta, roda `ensureSchema` no dialeto certo e avisa
+   se o destino não está vazio (linhas com o mesmo id seriam puladas).
+2. **Migrar agora** (confirmação em 2 cliques) — antes de copiar, um backup
+   JSON completo de TODOS os usuários + snapshot do `.db` é gravado em
+   `backups/pre-migration/` (sem opt-out). Depois: cópia pai→filho via Prisma
+   (`lib/db-copy.ts`, ordem derivada do registro do backup v3), relatório por
+   model e troca do perfil com `reconnectPrisma()`.
+3. **O banco antigo fica intacto** — para voltar, basta apontar de novo para
+   ele (ou usar o próprio "Mudar de banco" na direção contrária).
+
+Direções possíveis: SQLite↔Turso, SQLite↔Postgres/Supabase, Turso↔Postgres…
+qualquer par, porque a cópia é via Prisma (não via SQL de dialeto). O modo
+réplica continua sendo ativado pelo card próprio ("Acessar pelo celular").

@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { containsInsensitive } from "./db-text";
 
 /**
  * Busca leve cross-módulo: dado um texto, varre os modelos principais e devolve
@@ -14,7 +15,7 @@ export interface EntityHit {
 export async function searchEntities(query: string, userId: string, limit = 8): Promise<EntityHit[]> {
   const q = query.trim();
   if (q.length < 2) return [];
-  const like = { contains: q }; // SQLite LIKE é case-insensitive p/ ASCII
+  const like = containsInsensitive(q); // mesma semântica em SQLite e Postgres
 
   const [tasks, projects, events, friends, clients, transactions, notes, goals, media, links, wardrobe] =
     await Promise.all([

@@ -18,9 +18,12 @@ import {
 } from "@/components/ui/select";
 import {
     Utensils, Trash2, Plus, Minus, Leaf, Pizza, Coffee,
-    Pencil, Search, Loader2, UtensilsCrossed, X, Tags, CopyPlus
+    Pencil, Search, Loader2, UtensilsCrossed, X, Tags, CopyPlus, Sparkles
 } from "lucide-react";
-import { logMeal, updateMeal, deleteMeal, copyYesterdayMeals } from "@/app/(dashboard)/health/actions";
+import {
+    logMeal, updateMeal, deleteMeal, copyYesterdayMeals,
+    estimateMealNutrition, recalculateMealsWithoutCalories
+} from "@/app/(dashboard)/health/actions";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -48,13 +51,16 @@ const mealConfigs: Record<MealType, { color: string; bg: string; icon: React.Ele
 const fmtQty = (q: number) => (Number.isInteger(q) ? `${q}` : q.toFixed(2).replace(/\.?0+$/, ""));
 
 // --- DASHBOARD PRINCIPAL ---
-export function FoodLogger({ meals, dailyGoal = 2000, workoutBurn = 0 }: { meals: Meal[]; dailyGoal?: number; workoutBurn?: number }) {
+export function FoodLogger({ meals, dailyGoal = 2000, workoutBurn = 0, missingKcalCount = 0 }: { meals: Meal[]; dailyGoal?: number; workoutBurn?: number; missingKcalCount?: number }) {
     const router = useRouter();
     const today = new Date().toDateString();
     const todayMeals = meals.filter(m => new Date(m.date).toDateString() === today);
     const [connMeal, setConnMeal] = useState<{ id: string; title: string } | null>(null);
     const [mealToDelete, setMealToDelete] = useState<{ id: string; title: string } | null>(null);
     const [copying, setCopying] = useState(false);
+    const [recalcing, setRecalcing] = useState(false);
+    // Some o aviso na hora após um recálculo bem-sucedido (o refresh confirma depois).
+    const [recalcDone, setRecalcDone] = useState(false);
 
     const totalCals = todayMeals.reduce((acc, m) => acc + (m.calories || 0), 0);
     // Alvo do dia = meta + gasto do treino (mesma conta do saldo do dashboard).
@@ -67,6 +73,21 @@ export function FoodLogger({ meals, dailyGoal = 2000, workoutBurn = 0 }: { meals
         await deleteMeal(mealToDelete.id);
         toast.success("Refeição excluída.");
         setMealToDelete(null);
+    };
+
+    const handleRecalcMissing = async () => {
+        setRecalcing(true);
+        const res = await recalculateMealsWithoutCalories();
+        setRecalcing(false);
+        if (res.success) {
+            toast.success(res.message);
+            if (res.updated > 0) {
+                setRecalcDone(true);
+                router.refresh();
+            }
+        } else {
+            toast.error(res.message);
+        }
     };
 
     const handleCopyYesterday = async () => {
@@ -123,6 +144,19 @@ export function FoodLogger({ meals, dailyGoal = 2000, workoutBurn = 0 }: { meals
                     </div>
                 </div>
             </div>
+
+            {/* Refeições antigas sem kcal (capturas de versões anteriores): 1 clique recalcula em lote com IA */}
+            {missingKcalCount > 0 && !recalcDone && (
+                <div className="mx-4 mt-4 flex items-center justify-between gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-3.5 py-2.5">
+                    <p className="text-xs text-muted-foreground min-w-0">
+                        <span className="font-semibold text-foreground">{missingKcalCount} {missingKcalCount === 1 ? "refeição antiga está" : "refeições antigas estão"} sem calorias</span> — a IA pode estimar kcal e macros pela descrição.
+                    </p>
+                    <Button variant="outline" size="sm" onClick={handleRecalcMissing} disabled={recalcing} className="h-8 gap-1.5 rounded-lg text-xs shrink-0">
+                        {recalcing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 text-amber-500" />}
+                        Recalcular com IA
+                    </Button>
+                </div>
+            )}
 
             <ScrollArea className="flex-1 p-4">
                 <div className="space-y-3">
@@ -210,6 +244,7 @@ function MealRow({ meal, onConnections, onDelete }: { meal: Meal; onConnections:
 function MealFormDialog({ meal, children }: { meal?: Meal; children?: React.ReactNode }) {
     const [open, setOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [estimating, setEstimating] = useState(false);
     const [showSearchMobile, setShowSearchMobile] = useState(false);
 
     const [title, setTitle] = useState(meal?.title || "Almoço");
@@ -260,6 +295,28 @@ function MealFormDialog({ meal, children }: { meal?: Meal; children?: React.Reac
     const reset = () => {
         setManualDesc(""); setManualCals(0); setPlate([]); setShowSearchMobile(false);
         setProtein(""); setCarbs(""); setFat("");
+    };
+
+    // Estima kcal + macros pela descrição (one-shot IA) e preenche o formulário
+    // para o usuário revisar — nunca salva direto.
+    const handleEstimate = async () => {
+        if (!finalDesc.trim() && !title.trim()) {
+            toast.error("Descreva a refeição antes de estimar.");
+            return;
+        }
+        setEstimating(true);
+        const res = await estimateMealNutrition({ title, items: finalDesc });
+        setEstimating(false);
+        if (!res.success || !res.estimate) {
+            toast.error(res.message);
+            return;
+        }
+        // No modo prato as kcal já vêm da soma dos alimentos — só completa macros.
+        if (!usingPlate) setManualCals(res.estimate.calories);
+        if (res.estimate.protein != null) setProtein(String(res.estimate.protein));
+        if (res.estimate.carbs != null) setCarbs(String(res.estimate.carbs));
+        if (res.estimate.fat != null) setFat(String(res.estimate.fat));
+        toast.success(res.message);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -447,7 +504,19 @@ function MealFormDialog({ meal, children }: { meal?: Meal; children?: React.Reac
 
                             {/* Macros (opcional) — gramas. Vazio = não informado. */}
                             <div className="space-y-1.5">
-                                <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Macros <span className="font-normal normal-case">(opcional, em gramas)</span></Label>
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Macros <span className="font-normal normal-case">(opcional, em gramas)</span></Label>
+                                    <button
+                                        type="button"
+                                        onClick={handleEstimate}
+                                        disabled={estimating}
+                                        className="flex items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary/80 disabled:opacity-50 transition-colors"
+                                        title="A IA estima kcal e macros pela descrição da refeição"
+                                    >
+                                        {estimating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                                        Estimar com IA
+                                    </button>
+                                </div>
                                 <div className="grid grid-cols-3 gap-2">
                                     <div className="relative">
                                         <Input inputMode="decimal" value={protein} onChange={(e) => setProtein(e.target.value)} placeholder="0" className="h-11 pl-9 rounded-xl bg-muted/20 border-border/40 font-mono" />

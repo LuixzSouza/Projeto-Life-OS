@@ -2,7 +2,7 @@
 
 import {
   Phone, CheckCircle2, AlertCircle, Briefcase,
-  MoreHorizontal, Circle, CalendarDays, Copy, Plus, Trash2,
+  MoreHorizontal, Circle, CalendarDays, Copy, Plus, Trash2, FileDown, Loader2, ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -25,6 +25,10 @@ interface ContractsListProps {
   onDeleteTarget: (target: DeleteTarget) => void;
   /** Abre o modal de Nova Parcela para o contrato. */
   onAddInvoice: (billing: { id: string; title: string }) => void;
+  /** Gera o PDF da cobrança (contrato + parcelas) para enviar ao cliente. */
+  onPdf: (billing: BillingData) => void;
+  /** id do contrato com PDF em geração (spinner no botão). */
+  pdfBusyId?: string | null;
 }
 
 // Lista de Contratos & Projetos (com faturas) de um cliente, usada na página de
@@ -32,7 +36,7 @@ interface ContractsListProps {
 // (scroll natural do navegador — nada de conteúdo preso em 60vh).
 export function ContractsList({
   client, onNewBilling, onEditBilling, onEditInvoice, onReceiveInvoice,
-  onCopyCharge, onWhatsapp, onDeleteTarget, onAddInvoice,
+  onCopyCharge, onWhatsapp, onDeleteTarget, onAddInvoice, onPdf, pdfBusyId,
 }: ContractsListProps) {
   const formatCurrency = useFormatCurrency();
 
@@ -82,6 +86,17 @@ export function ContractsList({
                           title="Copiar Resumo da Cobrança"
                         >
                           <Copy size={13} />
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          disabled={pdfBusyId === billing.id}
+                          className="h-7 w-7 text-primary hover:text-primary hover:bg-primary/10 opacity-0 group-hover/billing:opacity-100 transition-opacity disabled:opacity-100"
+                          onClick={() => onPdf(billing)}
+                          title="Baixar PDF da cobrança (enviar ao cliente)"
+                        >
+                          {pdfBusyId === billing.id ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />}
                         </Button>
 
                         <DropdownMenu>
@@ -142,6 +157,17 @@ export function ContractsList({
                               {formatCurrency(invoice.value)}
                             </span>
                             <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover/inv:opacity-100 transition-opacity">
+                              {invoice.linkUrl && (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7 text-primary hover:bg-primary/10"
+                                  title="Abrir link de pagamento (boleto/checkout)"
+                                  onClick={() => window.open(invoice.linkUrl!.startsWith("http") ? invoice.linkUrl! : `https://${invoice.linkUrl}`, "_blank", "noopener,noreferrer")}
+                                >
+                                  <ExternalLink size={14} />
+                                </Button>
+                              )}
                               {!isPaid && client.phone && (
                                 <Button
                                   size="icon"

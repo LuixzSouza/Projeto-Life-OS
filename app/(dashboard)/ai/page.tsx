@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { ModelSelector } from "@/components/ai/model-selector";
 import { DeleteChatForm } from "../../../components/ai/delete-chat-form";
 import { ExportChatButton } from "@/components/ai/export-chat-button";
-import { getAiStatus, providerMeta, normalizeProvider, stripPending, extractActions, extractSuggestions, extractImages } from "@/lib/ai-help";
+import { getAiStatus, providerMeta, normalizeProvider, stripPending, extractActions, extractSuggestions, extractClarify, extractNav, extractImages } from "@/lib/ai-help";
 import { isEphemeralServerless } from "@/lib/db-config";
 import { AI_PROVIDERS } from "@/lib/ai-models";
 
@@ -142,6 +142,8 @@ export default async function AIPage({ searchParams }: AIPageProps) {
         content: stripPending(msg.content),
         actions: extractActions(msg.content),
         suggestions: extractSuggestions(msg.content),
+        clarify: extractClarify(msg.content) ?? undefined,
+        nav: extractNav(msg.content),
         images: extractImages(msg.content),
         createdAt: msg.createdAt,
         provider: msg.provider,

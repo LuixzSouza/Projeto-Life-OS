@@ -2,9 +2,29 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 
-// Nome do arquivo de configuração salvo na raiz do projeto
+// Nome do arquivo de configuração salvo no diretório de dados
 const CONFIG_FILE_NAME = "life-os-config.json";
-const CONFIG_PATH = path.join(process.cwd(), CONFIG_FILE_NAME);
+
+/**
+ * Diretório de DADOS do Life OS (config, banco padrão, backups). Em builds
+ * instalados (DISTRIBUICAO Fase 0) aponta para %LOCALAPPDATA%\LifeOS\data via
+ * env LIFE_OS_DATA_DIR; sem a env, mantém o comportamento histórico (cwd).
+ */
+export function getDataDir(): string {
+  const env = process.env.LIFE_OS_DATA_DIR?.trim();
+  if (env) {
+    try {
+      if (!fs.existsSync(env)) fs.mkdirSync(env, { recursive: true });
+    } catch (e) {
+      console.warn("⚠️ Não foi possível criar LIFE_OS_DATA_DIR, usando cwd:", e);
+      return process.cwd();
+    }
+    return env;
+  }
+  return process.cwd();
+}
+
+const CONFIG_PATH = path.join(getDataDir(), CONFIG_FILE_NAME);
 
 // =========================================================
 // PERFIL DE CONEXÃO (híbrido-ready)
@@ -13,11 +33,19 @@ const CONFIG_PATH = path.join(process.cwd(), CONFIG_FILE_NAME);
 // implementado. O modo "cloud" já está modelado para a fase futura
 // (Turso/Postgres) sem precisar reescrever o núcleo.
 
+/**
+ * Provedores de banco na nuvem. "turso" e "postgres"/"supabase" são funcionais;
+ * "mysql" e "mongodb" estão modelados para as fases 4/5 do DATABASE_ROADMAP
+ * (cards "Em breve" no wizard) — o buildAdapterClient recusa com erro claro.
+ * Supabase é Postgres com açúcar: mesmo ramo de conexão, detecção própria.
+ */
+export type CloudProvider = "turso" | "postgres" | "supabase" | "mysql" | "mongodb";
+
 export type DbProfile =
   | { mode: "local"; databasePath: string }
   | {
       mode: "cloud";
-      provider: "turso" | "postgres";
+      provider: CloudProvider;
       url: string;
       authToken?: string;
     }
@@ -44,6 +72,19 @@ interface ConfigShape {
   // Política de instância: permite (ou não) o cadastro de novas contas em /register.
   // undefined = aberto (compatível com instalações existentes).
   registrationOpen?: boolean;
+  // Backup automático diário (snapshot .db + export JSON com rotação).
+  autoBackup?: AutoBackupConfig;
+  // Última verificação de integridade agendada (epoch ms) — marcador semanal.
+  lastIntegrityCheckAt?: number;
+}
+
+export interface AutoBackupConfig {
+  /** undefined = ligado (backup que precisa ser lembrado não protege ninguém). */
+  enabled?: boolean;
+  /** Pasta destino. undefined = <pasta do banco>/backups/auto. Aponte para OneDrive/Drive p/ cópia externa. */
+  dir?: string;
+  /** Quantas cópias diárias manter (rotação). undefined = 7. */
+  keep?: number;
 }
 
 // Cache em memória do config em arquivo. O Proxy do Prisma resolve o perfil a
@@ -60,7 +101,11 @@ function readConfig(): ConfigShape {
     return cachedConfig;
   }
   try {
-    cachedConfig = JSON.parse(fs.readFileSync(CONFIG_PATH, "utf-8")) as ConfigShape;
+    // strip de BOM: arquivo editado/regravado por Bloco de Notas ou PowerShell
+    // 5.1 vem em UTF-8 com BOM, e JSON.parse rejeita — sem o strip o app
+    // "desinstala" sozinho (config vira {} → cai no setup_needed.db).
+    const bomFree = fs.readFileSync(CONFIG_PATH, "utf-8").replace(new RegExp("^\\uFEFF"), "");
+    cachedConfig = JSON.parse(bomFree) as ConfigShape;
   } catch (e) {
     console.error("⚠️ Erro ao ler config do banco:", e);
     cachedConfig = {};
@@ -116,12 +161,119 @@ export function getEnvProfile(): DbProfile | null {
       undefined;
     return { mode: "cloud", provider: "turso", url, authToken };
   }
+
+  // Demais dialetos chegam SÓ por DATABASE_URL (os nomes TURSO_* são do Turso).
+  const generic = process.env.DATABASE_URL?.trim();
+  if (generic) {
+    const provider = detectProviderFromUrl(generic);
+    if (provider && provider !== "turso") {
+      return { mode: "cloud", provider, url: generic };
+    }
+  }
   return null;
+}
+
+/**
+ * Detecta o provedor de nuvem pelo esquema/host da URL de conexão.
+ * Retorna null para URLs locais (`file:`) ou esquemas desconhecidos.
+ */
+export function detectProviderFromUrl(url: string): CloudProvider | null {
+  const u = url.trim().toLowerCase();
+  if (/^(libsql|wss?):\/\//.test(u)) return "turso";
+  if (/^postgres(ql)?:\/\//.test(u)) {
+    return /\.supabase\.(co|com)|\.pooler\.supabase\.com/.test(u) ? "supabase" : "postgres";
+  }
+  if (/^mysql:\/\//.test(u)) return "mysql";
+  if (/^mongodb(\+srv)?:\/\//.test(u)) return "mongodb";
+  // https:// é ambíguo (Turso aceita) — só conta como turso se o host for dele.
+  if (/^https:\/\//.test(u)) return /turso\.io|\.aws-|\.gcp-/.test(u) ? "turso" : null;
+  return null;
+}
+
+/**
+ * Mascara credenciais embutidas numa URL de banco para logs/erros/toasts.
+ * `postgres://user:senha@host/db` → `postgres://user:•••@host/db`.
+ * URLs sem credencial voltam intactas; valores não-URL são truncados.
+ */
+export function maskDbUrl(url: string): string {
+  try {
+    const m = url.match(/^([a-z+]+:\/\/)([^@/]+)@(.*)$/i);
+    if (!m) return url;
+    const [, scheme, cred, rest] = m;
+    const user = cred.includes(":") ? cred.slice(0, cred.indexOf(":")) : cred;
+    return `${scheme}${user}:•••@${rest}`;
+  } catch {
+    return "•••";
+  }
 }
 
 // =========================================================
 // PERFIL — leitura / escrita
 // =========================================================
+
+// ---------------------------------------------------------
+// Cifra dos campos sensíveis do perfil persistido (Segurança §2 do
+// DATABASE_ROADMAP): o life-os-config.json guardava authToken (e, com
+// Postgres, a senha dentro da URL) em texto puro. Ciframos com a
+// ENCRYPTION_KEY local via lib/crypto (keyring). Import preguiçoso para
+// evitar ciclo (crypto.ts usa getOrCreateSecret deste módulo).
+// Migração suave: decrypt() devolve texto puro legado como está; o valor é
+// regravado cifrado na próxima escrita do perfil.
+// ---------------------------------------------------------
+
+function cryptoModule(): typeof import("./crypto") | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require("./crypto") as typeof import("./crypto");
+  } catch {
+    return null; // ambiente sem chave estável (ex.: serverless sem env) — segue em claro
+  }
+}
+
+/** Cifra authToken/URL-com-senha antes de persistir no config. */
+function sealProfile(profile: DbProfile): DbProfile {
+  const c = cryptoModule();
+  if (!c) return profile;
+  try {
+    if (profile.mode === "replica" && profile.authToken) {
+      return { ...profile, authToken: c.encrypt(profile.authToken) };
+    }
+    if (profile.mode === "cloud") {
+      const sealed = { ...profile };
+      if (sealed.authToken) sealed.authToken = c.encrypt(sealed.authToken);
+      // Credencial embutida na URL (postgres://user:senha@host) também é segredo.
+      if (/^[a-z+]+:\/\/[^@/]*:[^@/]+@/i.test(sealed.url)) sealed.url = c.encrypt(sealed.url);
+      return sealed;
+    }
+  } catch (e) {
+    console.warn("⚠️ Não foi possível cifrar o perfil (gravando em claro):", e);
+  }
+  return profile;
+}
+
+/** Decifra os campos do perfil lido do config (texto puro legado passa direto). */
+function openProfile(profile: DbProfile): DbProfile {
+  const c = cryptoModule();
+  if (!c) return profile;
+  const open = (v: string): string => {
+    try {
+      return c.decrypt(v);
+    } catch {
+      return v; // chave trocada/corrompida: devolve como está (erro aparece na conexão)
+    }
+  };
+  if (profile.mode === "replica" && profile.authToken) {
+    return { ...profile, authToken: open(profile.authToken) };
+  }
+  if (profile.mode === "cloud") {
+    return {
+      ...profile,
+      url: open(profile.url),
+      authToken: profile.authToken ? open(profile.authToken) : profile.authToken,
+    };
+  }
+  return profile;
+}
 
 export function getDbProfile(): DbProfile | null {
   // 1. Env vars têm prioridade (Vercel/serverless — config em arquivo não persiste).
@@ -130,7 +282,7 @@ export function getDbProfile(): DbProfile | null {
 
   // 2. Config local em arquivo (desktop/local-first).
   const config = readConfig();
-  if (config.profile) return config.profile;
+  if (config.profile) return openProfile(config.profile);
   // Migração suave: config antigo só tinha databasePath.
   if (config.databasePath) {
     return { mode: "local", databasePath: config.databasePath };
@@ -140,7 +292,7 @@ export function getDbProfile(): DbProfile | null {
 
 export function setDbProfile(profile: DbProfile) {
   const config = readConfig();
-  config.profile = profile;
+  config.profile = sealProfile(profile);
   // Mantém o campo legado em sincronia para compatibilidade (local e réplica
   // têm arquivo local; nuvem pura não).
   config.databasePath =
@@ -205,6 +357,38 @@ export function isRegistrationOpen(): boolean {
 export function setRegistrationOpen(open: boolean) {
   const config = readConfig();
   config.registrationOpen = open;
+  writeConfig(config);
+}
+
+// =========================================================
+// BACKUP AUTOMÁTICO (config da máquina, não do usuário)
+// =========================================================
+
+export function getAutoBackupConfig(): Required<AutoBackupConfig> {
+  const cfg = readConfig().autoBackup ?? {};
+  const dbPath = getDatabasePath();
+  const defaultDir = path.join(dbPath ? path.dirname(dbPath) : getDataDir(), "backups", "auto");
+  return {
+    enabled: cfg.enabled !== false,
+    dir: cfg.dir?.trim() || defaultDir,
+    keep: Math.max(1, Math.min(60, cfg.keep ?? 7)),
+  };
+}
+
+export function setAutoBackupConfig(partial: AutoBackupConfig) {
+  const config = readConfig();
+  config.autoBackup = { ...config.autoBackup, ...partial };
+  writeConfig(config);
+}
+
+/** Marcador da verificação de integridade semanal (epoch ms; 0 = nunca rodou). */
+export function getLastIntegrityCheckAt(): number {
+  return readConfig().lastIntegrityCheckAt ?? 0;
+}
+
+export function setLastIntegrityCheckAt(epochMs: number) {
+  const config = readConfig();
+  config.lastIntegrityCheckAt = epochMs;
   writeConfig(config);
 }
 

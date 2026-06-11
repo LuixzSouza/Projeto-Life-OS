@@ -364,6 +364,18 @@ export function InvoiceModal({ invoice, onClose }: InvoiceModalProps) {
               </div>
 
               <div className="space-y-1.5">
+                  <Label className="text-[10px] uppercase font-black text-muted-foreground ml-1">Link de pagamento <span className="font-medium normal-case tracking-normal">(boleto / checkout — opcional)</span></Label>
+                  <Input
+                    name="linkUrl"
+                    type="url"
+                    placeholder="https://..."
+                    defaultValue={invoice?.linkUrl ?? ""}
+                    className="rounded-xl h-12 bg-muted/20 font-mono text-xs"
+                  />
+                  <p className="ml-1 text-[10px] text-muted-foreground">Vai junto na mensagem de cobrança do WhatsApp e fica clicável na lista.</p>
+              </div>
+
+              <div className="space-y-1.5">
                   <Label className="text-[10px] uppercase font-black text-muted-foreground ml-1">Status de Pagamento</Label>
                   <Select name="status" defaultValue={invoice?.status || "PENDING"}>
                       <SelectTrigger className="rounded-xl h-12 bg-muted/20">

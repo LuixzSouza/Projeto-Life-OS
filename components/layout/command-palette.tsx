@@ -5,14 +5,14 @@ import { useRouter } from "next/navigation";
 import {
   LayoutDashboard, Calendar, NotebookPen, Briefcase, Wallet, BrainCircuit,
   Plus, FileText, Loader2, Star, Settings, History as HistoryIcon, Users, Sparkles,
-  ListTodo, Receipt,
+  ListTodo, Receipt, Dumbbell, Layers, Link2, UserRound, CalendarRange, Target,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   CommandDialog, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem, CommandShortcut,
 } from "@/components/ui/command";
 import { getNotes, getNoteProjects, createBlankNote, optimizeAllNoteImages, type NoteData, type NoteProject } from "@/app/(dashboard)/notes/actions";
-import { getPaletteTasks, type PaletteTask } from "@/app/(dashboard)/palette-actions";
+import { getPaletteTasks, getPaletteExtras, type PaletteTask, type PaletteExtras } from "@/app/(dashboard)/palette-actions";
 
 // Texto pesquisável de uma nota: título + caderno + projeto + tags + um trecho
 // limpo do corpo (sem markdown nem base64), pra busca achar por conteúdo também.
@@ -37,6 +37,8 @@ const NAV = [
   { label: "Transações", href: "/finance/transactions", icon: Receipt },
   { label: "Assistente IA", href: "/ai", icon: BrainCircuit },
   { label: "Linha do Tempo", href: "/timeline", icon: HistoryIcon },
+  { label: "Retrospectiva", href: "/review", icon: CalendarRange },
+  { label: "Metas", href: "/goals", icon: Target },
   { label: "Conexões", href: "/social", icon: Users },
   { label: "Configurações", href: "/settings", icon: Settings },
 ];
@@ -48,6 +50,7 @@ export function CommandPalette() {
   const [notes, setNotes] = useState<NoteData[] | null>(null);
   const [projects, setProjects] = useState<NoteProject[] | null>(null);
   const [tasks, setTasks] = useState<PaletteTask[] | null>(null);
+  const [extras, setExtras] = useState<PaletteExtras | null>(null);
   const [loading, setLoading] = useState(false);
   const [creating, startCreate] = useTransition();
   const loadedOnce = useRef(false);
@@ -80,8 +83,8 @@ export function CommandPalette() {
     if (!loadedOnce.current) setLoading(true);
     const load = async () => {
       try {
-        const [n, p, t] = await Promise.all([getNotes(), getNoteProjects(), getPaletteTasks()]);
-        if (active) { setNotes(n); setProjects(p); setTasks(t); loadedOnce.current = true; }
+        const [n, p, t, x] = await Promise.all([getNotes(), getNoteProjects(), getPaletteTasks(), getPaletteExtras()]);
+        if (active) { setNotes(n); setProjects(p); setTasks(t); setExtras(x); loadedOnce.current = true; }
       } finally {
         if (active) setLoading(false);
       }
@@ -177,6 +180,92 @@ export function CommandPalette() {
               >
                 <ListTodo className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
                 <span className="truncate">{t.title}</span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+
+        {extras && extras.contacts.length > 0 && (
+          <CommandGroup heading="Contatos">
+            {extras.contacts.map((c) => (
+              <CommandItem
+                key={c.id}
+                value={`contato ${c.name} ${c.nickname ?? ""} ${c.company ?? ""}`}
+                onSelect={() => go("/social")}
+              >
+                <UserRound className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="truncate">{c.name}</span>
+                {(c.nickname || c.company) && (
+                  <span className="ml-auto shrink-0 truncate pl-2 text-xs text-muted-foreground">
+                    {c.nickname ?? c.company}
+                  </span>
+                )}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+
+        {extras && extras.workoutPlans.length > 0 && (
+          <CommandGroup heading="Fichas de treino">
+            {extras.workoutPlans.map((w) => (
+              <CommandItem
+                key={w.id}
+                value={`treino ficha ${w.name} ${w.goal}`}
+                onSelect={() => go("/health/gym")}
+              >
+                <Dumbbell className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="truncate">{w.name}</span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+
+        {extras && extras.goals.length > 0 && (
+          <CommandGroup heading="Metas em aberto">
+            {extras.goals.map((g) => (
+              <CommandItem
+                key={g.id}
+                value={`meta ${g.title} ${g.subjectTitle ?? ""}`}
+                onSelect={() => go(`/goals?goal=${g.id}`)}
+              >
+                <Target className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="truncate">{g.title}</span>
+                {g.subjectTitle && (
+                  <span className="ml-auto shrink-0 truncate pl-2 text-xs text-muted-foreground">{g.subjectTitle}</span>
+                )}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+
+        {extras && extras.decks.length > 0 && (
+          <CommandGroup heading="Flashcards">
+            {extras.decks.map((d) => (
+              <CommandItem
+                key={d.id}
+                value={`flashcards deck ${d.title}`}
+                onSelect={() => go(`/flashcards/${d.id}/study`)}
+              >
+                <Layers className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="truncate">{d.title}</span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+
+        {extras && extras.links.length > 0 && (
+          <CommandGroup heading="Links salvos">
+            {extras.links.map((l) => (
+              <CommandItem
+                key={l.id}
+                value={`link ${l.title} ${l.category ?? ""} ${l.url}`}
+                onSelect={() => { setOpen(false); window.open(l.url, "_blank", "noopener,noreferrer"); }}
+              >
+                <Link2 className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+                <span className="truncate">{l.title}</span>
+                {l.category && (
+                  <span className="ml-auto shrink-0 truncate pl-2 text-xs text-muted-foreground">{l.category}</span>
+                )}
               </CommandItem>
             ))}
           </CommandGroup>

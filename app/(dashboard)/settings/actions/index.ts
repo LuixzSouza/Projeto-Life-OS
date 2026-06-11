@@ -8,3 +8,6 @@ export * from "./maintenance";
 export * from "./profile";
 export * from "./security";
 export * from "./test-connection";
+export * from "./windows-integration";
+export * from "./migrate-db";
+export * from "./space";

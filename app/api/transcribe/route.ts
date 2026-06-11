@@ -60,49 +60,57 @@ export async function POST(request: Request) {
     const groqKey = decryptKey(s?.groqKey);
     const openaiKey = decryptKey(s?.openaiKey);
 
-    // Groq é mais rápido/barato para Whisper; cai no OpenAI se não houver.
-    let url = "";
-    let model = "";
-    let key = "";
-    if (groqKey) {
-      url = "https://api.groq.com/openai/v1/audio/transcriptions";
-      model = "whisper-large-v3";
-      key = groqKey;
-    } else if (openaiKey) {
-      url = "https://api.openai.com/v1/audio/transcriptions";
-      model = "whisper-1";
-      key = openaiKey;
-    } else {
+    if (!groqKey && !openaiKey) {
       return NextResponse.json(
         { success: false, message: "Configure uma chave Groq ou OpenAI em Configurações para transcrever." },
         { status: 400 },
       );
     }
 
-    const apiForm = new FormData();
-    apiForm.append("file", audio, "reuniao.webm");
-    apiForm.append("model", model);
-    apiForm.append("language", "pt");
-    apiForm.append("temperature", "0");
-    apiForm.append("response_format", "json");
+    // Contexto opcional (vocabulário da reunião + cauda do trecho anterior) —
+    // é o mecanismo oficial do Whisper p/ acertar nomes próprios e jargões.
+    const promptRaw = form.get("prompt");
+    const contextPrompt =
+      typeof promptRaw === "string" && promptRaw.trim()
+        ? sanitizePrompt(promptRaw.trim()).slice(0, 1200)
+        : "";
 
-    // Contexto opcional para melhorar a precisão (nomes/jargões da reunião).
-    const prompt = form.get("prompt");
-    if (typeof prompt === "string" && prompt.trim()) {
-      const clean = sanitizePrompt(prompt.trim()).slice(0, 800);
-      if (clean) apiForm.append("prompt", clean);
+    const callApi = async (url: string, key: string, model: string, withTemperature: boolean) => {
+      const apiForm = new FormData();
+      apiForm.append("file", audio, "reuniao.webm");
+      apiForm.append("model", model);
+      apiForm.append("language", "pt");
+      apiForm.append("response_format", "json");
+      // Modelos gpt-4o-*-transcribe não aceitam temperature como o Whisper.
+      if (withTemperature) apiForm.append("temperature", "0");
+      if (contextPrompt) apiForm.append("prompt", contextPrompt);
+      const res = await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${key}` }, body: apiForm });
+      const data = await res.json().catch(() => ({}));
+      return { ok: res.ok, data: data as { text?: string; error?: { message?: string } } };
+    };
+
+    // Groq (whisper-large-v3) é rápido e excelente. No caminho OpenAI, o
+    // gpt-4o-mini-transcribe é visivelmente mais preciso que o whisper-1 —
+    // com fallback automático se a conta/modelo não aceitar.
+    let result: { ok: boolean; data: { text?: string; error?: { message?: string } } };
+    if (groqKey) {
+      result = await callApi("https://api.groq.com/openai/v1/audio/transcriptions", groqKey, "whisper-large-v3", true);
+    } else {
+      const oaiUrl = "https://api.openai.com/v1/audio/transcriptions";
+      result = await callApi(oaiUrl, openaiKey!, "gpt-4o-mini-transcribe", false);
+      if (!result.ok) {
+        result = await callApi(oaiUrl, openaiKey!, "whisper-1", true);
+      }
     }
 
-    const res = await fetch(url, { method: "POST", headers: { Authorization: `Bearer ${key}` }, body: apiForm });
-    const data = await res.json();
-    if (!res.ok) {
+    if (!result.ok) {
       return NextResponse.json(
-        { success: false, message: data?.error?.message || "Falha na transcrição." },
+        { success: false, message: result.data?.error?.message || "Falha na transcrição." },
         { status: 502 },
       );
     }
 
-    const transcript = cleanTranscript((data.text as string) || "");
+    const transcript = cleanTranscript(result.data.text || "");
     return NextResponse.json({ success: true, transcript });
   } catch (error) {
     console.error("Erro na transcrição:", error);

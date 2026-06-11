@@ -16,6 +16,7 @@ import type { UserData } from "./sidebar-types";
 import { groupedSidebarItems, mobileNavItems, isActiveRoute, isItemActive } from "./sidebar-config";
 import { SidebarLink } from "./sidebar-link";
 import { UserProfileSection } from "./user-profile-section";
+import { ConnectionIndicator } from "./connection-indicator";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import type { NotificationInbox } from "@/lib/notifications";
 
@@ -161,6 +162,7 @@ export function Sidebar({ user, inbox }: { user?: UserData | null; inbox: Notifi
           </div>
         </ScrollArea>
 
+        <ConnectionIndicator isCollapsed={isCollapsed} />
         <UserProfileSection
           user={user}
           isCollapsed={isCollapsed}
@@ -277,6 +279,7 @@ export function Sidebar({ user, inbox }: { user?: UserData | null; inbox: Notifi
           </ScrollArea>
 
           <div className="mt-auto pb-safe">
+            <ConnectionIndicator />
             <UserProfileSection
               user={user}
               isCollapsed={false}

@@ -2,6 +2,7 @@
 
 import { requireUserId } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { containsInsensitive } from "@/lib/db-text";
 import { runOneShotAi } from "@/app/(dashboard)/ai/actions/oneshot";
 
 // =========================================================
@@ -72,9 +73,9 @@ export async function getDevilsAdvocate(input: AdvocateInput): Promise<AdvocateV
         userId,
         deletedAt: null,
         OR: [
-          { content: { contains: "meta" } },
-          { content: { contains: "objetivo" } },
-          { tags: { contains: "diário" } },
+          { content: containsInsensitive("meta") },
+          { content: containsInsensitive("objetivo") },
+          { tags: containsInsensitive("diário") },
         ],
       },
       orderBy: { updatedAt: "desc" },

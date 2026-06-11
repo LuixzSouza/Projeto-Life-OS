@@ -1,22 +1,28 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import { Search, Inbox, Sparkles, LayoutGrid, ArrowDownUp, Tag } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { ProjectCard } from "./project-card";
 import { NewProjectDialog } from "./new-project-dialog";
-import { setProjectPara } from "@/app/(dashboard)/projects/actions";
 import { PARA_TYPES, PARA_META, type ParaType } from "@/lib/para";
 
-export interface ProjectItem {
+// Resumo das tarefas (projeto ou inbox) calculado no servidor — alimenta os
+// sinais de prazo/ritmo/prioridade do card.
+export interface TaskSummary {
+  totalTasks: number;
+  completedTasks: number;
+  overdueTasks: number;
+  nextDue: string | null;
+  doneThisWeek: number;
+  highPriority: number;
+}
+
+export interface ProjectItem extends TaskSummary {
   id: string;
   slug: string;
   title: string;
@@ -25,35 +31,51 @@ export interface ProjectItem {
   color: string | null;
   paraType: string | null;
   updatedAt: string;
-  totalTasks: number;
-  completedTasks: number;
+  /** Prazo do PROJETO (ISO) — countdown no card. */
+  dueDate: string | null;
 }
 
-type FilterKey = "all" | "active" | "done";
+type FilterKey = "all" | "active" | "late" | "done" | "archived";
 type ParaFilter = "all" | ParaType | "none";
-type SortKey = "recent" | "name" | "progress" | "pending";
+type SortKey = "recent" | "name" | "progress" | "pending" | "deadline";
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "all", label: "Todos" },
   { key: "active", label: "Em andamento" },
+  { key: "late", label: "Atrasados" },
   { key: "done", label: "Concluídos" },
+  { key: "archived", label: "Arquivados" },
 ];
 
 const progressOf = (p: ProjectItem) => (p.totalTasks === 0 ? 0 : Math.round((p.completedTasks / p.totalTasks) * 100));
 
-export function ProjectsExplorer({ projects, inbox }: { projects: ProjectItem[]; inbox: { total: number; completed: number } }) {
+export function ProjectsExplorer({ projects, inbox }: { projects: ProjectItem[]; inbox: TaskSummary }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
   const [paraFilter, setParaFilter] = useState<ParaFilter>("all");
   const [sort, setSort] = useState<SortKey>("recent");
 
+  // Templates (status TEMPLATE) vivem numa seção própria, fora da lista padrão.
+  const templates = useMemo(() => projects.filter((p) => p.status === "TEMPLATE"), [projects]);
+
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     let list = projects.filter((p) => {
+      if (p.status === "TEMPLATE") return false; // seção própria
+      // Arquivados (paraType ARCHIVE) só aparecem no filtro "Arquivados".
+      const isArchived = p.paraType === "ARCHIVE";
+      if (filter === "archived") {
+        if (!isArchived) return false;
+      } else if (isArchived) {
+        return false;
+      }
       const matchesSearch = !q || p.title.toLowerCase().includes(q) || (p.description || "").toLowerCase().includes(q);
       const prog = progressOf(p);
       const matchesFilter =
-        filter === "all" ? true : filter === "done" ? prog === 100 && p.totalTasks > 0 : !(prog === 100 && p.totalTasks > 0);
+        filter === "all" || filter === "archived" ? true
+        : filter === "done" ? prog === 100 && p.totalTasks > 0
+        : filter === "late" ? p.overdueTasks > 0
+        : !(prog === 100 && p.totalTasks > 0);
       const matchesPara =
         paraFilter === "all" ? true : paraFilter === "none" ? !p.paraType : p.paraType === paraFilter;
       return matchesSearch && matchesFilter && matchesPara;
@@ -64,6 +86,16 @@ export function ProjectsExplorer({ projects, inbox }: { projects: ProjectItem[];
         case "name": return a.title.localeCompare(b.title);
         case "progress": return progressOf(b) - progressOf(a);
         case "pending": return (b.totalTasks - b.completedTasks) - (a.totalTasks - a.completedTasks);
+        case "deadline": {
+          // Atrasados primeiro; depois o prazo mais próximo (do projeto ou da
+          // próxima tarefa, o que vier antes); sem prazo por último.
+          if (a.overdueTasks !== b.overdueTasks) return b.overdueTasks - a.overdueTasks;
+          const dueOf = (p: ProjectItem) => Math.min(
+            p.dueDate ? new Date(p.dueDate).getTime() : Number.POSITIVE_INFINITY,
+            p.nextDue ? new Date(p.nextDue).getTime() : Number.POSITIVE_INFINITY,
+          );
+          return dueOf(a) - dueOf(b);
+        }
         default: return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
       }
     });
@@ -84,8 +116,12 @@ export function ProjectsExplorer({ projects, inbox }: { projects: ProjectItem[];
           slug="inbox"
           title="Caixa de Entrada"
           description="Tudo o que ainda não foi organizado em um projeto específico."
-          totalTasks={inbox.total}
-          completedTasks={inbox.completed}
+          totalTasks={inbox.totalTasks}
+          completedTasks={inbox.completedTasks}
+          overdueTasks={inbox.overdueTasks}
+          nextDue={inbox.nextDue}
+          doneThisWeek={inbox.doneThisWeek}
+          highPriority={inbox.highPriority}
           isInbox
         />
       </section>
@@ -150,6 +186,7 @@ export function ProjectsExplorer({ projects, inbox }: { projects: ProjectItem[];
               </SelectTrigger>
               <SelectContent className="rounded-xl">
                 <SelectItem value="recent">Recentes</SelectItem>
+                <SelectItem value="deadline">Prazo próximo</SelectItem>
                 <SelectItem value="name">Nome (A–Z)</SelectItem>
                 <SelectItem value="progress">Progresso</SelectItem>
                 <SelectItem value="pending">Mais pendências</SelectItem>
@@ -181,73 +218,63 @@ export function ProjectsExplorer({ projects, inbox }: { projects: ProjectItem[];
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 items-stretch">
             {visible.map((project) => (
-              <div key={project.id} className="relative">
-                <ProjectCard
-                  id={project.id}
-                  slug={project.slug}
-                  title={project.title}
-                  description={project.description}
-                  status={project.status}
-                  color={project.color || undefined}
-                  totalTasks={project.totalTasks}
-                  completedTasks={project.completedTasks}
-                  updatedAt={project.updatedAt}
-                />
-                <ParaBadge projectId={project.id} paraType={project.paraType} />
-              </div>
+              <ProjectCard
+                key={project.id}
+                id={project.id}
+                slug={project.slug}
+                title={project.title}
+                description={project.description}
+                status={project.status}
+                color={project.color || undefined}
+                totalTasks={project.totalTasks}
+                completedTasks={project.completedTasks}
+                overdueTasks={project.overdueTasks}
+                nextDue={project.nextDue}
+                doneThisWeek={project.doneThisWeek}
+                highPriority={project.highPriority}
+                updatedAt={project.updatedAt}
+                paraType={project.paraType}
+                projectDue={project.dueDate}
+              />
             ))}
           </div>
         )}
       </section>
+
+      {/* Templates: biblioteca de modelos ("Salvar como template" no menu ⋯) */}
+      {templates.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center gap-2 px-1">
+            <LayoutGrid className="h-4 w-4 text-violet-500" />
+            <h2 className="text-sm font-semibold text-foreground">Templates</h2>
+            <span className="text-xs text-muted-foreground">
+              · use o menu ⋯ → &quot;Usar template&quot; para criar um projeto novo
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 items-stretch">
+            {templates.map((t) => (
+              <ProjectCard
+                key={t.id}
+                id={t.id}
+                slug={t.slug}
+                title={t.title}
+                description={t.description}
+                status={t.status}
+                color={t.color || undefined}
+                totalTasks={t.totalTasks}
+                completedTasks={t.completedTasks}
+                overdueTasks={0}
+                nextDue={null}
+                doneThisWeek={0}
+                highPriority={0}
+                updatedAt={t.updatedAt}
+                paraType={t.paraType}
+              />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
 
-// Badge PARA no canto do card: mostra a gaveta atual e troca em 1 clique,
-// sem entrar no projeto. Fica FORA do <Link> do card (overlay), então não
-// precisa de stopPropagation.
-function ParaBadge({ projectId, paraType }: { projectId: string; paraType: string | null }) {
-  const router = useRouter();
-  const [isPending, start] = useTransition();
-  const meta = paraType ? PARA_META[paraType as ParaType] : null;
-
-  const choose = (next: ParaType | null) => {
-    start(async () => {
-      await setProjectPara(projectId, next);
-      router.refresh();
-    });
-  };
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          title={meta ? `PARA: ${meta.label} — clique para trocar` : "Classificar no PARA"}
-          className={cn(
-            "absolute right-3 top-3 z-10 rounded-md px-2 py-0.5 text-[9px] font-black uppercase tracking-widest shadow-sm transition-all hover:scale-105",
-            meta ? meta.badgeClass : "bg-muted/80 text-muted-foreground/70 hover:text-foreground",
-            isPending && "pointer-events-none opacity-50",
-          )}
-        >
-          {meta ? meta.label : "PARA?"}
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-44 rounded-xl">
-        {PARA_TYPES.map((key) => (
-          <DropdownMenuItem key={key} onClick={() => choose(key)} className="gap-2 text-xs font-semibold">
-            <span className={cn("rounded px-1.5 py-0.5 text-[9px] font-black uppercase", PARA_META[key].badgeClass)}>
-              {PARA_META[key].label}
-            </span>
-            <span className="truncate text-[10px] text-muted-foreground">{PARA_META[key].hint}</span>
-          </DropdownMenuItem>
-        ))}
-        {paraType && (
-          <DropdownMenuItem onClick={() => choose(null)} className="text-xs text-muted-foreground">
-            Remover classificação
-          </DropdownMenuItem>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}

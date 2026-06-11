@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getDbProfile } from "@/lib/db-config";
+import { isSqliteFamily } from "@/lib/db-dialect";
 import { revalidatePath } from "next/cache";
 
 // ============================================================================
@@ -10,11 +11,11 @@ import { revalidatePath } from "next/cache";
 
 // Executa limpeza e compactação do SQLite
 export async function optimizeDatabase() {
-  // VACUUM não é suportado pelo Turso e não faz sentido sobre uma réplica
-  // (o cache local é descartável; o primário é gerenciado na nuvem). Só roda
-  // no modo Local, onde há um arquivo .db de verdade pra compactar.
+  // VACUUM/PRAGMA são dialeto SQLite (gate de dialeto): não existem no
+  // Postgres/MySQL e não fazem sentido sobre Turso/réplica (o primário é
+  // gerenciado na nuvem). Só roda no modo Local, onde há um arquivo .db real.
   const mode = getDbProfile()?.mode;
-  if (mode !== "local") {
+  if (mode !== "local" || !isSqliteFamily()) {
     return {
       success: false,
       message:
@@ -50,12 +51,12 @@ export async function optimizeDatabase() {
 
 // Verifica se o arquivo .db está saudável
 export async function checkDatabaseIntegrity() {
-  // No modo nuvem pura o banco é gerenciado pelo Turso — não há arquivo local
-  // para diagnosticar. No Local/Híbrido o integrity_check roda sobre o arquivo.
-  if (getDbProfile()?.mode === "cloud") {
+  // PRAGMA integrity_check é dialeto SQLite e só faz sentido sobre um ARQUIVO
+  // local (Local/Híbrido). Nuvem (Turso/Postgres/...) é gerenciada pelo serviço.
+  if (getDbProfile()?.mode === "cloud" || !isSqliteFamily()) {
     return {
       success: false,
-      message: "Diagnóstico de arquivo não se aplica ao Turso (nuvem). O serviço cuida da integridade.",
+      message: "Diagnóstico de arquivo não se aplica a bancos na nuvem — o provedor cuida da integridade.",
     };
   }
 

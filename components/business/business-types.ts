@@ -1,6 +1,6 @@
 // Tipos compartilhados do módulo Business (CRM + cobranças).
 
-export interface InvoiceData { id: string; title: string; value: number; dueDate: Date; status: string; paidAt?: Date | null; transactionId?: string | null; }
+export interface InvoiceData { id: string; title: string; value: number; dueDate: Date; status: string; paidAt?: Date | null; transactionId?: string | null; linkUrl?: string | null; }
 export interface BillingData { id: string; title: string; totalValue: number; status: string; lastRemindedAt?: Date | null; invoices: InvoiceData[] }
 
 // Conexão vinculada ao cliente (subconjunto leve de Friend).

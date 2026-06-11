@@ -2,9 +2,10 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { requireUserId, hashPassword, verifyPassword, logout } from "@/lib/auth";
+import { requireUserId, hashPassword, verifyPassword, logout, login } from "@/lib/auth";
 import { validatePasswordStrength } from "@/lib/password-policy";
 import { setRegistrationOpen } from "@/lib/db-config";
+import { wipeUserData } from "@/lib/full-backup";
 
 // ============================================================================
 // SEGURANÇA E FACTORY RESET
@@ -49,50 +50,52 @@ export async function changePassword(formData: FormData) {
   revalidatePath("/");
 }
 
+/**
+ * Desconecta TODOS os outros dispositivos: incrementa User.tokenVersion (todo
+ * JWT antigo passa a ser rejeitado pelo getSession) e reemite o cookie apenas
+ * desta sessão, que continua válida. Registra o evento na aba Segurança.
+ */
+export async function disconnectOtherDevices(): Promise<{ success: boolean; message: string }> {
+  try {
+    const userId = await requireUserId();
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { tokenVersion: { increment: 1 } },
+    });
+
+    // Reemite o cookie do dispositivo atual já com a nova versão.
+    await login(userId);
+
+    // Best-effort: aparece em "Últimos acessos" como evento de revogação.
+    try {
+      await prisma.activityLog.create({
+        data: {
+          userId,
+          action: "REVOKE",
+          module: "auth",
+          summary: "Desconectou os outros dispositivos",
+        },
+      });
+    } catch {
+      /* log nunca trava a revogação */
+    }
+
+    revalidatePath("/settings");
+    return { success: true, message: "Outros dispositivos desconectados. Esta sessão continua ativa." };
+  } catch (error) {
+    console.error("Erro ao desconectar dispositivos:", error);
+    return { success: false, message: "Falha ao desconectar os outros dispositivos." };
+  }
+}
+
 export async function factoryReset() {
   try {
-    // Apaga SOMENTE os dados do usuário logado.
+    // Apaga SOMENTE os dados do usuário logado. A ordem filho→pai vive no
+    // registro central de lib/full-backup.ts (cobre 100% dos models —
+    // o factory reset antigo esquecia Notebook, Habit, Meeting, Tag, etc.).
     const userId = await requireUserId();
-    const scope = { where: { userId } };
-
-    // Ordem de deleção: filhos (FKs) -> pais
-    await prisma.aiMessage.deleteMany(scope);
-    await prisma.sitePage.deleteMany(scope);
-    await prisma.invoice.deleteMany(scope);
-    await prisma.flashcard.deleteMany(scope);
-    await prisma.studyNote.deleteMany(scope);
-    await prisma.studyContent.deleteMany(scope);
-    await prisma.learningTask.deleteMany(scope);
-    await prisma.learningGoal.deleteMany(scope);
-    await prisma.studySession.deleteMany(scope);
-    await prisma.transaction.deleteMany(scope);
-    await prisma.task.deleteMany(scope);
-    await prisma.event.deleteMany(scope);
-    await prisma.billing.deleteMany(scope);
-
-    await prisma.aiChat.deleteMany(scope);
-    await prisma.managedSite.deleteMany(scope);
-    await prisma.flashcardDeck.deleteMany(scope);
-    await prisma.studySubject.deleteMany(scope);
-    await prisma.account.deleteMany(scope);
-    await prisma.project.deleteMany(scope);
-    await prisma.client.deleteMany(scope);
-
-    await prisma.jobApplication.deleteMany(scope);
-    await prisma.workout.deleteMany(scope);
-    await prisma.healthMetric.deleteMany(scope);
-    await prisma.bodyMeasurement.deleteMany(scope);
-    await prisma.meal.deleteMany(scope);
-    await prisma.mealPlan.deleteMany(scope);
-    await prisma.recurringExpense.deleteMany(scope);
-    await prisma.wishlistItem.deleteMany(scope);
-    await prisma.routineItem.deleteMany(scope);
-    await prisma.accessItem.deleteMany(scope);
-    await prisma.savedLink.deleteMany(scope);
-    await prisma.mediaItem.deleteMany(scope);
-    await prisma.friend.deleteMany(scope);
-    await prisma.wardrobeItem.deleteMany(scope);
-    await prisma.backupLog.deleteMany(scope);
+    await wipeUserData(userId);
 
     revalidatePath("/");
     return { success: true };

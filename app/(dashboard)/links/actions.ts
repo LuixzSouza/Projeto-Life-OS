@@ -177,6 +177,19 @@ export async function checkLinksHealth(): Promise<LinkHealth> {
   return { statusById, brokenIds, checked: links.length };
 }
 
+// --- FAVORITO (1 clique no card; campo existia no schema sem UI) ---
+export async function toggleLinkFavorite(id: string, isFavorite: boolean) {
+  try {
+    const userId = await requireUserId();
+    await prisma.savedLink.updateMany({ where: { id, userId, deletedAt: null }, data: { isFavorite } });
+    revalidatePath("/links");
+    return { success: true };
+  } catch (error) {
+    console.error("Erro ao favoritar link:", error);
+    return { success: false };
+  }
+}
+
 // --- 4. REMOVER LINK ---
 export async function deleteLink(id: string) {
   try {

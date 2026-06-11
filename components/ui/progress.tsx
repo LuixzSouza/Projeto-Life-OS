@@ -12,12 +12,14 @@ interface ProgressProps
    * Útil para variações visuais sem alterar o comportamento.
    */
   indicatorClassName?: string;
+  /** Estilos inline do indicador (ex.: cor dinâmica vinda de dados). */
+  indicatorStyle?: React.CSSProperties;
 }
 
 const Progress = React.forwardRef<
   React.ElementRef<typeof ProgressPrimitive.Root>,
   ProgressProps
->(({ className, value = 0, indicatorClassName, ...props }, ref) => (
+>(({ className, value = 0, indicatorClassName, indicatorStyle, ...props }, ref) => (
   <ProgressPrimitive.Root
     ref={ref}
     data-slot="progress"
@@ -56,6 +58,7 @@ const Progress = React.forwardRef<
         indicatorClassName
       )}
       style={{
+        ...indicatorStyle,
         transform: `translateX(-${100 - (value ?? 0)}%)`,
       }}
     />

@@ -58,8 +58,12 @@ export const generateChargeMessage = (
     const pixKey = opts?.pixKey?.trim();
     const signature = opts?.businessName?.trim();
 
+    // Link de pagamento da PRÓXIMA parcela em aberto que tiver um (boleto/checkout).
+    const nextWithLink = sortedInvoices.find((inv) => inv.status !== "PAID" && inv.status !== "CANCELED" && inv.linkUrl?.trim());
+    const linkLine = nextWithLink ? `\n\nLink de pagamento: ${nextWithLink.linkUrl!.trim()}` : "";
+
     const pixLine = pixKey ? `\n\nSegue o PIX: ${pixKey}` : "";
     const signLine = signature ? `\n\n${signature}` : "\n\nObrigado!";
 
-    return `Oi ${firstName}, ${greeting}! ${randomIntro}\n\n${invoiceLines}${pixLine}${signLine}`;
+    return `Oi ${firstName}, ${greeting}! ${randomIntro}\n\n${invoiceLines}${linkLine}${pixLine}${signLine}`;
 };

@@ -55,6 +55,12 @@ export function BlockReminders() {
       void Notification.requestPermission().catch(() => {});
     }
 
+    // #11: registra o service worker (public/sw.js). Necessário p/ notificação
+    // no PWA instalado (Android) e p/ o clique focar/abrir a Agenda.
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      void navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+
     // Hidrata os já-avisados de hoje (evita repetir após refresh/navegação).
     const stored = loadAlerted();
     const tk = todayKey();
@@ -96,10 +102,24 @@ export function BlockReminders() {
         });
 
         if ("Notification" in window && Notification.permission === "granted") {
+          const title = `Começa ${when}: ${b.title}`;
+          const options: NotificationOptions = {
+            body: b.location ?? undefined,
+            icon: "/icon-192.png",
+            tag: `lifeos-block-${b.id}`, // dedup nativa por bloco
+            data: { url: "/agenda?tab=blocks" },
+          };
+          // Preferência: via service worker (#11) — persiste melhor, funciona no
+          // PWA Android e o clique abre a Agenda. Fallback: Notification direto.
           try {
-            new Notification(`Começa ${when}: ${b.title}`, { body: b.location ?? undefined });
+            const reg = "serviceWorker" in navigator ? await navigator.serviceWorker.getRegistration() : undefined;
+            if (reg) {
+              await reg.showNotification(title, options);
+            } else {
+              new Notification(title, options);
+            }
           } catch {
-            /* alguns navegadores exigem service worker — ignora */
+            /* sem suporte — o toast acima já cobriu */
           }
         }
       }

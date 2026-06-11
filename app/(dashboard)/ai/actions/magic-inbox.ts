@@ -12,7 +12,7 @@ import { moduleInfo } from "@/lib/ai-help";
 import type { AIModule } from "./types";
 
 // Módulos que a Inbox pode criar (subset seguro de criação direta).
-const INBOX_MODULES = ["FINANCE", "TASKS", "AGENDA", "STUDIES", "NUTRITION", "HEALTH"] as const;
+const INBOX_MODULES = ["FINANCE", "TASKS", "AGENDA", "STUDIES", "NUTRITION", "HEALTH", "LINKS"] as const;
 type InboxModule = (typeof INBOX_MODULES)[number];
 
 export interface MagicItem {
@@ -22,6 +22,10 @@ export interface MagicItem {
   category?: string;
   description?: string;
   date?: string; // YYYY-MM-DD
+  // NUTRITION: macros estimados em gramas
+  protein?: number;
+  carbs?: number;
+  fat?: number;
 }
 
 export interface MagicParseResult {
@@ -48,13 +52,17 @@ function sanitizeItems(raw: unknown): MagicItem[] {
     if (!it || typeof it !== "object") continue;
     const o = it as Record<string, unknown>;
     if (!isInboxModule(o.module) || typeof o.title !== "string" || !o.title.trim()) continue;
+    const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
     out.push({
       module: o.module,
       title: o.title.trim().slice(0, 120),
-      value: typeof o.value === "number" && Number.isFinite(o.value) ? o.value : undefined,
+      value: num(o.value),
       category: typeof o.category === "string" ? o.category.slice(0, 40) : undefined,
       description: typeof o.description === "string" ? o.description.slice(0, 300) : undefined,
       date: typeof o.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(o.date) ? o.date : undefined,
+      protein: num(o.protein),
+      carbs: num(o.carbs),
+      fat: num(o.fat),
     });
   }
   return out;
@@ -69,6 +77,14 @@ function localParse(text: string): MagicItem[] {
     .slice(0, 10);
 
   return segments.map((seg): MagicItem => {
+    // URL no texto → link salvo (título = resto do texto ou domínio).
+    const urlMatch = seg.match(/(https?:\/\/\S+|www\.\S+\.\S{2,})/i);
+    if (urlMatch) {
+      const url = urlMatch[1];
+      const rest = seg.replace(urlMatch[1], "").replace(/\s+/g, " ").trim().replace(/^[-—:]+|[-—:]+$/g, "").trim();
+      const domain = url.replace(/^https?:\/\//i, "").replace(/^www\./i, "").split(/[/?#]/)[0];
+      return { module: "LINKS", title: (rest || domain).slice(0, 80), description: url };
+    }
     // "50 mercado" / "R$ 49,90 farmácia" → gasto
     const money = seg.match(/^r?\$?\s*(\d+(?:[.,]\d{1,2})?)\s+(.{2,})$/i);
     if (money) {
@@ -88,8 +104,8 @@ function localParse(text: string): MagicItem[] {
   });
 }
 
-const PARSE_SYSTEM = `Você é o classificador da Inbox Mágica do Life OS. O usuário despeja texto livre; você devolve APENAS um array JSON (sem cercas, sem comentário) de registros a criar. Cada item: {"module":"FINANCE|TASKS|AGENDA|STUDIES|NUTRITION|HEALTH","title":"...","value":num?,"category":"...?","description":"...?","date":"YYYY-MM-DD?"}.
-Regras de mapeamento: FINANCE=gasto/receita (title=descrição, value=valor, category=EXPENSE|INCOME) · TASKS=tarefa (date=vencimento) · AGENDA=evento com dia/hora (date) · STUDIES=ideia/nota (title+description) · NUTRITION=comida (title, value=kcal se citado, category=BREAKFAST|LUNCH|SNACK|DINNER) · HEALTH=treino (title, value=minutos). Datas relativas: resolva usando a data de hoje informada. Máximo 10 itens. Se nada fizer sentido, devolva [].`;
+const PARSE_SYSTEM = `Você é o classificador da Inbox Mágica do Life OS. O usuário despeja texto livre; você devolve APENAS um array JSON (sem cercas, sem comentário) de registros a criar. Cada item: {"module":"FINANCE|TASKS|AGENDA|STUDIES|NUTRITION|HEALTH|LINKS","title":"...","value":num?,"category":"...?","description":"...?","date":"YYYY-MM-DD?"}.
+Regras de mapeamento: FINANCE=gasto/receita (title=descrição, value=valor, category=EXPENSE|INCOME) · TASKS=tarefa (date=vencimento) · AGENDA=evento com dia/hora (date) · STUDIES=ideia/nota (title+description) · NUTRITION=comida (title, description=itens, value=kcal — use o valor citado ou ESTIME pelas porções típicas (nunca deixe vazio), protein/carbs/fat=gramas estimadas, category=BREAKFAST(café da manhã)|LUNCH(almoço)|SNACK(lanche)|DINNER(janta/jantar)) · HEALTH=treino (title, value=minutos) · LINKS=URL para salvar (title=nome do site/conteúdo, description=a URL completa, category=categoria curta se óbvia). Datas relativas: resolva usando a data de hoje informada. Máximo 10 itens. Se nada fizer sentido, devolva [].`;
 
 export async function parseMagicCapture(text: string): Promise<MagicParseResult> {
   const userId = await requireUserId();
@@ -130,7 +146,12 @@ export async function confirmMagicCapture(items: MagicItem[]): Promise<MagicConf
       value: item.value,
       category: item.category,
       description: item.description,
-      date: item.date,
+      // A Inbox é captura rápida sem conversa: evento sem data explícita entra
+      // como "agora" (o chat, com diálogo, pergunta — a trava do AGENDA exige date).
+      date: item.module === "AGENDA" && !item.date ? new Date().toISOString() : item.date,
+      protein: item.protein,
+      carbs: item.carbs,
+      fat: item.fat,
     });
     if (result.ok) {
       const info = moduleInfo(item.module);

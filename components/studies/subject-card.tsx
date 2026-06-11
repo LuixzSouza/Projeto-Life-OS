@@ -1,10 +1,15 @@
 "use client";
 
+// Card de matéria (redesign 10/jun): a cor da matéria vira identidade — anel
+// de progresso ao redor do ícone (meta), wash sutil no topo, dificuldade em
+// pontinhos e rodapé de estatísticas em 3 colunas. "▶ Estudar" abre o modo
+// foco direto do card (study-launch.ts). Sem badges empilhadas: era isso que
+// espremia o layout em colunas estreitas.
+
 import React, { useMemo } from "react";
 import { StudySubject } from "@prisma/client";
 import {
-  MoreVertical, Clock, Edit, Trash2, BookOpen, Calendar,
-  BarChart3, Folder, CheckCircle2,
+  MoreVertical, Edit, Trash2, BookOpen, Folder, CheckCircle2, Play,
 } from "lucide-react";
 
 import {
@@ -17,8 +22,8 @@ import {
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { requestStudyStart } from "./study-launch";
 
 /* -------------------------------------------------------------------------- */
 /* TYPES                                                                      */
@@ -37,6 +42,8 @@ interface SubjectCardProps {
   onDetailsClick: (id: string) => void;
   parentName?: string | null;
   viewMode?: "grid" | "list";
+  /** Matéria raiz da seção (destaque embutido — sem wrapper externo). */
+  isRoot?: boolean;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -44,11 +51,11 @@ interface SubjectCardProps {
 /* -------------------------------------------------------------------------- */
 
 const DIFFICULTY_CONFIG = {
-  1: { label: "Iniciante", color: "text-emerald-600", bg: "bg-emerald-500/10" },
-  2: { label: "Fácil", color: "text-teal-600", bg: "bg-teal-500/10" },
-  3: { label: "Intermediário", color: "text-blue-600", bg: "bg-blue-500/10" },
-  4: { label: "Difícil", color: "text-amber-600", bg: "bg-amber-500/10" },
-  5: { label: "Expert", color: "text-rose-600", bg: "bg-rose-500/10" },
+  1: { label: "Iniciante", dot: "#10b981" },
+  2: { label: "Fácil", dot: "#14b8a6" },
+  3: { label: "Intermediário", dot: "#3b82f6" },
+  4: { label: "Difícil", dot: "#f59e0b" },
+  5: { label: "Expert", dot: "#f43f5e" },
 } as const;
 
 /* -------------------------------------------------------------------------- */
@@ -73,6 +80,56 @@ const formatDate = (date?: Date | string | null) => {
 };
 
 /* -------------------------------------------------------------------------- */
+/* SUB-COMPONENTES VISUAIS                                                    */
+/* -------------------------------------------------------------------------- */
+
+/** Anel SVG de progresso da meta envolvendo o ícone/emoji da matéria. */
+function ProgressRing({
+  percent, color, size = 56, stroke = 4, children,
+}: {
+  percent: number; color: string; size?: number; stroke?: number; children: React.ReactNode;
+}) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const filled = (Math.min(100, Math.max(0, percent)) / 100) * c;
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={stroke} className="stroke-muted" />
+        <circle
+          cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={stroke}
+          stroke={color} strokeLinecap="round"
+          strokeDasharray={`${filled} ${c - filled}`}
+          className="transition-all duration-700 ease-out"
+        />
+      </svg>
+      <div
+        className="absolute inset-[6px] flex items-center justify-center rounded-full"
+        style={{ backgroundColor: `${color}14`, color }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** Dificuldade como 5 pontinhos (ocupa 1/4 do espaço de uma badge de texto). */
+function DifficultyDots({ level }: { level: number }) {
+  const info = DIFFICULTY_CONFIG[Math.max(1, Math.min(5, level)) as keyof typeof DIFFICULTY_CONFIG];
+  return (
+    <span className="flex items-center gap-[3px]" title={`Dificuldade: ${info.label}`}>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <span
+          key={i}
+          className="h-1.5 w-1.5 rounded-full transition-colors"
+          style={{ backgroundColor: i <= level ? info.dot : "hsl(var(--muted))" }}
+        />
+      ))}
+    </span>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /* COMPONENT                                                                  */
 /* -------------------------------------------------------------------------- */
 
@@ -83,28 +140,28 @@ export function SubjectCard({
   onDetailsClick,
   parentName,
   viewMode = "grid",
+  isRoot = false,
 }: SubjectCardProps) {
 
   const {
-    difficultyInfo,
     progressPercent,
     isCompleted,
     totalMinutesFormatted,
-    goalMinutesFormatted,
+    remainingFormatted,
     lastStudiedFormatted,
+    difficulty,
   } = useMemo(() => {
-    const difficultyKey = Math.max(1, Math.min(5, subject.difficulty ?? 3)) as keyof typeof DIFFICULTY_CONFIG;
     const goalMinutes = subject.goalMinutes && subject.goalMinutes > 0 ? subject.goalMinutes : 3600;
     const totalMinutes = subject.totalMinutes ?? 0;
     const percent = goalMinutes > 0 ? Math.min((totalMinutes / goalMinutes) * 100, 100) : 0;
 
     return {
-      difficultyInfo: DIFFICULTY_CONFIG[difficultyKey],
       progressPercent: Math.round(percent),
       isCompleted: percent >= 100,
       totalMinutesFormatted: formatDuration(totalMinutes),
-      goalMinutesFormatted: formatDuration(goalMinutes),
+      remainingFormatted: formatDuration(Math.max(0, goalMinutes - totalMinutes)),
       lastStudiedFormatted: formatDate(subject.lastStudied),
+      difficulty: Math.max(1, Math.min(5, subject.difficulty ?? 3)),
     };
   }, [subject]);
 
@@ -114,9 +171,13 @@ export function SubjectCard({
     onDetailsClick(subject.id);
   };
 
-  // A cor da matéria entra apenas como acento sutil no ícone (identidade sem poluir).
-  const accent = subject.color || "hsl(var(--primary))";
-  const hasMeta = typeof subject.sessionCount === "number" || subject.lastStudied !== undefined;
+  const startStudy: React.MouseEventHandler = (e) => {
+    e.stopPropagation();
+    requestStudyStart(subject.id);
+  };
+
+  const accent = isCompleted ? "#10b981" : subject.color || "hsl(var(--primary))";
+  const ringColor = subject.color || "hsl(var(--primary))";
 
   const Menu = (
     <DropdownMenu>
@@ -145,15 +206,6 @@ export function SubjectCard({
     </DropdownMenu>
   );
 
-  const IconChip = (
-    <div
-      className="flex shrink-0 items-center justify-center rounded-xl border border-border/50"
-      style={{ backgroundColor: `${accent}14`, color: accent }}
-    >
-      {subject.icon ? <span className="leading-none">{subject.icon}</span> : <BookOpen className="h-5 w-5" />}
-    </div>
-  );
-
   /* --------------------------------- LISTA -------------------------------- */
   if (viewMode === "list") {
     return (
@@ -165,51 +217,47 @@ export function SubjectCard({
           isCompleted && "border-emerald-500/30"
         )}
       >
-        <CardContent className="flex flex-col items-center gap-4 p-4 md:flex-row">
-          <div className="flex w-full min-w-0 flex-1 items-center gap-3 md:w-auto">
-            <div className="h-10 w-10 [&>span]:text-lg">{IconChip}</div>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h3 className="truncate font-bold text-foreground group-hover:text-primary transition-colors">{subject.title}</h3>
-                {isCompleted && <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />}
-              </div>
-              <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                {parentName && (
-                  <span className="flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                    <Folder className="h-3 w-3" /> {parentName}
-                  </span>
-                )}
-                <Badge variant="secondary" className="border-none bg-muted px-1.5 py-0 text-[9px] uppercase text-muted-foreground">
-                  {subject.category ?? "Geral"}
-                </Badge>
-                <span className={cn("rounded px-1.5 py-0 text-[9px] font-semibold", difficultyInfo.bg, difficultyInfo.color)}>
-                  {difficultyInfo.label}
+        <CardContent className="flex items-center gap-3 p-3 sm:p-4">
+          <ProgressRing percent={progressPercent} color={ringColor} size={44} stroke={3}>
+            {subject.icon
+              ? <span className="text-base leading-none">{subject.icon}</span>
+              : <BookOpen className="h-4 w-4" />}
+          </ProgressRing>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h3 className="truncate font-bold text-foreground transition-colors group-hover:text-primary">{subject.title}</h3>
+              {isCompleted && <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />}
+            </div>
+            <div className="mt-0.5 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {parentName && (
+                <span className="flex min-w-0 items-center gap-1">
+                  <Folder className="h-3 w-3 shrink-0" /> <span className="truncate">{parentName}</span>
                 </span>
-              </div>
+              )}
+              <span className="truncate">{subject.category ?? "Geral"}</span>
+              <DifficultyDots level={difficulty} />
             </div>
           </div>
 
-          <div className="hidden shrink-0 items-center gap-6 text-sm sm:flex">
-            <div className="flex flex-col items-end">
-              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Foco</span>
-              <span className="font-bold text-foreground">{totalMinutesFormatted}</span>
-            </div>
-            <div className="flex w-16 flex-col items-end">
-              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Meta</span>
-              <span className={cn("font-bold", isCompleted ? "text-emerald-600" : "text-foreground")}>{progressPercent}%</span>
-            </div>
+          <div className="hidden shrink-0 flex-col items-end md:flex">
+            <span className="text-sm font-bold tabular-nums text-foreground">{totalMinutesFormatted}</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {isCompleted ? "meta ✓" : `${progressPercent}% da meta`}
+            </span>
           </div>
 
-          <div className="w-full shrink-0 md:w-32 lg:w-44">
-            <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
-              <div
-                className={cn("absolute left-0 top-0 h-full rounded-full transition-all duration-700", isCompleted ? "bg-emerald-500" : "bg-primary")}
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={startStudy}
+            title="Abrir o modo foco nesta matéria"
+            className="h-8 shrink-0 gap-1 rounded-lg px-2.5 text-[10px] font-black uppercase tracking-wider hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+          >
+            <Play className="h-3 w-3" /> <span className="hidden sm:inline">Estudar</span>
+          </Button>
 
-          <div className="ml-auto shrink-0 md:ml-0">{Menu}</div>
+          {Menu}
         </CardContent>
       </Card>
     );
@@ -220,76 +268,94 @@ export function SubjectCard({
     <Card
       onClick={handleCardClick}
       className={cn(
-        "group flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl border border-border/40 bg-card shadow-sm transition-all duration-300",
+        "group relative flex h-full cursor-pointer flex-col overflow-hidden rounded-2xl border border-border/40 bg-card shadow-sm transition-all duration-300",
         "hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md",
-        isCompleted && "border-emerald-500/30"
+        isCompleted && "border-emerald-500/30",
+        isRoot && "border-primary/25"
       )}
     >
-      <CardContent className="flex h-full flex-col gap-4 p-5">
+      {/* Wash sutil com a cor da matéria (identidade sem poluir) */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-24"
+        style={{ background: `linear-gradient(to bottom, ${accent}12, transparent)` }}
+      />
 
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="h-11 w-11 [&>span]:text-xl">{IconChip}</div>
-            <div className="min-w-0">
-              {parentName && (
-                <div className="mb-1 flex items-center gap-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                  <Folder className="h-3 w-3" />
-                  <span className="max-w-[130px] truncate">{parentName}</span>
-                </div>
+      <CardContent className="relative flex h-full flex-col p-4">
+        {/* Topo: anel de progresso + estudar/menu */}
+        <div className="flex items-start justify-between gap-2">
+          <ProgressRing percent={progressPercent} color={ringColor} size={56}>
+            {subject.icon
+              ? <span className="text-xl leading-none">{subject.icon}</span>
+              : <BookOpen className="h-5 w-5" />}
+          </ProgressRing>
+
+          <div className="flex items-center gap-1">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={startStudy}
+              title="Abrir o modo foco nesta matéria"
+              className={cn(
+                "h-8 gap-1 rounded-lg px-2.5 text-[10px] font-black uppercase tracking-wider transition-all",
+                "hover:border-primary/40 hover:bg-primary/5 hover:text-primary",
+                "md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
               )}
-              <h3 className="truncate text-[15px] font-bold leading-tight text-foreground transition-colors group-hover:text-primary">
-                {subject.title}
-              </h3>
-              <div className="mt-1.5 flex items-center gap-1.5">
-                <Badge variant="secondary" className="border-none bg-muted px-2 py-0 text-[10px] font-medium uppercase text-muted-foreground">
-                  {subject.category ?? "Geral"}
-                </Badge>
-                <span className={cn("rounded-md px-1.5 py-0.5 text-[10px] font-semibold", difficultyInfo.bg, difficultyInfo.color)}>
-                  {difficultyInfo.label}
-                </span>
-              </div>
-            </div>
+            >
+              <Play className="h-3 w-3" /> Estudar
+            </Button>
+            {Menu}
           </div>
-          {Menu}
         </div>
 
-        {/* Stats */}
-        <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-          <span className="flex items-center gap-1 font-semibold text-foreground">
-            <Clock className="h-3.5 w-3.5 text-muted-foreground" /> {totalMinutesFormatted}
-          </span>
-          {typeof subject.sessionCount === "number" && (
-            <span className="flex items-center gap-1">
-              <BarChart3 className="h-3.5 w-3.5" /> {subject.sessionCount} {subject.sessionCount === 1 ? "sessão" : "sessões"}
-            </span>
+        {/* Identificação */}
+        <div className="mt-3 min-w-0">
+          {(parentName || isRoot) && (
+            <p className="mb-0.5 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground/70">
+              <Folder className="h-3 w-3 shrink-0" />
+              <span className="truncate">{parentName ?? "Tópico raiz"}</span>
+            </p>
           )}
-          {hasMeta && (
-            <span className="ml-auto flex items-center gap-1">
-              <Calendar className="h-3.5 w-3.5" /> {lastStudiedFormatted}
+          <h3 className="line-clamp-2 text-[15px] font-bold leading-snug text-foreground transition-colors group-hover:text-primary">
+            {subject.title}
+          </h3>
+          <div className="mt-1.5 flex items-center gap-2">
+            <span className="truncate text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+              {subject.category ?? "Geral"}
             </span>
+            <DifficultyDots level={difficulty} />
+          </div>
+        </div>
+
+        {/* Status da meta (1 linha — o anel já mostra o avanço) */}
+        <p className={cn("mt-2.5 text-[11px] font-semibold", isCompleted ? "text-emerald-600" : "text-muted-foreground")}>
+          {isCompleted ? (
+            <span className="flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Meta concluída</span>
+          ) : (
+            <>
+              <span className="font-bold text-foreground">{progressPercent}%</span> da meta · faltam {remainingFormatted}
+            </>
           )}
-        </div>
+        </p>
 
-        {/* Progresso */}
-        <div className="mt-auto space-y-1.5 pt-1">
-          <div className="flex items-end justify-between text-xs">
-            <span className={cn("flex items-center gap-1 font-medium", isCompleted ? "text-emerald-600" : "text-muted-foreground")}>
-              {isCompleted && <CheckCircle2 className="h-3.5 w-3.5" />}
-              {isCompleted ? "Meta concluída" : "Progresso da meta"}
-            </span>
-            <span className={cn("font-bold", isCompleted ? "text-emerald-600" : "text-foreground")}>{progressPercent}%</span>
-          </div>
-          <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className={cn("absolute left-0 top-0 h-full rounded-full transition-all duration-700 ease-out", isCompleted ? "bg-emerald-500" : "bg-primary")}
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-          <div className="text-right text-[10px] text-muted-foreground/70">Objetivo: {goalMinutesFormatted}</div>
+        {/* Rodapé: estatísticas em 3 colunas */}
+        <div className="mt-auto grid grid-cols-3 divide-x divide-border/40 border-t border-border/40 pt-3 text-center">
+          <FooterStat label="Foco" value={totalMinutesFormatted} />
+          <FooterStat
+            label="Sessões"
+            value={typeof subject.sessionCount === "number" ? String(subject.sessionCount) : "—"}
+          />
+          <FooterStat label="Último" value={lastStudiedFormatted} />
         </div>
-
       </CardContent>
     </Card>
+  );
+}
+
+function FooterStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 px-1">
+      <p className="truncate text-xs font-bold tabular-nums text-foreground">{value}</p>
+      <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground/60">{label}</p>
+    </div>
   );
 }

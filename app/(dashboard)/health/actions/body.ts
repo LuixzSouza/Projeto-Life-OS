@@ -84,3 +84,93 @@ export async function saveBodyMeasurements(formData: FormData): Promise<ActionRe
     return { success: false, message: "Erro ao salvar no banco de dados." };
   }
 }
+
+// =========================================================
+// BACKFILL DE SNAPSHOTS DEGENERADOS
+// =========================================================
+// Pesos anotados pela IA em versões antigas criavam snapshots com height=0 e
+// gender "N/A". A página já coalesce na leitura, mas o dado cru fica errado no
+// banco (e em exports/gráficos de % gordura). Este backfill herda altura,
+// gênero e nascimento do snapshot real mais próximo (anterior; se não houver,
+// o seguinte). Peso e medidas nunca são alterados.
+
+function isRealGender(g: string): boolean {
+  return g === "MALE" || g === "FEMALE";
+}
+
+export async function backfillBodySnapshots(): Promise<ActionResponse & { fixed?: number }> {
+  try {
+    const userId = await requireUserId();
+    const rows = await prisma.bodyMeasurement.findMany({
+      where: { userId },
+      orderBy: { date: "asc" },
+      select: { id: true, height: true, gender: true, birthDate: true },
+    });
+
+    interface SnapshotPatch {
+      height?: number;
+      gender?: string;
+      birthDate?: Date;
+    }
+    const patches = new Map<string, SnapshotPatch>();
+
+    // Passada para frente: herda do último snapshot real anterior.
+    let lastHeight: number | null = null;
+    let lastGender: string | null = null;
+    let lastBirth: Date | null = null;
+    for (const r of rows) {
+      const patch: SnapshotPatch = {};
+      if (r.height <= 0 && lastHeight !== null) patch.height = lastHeight;
+      if (!isRealGender(r.gender) && lastGender !== null) patch.gender = lastGender;
+      if (r.birthDate === null && lastBirth !== null && (r.height <= 0 || !isRealGender(r.gender))) {
+        patch.birthDate = lastBirth;
+      }
+      if (Object.keys(patch).length > 0) patches.set(r.id, patch);
+
+      if (r.height > 0) lastHeight = r.height;
+      if (isRealGender(r.gender)) lastGender = r.gender;
+      if (r.birthDate !== null) lastBirth = r.birthDate;
+    }
+
+    // Passada para trás: degenerados ANTES do primeiro real herdam do seguinte.
+    let nextHeight: number | null = null;
+    let nextGender: string | null = null;
+    let nextBirth: Date | null = null;
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const r = rows[i];
+      const patch = patches.get(r.id) ?? {};
+      let touched = false;
+      if (r.height <= 0 && patch.height === undefined && nextHeight !== null) { patch.height = nextHeight; touched = true; }
+      if (!isRealGender(r.gender) && patch.gender === undefined && nextGender !== null) { patch.gender = nextGender; touched = true; }
+      if (r.birthDate === null && patch.birthDate === undefined && nextBirth !== null && (r.height <= 0 || !isRealGender(r.gender))) {
+        patch.birthDate = nextBirth; touched = true;
+      }
+      if (touched) patches.set(r.id, patch);
+
+      if (r.height > 0) nextHeight = r.height;
+      if (isRealGender(r.gender)) nextGender = r.gender;
+      if (r.birthDate !== null) nextBirth = r.birthDate;
+    }
+
+    let fixed = 0;
+    for (const [id, patch] of patches) {
+      const r = await prisma.bodyMeasurement.updateMany({ where: { id, userId }, data: patch });
+      fixed += r.count;
+    }
+
+    if (fixed > 0) {
+      revalidatePath("/health");
+      revalidatePath("/health/body");
+    }
+    return {
+      success: true,
+      message: fixed > 0
+        ? `${fixed} registro${fixed > 1 ? "s" : ""} corrigido${fixed > 1 ? "s" : ""} com os dados dos vizinhos. ✅`
+        : "Nenhum registro precisava de correção.",
+      fixed,
+    };
+  } catch (error) {
+    console.error("Erro no backfill de medidas corporais:", error);
+    return { success: false, message: "Erro ao corrigir registros antigos." };
+  }
+}

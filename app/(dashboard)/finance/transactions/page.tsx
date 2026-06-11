@@ -4,6 +4,7 @@ import { format, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { TransactionsView } from "@/components/finance/transactions-view";
 import { getCurrentUserId } from "@/lib/auth";
+import { containsInsensitive } from "@/lib/db-text";
 import { ErrorState } from "@/components/ui/error-state";
 
 // Tamanho da página da lista detalhada (o resumo e o gráfico continuam exatos,
@@ -74,8 +75,8 @@ export default async function TransactionsPage({
       ...(search
         ? {
             OR: [
-              { description: { contains: search } },
-              { category: { contains: search } },
+              { description: containsInsensitive(search) },
+              { category: containsInsensitive(search) },
             ],
           }
         : {}),

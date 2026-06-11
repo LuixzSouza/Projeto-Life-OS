@@ -3,8 +3,38 @@
 import { prisma } from "@/lib/prisma";
 import { login, logout, verifyPassword, hashPassword } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { isSystemInstalled, isRegistrationOpen } from "@/lib/db-config";
 import { validatePasswordStrength } from "@/lib/password-policy";
+import { isLoginBlocked, registerLoginFailure, clearLoginFailures } from "@/lib/rate-limit";
+
+/** IP + dispositivo da requisição atual (para rate-limit e log de acessos). */
+async function requestFingerprint(): Promise<{ ip: string; userAgent: string }> {
+  const h = await headers();
+  const ip =
+    h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    h.get("x-real-ip") ||
+    "local";
+  const userAgent = h.get("user-agent") ?? "desconhecido";
+  return { ip, userAgent };
+}
+
+/** Registro de acesso (aba Segurança) — best-effort, nunca trava o login. */
+async function logAccess(userId: string, action: "LOGIN" | "REGISTER", ip: string, userAgent: string) {
+  try {
+    await prisma.activityLog.create({
+      data: {
+        userId,
+        action,
+        module: "auth",
+        summary: `${action === "LOGIN" ? "Login" : "Conta criada"} de ${ip}`,
+        meta: JSON.stringify({ ip, userAgent }),
+      },
+    });
+  } catch (e) {
+    console.warn("[auth] falha ao registrar acesso:", e);
+  }
+}
 
 // 1. Definimos o tipo do estado (pode ser um erro ou nulo)
 export type AuthState = {
@@ -22,6 +52,14 @@ export async function authenticate(prevState: AuthState, formData: FormData) {
         return { error: "Sistema não instalado. Acesse /setup." };
     }
 
+    // 2.5 Rate-limit (força bruta): 5 falhas por email+IP a cada 10 minutos.
+    const { ip, userAgent } = await requestFingerprint();
+    const rateKey = `login:${email}:${ip}`;
+    const block = isLoginBlocked(rateKey);
+    if (block.blocked) {
+      return { error: `Muitas tentativas. Tente novamente em ${block.retryMinutes} min.` };
+    }
+
     // 3. Busca o usuário no banco
     const user = await prisma.user.findUnique({
       where: { email },
@@ -29,11 +67,14 @@ export async function authenticate(prevState: AuthState, formData: FormData) {
 
     // 4. Verifica senha (hash bcrypt)
     if (!user || !(await verifyPassword(password, user.password))) {
+      registerLoginFailure(rateKey);
       return { error: "Email ou senha incorretos." };
     }
 
     // 5. Cria a sessão
+    clearLoginFailures(rateKey);
     await login(user.id);
+    await logAccess(user.id, "LOGIN", ip, userAgent);
 
   } catch (error) {
     // Tratamento específico para o erro de redirecionamento do Next.js
@@ -99,6 +140,8 @@ export async function register(prevState: AuthState, formData: FormData) {
     });
 
     await login(user.id);
+    const { ip, userAgent } = await requestFingerprint();
+    await logAccess(user.id, "REGISTER", ip, userAgent);
   } catch (error) {
     if (error instanceof Error && error.message === "NEXT_REDIRECT") {
       throw error;

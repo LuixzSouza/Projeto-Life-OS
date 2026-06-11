@@ -10,6 +10,7 @@ export * from "./gym-session";
 export * from "./workout-plan";
 export * from "./metrics";
 export * from "./nutrition";
+export * from "./nutrition-ai";
 export * from "./body";
 export * from "./challenge";
 export * from "./food-api";

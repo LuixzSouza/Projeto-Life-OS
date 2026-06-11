@@ -2,7 +2,7 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
-type SkeletonVariant = "dashboard" | "grid" | "list" | "feed" | "detail";
+type SkeletonVariant = "dashboard" | "grid" | "list" | "feed" | "detail" | "agenda";
 
 interface PageSkeletonProps {
   variant?: SkeletonVariant;
@@ -38,6 +38,7 @@ export function PageSkeleton({
       {variant === "list" && <ListBody count={count ?? 6} />}
       {variant === "feed" && <FeedBody count={count ?? 5} />}
       {variant === "detail" && <DetailBody />}
+      {variant === "agenda" && <AgendaBody />}
     </div>
   );
 }
@@ -158,6 +159,44 @@ function FeedBody({ count }: { count: number }) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+/* Agenda: sidebar (mini-calendário + resumo) + card de abas com grade (G5). */
+function AgendaBody() {
+  return (
+    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
+      <div className="space-y-6 lg:col-span-3">
+        <div className="space-y-3 rounded-2xl border border-border/40 bg-card p-4 shadow-sm">
+          <Skeleton className="mx-auto h-5 w-32" />
+          <div className="grid grid-cols-7 gap-1.5">
+            {Array.from({ length: 35 }).map((_, i) => (
+              <Skeleton key={i} className="aspect-square w-full rounded-md" />
+            ))}
+          </div>
+        </div>
+        <div className="space-y-4 rounded-2xl border border-border/40 bg-card p-4 shadow-sm">
+          <Skeleton className="h-4 w-28" />
+          <div className="grid grid-cols-2 gap-3">
+            <Skeleton className="h-20 w-full rounded-xl" />
+            <Skeleton className="h-20 w-full rounded-xl" />
+          </div>
+          <Skeleton className="h-16 w-full rounded-xl" />
+        </div>
+      </div>
+      <div className="space-y-0 rounded-[2rem] border border-border/40 bg-card p-4 shadow-sm lg:col-span-9">
+        <div className="flex gap-2 border-b border-border/40 pb-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-9 w-24 rounded-lg" />
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-px pt-3">
+          {Array.from({ length: 35 }).map((_, i) => (
+            <Skeleton key={i} className="h-20 w-full rounded-sm" />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

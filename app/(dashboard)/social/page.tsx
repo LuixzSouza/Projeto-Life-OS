@@ -1,10 +1,12 @@
 import { prisma } from "@/lib/prisma";
-import { Users, Heart, TrendingUp, CalendarHeart } from "lucide-react";
+import { Users, Heart, TrendingUp, CalendarHeart, MessageCircleHeart } from "lucide-react";
 import { FriendList } from "@/components/social/friend-list";
 import { FriendFormDialog } from "@/components/social/add-friend-dialog";
 import { getCurrentUserId } from "@/lib/auth";
 import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
 import { StatCard } from "@/components/ui/stat-card";
+import { getLastContacts } from "./actions";
+import { isReconnectDue } from "@/lib/social-contact";
 
 // --- Página Principal (Server Component) ---
 export default async function SocialPage() {
@@ -28,6 +30,10 @@ export default async function SocialPage() {
     if (!f.birthday) return false;
     return f.birthday.getUTCMonth() === currentMonth;
   }).length;
+
+  // "Manter contato": último registro por amigo (ActivityLog) + quem está vencido.
+  const lastContacts = await getLastContacts();
+  const reconnectCount = friends.filter(f => isReconnectDue(lastContacts[f.id], f.proximity)).length;
 
   // 3. Serialization
   const serializedFriends = friends.map(f => ({
@@ -64,7 +70,7 @@ export default async function SocialPage() {
       <PageContainer className="space-y-8">
 
         {/* --- KPI SECTION --- */}
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
           <StatCard
             label="Rede Total"
             value={totalFriends}
@@ -86,6 +92,13 @@ export default async function SocialPage() {
             hint="Celebrações pendentes este mês"
             iconClassName="text-pink-600 bg-pink-500/10"
           />
+          <StatCard
+            label="Reconectar"
+            value={reconnectCount}
+            icon={MessageCircleHeart}
+            hint="Sem contato há mais tempo que o ideal"
+            iconClassName="text-rose-600 bg-rose-500/10"
+          />
         </section>
 
         {/* --- LISTAGEM PRINCIPAL --- */}
@@ -100,7 +113,7 @@ export default async function SocialPage() {
           </div>
           
           <div className="bg-card/50 rounded-xl border border-border/60 shadow-sm backdrop-blur-[2px]">
-             <FriendList initialData={serializedFriends} />
+             <FriendList initialData={serializedFriends} lastContacts={lastContacts} />
           </div>
         </section>
 

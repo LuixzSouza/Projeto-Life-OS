@@ -1,12 +1,21 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // DISTRIBUICAO Fase 0: build auto-contido p/ o instalador de amigos.
+  // Opt-in via env para NÃO mudar o fluxo pessoal (`npm start`/launcher usam
+  // o build normal). O dist script (Fase 1) roda com LIFE_OS_STANDALONE=1 e
+  // copia os nativos externalizados (libsql/Prisma engine) para o bundle.
+  ...(process.env.LIFE_OS_STANDALONE === "1" ? { output: "standalone" as const } : {}),
+
   // libSQL build NODE (réplica embarcada) importa um binário NATIVO (`libsql`).
   // Mantemos esses pacotes FORA do bundle do webpack: são resolvidos do
   // node_modules em runtime (via require). Sem isto, o webpack tenta empacotar o
   // nativo e o `require` em runtime falha com "dynamic usage of require".
   // A nuvem (Vercel) usa só `@libsql/client/web` (JS puro) e nunca carrega o nativo.
-  serverExternalPackages: ["@libsql/client", "libsql"],
+  // Postgres (DATABASE_ROADMAP Fase 1): o client derivado é gerado em
+  // node_modules/@lifeos/client-postgres e carregado em runtime (require),
+  // como o libsql — fora do bundle, resolvido do node_modules.
+  serverExternalPackages: ["@libsql/client", "libsql", "pg", "@lifeos/client-postgres", "@prisma/adapter-pg"],
 
   // Configurações de imagem
   images: {
@@ -42,7 +51,7 @@ const nextConfig: NextConfig = {
   // de fora da função serverless e o setup quebrava com 500 ("Baseline não
   // encontrado"). Forçamos a inclusão do arquivo no bundle de toda rota.
   outputFileTracingIncludes: {
-    "/**": ["./prisma/baseline.sql"],
+    "/**": ["./prisma/baseline.sql", "./prisma/baseline.postgres.sql"],
   },
 };
 

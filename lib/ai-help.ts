@@ -108,6 +108,8 @@ export const AI_CAPABILITIES: AiCapability[] = [
   { area: "Estudos", icon: "book", can: "logar sessões e anotações", example: "Estudei 1h de inglês" },
   { area: "Entretenimento", icon: "film", can: "adicionar filmes/séries e status", example: "Adicione o filme Duna como Quero ver" },
   { area: "CRM & Conexões", icon: "users", can: "cadastrar clientes e contatos", example: "Salve o cliente Acme Ltda" },
+  { area: "Vagas & Links", icon: "box", can: "acompanhar candidaturas e salvar links", example: "Movi a vaga da Acme pra entrevista" },
+  { area: "Notas & Config", icon: "book", can: "criar notas, tags e ajustar preferências seguras", example: "Mude minha meta de sono pra 8h" },
   { area: "Projetos & mais", icon: "box", can: "criar/gerenciar projetos, closet e cofre", example: "Crie o projeto Site novo" },
 ];
 
@@ -129,6 +131,12 @@ const MODULE_INFO: Record<string, { name: string; href: string }> = {
   NUTRITION: { name: "Refeição", href: "/health/nutrition" },
   SLEEP: { name: "Sono", href: "/health/sleep" },
   HABITS: { name: "Hábito", href: "/health" },
+  JOBS: { name: "Vaga", href: "/jobs" },
+  LINKS: { name: "Link", href: "/links" },
+  NOTES: { name: "Nota", href: "/notes" },
+  SITES: { name: "Site", href: "/cms" },
+  TAGS: { name: "Tag", href: "/connect" },
+  SETTINGS: { name: "Configuração", href: "/settings" },
 };
 
 export function moduleInfo(module: string): { name: string; href: string } {
@@ -157,11 +165,15 @@ export interface AIAction {
 const PENDING_RE = /<!--LIFEOS_PENDING:([A-Za-z0-9+/=]*)-->/;
 const ACTIONS_RE = /<!--LIFEOS_ACTIONS:([A-Za-z0-9+/=]*)-->/;
 const SUGGEST_RE = /<!--LIFEOS_SUGGEST:([A-Za-z0-9+/=]*)-->/;
-// Marcador CRU que o MODELO escreve no fim da resposta (instruído no system
-// prompt). É extraído no servidor e re-persistido como marcador base64.
+const CLARIFY_RE = /<!--LIFEOS_CLARIFY:([A-Za-z0-9+/=]*)-->/;
+const NAV_RE = /<!--LIFEOS_NAV:([A-Za-z0-9+/=]*)-->/;
+// Marcadores CRUS que o MODELO escreve no fim da resposta (instruídos no system
+// prompt). São extraídos no servidor e re-persistidos como marcadores base64.
 const SUGGEST_RAW_RE = /<!--\s*SUGGEST\s*:\s*(\[[\s\S]*?\])\s*-->/i;
+const CLARIFY_RAW_RE = /<!--\s*ASK\s*:\s*([[{][\s\S]*?[\]}])\s*-->/i;
+const NAV_RAW_RE = /<!--\s*GOTO\s*:\s*(\[[\s\S]*?\])\s*-->/i;
 // Remove qualquer marcador interno (em qualquer posição).
-const MARKER_RE = /\n*<!--LIFEOS_(?:PENDING|ACTIONS|SUGGEST):[A-Za-z0-9+/=]*-->/g;
+const MARKER_RE = /\n*<!--LIFEOS_(?:PENDING|ACTIONS|SUGGEST|CLARIFY|NAV):[A-Za-z0-9+/=]*-->/g;
 
 function toBase64(s: string): string {
   if (typeof Buffer !== "undefined") return Buffer.from(s, "utf8").toString("base64");
@@ -250,6 +262,187 @@ export function extractSuggestions(content: string): string[] {
 }
 
 /* ----------------------------------------------------------------------------
+   PERGUNTA DE ESCLARECIMENTO (clarify — "pergunte antes de chutar")
+   Quando falta informação ESSENCIAL para executar um pedido, o modelo encerra
+   a resposta com <!--ASK:[{"question":"...","options":[...]}]-->. O servidor
+   extrai, limpa o texto e persiste como marcador base64 (mesma infra dos
+   demais). A UI mostra um PAINEL DE RESPOSTAS acima do composer — opções de
+   1 toque, dica por opção, múltipla escolha e até 3 perguntas no mesmo turno
+   (digitar livre também vale).
+   Formatos aceitos do modelo (todos viram ClarifyRequest):
+   - objeto único:    {"question":"...","options":["a","b"]}
+   - lista:           [{"question":"...","options":[...]}, ...]
+   - opção com dica:  {"label":"Nubank","hint":"conta principal"}
+   - múltipla escolha: {"question":"...","options":[...],"multi":true}
+   ---------------------------------------------------------------------------- */
+
+export interface ClarifyOption {
+  label: string;
+  /** Contexto curto da opção (subtexto na UI). */
+  hint?: string;
+}
+
+export interface ClarifyQuestion {
+  question: string;
+  options: ClarifyOption[];
+  /** true = o usuário pode marcar várias opções antes de responder. */
+  multi?: boolean;
+}
+
+export interface ClarifyRequest {
+  questions: ClarifyQuestion[];
+}
+
+const MAX_CLARIFY_QUESTIONS = 3;
+const MAX_CLARIFY_OPTIONS = 4;
+const MAX_CLARIFY_OPTION_LEN = 60;
+const MAX_CLARIFY_HINT_LEN = 80;
+const MAX_CLARIFY_QUESTION_LEN = 200;
+
+function oneLine(s: string, max: number): string {
+  return s.trim().replace(/\s+/g, " ").slice(0, max);
+}
+
+function sanitizeClarifyOption(raw: unknown): ClarifyOption | null {
+  if (typeof raw === "string" && raw.trim()) return { label: oneLine(raw, MAX_CLARIFY_OPTION_LEN) };
+  if (raw && typeof raw === "object") {
+    const o = raw as Record<string, unknown>;
+    if (typeof o.label === "string" && o.label.trim()) {
+      const hint = typeof o.hint === "string" && o.hint.trim() ? oneLine(o.hint, MAX_CLARIFY_HINT_LEN) : undefined;
+      return { label: oneLine(o.label, MAX_CLARIFY_OPTION_LEN), hint };
+    }
+  }
+  return null;
+}
+
+function sanitizeClarifyQuestion(raw: unknown): ClarifyQuestion | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const question = typeof o.question === "string" ? oneLine(o.question, MAX_CLARIFY_QUESTION_LEN) : "";
+  if (!question) return null;
+  const options = Array.isArray(o.options)
+    ? o.options.map(sanitizeClarifyOption).filter((x): x is ClarifyOption => x !== null).slice(0, MAX_CLARIFY_OPTIONS)
+    : [];
+  // Sem pelo menos 2 opções o marcador não agrega nada (a pergunta já está no texto).
+  if (options.length < 2) return null;
+  return { question, options, ...(o.multi === true ? { multi: true } : {}) };
+}
+
+function sanitizeClarify(raw: unknown): ClarifyRequest | null {
+  // Aceita objeto único (formato original) ou lista de perguntas.
+  const list = Array.isArray(raw) ? raw : [raw];
+  const questions = list
+    .map(sanitizeClarifyQuestion)
+    .filter((q): q is ClarifyQuestion => q !== null)
+    .slice(0, MAX_CLARIFY_QUESTIONS);
+  return questions.length > 0 ? { questions } : null;
+}
+
+/** Extrai o marcador CRU escrito pelo modelo e devolve o texto limpo. */
+export function extractModelClarify(text: string): { text: string; clarify: ClarifyRequest | null } {
+  const m = text.match(CLARIFY_RAW_RE);
+  if (!m) return { text, clarify: null };
+  let clarify: ClarifyRequest | null = null;
+  try {
+    clarify = sanitizeClarify(JSON.parse(m[1]));
+  } catch {
+    clarify = null;
+  }
+  return { text: text.replace(CLARIFY_RAW_RE, "").trimEnd(), clarify };
+}
+
+export function encodeClarify(c: ClarifyRequest | null): string {
+  if (!c) return "";
+  return `\n\n<!--LIFEOS_CLARIFY:${toBase64(JSON.stringify(c))}-->`;
+}
+
+export function extractClarify(content: string): ClarifyRequest | null {
+  const m = content.match(CLARIFY_RE);
+  if (!m) return null;
+  try {
+    return sanitizeClarify(JSON.parse(fromBase64(m[1])));
+  } catch {
+    return null;
+  }
+}
+
+/* ----------------------------------------------------------------------------
+   ATALHOS DE NAVEGAÇÃO (nav — "te levo até lá")
+   Quando a resposta menciona uma área do app, o modelo encerra com
+   <!--GOTO:[{"label":"Ver minhas vagas","href":"/jobs"}]-->. O servidor extrai,
+   valida o href contra a WHITELIST de rotas internas (o modelo nunca inventa
+   destino) e persiste como marcador base64. A UI mostra chips de navegação que
+   levam direto à página (deep-link com query é permitido, ex.: /ai?q=...).
+   ---------------------------------------------------------------------------- */
+
+export interface NavSuggestion {
+  label: string;
+  href: string;
+}
+
+const MAX_NAV = 3;
+const MAX_NAV_LABEL_LEN = 40;
+const MAX_NAV_HREF_LEN = 160;
+
+// Primeiros segmentos de rota que a IA pode apontar (todas as áreas do app).
+const NAV_PREFIXES = [
+  "/dashboard", "/agenda", "/finance", "/projects", "/jobs", "/business",
+  "/social", "/notes", "/studies", "/flashcards", "/goals", "/health",
+  "/entertainment", "/wardrobe", "/links", "/access", "/cms", "/connect",
+  "/timeline", "/settings", "/trash", "/notifications", "/ai",
+];
+
+function sanitizeNavHref(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const href = raw.trim();
+  if (!href.startsWith("/") || href.includes("//") || /\s/.test(href) || href.length > MAX_NAV_HREF_LEN) return null;
+  const firstSegment = "/" + (href.split(/[/?#]/)[1] ?? "");
+  return NAV_PREFIXES.includes(firstSegment) ? href : null;
+}
+
+function sanitizeNav(raw: unknown): NavSuggestion[] {
+  if (!Array.isArray(raw)) return [];
+  const out: NavSuggestion[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const o = item as Record<string, unknown>;
+    const href = sanitizeNavHref(o.href);
+    const label = typeof o.label === "string" ? o.label.trim().replace(/\s+/g, " ").slice(0, MAX_NAV_LABEL_LEN) : "";
+    if (href && label) out.push({ label, href });
+    if (out.length >= MAX_NAV) break;
+  }
+  return out;
+}
+
+/** Extrai o marcador CRU escrito pelo modelo e devolve o texto limpo. */
+export function extractModelNav(text: string): { text: string; nav: NavSuggestion[] } {
+  const m = text.match(NAV_RAW_RE);
+  if (!m) return { text, nav: [] };
+  let nav: NavSuggestion[] = [];
+  try {
+    nav = sanitizeNav(JSON.parse(m[1]));
+  } catch {
+    nav = [];
+  }
+  return { text: text.replace(NAV_RAW_RE, "").trimEnd(), nav };
+}
+
+export function encodeNav(nav: NavSuggestion[]): string {
+  if (!nav.length) return "";
+  return `\n\n<!--LIFEOS_NAV:${toBase64(JSON.stringify(nav))}-->`;
+}
+
+export function extractNav(content: string): NavSuggestion[] {
+  const m = content.match(NAV_RE);
+  if (!m) return [];
+  try {
+    return sanitizeNav(JSON.parse(fromBase64(m[1])));
+  } catch {
+    return [];
+  }
+}
+
+/* ----------------------------------------------------------------------------
    ANEXOS DE IMAGEM (visão multimodal)
    A imagem (data URL comprimida) fica persistida na PRÓPRIA mensagem do
    usuário como marcador — a UI a renderiza na bolha, mas o histórico enviado
@@ -275,5 +468,5 @@ export function extractImages(content: string): string[] {
 
 // Remove TODOS os marcadores internos — para exibir ao usuário e enviar ao modelo.
 export function stripPending(content: string): string {
-  return content.replace(MARKER_RE, "").replace(SUGGEST_RAW_RE, "").replace(IMG_RE_GLOBAL, "").trimEnd();
+  return content.replace(MARKER_RE, "").replace(SUGGEST_RAW_RE, "").replace(CLARIFY_RAW_RE, "").replace(NAV_RAW_RE, "").replace(IMG_RE_GLOBAL, "").trimEnd();
 }

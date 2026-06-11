@@ -67,10 +67,28 @@ export default async function FinancePage() {
 
     // Despesas do mês atual p/ o Orçamento 75/10/15 (categoria + origem fixa).
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const monthExpenseTxs = await prisma.transaction.findMany({
-      where: { userId, deletedAt: null, type: { not: "INCOME" }, date: { gte: monthStart } },
-      select: { amount: true, category: true, recurringExpensePayment: { select: { id: true } } },
-    });
+    const [monthExpenseTxs, budgetRows, recentCategoryRows] = await Promise.all([
+      prisma.transaction.findMany({
+        where: { userId, deletedAt: null, type: { not: "INCOME" }, date: { gte: monthStart } },
+        select: { amount: true, category: true, recurringExpensePayment: { select: { id: true } } },
+      }),
+      // Tetos por categoria (primeira UI do model Category — guarda só o teto).
+      userId
+        ? prisma.category.findMany({
+            where: { userId, type: "EXPENSE", monthlyBudget: { not: null } },
+            select: { name: true, monthlyBudget: true },
+          })
+        : [],
+      // Categorias usadas nos últimos 6 meses (sugestões do formulário de teto).
+      prisma.transaction.findMany({
+        where: {
+          userId, deletedAt: null, type: { not: "INCOME" },
+          date: { gte: new Date(now.getFullYear(), now.getMonth() - 5, 1) },
+        },
+        select: { category: true },
+        distinct: ["category"],
+      }),
+    ]);
 
     /* ---------------------------------------------------------------------- */
     /* NORMALIZAÇÃO DOS DADOS                                                  */
@@ -226,6 +244,25 @@ export default async function FinancePage() {
       })),
     });
 
+    // Tetos por categoria: junta o teto salvo (Category.monthlyBudget) com o
+    // gasto do mês na categoria-texto correspondente das transações.
+    const spentByCategory = new Map<string, number>();
+    for (const tx of monthExpenseTxs) {
+      const cat = (tx.category || "").trim();
+      if (!cat) continue;
+      spentByCategory.set(cat, (spentByCategory.get(cat) ?? 0) + Math.abs(Number(tx.amount)));
+    }
+    const categoryBudgets = budgetRows.map((row) => ({
+      category: row.name,
+      budget: Number(row.monthlyBudget),
+      spent: spentByCategory.get(row.name) ?? 0,
+    }));
+    const budgeted = new Set(budgetRows.map((r) => r.name));
+    const budgetCategoryOptions = recentCategoryRows
+      .map((r) => (r.category || "").trim())
+      .filter((c) => c.length > 0 && !budgeted.has(c))
+      .sort((a, b) => a.localeCompare(b, "pt-BR"));
+
     /* ---------------------------------------------------------------------- */
     /* RENDER                                                                 */
     /* ---------------------------------------------------------------------- */
@@ -248,6 +285,8 @@ export default async function FinancePage() {
         monthIncome={monthIncome}
         monthExpense={monthExpense}
         budget={budget}
+        categoryBudgets={categoryBudgets}
+        budgetCategoryOptions={budgetCategoryOptions}
       />
     );
   } catch (error) {

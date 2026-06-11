@@ -59,9 +59,10 @@ interface NutritionDashboardProps {
     calorieOverride?: number | null; // Override manual salvo no perfil (null = automático)
     workoutBurn?: number;            // Gasto calórico estimado dos treinos do dia
     userName?: string;
+    missingKcalCount?: number;       // Refeições antigas sem kcal (banner de recálculo com IA)
 }
 
-export function NutritionDashboard({ initialDate, meals, weekData, mealPlan = [], suggestedGoal = null, tdee = null, calorieOverride = null, workoutBurn = 0, userName }: NutritionDashboardProps) {
+export function NutritionDashboard({ initialDate, meals, weekData, mealPlan = [], suggestedGoal = null, tdee = null, calorieOverride = null, workoutBurn = 0, userName, missingKcalCount = 0 }: NutritionDashboardProps) {
     const router = useRouter();
     const [date, setDate] = useState<Date | undefined>(new Date(initialDate));
     
@@ -237,7 +238,7 @@ export function NutritionDashboard({ initialDate, meals, weekData, mealPlan = []
                             </Card>
 
                             <div className="flex-1 min-h-[500px]">
-                                <FoodLogger meals={prismaMeals} dailyGoal={dailyGoal} workoutBurn={workoutBurn} />
+                                <FoodLogger meals={prismaMeals} dailyGoal={dailyGoal} workoutBurn={workoutBurn} missingKcalCount={missingKcalCount} />
                             </div>
                         </div>
                     </div>

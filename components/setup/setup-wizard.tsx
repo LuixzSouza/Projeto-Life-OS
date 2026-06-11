@@ -32,6 +32,7 @@ const DEFAULT_FORM: SetupFormData = {
   storagePath: "C:\\LifeOS_Data",
   tursoUrl: "",
   tursoToken: "",
+  pgUrl: "",
 };
 
 // Campos sensíveis que NÃO são persistidos no localStorage (segredo externo).
@@ -163,6 +164,20 @@ export function SetupWizard({ dbFromEnv = false }: SetupWizardProps) {
           toast.error("URL inválida. Use libsql://... ou https://...");
           return;
         }
+      } else if (formData.dbProvider === "postgres" || formData.dbProvider === "supabase") {
+        const url = formData.pgUrl.trim();
+        if (!url) {
+          toast.error("Informe a connection string do PostgreSQL.");
+          return;
+        }
+        if (/^eyJ/.test(url)) {
+          toast.error("Isso é uma API key, não a connection string. Use a URI do banco (postgresql://...).");
+          return;
+        }
+        if (!/^postgres(ql)?:\/\//i.test(url)) {
+          toast.error("URL inválida. Use o formato postgresql://usuario:senha@host:porta/banco.");
+          return;
+        }
       }
     }
     setStep((s) => Math.min(s + 1, 4));
@@ -203,9 +218,11 @@ export function SetupWizard({ dbFromEnv = false }: SetupWizardProps) {
           <input type="hidden" name="aiProvider" value={formData.aiProvider} />
           <input type="hidden" name="theme" value={formData.theme} />
           <input type="hidden" name="storageMode" value={effectiveStorageMode} />
+          <input type="hidden" name="dbProvider" value={formData.dbProvider} />
           <input type="hidden" name="storagePath" value={formData.storagePath} />
           <input type="hidden" name="tursoUrl" value={formData.tursoUrl} />
           <input type="hidden" name="tursoToken" value={formData.tursoToken} />
+          <input type="hidden" name="pgUrl" value={formData.pgUrl} />
 
           <div className="space-y-8">
             <div className="flex items-start justify-between gap-4">

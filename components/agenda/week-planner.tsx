@@ -71,7 +71,8 @@ export function WeekPlanner({ tasks, selectedDateISO, themedDays }: WeekPlannerP
       </div>
 
       <div className="flex-1 overflow-auto bg-background/30 p-4">
-        <div className="grid min-w-[980px] grid-cols-7 gap-3">
+        {/* G9: < md empilha um card por dia (hoje primeiro); ≥ md vira as 7 colunas */}
+        <div className="grid grid-cols-1 gap-3 md:min-w-[980px] md:grid-cols-7">
           {weekDays.map((day) => {
             const theme = themedByWeekday.get(day.getDay());
             const dayTasks = tasks
@@ -83,8 +84,8 @@ export function WeekPlanner({ tasks, selectedDateISO, themedDays }: WeekPlannerP
               <div
                 key={day.toISOString()}
                 className={cn(
-                  "flex min-h-[320px] flex-col rounded-2xl border bg-card shadow-sm transition-colors",
-                  today ? "border-primary/40 ring-1 ring-primary/20" : "border-border/40",
+                  "flex min-h-[140px] flex-col rounded-2xl border bg-card shadow-sm transition-colors md:min-h-[320px]",
+                  today ? "border-primary/40 ring-1 ring-primary/20 max-md:order-first" : "border-border/40",
                 )}
               >
                 {/* Cabeçalho do dia (cor do Dia Temático quando existir) */}
@@ -110,7 +111,14 @@ export function WeekPlanner({ tasks, selectedDateISO, themedDays }: WeekPlannerP
                 {/* Linhas do planner */}
                 <div className="flex-1 space-y-1 p-2">
                   {dayTasks.length === 0 && (
-                    <p className="px-1 pt-2 text-center text-[10px] text-muted-foreground/50">—</p>
+                    // G16: o "—" vira convite — foca o input do pé da coluna.
+                    <button
+                      type="button"
+                      onClick={() => document.getElementById(`planner-add-${format(day, "yyyy-MM-dd")}`)?.focus()}
+                      className="w-full rounded-lg px-1 py-2 text-center text-[10px] font-medium text-muted-foreground/50 transition-colors hover:bg-muted/40 hover:text-primary"
+                    >
+                      ✎ anotar algo…
+                    </button>
                   )}
                   {dayTasks.map((task) => {
                     const done = optimisticDone.get(task.id) ?? task.isDone;
@@ -170,13 +178,14 @@ function DayQuickAdd({ day }: { day: Date }) {
     <form ref={formRef} action={submit} className="flex items-center gap-1 border-t border-border/40 p-2">
       <input type="hidden" name="dueDate" value={format(day, "yyyy-MM-dd")} />
       <Input
+        id={`planner-add-${format(day, "yyyy-MM-dd")}`}
         name="title"
         required
         maxLength={200}
         placeholder="Anotar…"
         className="h-7 flex-1 border-none bg-transparent px-1 text-xs shadow-none focus-visible:ring-0"
       />
-      <Button type="submit" disabled={isPending} size="icon" variant="ghost" className="h-7 w-7 shrink-0 rounded-md" title="Adicionar">
+      <Button type="submit" disabled={isPending} size="icon" variant="ghost" className="h-9 w-9 md:h-7 md:w-7 shrink-0 rounded-md" title="Adicionar">
         {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
       </Button>
     </form>

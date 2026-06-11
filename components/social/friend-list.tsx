@@ -10,7 +10,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-import { deleteFriend } from "@/app/(dashboard)/social/actions";
+import { deleteFriend, registerContact } from "@/app/(dashboard)/social/actions";
+import { isReconnectDue } from "@/lib/social-contact";
 import { FriendFormDialog, FriendData } from "./add-friend-dialog";
 import { getBirthdayInfo } from "./friend-helpers";
 import { FriendFilterBar } from "./friend-filter-bar";
@@ -19,9 +20,20 @@ import { FriendDetailModal } from "./friend-detail-modal";
 import { EntityConnectionsDialog } from "@/components/connect/entity-connections-dialog";
 
 // --- COMPONENTE PRINCIPAL ---
-export function FriendList({ initialData }: { initialData: FriendData[] }) {
+export function FriendList({
+  initialData,
+  lastContacts = {},
+}: {
+  initialData: FriendData[];
+  /** friendId → ISO do último contato registrado (derivado do ActivityLog). */
+  lastContacts?: Record<string, string>;
+}) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("ALL");
+  // Registros feitos nesta sessão (otimista, por cima do que veio do servidor).
+  const [contactOverrides, setContactOverrides] = useState<Record<string, string>>({});
+  const lastContactOf = (id?: string | null) =>
+    id ? contactOverrides[id] ?? lastContacts[id] ?? null : null;
 
   // Controle de Modais Centralizado
   const [selectedFriend, setSelectedFriend] = useState<FriendData | null>(null);
@@ -39,7 +51,10 @@ export function FriendList({ initialData }: { initialData: FriendData[] }) {
           (friend.company?.toLowerCase() || "").includes(searchLower) ||
           (friend.tags?.toLowerCase() || "").includes(searchLower);
 
-      const matchesType = filter === "ALL" ? true : friend.proximity === filter;
+      const matchesType =
+        filter === "ALL" ? true :
+        filter === "RECONNECT" ? isReconnectDue(lastContactOf(friend.id), friend.proximity) :
+        friend.proximity === filter;
       return matchesSearch && matchesType;
     });
 
@@ -51,7 +66,26 @@ export function FriendList({ initialData }: { initialData: FriendData[] }) {
       if (bdA <= 30 || bdB <= 30) return bdA - bdB;
       return (a.name || "").localeCompare(b.name || "");
     });
-  }, [initialData, search, filter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- lastContactOf depende só destes dois estados
+  }, [initialData, search, filter, lastContacts, contactOverrides]);
+
+  // Registrar "falei hoje" (otimista: o chip atualiza na hora).
+  const handleContact = async (friend: FriendData) => {
+    if (!friend.id) return;
+    const id = friend.id;
+    setContactOverrides(prev => ({ ...prev, [id]: new Date().toISOString() }));
+    const res = await registerContact(id);
+    if (res.success) {
+      toast.success(res.message);
+    } else {
+      setContactOverrides(prev => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      toast.error(res.message);
+    }
+  };
 
   // Ações
   const handleDelete = async () => {
@@ -90,6 +124,8 @@ export function FriendList({ initialData }: { initialData: FriendData[] }) {
               <FriendCard
                 key={friend.id}
                 friend={friend}
+                lastContactAt={lastContactOf(friend.id)}
+                onContact={handleContact}
                 onSelect={setSelectedFriend}
                 onEdit={setEditingFriend}
                 onDelete={setFriendToDelete}

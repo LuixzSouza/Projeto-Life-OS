@@ -5,6 +5,7 @@ import { Briefcase } from "lucide-react";
 import { getCurrentUserId } from "@/lib/auth";
 import { getPortfolio } from "@/app/(dashboard)/projects/actions";
 import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
+import { AskAiButton } from "@/components/ai/ask-ai-button";
 
 export const metadata: Metadata = {
   title: "Vagas & Candidaturas | Life OS",
@@ -36,6 +37,7 @@ export default async function JobsPage() {
         icon={<Briefcase className="h-6 w-6" />}
         title="Vagas & Candidaturas"
         description="Acompanhe suas inscrições, entrevistas e o status de cada processo."
+        actions={<AskAiButton q="Como está meu funil de vagas? Algum processo parado precisando de follow-up?" label="Analisar com IA" />}
       />
 
       <PageContainer>

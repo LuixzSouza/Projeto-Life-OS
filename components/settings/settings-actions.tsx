@@ -4,9 +4,9 @@ import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { importJsonData, factoryReset } from "@/app/(dashboard)/settings/actions";
+import { importJsonData, factoryReset, validateBackupFile } from "@/app/(dashboard)/settings/actions";
 import { toast } from "sonner";
-import { Upload, AlertTriangle, Loader2, Trash2, FileJson } from "lucide-react";
+import { Upload, AlertTriangle, Loader2, Trash2, FileJson, ShieldCheck } from "lucide-react";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -25,7 +25,41 @@ import { cn } from "@/lib/utils";
 // ============================================================================
 export function RestoreBackupForm() {
     const [isLoading, setIsLoading] = useState(false);
+    const [isValidating, setIsValidating] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Dry-run: lê o arquivo e mostra as contagens SEM importar nada.
+    const handleValidate = async () => {
+        const file = fileInputRef.current?.files?.[0];
+        if (!file) {
+            toast.error("Selecione um arquivo JSON primeiro.");
+            return;
+        }
+        setIsValidating(true);
+        try {
+            const formData = new FormData();
+            formData.set("file", file);
+            const summary = await validateBackupFile(formData);
+            if (!summary.valid) {
+                toast.error(summary.message ?? "Backup inválido.");
+                return;
+            }
+            const top = summary.counts
+                .slice()
+                .sort((a, b) => b.count - a.count)
+                .slice(0, 6)
+                .map((c) => `${c.label}: ${c.count}`)
+                .join(" · ");
+            toast.success(
+                `Backup válido (${summary.legacy ? "formato antigo" : "v" + summary.schemaVersion}) — ${summary.total} registros.`,
+                { description: top || "Arquivo sem registros." }
+            );
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Falha ao validar o arquivo.");
+        } finally {
+            setIsValidating(false);
+        }
+    };
 
     const handleUpload = async (formData: FormData) => {
         const file = formData.get("file") as File;
@@ -78,21 +112,40 @@ export function RestoreBackupForm() {
                 </div>
             </div>
             
-            <Button 
-                type="submit" 
-                className="w-full shadow-sm transition-all active:scale-[0.98]"
-                disabled={isLoading}
-            >
-                {isLoading ? (
-                    <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Restaurando...
-                    </>
-                ) : (
-                    <>
-                        <Upload className="mr-2 h-4 w-4" /> Iniciar Restauração
-                    </>
-                )}
-            </Button>
+            <div className="flex gap-2">
+                <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1 shadow-sm transition-all active:scale-[0.98]"
+                    disabled={isLoading || isValidating}
+                    onClick={handleValidate}
+                >
+                    {isValidating ? (
+                        <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Validando...
+                        </>
+                    ) : (
+                        <>
+                            <ShieldCheck className="mr-2 h-4 w-4" /> Validar Backup
+                        </>
+                    )}
+                </Button>
+                <Button
+                    type="submit"
+                    className="flex-1 shadow-sm transition-all active:scale-[0.98]"
+                    disabled={isLoading || isValidating}
+                >
+                    {isLoading ? (
+                        <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Restaurando...
+                        </>
+                    ) : (
+                        <>
+                            <Upload className="mr-2 h-4 w-4" /> Iniciar Restauração
+                        </>
+                    )}
+                </Button>
+            </div>
             
             <p className="text-[10px] text-muted-foreground text-center flex items-center justify-center gap-1.5">
                 <AlertTriangle className="h-3 w-3" />

@@ -5,21 +5,22 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ProgressBar } from './progress-bar';
 import { DateBadge } from './date-badge';
 import { PriorityBadge } from './priority-badge';
-import { StatusBadge } from './status-badge';
+import { StatusStepper } from './status-stepper';
 import { QuickActionButton } from './quick-action-button';
-import { Star, Pin, Layout } from 'lucide-react';
+import { Star, Pin, Layout, Lock } from 'lucide-react';
 import type { TaskBaseProps } from '@/types/task-types';
 import { motion } from 'framer-motion';
+import { useIsTaskBlocked } from './blocked-tasks-context';
 
 // Tipagem estrita
 type TaskPriority = "HIGH" | "MEDIUM" | "LOW";
-type TaskStatus = "TODO" | "IN_PROGRESS" | "DONE" | "REVIEW";
 
 export function TaskGridItem({
-  task, isOverdue, isPinned, isStarred, isDone, progress, onToggle, onToggleStar, onOpenModal,
+  task, isOverdue, isPinned, isStarred, isDone, status, progress, onToggle, onStatusChange, onToggleStar, onOpenModal,
 }: TaskBaseProps) {
   
   const stopPropagation = (e: React.MouseEvent | React.PointerEvent) => e.stopPropagation();
+  const isBlocked = useIsTaskBlocked(task.id) && !isDone;
 
   return (
     // 1. Substituímos Reorder.Item por motion.div para estabilizar o Grid
@@ -44,21 +45,51 @@ export function TaskGridItem({
         isDone && 'opacity-60 grayscale-[0.5]'
       )}
     >
-      {/* HEADER / VISUAL */}
-      <div className="relative aspect-[16/10] w-full overflow-hidden bg-muted/10 cursor-pointer" onClick={onOpenModal}>
+      {/* HEADER / VISUAL — com imagem: capa 16:10; sem imagem: faixa compacta
+          com monograma (fallback frictionless do projeto, sem buraco vazio). */}
+      <div
+        className={cn(
+          "relative w-full overflow-hidden cursor-pointer",
+          task.image ? "aspect-[16/10] bg-muted/10" : "h-20 border-b border-border/30"
+        )}
+        onClick={onOpenModal}
+      >
         {task.image ? (
-          <img src={task.image} alt={task.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+          <>
+            <img src={task.image} alt={task.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          </>
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/5 via-transparent to-muted/20">
-            <Layout className="h-10 w-10 text-primary/10" />
+          <div className="relative h-full w-full bg-gradient-to-br from-primary/[0.07] via-transparent to-muted/30 transition-colors duration-500 group-hover:from-primary/[0.12]">
+            {/* Monograma da tarefa: identidade visual sem exigir upload */}
+            <span className="absolute -bottom-4 right-3 select-none text-7xl font-black leading-none text-primary/[0.08] transition-colors duration-500 group-hover:text-primary/[0.14]">
+              {(task.title.trim().charAt(0) || "•").toUpperCase()}
+            </span>
+            <Layout className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-primary/15" />
           </div>
         )}
 
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-        
         <div className="absolute top-3 left-3 flex gap-2 z-10" onPointerDown={stopPropagation}>
+          {isBlocked && (
+            <div
+              title="Bloqueada por outra tarefa"
+              className={cn(
+                "p-1.5 rounded-xl border shadow-sm",
+                task.image
+                  ? "bg-black/40 backdrop-blur-md border-white/10 text-amber-400"
+                  : "bg-background/80 backdrop-blur-sm border-border/50 text-amber-500"
+              )}
+            >
+              <Lock className="h-3.5 w-3.5" />
+            </div>
+          )}
           {isPinned && (
-            <div className="p-1.5 bg-black/40 backdrop-blur-md rounded-xl border border-white/10 text-amber-400 shadow-xl">
+            <div className={cn(
+              "p-1.5 rounded-xl border shadow-sm",
+              task.image
+                ? "bg-black/40 backdrop-blur-md border-white/10 text-amber-400"
+                : "bg-background/80 backdrop-blur-sm border-border/50 text-amber-500"
+            )}>
               <Pin className="h-3.5 w-3.5 rotate-45 fill-current" />
             </div>
           )}
@@ -69,7 +100,11 @@ export function TaskGridItem({
             icon={<Star className={cn("h-4 w-4", isStarred && "fill-current")} />}
             label="Priorizar"
             onClick={onToggleStar}
-            className={cn("bg-black/40 backdrop-blur-md border-white/10", isStarred ? "text-yellow-400" : "text-white")}
+            className={cn(
+              task.image
+                ? cn("bg-black/40 backdrop-blur-md border-white/10", isStarred ? "text-yellow-400" : "text-white")
+                : cn("bg-background/80 backdrop-blur-sm border-border/50", isStarred ? "text-yellow-500" : "text-muted-foreground")
+            )}
           />
         </div>
       </div>
@@ -95,8 +130,9 @@ export function TaskGridItem({
           </div>
         </div>
 
-        <div className="mt-auto flex flex-wrap gap-1.5" onPointerDown={stopPropagation}>
-          <StatusBadge status={(task.status as TaskStatus) || "TODO"} className="h-5 px-2 text-[8px] font-black uppercase tracking-[0.1em]" />
+        <div className="mt-auto flex flex-wrap items-center gap-1.5" onPointerDown={stopPropagation}>
+          {/* Stepper interativo: 1 clique avança no pipeline (substitui o badge morto) */}
+          <StatusStepper status={status} onChange={onStatusChange} className="h-6" />
           <PriorityBadge priority={(task.priority as TaskPriority) || "MEDIUM"} className="h-5 px-2 text-[8px] font-black uppercase tracking-[0.1em]" />
           {task.dueDate && <DateBadge date={task.dueDate} isOverdue={isOverdue} className="h-5 px-2 text-[8px] font-black uppercase tracking-[0.1em]" />}
         </div>

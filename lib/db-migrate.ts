@@ -10,6 +10,10 @@ import { loadNodeLibsql } from "./prisma";
 // (`INSERT OR IGNORE`), sem apagar/sobrescrever nada que já esteja lá. Assim a
 // carga do PC convive com o que possa ter sido criado pelo celular.
 //
+// GATE DE DIALETO: esta migração é SQLite→libSQL por construção (sqlite_master,
+// PRAGMA, INSERT OR IGNORE). Migração entre dialetos diferentes (ex.: →Postgres)
+// é a Fase 3 do DATABASE_ROADMAP e usa Prisma puro (findMany→createMany), não SQL.
+//
 // É genérica (independente do schema do Prisma): lê as tabelas reais do arquivo
 // via `sqlite_master` e copia coluna a coluna. Para não violar foreign keys, as
 // tabelas são inseridas em ordem de dependência (pais antes de filhos) e cada

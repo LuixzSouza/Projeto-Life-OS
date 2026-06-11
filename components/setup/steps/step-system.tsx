@@ -1,7 +1,11 @@
+import { useTransition } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { FolderInput, Cloud, CheckCircle2, Lock, Info, RefreshCw, HardDrive, Database, FilePlus2 } from "lucide-react";
+import { testPostgresSetupConnection } from "@/app/actions/setup";
+import { FolderInput, Cloud, CheckCircle2, Lock, Info, RefreshCw, HardDrive, Database, FilePlus2, PlugZap } from "lucide-react";
 import { FolderPicker } from "@/components/settings/folder-picker";
 import {
   DB_PROVIDERS,
@@ -192,6 +196,10 @@ export function StepSystem({ formData, setFormData, setDbProvider, dbFromEnv }: 
         </div>
       )}
 
+      {(formData.dbProvider === "postgres" || formData.dbProvider === "supabase") && (
+        <PostgresPanel formData={formData} setFormData={setFormData} />
+      )}
+
       {formData.dbProvider === "local" && (
         <LocalDbPanel formData={formData} setFormData={setFormData} />
       )}
@@ -282,6 +290,117 @@ function ProviderGrid({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+// =========================================================
+// PAINEL POSTGRES / SUPABASE (connection string única)
+// =========================================================
+function PostgresPanel({
+  formData,
+  setFormData,
+}: {
+  formData: SetupFormData;
+  setFormData: React.Dispatch<React.SetStateAction<SetupFormData>>;
+}) {
+  const isSupabase = formData.dbProvider === "supabase";
+  const url = formData.pgUrl.trim();
+  const looksLikeApiKey = /^eyJ/.test(url);
+  const isDirectSupabase = isSupabase && /:5432\//.test(url);
+  const [isTesting, startTesting] = useTransition();
+
+  const handleTest = () => {
+    startTesting(async () => {
+      const res = await testPostgresSetupConnection(url);
+      if (res.success) toast.success(res.message, { duration: 6000 });
+      else toast.error(res.message, { duration: 9000 });
+    });
+  };
+
+  return (
+    <div className="space-y-3 p-4 rounded-xl border border-indigo-500/30 bg-indigo-500/5">
+      <Label className="text-foreground flex items-center gap-2 text-sm font-semibold">
+        <Database className="h-4 w-4 text-indigo-500" />
+        {isSupabase ? "Conexão com o Supabase" : "Conexão com o PostgreSQL"}
+      </Label>
+      {isSupabase ? (
+        <ol className="text-xs text-muted-foreground leading-relaxed space-y-1.5 list-none">
+          {[
+            <>
+              Crie um projeto grátis em{" "}
+              <a href="https://supabase.com" target="_blank" rel="noopener noreferrer" className="text-primary underline underline-offset-2">
+                supabase.com
+              </a>{" "}
+              (anote a <strong>senha do banco</strong> escolhida na criação).
+            </>,
+            <>
+              No painel do projeto, clique em <strong>Connect</strong> (topo) ou vá em{" "}
+              <strong>Settings → Database</strong>.
+            </>,
+            <>
+              Copie a <strong>Connection string (URI)</strong> — para usar no PC, a{" "}
+              <em>Direct connection</em> (porta 5432); para deploy na Vercel, a do{" "}
+              <em>Transaction pooler</em> (porta 6543).
+            </>,
+            <>
+              Troque <code>[YOUR-PASSWORD]</code> pela senha do banco e cole abaixo.{" "}
+              <strong>Não</strong> use as API keys (<code>anon</code>/<code>service_role</code>) — aqui é só a URI.
+            </>,
+          ].map((step, i) => (
+            <li key={i} className="flex gap-2">
+              <span className="shrink-0 h-4 w-4 rounded-full bg-green-500/15 text-green-600 text-[10px] font-bold flex items-center justify-center mt-0.5">
+                {i + 1}
+              </span>
+              <span>{step}</span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          Cole a connection string do seu Postgres (Neon, Railway, RDS ou self-hosted).
+          Em nuvem o SSL é adicionado automaticamente se faltar.
+        </p>
+      )}
+      <div className="grid gap-1.5 pt-1">
+        <Label htmlFor="pgUrl" className="text-[11px] font-semibold uppercase text-muted-foreground">
+          Connection string
+        </Label>
+        <Input
+          id="pgUrl"
+          type="password"
+          value={formData.pgUrl}
+          onChange={(e) => setFormData({ ...formData, pgUrl: e.target.value })}
+          placeholder="postgresql://usuario:senha@host:5432/banco"
+          className="bg-background font-mono text-xs border-border h-10"
+        />
+        {looksLikeApiKey ? (
+          <p className="text-[10px] text-rose-500">
+            ⚠️ Isso parece uma API key (JWT), não a connection string. {isSupabase && "No Supabase, NUNCA use a service_role key aqui — "}
+            use a URI <code>postgresql://...</code> do banco.
+          </p>
+        ) : isDirectSupabase ? (
+          <p className="text-[10px] text-amber-600/90">
+            💡 Porta 5432 = conexão direta (boa p/ desktop). Para deploy na Vercel, troque pela
+            string do pooler (porta 6543, host <code>*.pooler.supabase.com</code>).
+          </p>
+        ) : (
+          <p className="text-[10px] text-muted-foreground">
+            A senha fica embutida na URL — o Life OS a mascara em todos os logs e erros.
+          </p>
+        )}
+      </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={handleTest}
+        disabled={isTesting || !url || looksLikeApiKey}
+        className="border-indigo-500/30 hover:bg-indigo-500/10"
+      >
+        <PlugZap className={isTesting ? "h-4 w-4 animate-pulse" : "h-4 w-4"} />
+        {isTesting ? "Conectando..." : "Testar conexão"}
+      </Button>
     </div>
   );
 }

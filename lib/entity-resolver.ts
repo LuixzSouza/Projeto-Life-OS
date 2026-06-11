@@ -35,7 +35,7 @@ export const ENTITY_ROUTE: Record<string, string> = {
   link: "/links",
   flashcardDeck: "/flashcards",
   studySubject: "/studies",
-  goal: "/studies",
+  goal: "/goals",
   wardrobeItem: "/wardrobe",
   workout: "/health/gym",
   meal: "/health/nutrition",

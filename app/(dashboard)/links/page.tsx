@@ -3,6 +3,7 @@ import { Link2 } from "lucide-react"
 import { LinkGrid } from "@/components/links/link-grid"
 import { getCurrentUserId } from "@/lib/auth"
 import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell"
+import { AskAiButton } from "@/components/ai/ask-ai-button"
 
 export default async function LinksPage() {
   const userId = await getCurrentUserId()
@@ -20,7 +21,8 @@ export default async function LinksPage() {
         title="Biblioteca de Links"
         description="Centralize recursos importantes, referências e ferramentas para acesso rápido e organizado."
         actions={
-          <div className="flex gap-3">
+          <div className="flex items-center gap-3">
+            <AskAiButton q="Organize minha biblioteca de links: o que está sem categoria ou parece duplicado?" label="Organizar com IA" />
             <HeaderStat value={links.length} label="Links" />
             <HeaderStat value={categoryCount} label="Categorias" />
           </div>

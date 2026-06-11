@@ -84,6 +84,24 @@ export async function logSession(
 }
 
 // -------------------------------------
+// R: HISTÓRICO PAGINADO ("Ver tudo" do Histórico recente)
+// Cursor por data: escala para anos de sessões sem carregar tudo de uma vez.
+// -------------------------------------
+export async function getSessionHistory(beforeISO?: string, limit = 30) {
+  const userId = await requireUserId();
+  const before = beforeISO ? new Date(beforeISO) : null;
+  return prisma.studySession.findMany({
+    where: {
+      userId,
+      ...(before && !Number.isNaN(before.getTime()) ? { date: { lt: before } } : {}),
+    },
+    orderBy: { date: "desc" },
+    take: Math.min(Math.max(limit, 1), 100),
+    include: { subject: true },
+  });
+}
+
+// -------------------------------------
 // D: DELETE SESSION (Excluir Sessão)
 // -------------------------------------
 export async function deleteSession(sessionId: string) {

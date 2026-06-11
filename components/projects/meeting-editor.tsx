@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import {
   Sparkles, ListChecks, Trash2, Loader2, Save, X, Mic, Square, Info, Pause, Play,
   ImagePlus, Copy, Download, ChevronLeft, ChevronRight, GripVertical, Check, CloudOff, FileDown,
-  Users, Tag, Gavel,
+  Users, Tag, Gavel, Wand2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,9 +16,11 @@ import { cn } from "@/lib/utils";
 import { compressImage } from "@/lib/image-compress";
 import type { MeetingImage } from "@/lib/meeting-images";
 import { useRecording, AudioMeter } from "@/components/providers/recording-provider";
+import { parseActionItems } from "@/lib/meeting-summary";
 import { MeetingTokenField } from "./meeting-token-field";
 import {
   updateMeeting, deleteMeeting, summarizeMeeting, createTasksFromMeeting, getMeetingNotes,
+  getConnectionNames, polishMeetingTranscript,
 } from "@/app/(dashboard)/projects/actions";
 
 export interface MeetingData {
@@ -58,6 +60,9 @@ export function MeetingEditor({ meeting, onClose }: { meeting: MeetingData; onCl
   const [lightbox, setLightbox] = useState<number | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [polishing, setPolishing] = useState(false);
+  // Autocomplete dos participantes: nomes das Conexões (CRM social).
+  const [connectionNames, setConnectionNames] = useState<string[]>([]);
 
   const notesRef = useRef(notes);
   const titleRef = useRef(title);
@@ -181,6 +186,13 @@ export function MeetingEditor({ meeting, onClose }: { meeting: MeetingData; onCl
     });
     return () => { mounted = false; };
   }, [rec.summaryEvent, meeting.id]);
+
+  // Nomes das Conexões para o autocomplete (1 fetch por abertura do editor).
+  useEffect(() => {
+    let mounted = true;
+    getConnectionNames().then((names) => { if (mounted) setConnectionNames(names); });
+    return () => { mounted = false; };
+  }, []);
 
   // Navegação por teclado no lightbox.
   useEffect(() => {
@@ -360,6 +372,66 @@ export function MeetingEditor({ meeting, onClose }: { meeting: MeetingData; onCl
     else toast.error(res.message);
   };
 
+  // Polimento da transcrição: IA corrige pontuação/erros óbvios preservando os
+  // [mm:ss]. Substitui as notas — com "Desfazer" no toast por segurança.
+  const handlePolish = async () => {
+    if (polishing || !notes.trim()) return;
+    if (isRecordingThis) { toast.error("Pare a gravação antes de polir."); return; }
+    setPolishing(true);
+    try {
+      await persist(); // o servidor precisa ter exatamente o texto atual
+      const res = await polishMeetingTranscript(meeting.id);
+      if (res.success && res.polished) {
+        const previous = res.previous ?? notes;
+        setNotes(res.polished);
+        notesRef.current = res.polished;
+        toast.success("Transcrição polida!", {
+          duration: 8000,
+          action: {
+            label: "Desfazer",
+            onClick: () => {
+              setNotes(previous);
+              notesRef.current = previous;
+              void queueSave({ rawNotes: previous });
+            },
+          },
+        });
+        router.refresh();
+      } else {
+        toast.error(res.message);
+      }
+    } catch {
+      toast.error("Falha ao polir a transcrição.");
+    } finally {
+      setPolishing(false);
+    }
+  };
+
+  const copySummary = () => {
+    if (!summary) return;
+    navigator.clipboard.writeText(summary).then(
+      () => toast.success("Resumo copiado!"),
+      () => toast.error("Não foi possível copiar."),
+    );
+  };
+
+  // Itens de ação detectados no resumo (bullets) — vira o convite ao checklist.
+  const actionCount = parseActionItems(summary).length;
+
+  // Ctrl+S salva (o autosave já cobre, mas o dedo no Ctrl+S é instinto).
+  const handleSaveRef = useRef(handleSave);
+  useEffect(() => { handleSaveRef.current = handleSave; });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        void handleSaveRef.current();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   return (
     <div className="flex flex-col max-h-[88vh]">
       {/* HEADER */}
@@ -439,7 +511,15 @@ export function MeetingEditor({ meeting, onClose }: { meeting: MeetingData; onCl
               </>
             ) : (
               <Button
-                onClick={() => rec.startSession(meeting.id, title)}
+                onClick={() => {
+                  // Vocabulário da reunião → prompt do Whisper: nomes de
+                  // participantes, tags e título ajudam a transcrever CERTO
+                  // exatamente as palavras que mais erram (nomes próprios/jargão).
+                  const vocab = [...participants, ...tags, title.replace(/\d{1,2}[:/h]\d{2}/g, "").trim()]
+                    .filter(Boolean)
+                    .join(", ");
+                  void rec.startSession(meeting.id, title, vocab);
+                }}
                 disabled={otherRecording}
                 variant="outline"
                 size="sm"
@@ -449,7 +529,10 @@ export function MeetingEditor({ meeting, onClose }: { meeting: MeetingData; onCl
               </Button>
             )}
             {!isRecordingThis && (
-              <span className="text-[11px] text-muted-foreground">Sua voz + áudio do computador → vira texto nas notas</span>
+              <span className="text-[11px] text-muted-foreground">
+                Sua voz + áudio do computador → vira texto nas notas
+                <span className="hidden sm:inline"> · preencha os participantes antes: a transcrição acerta os nomes</span>
+              </span>
             )}
           </div>
 
@@ -472,7 +555,8 @@ export function MeetingEditor({ meeting, onClose }: { meeting: MeetingData; onCl
             values={participants}
             onChange={commitParticipants}
             placeholder="Nome e Enter…"
-            hint="Quem esteve na reunião. Aparece na ata em PDF."
+            hint="Quem esteve na reunião — digite e escolha das suas Conexões. A transcrição usa os nomes para acertar a grafia."
+            suggestions={connectionNames}
           />
           <MeetingTokenField
             label="Tags"
@@ -489,6 +573,16 @@ export function MeetingEditor({ meeting, onClose }: { meeting: MeetingData; onCl
           <div className="flex items-center justify-between gap-2">
             <label className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">Notas (cole prints com Ctrl+V)</label>
             <div className="flex items-center gap-1">
+              <Button
+                onClick={handlePolish}
+                disabled={polishing || !notes.trim() || isRecordingThis}
+                variant="ghost"
+                size="sm"
+                title="A IA corrige pontuação e erros óbvios de transcrição, preservando os [mm:ss] — dá para desfazer"
+                className="h-7 gap-1.5 px-2 text-[11px] text-primary hover:text-primary"
+              >
+                {polishing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />} Polir
+              </Button>
               <Button onClick={copyNotes} disabled={!notes.trim()} variant="ghost" size="sm" className="h-7 gap-1.5 px-2 text-[11px] text-muted-foreground">
                 <Copy className="h-3.5 w-3.5" /> Copiar
               </Button>
@@ -612,25 +706,51 @@ export function MeetingEditor({ meeting, onClose }: { meeting: MeetingData; onCl
         {/* Resumo IA */}
         {summary && (
           <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-            <p className="text-[10px] uppercase font-bold tracking-wider text-primary flex items-center gap-1.5 mb-2">
-              <Sparkles className="h-3 w-3" /> Resumo da IA
-            </p>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+                <Sparkles className="h-3 w-3" /> Resumo da IA
+                {actionCount > 0 && (
+                  <span className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold normal-case tracking-normal tabular-nums">
+                    {actionCount} item{actionCount === 1 ? "" : "s"} de ação
+                  </span>
+                )}
+              </p>
+              <Button onClick={copySummary} variant="ghost" size="sm" className="h-7 gap-1.5 px-2 text-[11px] text-muted-foreground">
+                <Copy className="h-3.5 w-3.5" /> Copiar
+              </Button>
+            </div>
             <p className="text-[15px] whitespace-pre-wrap leading-7 text-foreground/90">{summary}</p>
+            {actionCount > 0 && (
+              <p className="mt-2 text-[11px] text-muted-foreground/70">
+                💡 &quot;Gerar checklist&quot; transforma esses {actionCount} item{actionCount === 1 ? "" : "s"} em tarefas do projeto.
+              </p>
+            )}
           </div>
         )}
       </div>
 
       {/* FOOTER */}
       <div className="px-6 py-4 border-t border-border/40 bg-muted/5 flex flex-wrap items-center gap-2">
-        <Button onClick={handleSummarize} disabled={summarizing} className="gap-2 rounded-xl bg-primary shadow-lg shadow-primary/20">
+        <Button
+          onClick={handleSummarize}
+          disabled={summarizing || !notes.trim()}
+          title={!notes.trim() ? "Escreva (ou grave) as notas primeiro" : summary ? "Gera o resumo de novo com as notas atuais" : undefined}
+          className="gap-2 rounded-xl bg-primary shadow-lg shadow-primary/20"
+        >
           {summarizing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-          Resumir com IA
+          {summary ? "Resumir de novo" : "Resumir com IA"}
         </Button>
-        <Button onClick={handleGenerateTasks} disabled={generating || !summary} variant="secondary" className="gap-2 rounded-xl">
+        <Button
+          onClick={handleGenerateTasks}
+          disabled={generating || !summary || actionCount === 0}
+          title={!summary ? "Gere o resumo primeiro" : actionCount === 0 ? "O resumo não tem itens de ação (bullets)" : `Cria ${actionCount} tarefa(s) no projeto`}
+          variant="secondary"
+          className="gap-2 rounded-xl"
+        >
           {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ListChecks className="h-4 w-4" />}
-          Gerar checklist
+          Gerar checklist{actionCount > 0 ? ` (${actionCount})` : ""}
         </Button>
-        <Button onClick={handleSave} disabled={saving} variant="outline" className="gap-2 rounded-xl">
+        <Button onClick={handleSave} disabled={saving} title="Atalho: Ctrl+S" variant="outline" className="gap-2 rounded-xl">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Salvar
         </Button>

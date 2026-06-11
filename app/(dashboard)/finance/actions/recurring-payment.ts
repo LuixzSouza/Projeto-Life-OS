@@ -70,7 +70,7 @@ export async function payRecurringExpense(formData: FormData) {
         }),
         prisma.account.update({
           where: { id: account.id },
-          data: { balance: Number(account.balance) - value },
+          data: { balance: { decrement: value } },
           select: { id: true },
         }),
       );
@@ -123,7 +123,7 @@ export async function undoRecurringExpensePayment(formData: FormData) {
       if (account && !account.isConnected) {
         ops.push(prisma.account.update({
           where: { id: account.id },
-          data: { balance: Number(account.balance) + Number(payment.transaction.amount) },
+          data: { balance: { increment: Number(payment.transaction.amount) } },
           select: { id: true },
         }));
       }

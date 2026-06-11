@@ -15,6 +15,26 @@ export const metadata: Metadata = {
   description: "Memorização ativa com repetição espaçada.",
 };
 
+/** Previsão da fila: quantos cartões vencem amanhã e nos próximos 7 dias.
+ *  Helper fora do componente — o compilador do React não aceita Date.now()
+ *  direto no corpo do render. */
+function countUpcoming(cards: { nextReview: Date | null }[]): { dueTomorrow: number; dueWeek: number } {
+  const now = Date.now();
+  const DAY = 864e5;
+  const endTomorrow = now + 2 * DAY;
+  const endWeek = now + 7 * DAY;
+  let dueTomorrow = 0;
+  let dueWeek = 0;
+  for (const c of cards) {
+    if (!c.nextReview) continue;
+    const t = new Date(c.nextReview).getTime();
+    if (t <= now) continue; // já está no "hoje"
+    if (t <= endTomorrow) dueTomorrow++;
+    if (t <= endWeek) dueWeek++;
+  }
+  return { dueTomorrow, dueWeek };
+}
+
 export default async function FlashcardsPage() {
   const userId = await getCurrentUserId();
   /**
@@ -54,6 +74,9 @@ export default async function FlashcardsPage() {
 
   // Cartões devidos hoje (curva de esquecimento) em todos os baralhos.
   const dueToday = countDue(allCards);
+
+  // Previsão da fila: o que vence amanhã e nos próximos 7 dias (planejar o ritmo).
+  const { dueTomorrow, dueWeek } = countUpcoming(allCards);
 
   const learningPercent = totalCards > 0 ? (stats.learning / totalCards) * 100 : 0;
   const reviewingPercent = totalCards > 0 ? (stats.reviewing / totalCards) * 100 : 0;
@@ -111,25 +134,35 @@ export default async function FlashcardsPage() {
                             Distribuídos em {decks.length} {decks.length === 1 ? "baralho" : "baralhos"}.
                         </p>
 
-                        {/* Para revisar hoje */}
+                        {/* Para revisar hoje → Revisão Geral (todos os baralhos numa fila) */}
                         <div className={cn(
-                            "mt-4 flex items-center gap-2.5 rounded-xl border p-3",
+                            "mt-4 rounded-xl border p-3",
                             dueToday > 0 ? "border-primary/20 bg-primary/5" : "border-emerald-500/20 bg-emerald-500/5"
                         )}>
-                            <div className={cn("p-1.5 rounded-lg", dueToday > 0 ? "bg-primary/10 text-primary" : "bg-emerald-500/10 text-emerald-600")}>
-                                {dueToday > 0 ? <Zap className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+                            <div className="flex items-center gap-2.5">
+                                <div className={cn("p-1.5 rounded-lg", dueToday > 0 ? "bg-primary/10 text-primary" : "bg-emerald-500/10 text-emerald-600")}>
+                                    {dueToday > 0 ? <Zap className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+                                </div>
+                                <p className={cn("text-sm font-bold leading-tight", dueToday === 0 && "text-emerald-600")}>
+                                    {dueToday > 0 ? `${dueToday} para revisar hoje` : "Tudo em dia! 🎉"}
+                                </p>
                             </div>
-                            <div className="min-w-0">
-                                {dueToday > 0 ? (
-                                    <>
-                                        <p className="text-sm font-bold leading-none">{dueToday} para revisar hoje</p>
-                                        <p className="text-[11px] text-muted-foreground mt-1">Escolha um baralho abaixo e mande ver.</p>
-                                    </>
-                                ) : (
-                                    <p className="text-sm font-bold text-emerald-600 leading-tight">Tudo em dia! 🎉</p>
-                                )}
-                            </div>
+                            {dueToday > 0 && (
+                                <Link href="/flashcards/review" className="mt-3 block">
+                                    <Button size="sm" className="h-9 w-full gap-1.5 rounded-lg font-bold shadow-sm">
+                                        <Zap className="h-4 w-4" /> Revisar tudo agora
+                                    </Button>
+                                </Link>
+                            )}
                         </div>
+
+                        {/* Previsão da fila */}
+                        {(dueTomorrow > 0 || dueWeek > 0) && (
+                            <p className="mt-3 text-[11px] font-medium text-muted-foreground">
+                                📅 Vencendo: <strong className="text-foreground">{dueTomorrow}</strong> até amanhã
+                                {" · "}<strong className="text-foreground">{dueWeek}</strong> nos próximos 7 dias
+                            </p>
+                        )}
                     </CardContent>
                 </Card>
 

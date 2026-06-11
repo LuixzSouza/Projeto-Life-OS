@@ -1,0 +1,25 @@
+# Bancos descartáveis para testar o multi-banco do Life OS (DATABASE_ROADMAP ·
+# bloco Transversal). NÃO é infraestrutura do app — o Life OS continua
+# local-first; isto é só a matriz de teste do smoke.
+#
+#   docker compose -f docker-compose.db.yml up -d postgres
+#   npm run db:smoke:postgres -- "postgresql://postgres:lifeos@localhost:55432/lifeos"
+#   docker compose -f docker-compose.db.yml down -v
+#
+# MySQL/Mongo entram aqui quando as Fases 4/5 destravarem (MySQL exige o
+# upgrade p/ Prisma 6 — ver decisão 0.5 no roadmap).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lifeos-pg-smoke
+    environment:
+      POSTGRES_PASSWORD: lifeos
+      POSTGRES_DB: lifeos
+    ports:
+      - "55432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 15

@@ -142,7 +142,7 @@ export function ThemedDays({ themedDays, weekday }: { themedDays: ThemedDayData[
                     <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">{WEEKDAYS[d]}</span>
                     <div className="flex items-center gap-1.5">
                       {hasTheme && (
-                        <Button variant="ghost" size="icon" onClick={() => clearDay(d)} disabled={saving} className="h-7 w-7 text-muted-foreground hover:text-rose-500">
+                        <Button variant="ghost" size="icon" onClick={() => clearDay(d)} disabled={saving} className="h-9 w-9 md:h-7 md:w-7 text-muted-foreground hover:text-rose-500">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       )}

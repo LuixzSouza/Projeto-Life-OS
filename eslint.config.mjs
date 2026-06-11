@@ -27,6 +27,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Pacote do instalador (DISTRIBUICAO): cópia do código + build standalone —
+    // lintar isso duplica cada aviso e adiciona ~800 erros de código gerado.
+    "dist/**",
+    "release/**",
   ]),
 ]);
 

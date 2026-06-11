@@ -27,6 +27,8 @@ import { prisma } from "@/lib/prisma";
 
 // Componentes Server-side separados (seções)
 import { FinanceSection } from "./_components/finance-section";
+import { TodaySection } from "./_components/today-section";
+import { ConsistencyCard } from "./_components/consistency-card";
 import { ProductivitySection } from "./_components/productivity-section";
 import { PersonalSection } from "./_components/personal-section";
 import { HealthOverviewSection } from "./_components/health-overview-section";
@@ -66,6 +68,12 @@ export default async function DashboardPage() {
       {/* Briefing diário proativo: a IA fala primeiro (agenda, prioridades,
           saldo, hábitos). Fora do Modo de Preservação — orienta qualquer dia. */}
       <AiBriefingCard />
+
+      {/* Tela "Hoje": agenda do dia + tarefas vencidas numa olhada (visão de
+          chegada). Fora do Modo de Preservação — compromissos não somem. */}
+      <Suspense fallback={<Skeleton className="h-[140px] w-full rounded-2xl" />}>
+        <TodaySection userId={userId} />
+      </Suspense>
 
       {/* Fase 0 — captura diária: energia + hábitos + caixa de entrada (base dos insights) */}
       <div className="grid gap-4 lg:grid-cols-2">
@@ -111,6 +119,11 @@ export default async function DashboardPage() {
         {/* Reset Semanal: resumo dos últimos 7 dias + direção da próxima. */}
         <Suspense fallback={null}>
           <WeeklyResetCard />
+        </Suspense>
+
+        {/* Constância: mini-heatmap das últimas 16 semanas + sequência atual. */}
+        <Suspense fallback={null}>
+          <ConsistencyCard userId={userId} />
         </Suspense>
 
         {/* Overview do Dia: unifica Treino + Nutrição numa olhada (topo da Home) */}

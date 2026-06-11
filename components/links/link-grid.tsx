@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { SavedLink } from "@prisma/client";
 import { toast } from "sonner";
-import { deleteLink, checkLinksHealth, type LinkHealth } from "@/app/(dashboard)/links/actions";
+import { deleteLink, checkLinksHealth, toggleLinkFavorite, type LinkHealth } from "@/app/(dashboard)/links/actions";
 import { LinkForm } from "./link-form";
 import { EntityConnectionsDialog } from "@/components/connect/entity-connections-dialog";
 
@@ -57,7 +57,8 @@ import {
   Copy,
   WifiOff,
   Check,
-  Tag as TagIcon
+  Tag as TagIcon,
+  Star
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -89,6 +90,21 @@ export function LinkGrid({ links }: { links: SavedLink[] }) {
   const [checking, setChecking] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [brokenOnly, setBrokenOnly] = useState(false);
+
+  // Favoritos: otimista por cima das props do servidor (revalidate confirma depois).
+  const [favOverrides, setFavOverrides] = useState<Record<string, boolean>>({});
+  const [favOnly, setFavOnly] = useState(false);
+  const isFav = (l: SavedLink) => favOverrides[l.id] ?? l.isFavorite;
+
+  const handleToggleFavorite = async (link: SavedLink) => {
+    const next = !isFav(link);
+    setFavOverrides((prev) => ({ ...prev, [link.id]: next }));
+    const res = await toggleLinkFavorite(link.id, next);
+    if (!res.success) {
+      setFavOverrides((prev) => ({ ...prev, [link.id]: !next }));
+      toast.error("Não consegui atualizar o favorito.");
+    }
+  };
 
   const handleCheckHealth = async () => {
     setChecking(true);
@@ -129,19 +145,22 @@ export function LinkGrid({ links }: { links: SavedLink[] }) {
 
   const brokenSet = useMemo(() => new Set(health?.brokenIds ?? []), [health]);
 
-  // 1. Filtragem
+  // 1. Filtragem + ordenação (favoritos primeiro, depois a ordem do servidor)
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return links.filter((l) => {
+    const result = links.filter((l) => {
       const matchCat = categoryFilter === "all" || l.category === categoryFilter;
       const matchQuery = !q ||
         l.title.toLowerCase().includes(q) ||
         l.description?.toLowerCase().includes(q) ||
         l.category?.toLowerCase().includes(q);
       const matchBroken = !brokenOnly || brokenSet.has(l.id);
-      return matchCat && matchQuery && matchBroken;
+      const matchFav = !favOnly || isFav(l);
+      return matchCat && matchQuery && matchBroken && matchFav;
     });
-  }, [links, query, categoryFilter, brokenOnly, brokenSet]);
+    return result.sort((a, b) => Number(isFav(b)) - Number(isFav(a)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- isFav depende só de favOverrides
+  }, [links, query, categoryFilter, brokenOnly, brokenSet, favOnly, favOverrides]);
 
   // 2. Lógica de Paginação
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
@@ -197,6 +216,20 @@ export function LinkGrid({ links }: { links: SavedLink[] }) {
               ))}
             </SelectContent>
           </Select>
+
+          {/* Só favoritos */}
+          <Button
+            variant="outline"
+            onClick={() => { setFavOnly((v) => !v); setCurrentPage(1); }}
+            title="Mostrar só os favoritos"
+            className={cn(
+              "gap-2 transition-colors",
+              favOnly && "border-amber-500/40 bg-amber-500/10 text-amber-600 hover:bg-amber-500/15"
+            )}
+          >
+            <Star className={cn("h-4 w-4", favOnly && "fill-amber-400 text-amber-500")} />
+            <span className="hidden sm:inline">Favoritos</span>
+          </Button>
 
           {/* Verificar saúde dos links */}
           <Button
@@ -295,7 +328,19 @@ export function LinkGrid({ links }: { links: SavedLink[] }) {
                 </div>
 
                 {/* Actions Overlay */}
-                <div className="absolute top-3 right-3 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                <div className={cn(
+                    "absolute top-3 right-3 flex items-center gap-1.5 transition-opacity",
+                    isFav(link) ? "opacity-100" : "opacity-100 md:opacity-0 md:group-hover:opacity-100"
+                )}>
+                    <Button
+                        size="icon"
+                        variant="secondary"
+                        onClick={() => handleToggleFavorite(link)}
+                        title={isFav(link) ? "Desfavoritar" : "Favoritar"}
+                        className="h-8 w-8 rounded-full bg-background/90 backdrop-blur shadow-sm hover:bg-background"
+                    >
+                        <Star className={cn("h-4 w-4", isFav(link) ? "fill-amber-400 text-amber-500" : "text-muted-foreground")} />
+                    </Button>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full bg-background/90 backdrop-blur shadow-sm hover:bg-background">
@@ -421,7 +466,7 @@ export function LinkGrid({ links }: { links: SavedLink[] }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Remover recurso?</AlertDialogTitle>
             <AlertDialogDescription>
-              Isso excluirá permanentemente o link da sua biblioteca.
+              O link vai para a lixeira — você pode restaurá-lo depois em /trash.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

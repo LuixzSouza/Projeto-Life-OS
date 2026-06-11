@@ -5,11 +5,14 @@ import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SettingsTabs } from "@/components/settings/settings-tabs";
 import { Database, Shield, BrainCircuit, User, Plug, Wrench } from "lucide-react";
 import path from "path";
+import fs from "fs";
 import { cn } from "@/lib/utils";
-import { getDatabasePath, isRegistrationOpen } from "@/lib/db-config";
+import { getDatabasePath, getDbProfile, maskDbUrl, isRegistrationOpen } from "@/lib/db-config";
 import os from "os";
+import { headers } from "next/headers";
 import { getCurrentUserId } from "@/lib/auth";
 import { decryptSettings } from "@/lib/settings-crypto";
+import { makeCalendarToken } from "@/lib/ical";
 
 // --- Importação dos Componentes ---
 import AppearanceForm from "@/components/settings/appearance-form"; 
@@ -22,6 +25,8 @@ import { DbSyncCard } from "@/components/settings/db-sync-card";
 import { MigrateToReplicaCard } from "@/components/settings/migrate-to-replica-card";
 import APIIntegrationsForm from "@/components/settings/api-integrations-form";
 import { BackupManager } from "@/components/settings/backup-manager";
+import { AutoBackupCard } from "@/components/settings/auto-backup-card"; // ✅ Backup automático diário
+import { getAutoBackupStatus } from "@/lib/auto-backup";
 import { SystemInfoCard } from "@/components/settings/system-info-card"; // ✅ Info do Sistema
 import { MaintenancePanel } from "@/components/settings/maintenance-panel"; // ✅ Manutenção (VACUUM)
 import { SelectiveExport } from "@/components/settings/selective-export"; // ✅ Exportação Seletiva
@@ -29,8 +34,15 @@ import { SelectiveDelete } from "@/components/settings/selective-delete"; // ✅
 import { AiMemoriesCard } from "@/components/settings/ai-memories-card"; // ✅ Memórias da IA
 import { AiAutomationsCard } from "@/components/settings/ai-automations-card"; // ✅ Automações da IA
 import { AiPrivacyCard } from "@/components/settings/ai-privacy-card"; // ✅ Privacidade/Web da IA
+import { RemoteAccessCard } from "@/components/settings/remote-access-card"; // ✅ Acesso pelo celular
 import { listAiMemories } from "./actions/ai-memories";
 import { listAiAutomations } from "./actions/ai-automations";
+import { getWindowsIntegrationStatus } from "./actions/windows-integration";
+import { AccessLogCard, describeUserAgent, type AccessLogEntry } from "@/components/settings/access-log-card";
+import { SessionsCard } from "@/components/settings/sessions-card"; // ✅ Desconectar outros dispositivos
+import { DbOverviewCard, type DbOverview } from "@/components/settings/db-overview-card"; // ✅ Card "Seu banco"
+import { MigrateDbCard } from "@/components/settings/migrate-db-card"; // ✅ Mudar de banco (Fase 3)
+import { SpaceOptimizerCard } from "@/components/settings/space-optimizer-card"; // ✅ Otimizar espaço (plano grátis)
 
 const SETTINGS_TABS = ["profile", "intelligence", "integrations", "system", "security"] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number];
@@ -46,53 +58,139 @@ export default async function SettingsPage({
 
     // 1. Busca Dados do Usuário logado
     const userId = await getCurrentUserId();
-    const user = userId ? await prisma.user.findUnique({ where: { id: userId } }) : null;
+
+    // 1b. Tudo que só depende do userId vai num ÚNICO lote paralelo
+    // (Performance §1 do DATABASE_ROADMAP: em banco remoto cada await
+    // sequencial custa 20–150ms — eram ~8 viagens em série nesta página).
+    const [
+        user,
+        rawSettings,
+        dbStatus,
+        [aiMemories, aiAutomations],
+        backupHistory,
+        autoBackupStatus,
+        stats,
+        rawAccessLogs,
+    ] = await Promise.all([
+        userId ? prisma.user.findUnique({ where: { id: userId } }) : null,
+        userId ? prisma.settings.findUnique({ where: { userId } }) : null,
+        getDbStatus(),
+        userId
+            ? Promise.all([listAiMemories(), listAiAutomations()])
+            : Promise.resolve<[Awaited<ReturnType<typeof listAiMemories>>, Awaited<ReturnType<typeof listAiAutomations>>]>([[], []]),
+        prisma.backupLog.findMany({
+            where: { userId },
+            orderBy: { createdAt: "desc" },
+            take: 20,
+        }),
+        userId ? getAutoBackupStatus(userId) : null,
+        // Fallback seguro: estatística que falha não derruba a página.
+        getStorageStats().catch(() => ({
+            totalItems: 0,
+            totalSize: "0 B",
+            breakdown: [],
+            disk: null,
+        })),
+        userId
+            ? prisma.activityLog.findMany({
+                  where: { userId, module: "auth" },
+                  orderBy: { createdAt: "desc" },
+                  take: 10,
+              })
+            : [],
+    ]);
+
     // Chaves vêm cifradas do banco; descriptografamos para exibir/editar nos forms.
-    const settings = decryptSettings(
-        userId ? await prisma.settings.findUnique({ where: { userId } }) : null
-    );
-    
+    const settings = decryptSettings(rawSettings);
+
     // 2. Resolve Caminho do Banco
     const rawDbPath = getDatabasePath();
     const dbFullPath = rawDbPath || path.join(process.cwd(), 'life_os.db');
     const dbFolder = path.dirname(dbFullPath);
 
-    // 2b. Status do banco (modo réplica habilita o cartão de sincronização)
-    const dbStatus = await getDbStatus();
+    // 2b-2. Card "Seu banco": identidade do provedor (latência vem do getDbStatus).
+    const dbProfile = getDbProfile();
+    const CLOUD_LABELS: Record<string, string> = {
+        turso: "Turso", postgres: "PostgreSQL", supabase: "Supabase",
+        mysql: "MySQL", mongodb: "MongoDB",
+    };
+    const dbProviderLabel =
+        dbProfile?.mode === "local" ? "SQLite local"
+        : dbProfile?.mode === "replica" ? "Réplica local + Turso"
+        : dbProfile?.mode === "cloud" ? (CLOUD_LABELS[dbProfile.provider] ?? dbProfile.provider)
+        : "Não configurado";
+    const dbLocation =
+        dbProfile?.mode === "cloud" ? maskDbUrl(dbProfile.url)
+        : dbProfile?.mode === "replica" ? `${dbProfile.databasePath} ⇄ ${maskDbUrl(dbProfile.syncUrl)}`
+        : dbProfile?.mode === "local" ? dbProfile.databasePath
+        : null;
     
-    // 2c. Memórias e automações da IA (aba Inteligência)
-    const [aiMemories, aiAutomations] = userId
-        ? await Promise.all([listAiMemories(), listAiAutomations()])
-        : [[], []];
+    // 4b. Endereços de rede local p/ acesso pelo celular (só faz sentido fora da nuvem).
+    // A porta vem do header Host da própria requisição (cobre launcher em 3000..3011).
+    const requestHost = (await headers()).get("host") ?? "localhost:3000";
+    const serverPort = requestHost.includes(":") ? requestHost.split(":").pop()! : "80";
+    // Prioriza IPs de rede local DOMÉSTICA (192.168/10/172.16-31) — adaptadores
+    // de VPN virtual (Radmin/Hamachi 25-26.x, Tailscale 100.64+) entram por
+    // último: o celular na mesma rede Wi-Fi não os alcança, e o QR usa o 1º da lista.
+    const lanPriority = (ip: string): number => {
+        if (/^192\.168\./.test(ip) || /^10\./.test(ip) || /^172\.(1[6-9]|2\d|3[01])\./.test(ip)) return 0;
+        return 1; // VPNs virtuais e faixas não-domésticas
+    };
+    const lanUrls = dbStatus.mode === "cloud" ? [] : Object.values(os.networkInterfaces())
+        .flatMap((list) => list ?? [])
+        .filter((iface) => iface.family === "IPv4" && !iface.internal)
+        .sort((a, b) => lanPriority(a.address) - lanPriority(b.address))
+        .map((iface) => `http://${iface.address}:${serverPort}`);
 
-    // 3. Histórico de Backups
-    const backupHistory = await prisma.backupLog.findMany({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-        take: 20
+    // 4c. Integração com o Windows (iniciar com o sistema / firewall)
+    const windowsIntegration = userId && dbStatus.mode !== "cloud"
+        ? await getWindowsIntegrationStatus()
+        : null;
+
+    // 4c-2. Feed iCal da Agenda (token assinado; gira junto com o tokenVersion)
+    const calendarToken = userId && user ? makeCalendarToken(userId, user.tokenVersion) : null;
+
+    // 4d. Últimos acessos (aba Segurança) — linhas vieram no lote paralelo.
+    const accessLogs: AccessLogEntry[] = rawAccessLogs.map((log) => {
+        let ip = "?";
+        let device = "Desconhecido";
+        try {
+            const meta = JSON.parse(log.meta ?? "{}") as { ip?: string; userAgent?: string };
+            ip = meta.ip ?? "?";
+            device = describeUserAgent(meta.userAgent ?? "");
+        } catch { /* meta antiga/ausente */ }
+        return { id: log.id, action: log.action, ip, device, createdAt: log.createdAt.toISOString() };
     });
 
-    // 4. Estatísticas de Armazenamento (Com Fallback Seguro)
-    let stats;
+    // 5. Informações do Ambiente (Servidor) — inclui a versão do app ("Sobre")
+    let appVersion = "?";
     try {
-        stats = await getStorageStats();
-    } catch (e) {
-        // Fallback corrigido para bater com a interface TypeScript
-        stats = { 
-            totalItems: 0, 
-            totalSize: "0 B", 
-            breakdown: [], 
-            disk: null 
-        };
-    }
+        const pkg = JSON.parse(
+            fs.readFileSync(path.join(process.cwd(), "package.json"), "utf-8")
+        ) as { version?: string };
+        appVersion = pkg.version ?? "?";
+    } catch { /* build instalado pode não ter package.json acessível */ }
 
-    // 5. Informações do Ambiente (Servidor)
     const systemInfo = {
         cwd: process.cwd(),
         platform: os.platform() + " " + os.release(),
         nodeVersion: process.version,
         memory: Math.round(process.memoryUsage().rss / 1024 / 1024) + " MB",
-        uptime: Math.floor(process.uptime()) + "s"
+        uptime: Math.floor(process.uptime()) + "s",
+        version: appVersion
+    };
+
+    // 6. Card "Seu banco" — consolida a identidade/saúde do banco num lugar só.
+    const dbOverview: DbOverview = {
+        mode: dbStatus.mode,
+        providerLabel: dbProviderLabel,
+        location: dbLocation,
+        latencyMs: dbStatus.latencyMs,
+        sizeBytes: dbStatus.sizeBytes,
+        sizeLimitBytes: dbStatus.sizeLimitBytes,
+        lastSyncAt: dbStatus.lastSyncAt,
+        lastSyncError: dbStatus.lastSyncError,
+        lastBackupAt: backupHistory[0]?.createdAt.toISOString() ?? null,
     };
 
     return (
@@ -148,33 +246,18 @@ export default async function SettingsPage({
                         </div>
 
                         <div className="md:col-span-8 space-y-6">
+                            {/* Card "Seu banco" — válido p/ qualquer modo/provedor (Turso,
+                                Postgres, Supabase, local, réplica). */}
+                            <DbOverviewCard overview={dbOverview} />
                             {dbStatus.isReplica && (
                                 <DbSyncCard
                                     syncUrl={dbStatus.syncUrl}
                                     databasePath={dbStatus.databasePath}
+                                    lastSyncAt={dbStatus.lastSyncAt}
+                                    lastSyncError={dbStatus.lastSyncError}
                                 />
                             )}
                             {dbStatus.mode === "local" && <MigrateToReplicaCard />}
-                            {dbStatus.mode === "cloud" && (
-                                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-5 flex items-start gap-4">
-                                    <div className="p-3 bg-background rounded-xl shadow-sm text-emerald-500 border border-emerald-500/20 shrink-0">
-                                        <Database className="h-6 w-6" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <h4 className="font-semibold text-foreground flex items-center gap-2">
-                                            Conectado à Nuvem (Turso)
-                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600">
-                                                NUVEM
-                                            </span>
-                                        </h4>
-                                        <p className="text-xs text-muted-foreground leading-relaxed max-w-md">
-                                            Este ambiente lê o banco diretamente do Turso (via variáveis de
-                                            ambiente). Backups e otimização de arquivo local não se aplicam aqui —
-                                            o Turso cuida disso.
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
                             <Card className="border-border shadow-sm bg-card">
                                 <CardContent className="p-6">
                                     {dbStatus.mode !== "cloud" && (
@@ -189,6 +272,21 @@ export default async function SettingsPage({
                         </div>
                     </div>
 
+                    {/* A2. Acesso Remoto (celular na rede local / fora de casa) */}
+                    {dbStatus.mode !== "cloud" && (
+                        <div className="grid gap-6 md:grid-cols-12 pt-6 border-t border-border">
+                            <div className="md:col-span-4">
+                                <h3 className="text-lg font-medium text-foreground">Acesso Remoto</h3>
+                                <p className="text-sm text-muted-foreground">
+                                    Use o Life OS no celular mantendo os dados no seu computador.
+                                </p>
+                            </div>
+                            <div className="md:col-span-8">
+                                <RemoteAccessCard lanUrls={lanUrls} mode={dbStatus.mode ?? "local"} windows={windowsIntegration} calendarToken={calendarToken} />
+                            </div>
+                        </div>
+                    )}
+
                     {/* B. Manutenção Técnica (VACUUM & CHECK) */}
                     <div className="grid gap-6 md:grid-cols-12 pt-6 border-t border-border">
                         <div className="md:col-span-4">
@@ -199,7 +297,10 @@ export default async function SettingsPage({
                                 Ferramentas para otimizar performance e verificar integridade.
                             </p>
                         </div>
-                        <div className="md:col-span-8">
+                        <div className="md:col-span-8 space-y-4">
+                            {/* Otimizador de espaço: recompressão de imagens + faxina
+                                seletiva — essencial p/ render o plano grátis. */}
+                            <SpaceOptimizerCard />
                             <MaintenancePanel mode={dbStatus.mode} />
                         </div>
                     </div>
@@ -212,7 +313,8 @@ export default async function SettingsPage({
                                 Pontos de restauração salvos automaticamente na pasta do sistema.
                             </p>
                         </div>
-                        <div className="md:col-span-8">
+                        <div className="md:col-span-8 space-y-4">
+                            {autoBackupStatus && <AutoBackupCard initial={autoBackupStatus} />}
                             <BackupManager history={backupHistory} mode={dbStatus.mode} />
                         </div>
                     </div>
@@ -225,15 +327,18 @@ export default async function SettingsPage({
                                 Exporte partes específicas ou transfira dados via arquivo JSON.
                             </p>
                         </div>
-                        <div className="md:col-span-8">
-                            <div className="grid md:grid-cols-2 gap-4 h-full">
+                        <div className="md:col-span-8 space-y-4">
+                            {/* Mudar de banco (Fase 3): copia a instância inteira p/ outro
+                                provedor e troca o perfil — banco antigo intacto. */}
+                            <MigrateDbCard />
+                            <div className="grid md:grid-cols-2 gap-4">
                                 {/* Exportação Seletiva (Novo) */}
-                                <SelectiveExport /> 
-                                
+                                <SelectiveExport />
+
                                 {/* Importação */}
                                 <Card className="border-border shadow-sm bg-card h-full">
                                     <CardContent className="p-6">
-                                        <RestoreBackupForm /> 
+                                        <RestoreBackupForm />
                                     </CardContent>
                                 </Card>
                             </div>
@@ -347,12 +452,14 @@ export default async function SettingsPage({
                             <h3 className="text-lg font-medium text-foreground">Acesso</h3>
                             <p className="text-sm text-muted-foreground">Altere sua senha mestre.</p>
                         </div>
-                        <div className="md:col-span-8">
+                        <div className="md:col-span-8 space-y-6">
                             <SecurityForm
                                 initialAutoLock={settings?.autoLockMinutes ?? 15}
                                 initialPrivacyMode={settings?.privacyMode ?? false}
                                 initialRegistrationOpen={isRegistrationOpen()}
                             />
+                            <SessionsCard />
+                            <AccessLogCard entries={accessLogs} />
                         </div>
                     </div>
                 </TabsContent>

@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import {
-  Play, CheckCircle2, Lightbulb, FolderTree, Settings, Coffee,
-  Volume2, VolumeX, Bell, Award, ChevronRight, Zap,
+  Play, CheckCircle2, Lightbulb, Settings, Coffee,
+  Volume2, VolumeX, Bell, Award, Zap,
 } from "lucide-react";
 import { StudySubject } from "@prisma/client";
 import { logSession } from "@/app/(dashboard)/studies/actions";
@@ -15,18 +15,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SubjectCombobox } from "./subject-combobox";
 
 import {
   SESSION_TYPE_OPTIONS, POMODORO_PRESETS, STUDY_TIPS,
   type SessionType, type PomodoroPreset,
 } from "./study-timer-constants";
 import { FocusModeModal } from "./focus-mode-modal";
+import { onStudyStart } from "./study-launch";
 
 /* ================================
    PAINEL PRINCIPAL
 ================================ */
-export function StudyTimer({ subjects }: { subjects: StudySubject[] }) {
+// totalMinutes opcional: a página passa as matérias COM estatística — o
+// combobox usa para mostrar o tempo já focado ao lado de cada opção.
+export function StudyTimer({ subjects }: { subjects: (StudySubject & { totalMinutes?: number })[] }) {
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>("");
   const [showSettings, setShowSettings] = useState(false);
   const [pomodoroPreset, setPomodoroPreset] = useState<PomodoroPreset>("CLASSIC");
@@ -50,16 +54,14 @@ export function StudyTimer({ subjects }: { subjects: StudySubject[] }) {
       return () => clearInterval(interval);
   }, []);
 
-  const groupedSubjects = subjects.reduce((acc, subject) => {
-    if (!subject.parentId) {
-      if (!acc[subject.id]) acc[subject.id] = { parent: subject, children: [] };
-      else acc[subject.id].parent = subject;
-    } else {
-      if (!acc[subject.parentId]) acc[subject.parentId] = { parent: null, children: [] };
-      acc[subject.parentId].children.push(subject);
-    }
-    return acc;
-  }, {} as Record<string, { parent: StudySubject | null; children: StudySubject[] }>);
+  // "▶ Estudar" direto do card da matéria: seleciona e abre o foco na hora.
+  useEffect(() => {
+    return onStudyStart((subjectId) => {
+      if (!subjects.some((s) => s.id === subjectId)) return;
+      setSelectedSubjectId(subjectId);
+      setIsFocusModeOpen(true);
+    });
+  }, [subjects]);
 
   const selectedSubject = subjects.find(s => s.id === selectedSubjectId) || null;
 
@@ -119,23 +121,13 @@ export function StudyTimer({ subjects }: { subjects: StudySubject[] }) {
 
                     <div className="space-y-3">
                         <Label className="text-xs uppercase font-bold text-muted-foreground tracking-wider">O que vamos estudar?</Label>
-                        <Select value={selectedSubjectId} onValueChange={setSelectedSubjectId}>
-                            <SelectTrigger className="h-14 text-base bg-muted/30 border-border/60">
-                                <SelectValue placeholder="Selecione um tópico ou matéria" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {Object.entries(groupedSubjects).map(([parentId, group]) => (
-                                    <SelectGroup key={parentId}>
-                                    {group.parent && (
-                                        <SelectItem value={group.parent.id} className="font-bold py-3"><FolderTree className="h-4 w-4 inline mr-2" />{group.parent.title}</SelectItem>
-                                    )}
-                                    {group.children.map(child => (
-                                        <SelectItem key={child.id} value={child.id} className="pl-8 py-2"><ChevronRight className="h-3 w-3 inline mr-2 opacity-50" />{child.title}</SelectItem>
-                                    ))}
-                                    </SelectGroup>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        {/* Combobox com busca: escala p/ dezenas de matérias (digite 2 letras e achou) */}
+                        <SubjectCombobox
+                            subjects={subjects}
+                            value={selectedSubjectId}
+                            onChange={setSelectedSubjectId}
+                            className="h-14 rounded-xl border-border/60 bg-muted/30 text-base"
+                        />
                     </div>
 
                     <Button

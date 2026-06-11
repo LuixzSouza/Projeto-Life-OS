@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   Plus, Search, Target, Pencil, Trash2, GraduationCap, Loader2, CheckCircle2,
-  Circle, CalendarDays, X, Flag,
+  Circle, CalendarDays, X, Flag, AlertTriangle, Trophy, ChevronDown, Sparkles, ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -22,9 +22,10 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { EntityConnections } from "@/components/connect/entity-connections";
+import { SubjectCombobox } from "@/components/studies/subject-combobox";
 import {
-  getGoals, createGoal, updateGoal, deleteGoal,
-  addGoalTask, toggleGoalTask, deleteGoalTask,
+  getGoals, createGoal, updateGoal, deleteGoal, setGoalStatus,
+  addGoalTask, toggleGoalTask, deleteGoalTask, suggestGoalSteps,
   type GoalData, type GoalSubject, type GoalTaskData,
 } from "@/app/(dashboard)/goals/actions";
 
@@ -45,19 +46,61 @@ function fmtDate(iso: string | null): string | null {
   return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
 }
 
-export function GoalsClient({ initialGoals, subjects }: { initialGoals: GoalData[]; subjects: GoalSubject[] }) {
+/** Dias entre hoje e o prazo (negativo = atrasada). Prazos gravados ao meio-dia UTC. */
+function daysUntil(iso: string): number {
+  const target = new Date(iso);
+  const today = new Date();
+  const t = Date.UTC(target.getUTCFullYear(), target.getUTCMonth(), target.getUTCDate());
+  const n = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.round((t - n) / 864e5);
+}
+
+/** Chip de prazo: atrasada (rosa) · vence hoje/em breve (âmbar) · futuro (neutro). */
+function deadlineChip(iso: string | null, isDone: boolean): { label: string; className: string; urgent: boolean } | null {
+  if (!iso) return null;
+  const formatted = fmtDate(iso)!;
+  if (isDone) return { label: formatted, className: "text-muted-foreground", urgent: false };
+  const d = daysUntil(iso);
+  if (d < 0) return { label: `atrasada há ${Math.abs(d)}d`, className: "rounded-md bg-rose-500/10 px-1.5 py-0.5 font-bold text-rose-500", urgent: true };
+  if (d === 0) return { label: "vence hoje", className: "rounded-md bg-amber-500/10 px-1.5 py-0.5 font-bold text-amber-600", urgent: true };
+  if (d <= 7) return { label: `faltam ${d}d`, className: "rounded-md bg-amber-500/10 px-1.5 py-0.5 font-bold text-amber-600", urgent: false };
+  return { label: formatted, className: "text-muted-foreground", urgent: false };
+}
+
+export function GoalsClient({
+  initialGoals, subjects, initialOpenId,
+}: {
+  initialGoals: GoalData[];
+  subjects: GoalSubject[];
+  /** Deep-link (?goal=<id>): abre a meta direto no diálogo (busca global). */
+  initialOpenId?: string | null;
+}) {
   const [goals, setGoals] = useState<GoalData[]>(initialGoals);
   const [search, setSearch] = useState("");
   const [onlyOpen, setOnlyOpen] = useState(false);
-  const [editing, setEditing] = useState<GoalData | "new" | null>(null);
+  const [editing, setEditing] = useState<GoalData | "new" | null>(
+    () => (initialOpenId ? initialGoals.find((g) => g.id === initialOpenId) ?? null : null),
+  );
   const [deleting, setDeleting] = useState<GoalData | null>(null);
   const [, startTransition] = useTransition();
 
   const refresh = async () => setGoals(await getGoals());
 
-  const filtered = useMemo(() => {
+  // Deep-link quando o componente JÁ está montado (ex.: palette em cima de /goals).
+  useEffect(() => {
+    if (!initialOpenId) return;
+    setEditing((current) => {
+      if (current !== null) return current; // não rouba o foco de um diálogo aberto
+      return goals.find((g) => g.id === initialOpenId) ?? null;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reage só à mudança do deep-link
+  }, [initialOpenId]);
+
+  const [showDone, setShowDone] = useState(false);
+
+  const { open, done, overdueCount } = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return goals.filter((g) => {
+    const filtered = goals.filter((g) => {
       if (onlyOpen && g.status === "DONE") return false;
       if (!q) return true;
       return (
@@ -66,7 +109,36 @@ export function GoalsClient({ initialGoals, subjects }: { initialGoals: GoalData
         (g.subjectTitle?.toLowerCase().includes(q) ?? false)
       );
     });
+    const open = filtered.filter((g) => g.status !== "DONE");
+    const done = filtered.filter((g) => g.status === "DONE");
+    // Em aberto: atrasadas primeiro, depois prazo mais perto, depois prioridade.
+    open.sort((a, b) => {
+      const da = a.targetDate ? daysUntil(a.targetDate) : Infinity;
+      const db = b.targetDate ? daysUntil(b.targetDate) : Infinity;
+      const oa = da < 0 ? 0 : 1;
+      const ob = db < 0 ? 0 : 1;
+      if (oa !== ob) return oa - ob;
+      if (da !== db) return da - db;
+      return b.priority - a.priority;
+    });
+    const overdueCount = goals.filter((g) => g.status !== "DONE" && g.targetDate && daysUntil(g.targetDate) < 0).length;
+    return { open, done, overdueCount };
   }, [goals, search, onlyOpen]);
+
+  // Concluir/reabrir direto do card (otimista — sem abrir o diálogo).
+  const quickToggle = (goal: GoalData) => {
+    const next = goal.status === "DONE" ? "IN_PROGRESS" : "DONE";
+    setGoals((prev) => prev.map((g) => (g.id === goal.id ? { ...g, status: next } : g)));
+    startTransition(async () => {
+      const res = await setGoalStatus(goal.id, next);
+      if (!res.success) {
+        setGoals((prev) => prev.map((g) => (g.id === goal.id ? { ...g, status: goal.status } : g)));
+        toast.error("Não consegui atualizar a meta.");
+      } else if (next === "DONE") {
+        toast.success("Meta concluída! 🏆");
+      }
+    });
+  };
 
   const handleDelete = () => {
     if (!deleting) return;
@@ -83,6 +155,106 @@ export function GoalsClient({ initialGoals, subjects }: { initialGoals: GoalData
     });
   };
 
+  // Card usado nas duas seções (Em aberto / Concluídas).
+  const renderGoal = (goal: GoalData) => {
+    const pr = priorityMeta(goal.priority);
+    const progress = goal.totalTasks > 0 ? Math.round((goal.doneTasks / goal.totalTasks) * 100) : 0;
+    const isDone = goal.status === "DONE";
+    const chip = deadlineChip(goal.targetDate, isDone);
+    const nextStep = isDone ? null : goal.tasks.find((t) => !t.isDone) ?? null;
+    return (
+      <div
+        key={goal.id}
+        className={cn(
+          "group flex cursor-pointer flex-col rounded-xl border border-border/40 bg-card p-4 shadow-sm transition-all hover:border-primary/30 hover:shadow-md",
+          isDone && "opacity-80",
+        )}
+        onClick={() => setEditing(goal)}
+      >
+        <div className="mb-2 flex items-start justify-between gap-2">
+          <div className="flex min-w-0 items-start gap-2">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); quickToggle(goal); }}
+              title={isDone ? "Reabrir meta" : "Concluir meta"}
+              className="mt-0.5 shrink-0 text-muted-foreground/40 transition-colors hover:text-emerald-500"
+            >
+              {isDone
+                ? <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                : <Circle className="h-5 w-5" />}
+            </button>
+            <h3 className={cn("line-clamp-2 font-semibold text-foreground", isDone && "line-through text-muted-foreground")}>
+              {goal.title}
+            </h3>
+          </div>
+          {!isDone && (
+            <Badge className={cn("shrink-0 gap-1 border-none text-[10px]", pr.className)}>
+              <Flag className="h-3 w-3" /> {pr.label}
+            </Badge>
+          )}
+        </div>
+
+        {goal.description && (
+          <p className="line-clamp-2 text-sm text-muted-foreground">{goal.description}</p>
+        )}
+
+        {/* Progresso */}
+        <div className="mt-3 space-y-1.5">
+          <div className="flex items-center justify-between text-[11px]">
+            <span className="font-medium text-muted-foreground">
+              {goal.totalTasks > 0 ? `${goal.doneTasks}/${goal.totalTasks} passos` : "Sem passos"}
+            </span>
+            <span className="font-bold text-foreground">{isDone ? 100 : progress}%</span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className={cn("h-full rounded-full transition-all", isDone || progress === 100 ? "bg-emerald-500" : "bg-primary")}
+              style={{ width: `${isDone ? 100 : progress}%` }}
+            />
+          </div>
+          {nextStep && (
+            <p className="flex items-center gap-1 text-[11px] text-muted-foreground" title={nextStep.title}>
+              <ArrowRight className="h-3 w-3 shrink-0 text-primary/70" />
+              <span className="truncate">{nextStep.title}</span>
+            </p>
+          )}
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          {goal.subjectTitle && (
+            <Badge
+              variant="secondary"
+              className="gap-1 border-none text-[10px]"
+              style={{ backgroundColor: `${goal.subjectColor ?? "#6366f1"}1a`, color: goal.subjectColor ?? "#6366f1" }}
+            >
+              <GraduationCap className="h-3 w-3" /> {goal.subjectTitle}
+            </Badge>
+          )}
+          {chip && (
+            <span className={cn("inline-flex items-center gap-1 text-[10px]", chip.className)}>
+              {chip.urgent ? <AlertTriangle className="h-3 w-3" /> : <CalendarDays className="h-3 w-3" />}
+              {chip.label}
+            </span>
+          )}
+        </div>
+
+        <div className="mt-3 flex justify-end gap-1 border-t border-border/40 pt-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditing(goal); }} title="Editar">
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost" size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+            onClick={(e) => { e.stopPropagation(); setDeleting(goal); }}
+            title="Mover para a lixeira"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Toolbar */}
@@ -97,6 +269,12 @@ export function GoalsClient({ initialGoals, subjects }: { initialGoals: GoalData
           />
         </div>
         <div className="flex items-center gap-2">
+          {overdueCount > 0 && (
+            <Badge className="gap-1 border-none bg-rose-500/10 text-rose-500">
+              <AlertTriangle className="h-3 w-3" />
+              {overdueCount} atrasada{overdueCount > 1 ? "s" : ""}
+            </Badge>
+          )}
           <Button variant={onlyOpen ? "default" : "outline"} size="sm" className="gap-2" onClick={() => setOnlyOpen((v) => !v)}>
             <Circle className="h-4 w-4" /> Em aberto
           </Button>
@@ -106,8 +284,8 @@ export function GoalsClient({ initialGoals, subjects }: { initialGoals: GoalData
         </div>
       </div>
 
-      {/* Grid */}
-      {filtered.length === 0 ? (
+      {/* Em aberto */}
+      {open.length === 0 && done.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border/60 py-20 text-center">
           <Target className="h-10 w-10 text-muted-foreground/30" />
           <p className="text-sm text-muted-foreground">
@@ -115,85 +293,37 @@ export function GoalsClient({ initialGoals, subjects }: { initialGoals: GoalData
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((goal) => {
-            const pr = priorityMeta(goal.priority);
-            const progress = goal.totalTasks > 0 ? Math.round((goal.doneTasks / goal.totalTasks) * 100) : 0;
-            const isDone = goal.status === "DONE";
-            const target = fmtDate(goal.targetDate);
-            return (
-              <div
-                key={goal.id}
-                className="group flex cursor-pointer flex-col rounded-xl border border-border/40 bg-card p-4 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
-                onClick={() => setEditing(goal)}
+        <>
+          {open.length === 0 ? (
+            <div className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-emerald-500/30 bg-emerald-500/5 py-8 text-sm text-muted-foreground">
+              <Trophy className="h-4 w-4 text-emerald-500" /> Tudo concluído por aqui. Hora de uma meta nova!
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {open.map(renderGoal)}
+            </div>
+          )}
+
+          {/* Concluídas (recolhível) */}
+          {!onlyOpen && done.length > 0 && (
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => setShowDone((v) => !v)}
+                className="flex items-center gap-2 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground"
               >
-                <div className="mb-2 flex items-start justify-between gap-2">
-                  <h3 className={cn("line-clamp-2 font-semibold text-foreground", isDone && "line-through text-muted-foreground")}>
-                    {goal.title}
-                  </h3>
-                  {isDone ? (
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
-                  ) : (
-                    <Badge className={cn("shrink-0 gap-1 border-none text-[10px]", pr.className)}>
-                      <Flag className="h-3 w-3" /> {pr.label}
-                    </Badge>
-                  )}
+                <Trophy className="h-4 w-4 text-amber-500" />
+                Concluídas ({done.length})
+                <ChevronDown className={cn("h-4 w-4 transition-transform", showDone && "rotate-180")} />
+              </button>
+              {showDone && (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {done.map(renderGoal)}
                 </div>
-
-                {goal.description && (
-                  <p className="line-clamp-2 text-sm text-muted-foreground">{goal.description}</p>
-                )}
-
-                {/* Progresso */}
-                <div className="mt-3 space-y-1.5">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="font-medium text-muted-foreground">
-                      {goal.totalTasks > 0 ? `${goal.doneTasks}/${goal.totalTasks} passos` : "Sem passos"}
-                    </span>
-                    <span className="font-bold text-foreground">{progress}%</span>
-                  </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                    <div
-                      className={cn("h-full rounded-full transition-all", isDone || progress === 100 ? "bg-emerald-500" : "bg-primary")}
-                      style={{ width: `${isDone ? 100 : progress}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                  {goal.subjectTitle && (
-                    <Badge
-                      variant="secondary"
-                      className="gap-1 border-none text-[10px]"
-                      style={{ backgroundColor: `${goal.subjectColor ?? "#6366f1"}1a`, color: goal.subjectColor ?? "#6366f1" }}
-                    >
-                      <GraduationCap className="h-3 w-3" /> {goal.subjectTitle}
-                    </Badge>
-                  )}
-                  {target && (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-                      <CalendarDays className="h-3 w-3" /> {target}
-                    </span>
-                  )}
-                </div>
-
-                <div className="mt-3 flex justify-end gap-1 border-t border-border/40 pt-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditing(goal); }} title="Editar">
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    variant="ghost" size="icon"
-                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                    onClick={(e) => { e.stopPropagation(); setDeleting(goal); }}
-                    title="Mover para a lixeira"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       <GoalDialog
@@ -249,6 +379,25 @@ function GoalDialog({
   const [tasks, setTasks] = useState<GoalTaskData[]>(goal?.tasks ?? []);
   const [newTask, setNewTask] = useState("");
   const [, startTask] = useTransition();
+  const [suggesting, startSuggest] = useTransition();
+
+  // Pede à IA para quebrar a meta em passos e recarrega a lista do servidor.
+  const suggestSteps = () => {
+    if (!goal) return;
+    startSuggest(async () => {
+      const res = await suggestGoalSteps(goal.id);
+      if (!res.success) {
+        toast.error(res.message);
+        return;
+      }
+      if (res.created > 0) toast.success(res.message);
+      else toast.info(res.message);
+      await onTasksChanged();
+      const fresh = await getGoals();
+      const updated = fresh.find((g) => g.id === goal.id);
+      if (updated) setTasks(updated.tasks);
+    });
+  };
 
   const save = () => {
     if (!title.trim()) {
@@ -337,15 +486,13 @@ function GoalDialog({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Matéria</label>
-              <Select value={subjectId} onValueChange={setSubjectId}>
-                <SelectTrigger><SelectValue placeholder="Nenhuma" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Nenhuma</SelectItem>
-                  {subjects.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SubjectCombobox
+                subjects={subjects}
+                value={subjectId}
+                onChange={setSubjectId}
+                emptyOption={{ value: "none", label: "Nenhuma" }}
+                placeholder="Nenhuma"
+              />
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Prioridade</label>
@@ -377,10 +524,23 @@ function GoalDialog({
           {/* Subtarefas — só em edição (precisam do id da meta) */}
           {goal && (
             <div className="space-y-2 border-t border-border/40 pt-4">
-              <p className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                <span>Passos</span>
-                {tasks.length > 0 && <span>{doneCount}/{tasks.length}</span>}
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Passos{tasks.length > 0 && <span className="ml-2 font-semibold normal-case tracking-normal">{doneCount}/{tasks.length}</span>}
+                </p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1.5 px-2 text-xs text-primary hover:text-primary"
+                  disabled={suggesting}
+                  onClick={suggestSteps}
+                  title="A IA quebra a meta em passos concretos (sem repetir os existentes)"
+                >
+                  {suggesting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  Sugerir com IA
+                </Button>
+              </div>
               <ul className="space-y-1">
                 {tasks.map((t) => (
                   <li key={t.id} className="group flex items-center gap-2 rounded-lg border border-border/40 bg-card px-2.5 py-1.5">

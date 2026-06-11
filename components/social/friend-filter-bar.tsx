@@ -10,6 +10,7 @@ const FILTERS = [
   { key: "CLOSE", label: "Próximos" },
   { key: "WORK", label: "Trabalho" },
   { key: "FAMILY", label: "Família" },
+  { key: "RECONNECT", label: "Reconectar 🤝" },
 ];
 
 interface FriendFilterBarProps {

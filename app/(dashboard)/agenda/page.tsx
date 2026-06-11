@@ -1,11 +1,14 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AgendaTabsRoot } from "@/components/agenda/agenda-tabs";
+import { isAgendaTab } from "@/components/agenda/agenda-shared";
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
-import { Target, CalendarClock, ListChecks, Clock, ListTodo, Sun, CalendarRange, Timer, Brain, PenLine } from "lucide-react";
+import { Target, CalendarClock, ListChecks, Clock, ListTodo, Sun, Sunrise, CalendarRange, Timer, Brain, PenLine } from "lucide-react";
 import {
-  parseISO, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameDay,
+  parseISO, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isSameDay, format,
 } from "date-fns";
 
 import { AgendaHeader } from "@/components/agenda/agenda-header";
@@ -15,6 +18,7 @@ import { TaskList } from "@/components/agenda/task-list";
 import { RoutineManager } from "@/components/agenda/routine-manager";
 import { TimeBlockingDay } from "@/components/agenda/time-blocking-day";
 import { WeekPlanner } from "@/components/agenda/week-planner";
+import { TodayPanel } from "@/components/agenda/today-panel";
 import { getRoutineItems } from "./actions";
 import { getThemedDays } from "./themed-days-actions";
 import { getFocusStats, getFocusDrivers } from "./focus-actions";
@@ -28,13 +32,15 @@ const projectSelect = { select: { title: true, color: true } } satisfies Prisma.
 export const dynamic = "force-dynamic";
 
 interface AgendaPageProps {
-  searchParams: Promise<{ date?: string }>;
+  searchParams: Promise<{ date?: string; tab?: string }>;
 }
 
 export default async function AgendaPage({ searchParams }: AgendaPageProps) {
   const params = await searchParams;
   const selectedDate = params.date ? parseISO(params.date) : new Date();
   const isSpecificDate = !!params.date;
+  // Aba ativa vem da URL (deep-link + sobrevive ao refresh — D5 do roadmap).
+  const activeTab = isAgendaTab(params.tab) ? params.tab : "calendar";
   const now = new Date();
 
   // Intervalo da grade do mês (6 semanas) — alimenta o calendário unificado.
@@ -48,20 +54,30 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
   const weekStart = startOfWeek(selectedDate, { weekStartsOn: 0 });
   const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 0 });
 
-  const [agendaItems, pendingTasks, pendingTaskCount, routineItems, blockEvents, themedDays, focusStats, focusDrivers, weekTasks] = await Promise.all([
+  const [agendaItems, pendingTasks, pendingTaskCount, routineItems, blockEvents, themedDays, focusStats, focusDrivers, weekTasks, currentUser] = await Promise.all([
     getAgendaItems(rangeStart, rangeEnd),
     prisma.task.findMany({
       where: { isDone: false, userId, deletedAt: null },
-      orderBy: { dueDate: "asc" },
+      // nulls last: sem isso, 50 tarefas SEM prazo podiam esconder as datadas
+      // (SQLite põe NULL primeiro) — e no Postgres a ordem inverteria.
+      orderBy: { dueDate: { sort: "asc", nulls: "last" } },
       take: 50,
       include: { project: projectSelect },
     }),
     prisma.task.count({ where: { isDone: false, userId, deletedAt: null } }),
     getRoutineItems(),
     // Eventos da janela do mês para a grade de Time-Blocking (criar/editar reais).
-    // Inclui a tarefa vinculada (isDone) p/ concluir direto do bloco.
+    // Inclui a tarefa vinculada (isDone) p/ concluir direto do bloco. Âncoras
+    // recorrentes ANTERIORES à janela também entram: são a porta de edição da
+    // série (e do "só esta ocorrência") no calendário unificado.
     prisma.event.findMany({
-      where: { userId, startTime: { gte: rangeStart, lte: rangeEnd }, deletedAt: null },
+      where: {
+        userId, deletedAt: null,
+        OR: [
+          { startTime: { gte: rangeStart, lte: rangeEnd } },
+          { frequency: { not: null }, startTime: { lte: rangeEnd } },
+        ],
+      },
       orderBy: { startTime: "asc" },
       include: { project: projectSelect, task: { select: { isDone: true, title: true } } },
     }),
@@ -73,10 +89,17 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
       orderBy: { createdAt: "asc" },
       include: { project: projectSelect },
     }),
+    // Saudação personalizada (G19): primeira palavra do nome do usuário.
+    userId ? prisma.user.findUnique({ where: { id: userId }, select: { name: true } }) : Promise.resolve(null),
   ]);
 
-  // Dias com qualquer registro (para marcar no calendário).
-  const bookedDays = agendaItems.map((i) => new Date(i.date));
+  // Dias com registros + contagem (G21: o tracinho do mini-calendário vira intensidade).
+  const busyCount = new Map<string, number>();
+  for (const i of agendaItems) {
+    const k = format(new Date(i.date), "yyyy-MM-dd");
+    busyCount.set(k, (busyCount.get(k) ?? 0) + 1);
+  }
+  const busyDays = [...busyCount.entries()].map(([k, count]) => ({ date: new Date(`${k}T12:00:00`), count }));
 
   // Eventos serializados p/ editar/excluir direto no Calendário unificado.
   const editableEvents = blockEvents.map((e) => ({
@@ -87,6 +110,10 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
     endTime: e.endTime ? e.endTime.toISOString() : null,
     location: e.location,
     color: e.color,
+    isAllDay: e.isAllDay,
+    frequency: e.frequency,
+    recurrenceEnd: e.recurrenceEnd ? e.recurrenceEnd.toISOString() : null,
+    emailAlert: e.emailAlert,
   }));
 
   // Resumo do dia selecionado.
@@ -95,18 +122,25 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
     .filter((i) => i.time && new Date(i.date) > now)
     .sort((a, b) => +new Date(a.date) - +new Date(b.date))[0];
 
+  // Modo Hoje (#6): itens do dia REAL (independente do dia selecionado). Se o
+  // usuário navega outro mês, hoje pode estar fora da janela carregada.
+  const todayInRange = now >= rangeStart && now <= rangeEnd;
+  const itemsRealToday = todayInRange ? agendaItems.filter((i) => isSameDay(new Date(i.date), now)) : [];
+  const firstName = currentUser?.name?.trim().split(/\s+/)[0] || null;
+
   return (
     <div className="min-h-screen bg-muted/30 pb-24 animate-in fade-in duration-500">
-      <AgendaHeader isSpecificDate={isSpecificDate} date={selectedDate} />
+      <AgendaHeader isSpecificDate={isSpecificDate} date={selectedDate} userName={firstName} />
 
       <div className="mx-auto max-w-[1600px] space-y-8 px-4 py-6 md:px-8">
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
 
-          {/* SIDEBAR */}
-          <div className="space-y-6 lg:col-span-3">
+          {/* SIDEBAR — no mobile vai DEPOIS do card principal (G6): as abas são
+              o destino; mini-calendário e resumo são apoio. */}
+          <div className="order-2 space-y-6 lg:order-none lg:col-span-3">
             <Card className="overflow-hidden rounded-[1.5rem] border-border/40 bg-card shadow-sm">
               <CardContent className="flex justify-center p-4">
-                <AgendaCalendar bookedDays={bookedDays} />
+                <AgendaCalendar busyDays={busyDays} />
               </CardContent>
             </Card>
 
@@ -135,7 +169,12 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
                     <Clock className="h-3 w-3" /> Próximo na Fila
                   </h4>
                   {nextUp ? (
-                    <div className="cursor-pointer rounded-xl border border-l-4 border-primary/20 border-l-primary bg-primary/5 p-3 transition-colors hover:bg-primary/10">
+                    // G1: o card agora LEVA a algum lugar — abre a grade de
+                    // Blocos do dia (onde o horário vive).
+                    <Link
+                      href={`/agenda?date=${format(selectedDate, "yyyy-MM-dd")}&tab=blocks`}
+                      className="block cursor-pointer rounded-xl border border-l-4 border-primary/20 border-l-primary bg-primary/5 p-3 transition-colors hover:bg-primary/10"
+                    >
                       <p className="truncate text-sm font-bold text-primary">{nextUp.title}</p>
                       <div className="mt-2 flex items-center justify-between">
                         <Badge variant="outline" className="border-primary/20 bg-background px-1.5 font-mono text-[10px] text-primary">
@@ -145,7 +184,7 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
                           <p className="max-w-[120px] truncate text-[10px] font-medium text-muted-foreground">{nextUp.subtitle}</p>
                         )}
                       </div>
-                    </div>
+                    </Link>
                   ) : (
                     <div className="rounded-xl border border-dashed border-border/40 bg-muted/20 py-4 text-center">
                       <p className="text-xs font-medium text-muted-foreground">Sem horários pendentes hoje.</p>
@@ -156,32 +195,41 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
             </Card>
           </div>
 
-          {/* ÁREA PRINCIPAL */}
-          <div className="lg:col-span-9">
-            <Card className="flex h-[calc(100vh-140px)] min-h-[700px] flex-col overflow-hidden rounded-[2rem] border-border/40 bg-card shadow-xl">
-              <Tabs defaultValue="calendar" className="flex h-full w-full flex-1 flex-col">
+          {/* ÁREA PRINCIPAL — no mobile altura natural (G7: um scroll só). */}
+          <div className="order-1 lg:order-none lg:col-span-9">
+            <Card className="flex flex-col overflow-hidden rounded-[2rem] border-border/40 bg-card shadow-xl md:h-[calc(100vh-140px)] md:min-h-[700px]">
+              <AgendaTabsRoot initialTab={activeTab} className="flex h-full w-full flex-1 flex-col">
                 <div className="flex items-center justify-between border-b border-border/40 bg-muted/10 px-4 py-3">
-                  <TabsList className="h-11 overflow-x-auto rounded-xl border border-border/40 bg-muted/50 p-1 shadow-inner">
-                    <TabsTrigger value="calendar" className="gap-2 rounded-lg px-5 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm">
+                  {/* G2/G3: realce primário em TODAS as abas + scroll sem barra no mobile */}
+                  <TabsList className="h-11 overflow-x-auto scrollbar-hide rounded-xl border border-border/40 bg-muted/50 p-1 shadow-inner">
+                    <TabsTrigger value="today" className="gap-2 rounded-lg px-3 sm:px-5 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm">
+                      <Sunrise className="h-4 w-4" /> Hoje
+                    </TabsTrigger>
+                    <TabsTrigger value="calendar" className="gap-2 rounded-lg px-3 sm:px-5 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm">
                       <CalendarRange className="h-4 w-4" /> Calendário
                     </TabsTrigger>
-                    <TabsTrigger value="blocks" className="gap-2 rounded-lg px-5 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm">
+                    <TabsTrigger value="blocks" className="gap-2 rounded-lg px-3 sm:px-5 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm">
                       <Timer className="h-4 w-4" /> Blocos
                     </TabsTrigger>
-                    <TabsTrigger value="planner" className="gap-2 rounded-lg px-5 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm">
+                    <TabsTrigger value="planner" className="gap-2 rounded-lg px-3 sm:px-5 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm">
                       <PenLine className="h-4 w-4" /> Planner
                     </TabsTrigger>
-                    <TabsTrigger value="focus" className="gap-2 rounded-lg px-5 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm">
+                    <TabsTrigger value="focus" className="gap-2 rounded-lg px-3 sm:px-5 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm">
                       <Brain className="h-4 w-4" /> Foco
                     </TabsTrigger>
-                    <TabsTrigger value="tasks" className="gap-2 rounded-lg px-5 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                    <TabsTrigger value="tasks" className="gap-2 rounded-lg px-3 sm:px-5 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm">
                       <ListTodo className="h-4 w-4" /> Tarefas
                     </TabsTrigger>
-                    <TabsTrigger value="routine" className="gap-2 rounded-lg px-5 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                    <TabsTrigger value="routine" className="gap-2 rounded-lg px-3 sm:px-5 text-[10px] font-black uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm">
                       <Sun className="h-4 w-4" /> Rotina
                     </TabsTrigger>
                   </TabsList>
                 </div>
+
+                {/* MODO HOJE (#6): linha do tempo vertical do dia real */}
+                <TabsContent value="today" className="m-0 flex h-full flex-1 flex-col overflow-hidden p-0 data-[state=active]:flex">
+                  <TodayPanel items={itemsRealToday} inRange={todayInRange} />
+                </TabsContent>
 
                 {/* CALENDÁRIO UNIFICADO */}
                 <TabsContent value="calendar" className="m-0 flex h-full flex-1 flex-col overflow-hidden p-0 data-[state=active]:flex">
@@ -213,7 +261,7 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
                 <TabsContent value="routine" className="m-0 flex-1 overflow-y-auto bg-background/50 p-6 data-[state=active]:flex flex-col">
                   <RoutineManager items={routineItems} />
                 </TabsContent>
-              </Tabs>
+              </AgendaTabsRoot>
             </Card>
           </div>
         </div>

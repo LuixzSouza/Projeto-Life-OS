@@ -6,6 +6,7 @@ import { ProjectSettingsMenu } from "@/components/projects/project-settings-menu
 import { TaskReorderList } from "@/components/projects/task-reorder-list";
 import { TaskKanbanBoard } from "@/components/projects/task-kanban-board";
 import { TasksByDay } from "@/components/projects/tasks-by-day";
+import { TaskTimeline } from "@/components/projects/task-timeline";
 import { ProjectNotes } from "@/components/projects/project-notes";
 import { ProjectLinkedNotes } from "@/components/projects/project-linked-notes";
 import { TaskDeepLink } from "@/components/projects/task-deep-link";
@@ -13,13 +14,16 @@ import { getNotesForProject, getProjectBacklinks, getNotes, getNoteProjects } fr
 import { getPaletteTasks } from "@/app/(dashboard)/palette-actions";
 import type { Mentionables } from "@/components/notes/use-mention-menu";
 import { MeetingBoard } from "@/components/projects/meeting-board";
+import { ProjectAiSummary } from "@/components/projects/project-ai-summary";
+import { BlockedTasksProvider } from "@/components/projects/task/blocked-tasks-context";
+import { getTaskBlockers } from "@/app/(dashboard)/projects/actions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import {
   ArrowLeft, Search, SlidersHorizontal,
-  FileText, ListTodo, LayoutGrid, List, AlignJustify, Columns3,
+  FileText, ListTodo, LayoutGrid, List, AlignJustify, Columns3, ChartGantt,
   CalendarClock, CalendarDays, Hash, Inbox, AlignLeft,
 } from "lucide-react";
 import { EntityConnections } from "@/components/connect/entity-connections";
@@ -28,6 +32,7 @@ import { notFound } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Prisma } from "@prisma/client";
 import { getCurrentUserId } from "@/lib/auth";
+import { containsInsensitive } from "@/lib/db-text";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem,
   DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator,
@@ -37,7 +42,7 @@ import React from "react";
 // --- TYPES ---
 type FilterType = "all" | "active" | "completed";
 type SortType = "priority" | "dueDate" | "createdAt" | "order";
-type ViewMode = "list" | "grid" | "compact" | "kanban" | "byday";
+type ViewMode = "list" | "grid" | "compact" | "kanban" | "byday" | "timeline";
 
 interface ProjectDetailPageProps {
   params: Promise<{ slug: string }>;
@@ -89,8 +94,8 @@ export default async function ProjectDetailPage(props: ProjectDetailPageProps) {
     deletedAt: null,
     ...(searchQuery ? {
         OR: [
-            { title: { contains: searchQuery } },
-            { description: { contains: searchQuery } }
+            { title: containsInsensitive(searchQuery) },
+            { description: containsInsensitive(searchQuery) }
         ]
     } : {}),
     ...(effectiveFilter === "active" ? { isDone: false } : {}),
@@ -99,7 +104,7 @@ export default async function ProjectDetailPage(props: ProjectDetailPageProps) {
 
   const orderBy: Prisma.TaskOrderByWithRelationInput[] =
     sortBy === "priority" ? [{ priority: "desc" }, { createdAt: "asc" }] :
-    sortBy === "dueDate" ? [{ dueDate: "asc" }] :
+    sortBy === "dueDate" ? [{ dueDate: { sort: "asc", nulls: "last" } }] :
     sortBy === "order" ? [{ order: "asc" }, { createdAt: "desc" }] : [{ createdAt: "desc" }];
 
   const [tasks, allStats, rawMeetings] = await Promise.all([
@@ -146,6 +151,12 @@ export default async function ProjectDetailPage(props: ProjectDetailPageProps) {
     projects: mentionProjects.map((p) => ({ id: p.id, title: p.title, slug: p.slug })),
     tasks: mentionTasks,
   };
+
+  // Dependências: tarefas bloqueadas por outra ainda pendente (cadeado nas views).
+  const blockers = await getTaskBlockers(dbProjectId);
+  const blockedTaskIds = Array.from(
+    new Set(blockers.filter((b) => !b.blockerDone).map((b) => b.taskId))
+  );
 
   const doneCount = allStats.find(s => s.isDone)?._count.isDone ?? 0;
   const pendingCount = allStats.find(s => !s.isDone)?._count.isDone ?? 0;
@@ -199,7 +210,8 @@ export default async function ProjectDetailPage(props: ProjectDetailPageProps) {
           </div>
 
           {!isInbox && dbProjectId && (
-            <div className="shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
+              <ProjectAiSummary projectId={dbProjectId} projectTitle={projectTitle} />
               <ProjectSettingsMenu
                 projectId={dbProjectId} projectTitle={projectTitle}
                 projectDescription={projectDescription} projectColor={projectColor}
@@ -293,6 +305,7 @@ export default async function ProjectDetailPage(props: ProjectDetailPageProps) {
                     { mode: 'grid', icon: LayoutGrid },
                     { mode: 'compact', icon: AlignJustify },
                     { mode: 'byday', icon: CalendarDays },
+                    { mode: 'timeline', icon: ChartGantt },
                     { mode: 'kanban', icon: Columns3 }
                   ].map((item) => (
                     <Link
@@ -332,16 +345,21 @@ export default async function ProjectDetailPage(props: ProjectDetailPageProps) {
               <TaskInput projectId={isInbox ? "inbox" : dbProjectId!} />
             </div>
 
-            {/* Lista / Por dia / Kanban */}
-            {isKanban ? (
-              <TaskKanbanBoard initialTasks={tasks} />
-            ) : tasks.length === 0 ? (
-              <EmptyState search={!!searchQuery} />
-            ) : viewMode === "byday" ? (
-              <TasksByDay initialTasks={tasks} />
-            ) : (
-              <TaskReorderList initialTasks={tasks} viewMode={viewMode as "list" | "grid" | "compact"} />
-            )}
+            {/* Lista / Por dia / Kanban — todas dentro do provider de bloqueios
+                (cadeado nos itens cuja bloqueadora ainda está pendente) */}
+            <BlockedTasksProvider ids={blockedTaskIds}>
+              {isKanban ? (
+                <TaskKanbanBoard initialTasks={tasks} />
+              ) : tasks.length === 0 ? (
+                <EmptyState search={!!searchQuery} />
+              ) : viewMode === "byday" ? (
+                <TasksByDay initialTasks={tasks} />
+              ) : viewMode === "timeline" ? (
+                <TaskTimeline initialTasks={tasks} />
+              ) : (
+                <TaskReorderList initialTasks={tasks} viewMode={viewMode as "list" | "grid" | "compact"} />
+              )}
+            </BlockedTasksProvider>
           </div>
           )}
 

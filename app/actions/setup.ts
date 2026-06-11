@@ -4,7 +4,15 @@ import type { PrismaClient } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { login, hashPassword } from "@/lib/auth";
-import { setDbProfile, getEnvProfile, isEphemeralServerless, type DbProfile } from "@/lib/db-config";
+import {
+  setDbProfile,
+  getEnvProfile,
+  isEphemeralServerless,
+  detectProviderFromUrl,
+  type DbProfile,
+} from "@/lib/db-config";
+import { friendlyDbError } from "@/lib/db-errors";
+import { dialectOf } from "@/lib/db-dialect";
 import { reconnectPrisma, buildAdapterClient } from "@/lib/prisma";
 import { ensureSchema } from "@/lib/db-bootstrap";
 import { mergeSqliteIntoTurso } from "@/lib/db-migrate";
@@ -45,6 +53,34 @@ function resolveProfileFromForm(formData: FormData): {
   storagePath: string;
 } {
   const mode = (formData.get("storageMode") as string) || "local";
+  const dbProvider = ((formData.get("dbProvider") as string) || "").trim();
+
+  // --- PostgreSQL / Supabase (DATABASE_ROADMAP Fase 1/2) ---
+  if (mode === "cloud" && (dbProvider === "postgres" || dbProvider === "supabase")) {
+    let url = ((formData.get("pgUrl") as string) || "").trim();
+    if (!url) throw new Error("A connection string do PostgreSQL é obrigatória.");
+    // PEGADINHA #1 (Supabase): colaram a service_role key (JWT) em vez da
+    // connection string do banco. A key da API NUNCA entra aqui.
+    if (/^eyJ/.test(url)) {
+      throw new Error(
+        "Isso é uma API key (JWT), não a connection string. No Supabase use Settings → Database → Connection string (URI) — formato postgresql://usuario:senha@host:porta/banco."
+      );
+    }
+    if (!/^postgres(ql)?:\/\//i.test(url)) {
+      throw new Error("URL inválida. Use o formato postgresql://usuario:senha@host:porta/banco.");
+    }
+    // SSL por padrão em host remoto (segurança §3): adiciona sslmode=require
+    // se faltar — self-hosted local (localhost) fica como está.
+    const isLocalHost = /@(localhost|127\.0\.0\.1)[:/]/i.test(url);
+    if (!isLocalHost && !/sslmode=/i.test(url)) {
+      url += (url.includes("?") ? "&" : "?") + "sslmode=require";
+    }
+    // Detecção fina: URL *.supabase.co vira provider "supabase" mesmo se o
+    // card escolhido foi o Postgres genérico (e vice-versa).
+    const detected = detectProviderFromUrl(url);
+    const provider = detected === "supabase" || detected === "postgres" ? detected : "postgres";
+    return { profile: { mode: "cloud", provider, url }, storagePath: "" };
+  }
 
   if (mode === "cloud") {
     const url = ((formData.get("tursoUrl") as string) || "").trim();
@@ -97,37 +133,8 @@ export interface SetupState {
   existing?: boolean;
 }
 
-/**
- * Traduz erros técnicos (Turso/libSQL/fs) em mensagens acionáveis em pt-BR.
- */
-function friendlyError(error: unknown, mode: DbProfile["mode"]): string {
-  const raw = error instanceof Error ? error.message : String(error);
-  const low = raw.toLowerCase();
-
-  // Réplica também fala com o Turso (espelho), então herda o mapeamento da nuvem.
-  if (mode === "cloud" || mode === "replica") {
-    if (low.includes("401") || low.includes("unauthor")) {
-      return "Turso recusou o token (401). O formato está ok, mas este token NÃO vale para este banco. Gere um token NOVO abrindo o banco específico no dashboard (ou `turso db tokens create <nome-do-banco>`). Atenção: token de API da conta ≠ token do banco; e se o banco foi recriado, tokens antigos param de valer.";
-    }
-    if (low.includes("jwt") || low.includes("token")) {
-      return "Falha de autenticação no Turso. Verifique o TURSO_AUTH_TOKEN (deve ser o JWT que começa com 'eyJ…', gerado para ESTE banco — não a URL).";
-    }
-    // HTTP 400 / SERVER_ERROR do Turso quase sempre = token inválido (é comum
-    // colar a URL no campo do token por engano). Aponta direto pra causa.
-    if (low.includes("400") || low.includes("server_error")) {
-      return "O Turso rejeitou a conexão (HTTP 400). Quase sempre é o TURSO_AUTH_TOKEN errado — confirme que é o token JWT (começa com 'eyJ…'), NÃO a URL do banco. Gere com: turso db tokens create <nome-do-banco>.";
-    }
-    if (low.includes("enotfound") || low.includes("getaddrinfo") || low.includes("fetch failed") || low.includes("econnrefused") || low.includes("url")) {
-      return "Não foi possível conectar ao banco Turso. Confira o TURSO_DATABASE_URL (formato libsql://...) e sua conexão.";
-    }
-  }
-
-  if (low.includes("baseline")) {
-    return "Arquivo de schema (baseline.sql) não encontrado no servidor. Problema de build/deploy.";
-  }
-  // Caso geral: devolve a mensagem original (já é informativa).
-  return raw;
-}
+// Tradução de erros técnicos: promovida para lib/db-errors.ts (Resiliência §2
+// do DATABASE_ROADMAP) — o setup usa a MESMA tradução que o runtime.
 
 /**
  * Valida um perfil de nuvem ANTES de tentar conectar. Pega os erros de
@@ -136,7 +143,9 @@ function friendlyError(error: unknown, mode: DbProfile["mode"]): string {
  * "HTTP 400" críptico lá na frente.
  */
 function assertValidCloudProfile(profile: DbProfile): void {
-  // Vale para nuvem pura E réplica (ambas autenticam no Turso com um JWT).
+  // Vale para Turso (nuvem) E réplica (ambas autenticam no Turso com um JWT).
+  // Postgres/Supabase autenticam pela senha NA URL — validados no resolve.
+  if (profile.mode === "cloud" && profile.provider !== "turso") return;
   if (profile.mode !== "cloud" && profile.mode !== "replica") return;
   const token = profile.authToken?.trim();
   if (!token) {
@@ -159,6 +168,57 @@ function assertValidCloudProfile(profile: DbProfile): void {
   }
 }
 
+/**
+ * Testa uma connection string de Postgres/Supabase ANTES de instalar (botão
+ * "Testar conexão" do wizard — UX de status §3). Pré-instalação não há login;
+ * com o sistema instalado, exige sessão (não vira um proxy de teste aberto).
+ */
+export async function testPostgresSetupConnection(
+  rawUrl: string
+): Promise<{ success: boolean; message: string }> {
+  const { isSystemInstalled } = await import("@/lib/db-config");
+  if (isSystemInstalled()) {
+    const { getCurrentUserId } = await import("@/lib/auth");
+    if (!(await getCurrentUserId())) {
+      return { success: false, message: "Faça login para testar conexões." };
+    }
+  }
+
+  let url = (rawUrl || "").trim();
+  if (!url) return { success: false, message: "Informe a connection string." };
+  if (/^eyJ/.test(url)) {
+    return {
+      success: false,
+      message: "Isso é uma API key (JWT), não a connection string. Use a URI postgresql://… do banco.",
+    };
+  }
+  if (!/^postgres(ql)?:\/\//i.test(url)) {
+    return { success: false, message: "URL inválida. Use o formato postgresql://usuario:senha@host:porta/banco." };
+  }
+  const isLocalHost = /@(localhost|127\.0\.0\.1)[:/]/i.test(url);
+  if (!isLocalHost && !/sslmode=/i.test(url)) {
+    url += (url.includes("?") ? "&" : "?") + "sslmode=require";
+  }
+  const detected = detectProviderFromUrl(url);
+  const provider = detected === "supabase" ? "supabase" : "postgres";
+  const profile: DbProfile = { mode: "cloud", provider, url };
+
+  const built = buildAdapterClient(profile);
+  try {
+    await built.client.$queryRawUnsafe("SELECT 1");
+    return {
+      success: true,
+      message: provider === "supabase"
+        ? "Conexão com o Supabase validada — pode concluir a instalação."
+        : "Conexão com o PostgreSQL validada — pode concluir a instalação.",
+    };
+  } catch (error) {
+    return { success: false, message: friendlyDbError(error, profile) };
+  } finally {
+    await built.client.$disconnect().catch(() => {});
+  }
+}
+
 export async function setupSystem(
   _prevState: SetupState | null,
   formData: FormData
@@ -166,8 +226,8 @@ export async function setupSystem(
   let tempPrisma: PrismaClient | null = null;
   // Cliente libSQL bruto (só no modo réplica) — guardado p/ fechar no finally.
   let tempLibsql: { close(): void } | null = null;
-  // Default usado nas mensagens de erro antes de o perfil ser resolvido.
-  let mode: DbProfile["mode"] = "local";
+  // Perfil resolvido — usado p/ traduzir erros por provedor (null até resolver).
+  let profileForErrors: DbProfile | null = null;
 
   try {
     console.log("🚀 Iniciando Setup Completo...");
@@ -179,7 +239,7 @@ export async function setupSystem(
     const { profile, storagePath } = envProfile
       ? { profile: envProfile, storagePath: "" }
       : resolveProfileFromForm(formData);
-    mode = profile.mode;
+    profileForErrors = profile;
 
     // Pega config de nuvem inválida (token ausente / URL no lugar do token)
     // antes de gastar uma viagem ao Turso só pra receber um 400 opaco.
@@ -205,7 +265,7 @@ export async function setupSystem(
     }
 
     console.log(`📦 Garantindo schema (${profile.mode})...`);
-    await ensureSchema(tempPrisma);
+    await ensureSchema(tempPrisma, dialectOf(profile));
 
     // --- PARTE 2b: MIGRAÇÃO AUTOMÁTICA (modo réplica) ---
     // Se a pasta escolhida já tiver um life_os.db "local" com dados (instalação
@@ -326,7 +386,7 @@ export async function setupSystem(
     await login(adminUser.id);
   } catch (error) {
     console.error("❌ Erro CRÍTICO no Setup:", error);
-    return { error: friendlyError(error, mode) };
+    return { error: friendlyDbError(error, profileForErrors) };
   } finally {
     if (tempPrisma) {
       await tempPrisma.$disconnect();

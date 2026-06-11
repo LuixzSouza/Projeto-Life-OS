@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft, Star, History, Save, Loader2, Trash2, Check, Briefcase,
-  FileDown, FileText, MoreVertical, Search, ExternalLink, Link2, Sparkles, Atom,
+  FileDown, FileText, MoreVertical, Search, ExternalLink, Link2, Sparkles, Atom, Layers, BrainCircuit,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -24,7 +24,7 @@ import {
 import { NoteEditor } from "@/components/notes/note-editor";
 import { NoteHistoryDialog } from "@/components/notes/note-history-dialog";
 import { EntityConnections } from "@/components/connect/entity-connections";
-import { updateNote, deleteNote, uploadNoteImage, inlineNoteImages, type NoteData, type NoteSubject, type NoteProject } from "@/app/(dashboard)/notes/actions";
+import { updateNote, deleteNote, uploadNoteImage, inlineNoteImages, generateNoteFlashcards, type NoteData, type NoteSubject, type NoteProject } from "@/app/(dashboard)/notes/actions";
 import { assessAtomicity, isAtomicityExempt } from "@/lib/note-atomicity";
 import type { NotebookData } from "@/app/(dashboard)/notes/notebook-actions";
 
@@ -192,6 +192,40 @@ export function NoteFullEditor({
     }
   };
 
+  // Gera flashcards desta nota com a IA. Salva antes se houver edição pendente,
+  // para os cards refletirem o texto que está na tela (a action lê do banco).
+  const [generatingCards, setGeneratingCards] = useState(false);
+  const generateCards = async () => {
+    setGeneratingCards(true);
+    try {
+      if (dirty && title.trim()) {
+        const snap = snapshot;
+        const fd = new FormData();
+        fd.set("id", note.id);
+        fd.set("title", title);
+        fd.set("content", content);
+        fd.set("notebookId", notebookId);
+        fd.set("subjectId", subjectId);
+        fd.set("projectId", projectId);
+        fd.set("tags", tags);
+        fd.set("isFavorite", String(isFavorite));
+        const saved = await updateNote(fd);
+        if (saved.success) setSavedSnapshot(snap);
+      }
+      const res = await generateNoteFlashcards(note.id);
+      if (!res.success) {
+        toast.error(res.message);
+        return;
+      }
+      toast.success(res.message, res.deckId ? {
+        action: { label: "Estudar agora", onClick: () => router.push(`/flashcards/${res.deckId}/study`) },
+        duration: 8000,
+      } : undefined);
+    } finally {
+      setGeneratingCards(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background pb-16">
       {/* Header fixo */}
@@ -259,7 +293,20 @@ export function NoteFullEditor({
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem
+                onSelect={(e) => { e.preventDefault(); void generateCards(); }}
+                disabled={generatingCards}
+                className="gap-2"
+              >
+                {generatingCards ? <Loader2 className="h-4 w-4 animate-spin" /> : <Layers className="h-4 w-4" />} Gerar flashcards (IA)
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => router.push(`/ai?q=${encodeURIComponent(`Leia minha nota "${title}" e resuma os pontos-chave; depois me faça 3 perguntas de revisão sobre ela.`)}`)}
+                className="gap-2"
+              >
+                <BrainCircuit className="h-4 w-4" /> Perguntar à IA
+              </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={(e) => { e.preventDefault(); void exportMarkdown(); }}
                 disabled={exporting}

@@ -12,6 +12,7 @@ import type {
 } from "@/components/finance/finance-dashboard";
 import type { CashFlowPoint } from "@/components/finance/cash-flow-chart";
 import type { BudgetSnapshot } from "@/lib/budget-buckets";
+import type { CategoryBudgetItem } from "@/components/finance/dashboard/category-budgets-card";
 import { SmartViewProvider } from "@/components/finance/smart-view-context";
 
 // Replicamos a interface aqui para garantir que o Loader exija os dados corretos
@@ -32,6 +33,8 @@ interface FinanceDashboardLoaderProps {
   monthIncome: number;
   monthExpense: number;
   budget: BudgetSnapshot;
+  categoryBudgets: CategoryBudgetItem[];
+  budgetCategoryOptions: string[];
 }
 
 // Importa o Dashboard inteiro desativando o SSR

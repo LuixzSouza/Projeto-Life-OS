@@ -64,6 +64,7 @@ export default async function NutritionPage(props: PageProps) {
   let calorieOverride: number | null = null;
   let workoutBurn = 0;
   let userName: string | undefined;
+  let missingKcalCount = 0;
 
   let selectedDate = new Date();
   let hasError = false;
@@ -90,7 +91,7 @@ export default async function NutritionPage(props: PageProps) {
 
     // Busca Paralela Otimizada (Agora inclui o MealPlan)
     const userId = await getCurrentUserId();
-    const [dayMeals, weekMeals, mealPlan, latestBody, currentUser, dayWorkouts] = await Promise.all([
+    const [dayMeals, weekMeals, mealPlan, latestBody, currentUser, dayWorkouts, missingKcal] = await Promise.all([
       // 1. Refeições do dia selecionado (Histórico)
       prisma.meal.findMany({
         where: { date: { gte: startOfDay, lte: endOfDay }, userId },
@@ -121,6 +122,10 @@ export default async function NutritionPage(props: PageProps) {
             select: { type: true, duration: true, intensity: true, distance: true },
           })
         : Promise.resolve([]),
+      // 7. Refeições antigas sem calorias (banner "Recalcular com IA")
+      userId
+        ? prisma.meal.count({ where: { userId, OR: [{ calories: null }, { calories: { lte: 0 } }] } })
+        : Promise.resolve(0),
     ]);
 
     // Meta calórica sugerida automaticamente a partir do perfil corporal.
@@ -138,6 +143,7 @@ export default async function NutritionPage(props: PageProps) {
       }
     }
     userName = currentUser?.name ?? undefined;
+    missingKcalCount = missingKcal;
 
     // Gasto calórico estimado dos treinos do dia (some ao orçamento do diário).
     workoutBurn = estimateDayBurn(
@@ -227,6 +233,7 @@ export default async function NutritionPage(props: PageProps) {
             calorieOverride={calorieOverride}
             workoutBurn={workoutBurn}
             userName={userName}
+            missingKcalCount={missingKcalCount}
         />
       </PageContainer>
     </PageShell>

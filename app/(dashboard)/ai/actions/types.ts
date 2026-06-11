@@ -48,7 +48,14 @@ export type AIModule =
   | "AGENDA"
   | "NUTRITION"
   | "SLEEP"
-  | "HABITS";
+  | "HABITS"
+  | "JOBS"      // candidaturas a vagas (JobApplication)
+  | "GOALS"     // metas de aprendizado (LearningGoal + passos)
+  | "LINKS"     // links & apps salvos (SavedLink)
+  | "NOTES"     // notas/cadernos (StudyNote)
+  | "SITES"     // sites & CMS (ManagedSite — leitura)
+  | "TAGS"      // tags do tecido conectivo (Tag)
+  | "SETTINGS"; // configurações seguras (Settings — sem chaves/segredos)
 
 export type QueryMode = "list" | "summary";
 export type MutateAction = "CREATE" | "UPDATE" | "DELETE";
@@ -110,6 +117,10 @@ export interface ToolArgs {
   category?: string;
   status?: string;
   date?: string;
+  // NUTRITION: macros estimados em gramas (junto com value=kcal)
+  protein?: number;
+  carbs?: number;
+  fat?: number;
   extra?: Record<string, ExtraValue>;
 }
 

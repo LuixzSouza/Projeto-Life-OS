@@ -8,16 +8,26 @@ import { Label } from "@/components/ui/label";
 import { Download, FileJson, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
+// Cópia de UI dos módulos do backup v3 (lib/full-backup.ts é server-only).
 const MODULES = [
-    { id: "tasks", label: "Tarefas & Projetos" },
-    { id: "finance", label: "Finanças (Contas/Transações)" },
-    { id: "notes", label: "Estudos & Flashcards" },
+    { id: "tasks", label: "Projetos & Tarefas" },
+    { id: "finance", label: "Finanças" },
+    { id: "crm", label: "Negócios & Clientes" },
+    { id: "connections", label: "Conexões" },
+    { id: "agenda", label: "Agenda & Rotinas" },
+    { id: "studies", label: "Estudos & Flashcards" },
     { id: "health", label: "Saúde & Treinos" },
-    { id: "system", label: "Configurações & Cofre" },
+    { id: "ai", label: "IA (conversas e memórias)" },
+    { id: "vault", label: "Cofre de Acessos" },
+    { id: "links", label: "Links Salvos" },
+    { id: "entertainment", label: "Entretenimento" },
+    { id: "wardrobe", label: "Closet" },
+    { id: "sites", label: "Sites Gerenciados" },
+    { id: "system", label: "Configurações & Sistema" },
 ];
 
 export function SelectiveExport() {
-    const [selected, setSelected] = useState<string[]>(["tasks", "finance", "notes", "health", "system"]);
+    const [selected, setSelected] = useState<string[]>(MODULES.map((m) => m.id));
     const [isLoading, setIsLoading] = useState(false);
 
     const toggle = (id: string) => {

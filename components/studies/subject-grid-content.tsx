@@ -82,32 +82,38 @@ export function SubjectGridContent({
                   onClick={() => toggleSection(root.id)}
                   className="w-full flex items-center gap-3 border-b border-border/40 pb-3 text-left group"
                 >
-                  <div className="h-6 w-1.5 bg-primary rounded-full" />
+                  {/* Barra com a COR da matéria raiz — identidade da seção */}
+                  <div className="h-6 w-1.5 rounded-full" style={{ backgroundColor: root.color || "hsl(var(--primary))" }} />
                   <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform shrink-0", isCollapsed && "-rotate-90")} />
-                  <h4 className="font-bold text-xl group-hover:text-primary transition-colors">{root.title}</h4>
-                  <Badge variant="secondary" className="text-xs bg-muted/50 border-none">{children.length} sub-tópicos</Badge>
+                  <h4 className="font-bold text-xl truncate group-hover:text-primary transition-colors">{root.title}</h4>
+                  {children.length > 0 && (
+                    <Badge variant="secondary" className="text-xs bg-muted/50 border-none shrink-0">
+                      {children.length} {children.length === 1 ? "sub-tópico" : "sub-tópicos"}
+                    </Badge>
+                  )}
                   {sectionMinutes > 0 && (
-                    <span className="ml-auto flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                    <span className="ml-auto flex shrink-0 items-center gap-1.5 text-xs font-semibold text-muted-foreground">
                       <Clock className="h-3.5 w-3.5" /> {formatMinutes(sectionMinutes)}
                     </span>
                   )}
                 </button>
 
-                {/* Pai e Filhos compartilham O MESMO GRID para não quebrar a tela */}
+                {/* Pai e Filhos compartilham O MESMO GRID para não quebrar a tela.
+                    Máx. 3 colunas: a área principal tem só 2/3 da página — com 4
+                    colunas os cards ficavam espremidos/truncando tudo. */}
                 {!isCollapsed && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-5 animate-in fade-in slide-in-from-top-2 duration-300">
 
-                    {/* Matéria Raiz (destaque sutil) */}
-                    <div className="relative rounded-2xl ring-2 ring-primary/15">
-                      <SubjectCard
-                        subject={root}
-                        onEdit={onEdit}
-                        onDelete={onDelete}
-                        onDetailsClick={onDetailsClick}
-                        parentName={undefined}
-                        viewMode="grid"
-                      />
-                    </div>
+                    {/* Matéria Raiz (destaque embutido no card — borda primária) */}
+                    <SubjectCard
+                      subject={root}
+                      onEdit={onEdit}
+                      onDelete={onDelete}
+                      onDetailsClick={onDetailsClick}
+                      parentName={undefined}
+                      viewMode="grid"
+                      isRoot
+                    />
 
                     {/* Matérias Filhas */}
                     {children.map((child) => (
