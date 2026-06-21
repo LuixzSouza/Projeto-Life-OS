@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogBody, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { BrainCircuit, Zap, GraduationCap, PenLine } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,23 +17,14 @@ export function StudyModeDialog({ deck, onClose }: StudyModeDialogProps) {
   const total = deck?.cards.length ?? 0;
   return (
     <Dialog open={!!deck} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-2xl p-0 overflow-hidden gap-0 border-border/60 shadow-2xl rounded-2xl bg-background">
+      <DialogContent size="lg">
+          <DialogHeader
+            icon={<BrainCircuit />}
+            title="Central de aprendizado"
+            description={<>Estudos de <strong className="text-foreground">{deck?.title}</strong>. Qual será a estratégia de hoje?</>}
+          />
 
-          {/* Header com gradiente */}
-          <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-background p-8 border-b border-border/40">
-              <DialogHeader>
-                  <DialogTitle className="text-2xl flex items-center gap-3 font-extrabold">
-                      <div className="p-2.5 bg-background rounded-xl shadow-sm border border-border/50">
-                          <BrainCircuit className="h-6 w-6 text-primary" />
-                      </div>
-                      Central de Aprendizado
-                  </DialogTitle>
-                  <DialogDescription className="text-base text-foreground/80 mt-2">
-                      Você está prestes a iniciar os estudos de <strong className="text-foreground">{deck?.title}</strong>. Qual será a sua estratégia de hoje?
-                  </DialogDescription>
-              </DialogHeader>
-          </div>
-
+          <DialogBody className="p-0">
           <div className="grid md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-border/50">
 
               {/* Botão: Modo Memória (recomendado) */}
@@ -93,12 +84,11 @@ export function StudyModeDialog({ deck, onClose }: StudyModeDialogProps) {
                   </p>
               </Link>
           </div>
+          </DialogBody>
 
-          <div className="p-5 bg-muted/10 border-t border-border/40 flex justify-end">
-              <Button variant="outline" size="lg" className="rounded-xl font-bold h-12 px-8" onClick={onClose}>
-                  Cancelar
-              </Button>
-          </div>
+          <DialogFooter>
+              <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          </DialogFooter>
       </DialogContent>
     </Dialog>
   );

@@ -7,9 +7,8 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle,
+  DialogBody,
   DialogFooter,
-  DialogDescription,
 } from "@/components/ui/dialog";
 
 import { Button } from "@/components/ui/button";
@@ -218,35 +217,16 @@ export function SubjectFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent className="gap-0 overflow-hidden rounded-2xl border-border/60 p-0 shadow-2xl sm:max-w-md">
+      <DialogContent size="md">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col" noValidate>
+          {/* Header padrão; o ícone do chip e o título refletem a matéria ao vivo. */}
+          <DialogHeader
+            icon={icon ? <span className="text-xl leading-none">{icon}</span> : <FolderTree />}
+            title={title.trim() || (isEditing ? "Editar tópico" : "Novo tópico")}
+            description={isEditing ? "Ajuste os detalhes desta matéria." : "Crie uma matéria raiz ou um subtópico."}
+          />
 
-        {/* Barra de acento na cor escolhida (identidade sem fundo pesado). */}
-        <div
-          className="h-1.5 w-full transition-colors"
-          style={{ background: `linear-gradient(90deg, ${color}, ${color}66)` }}
-        />
-
-        {/* HEADER com PRÉVIA AO VIVO da matéria (avatar reflete ícone + cor). */}
-        <DialogHeader className="space-y-0 px-6 pb-4 pt-5 text-left">
-          <div className="flex items-center gap-3">
-            <div
-              className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-2xl transition-colors"
-              style={{ backgroundColor: `${color}1f`, color, boxShadow: `inset 0 0 0 1px ${color}33` }}
-            >
-              {icon ? <span className="leading-none">{icon}</span> : <FolderTree className="h-5 w-5" />}
-            </div>
-            <div className="min-w-0">
-              <DialogTitle className="truncate text-lg font-bold leading-tight">
-                {title.trim() || (isEditing ? "Editar tópico" : "Novo tópico")}
-              </DialogTitle>
-              <DialogDescription className="text-xs text-muted-foreground">
-                {isEditing ? "Ajuste os detalhes desta matéria." : "Crie uma matéria raiz ou um subtópico."}
-              </DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-5 px-6 pb-6" noValidate>
+          <DialogBody className="space-y-5">
 
           <div className="space-y-1.5">
             <Label htmlFor="subject-title" className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -371,8 +351,9 @@ export function SubjectFormDialog({
               </Select>
             </div>
           </div>
+          </DialogBody>
 
-          <DialogFooter className="gap-2 pt-2 sm:gap-2">
+          <DialogFooter>
             <Button type="button" variant="ghost" onClick={handleClose} disabled={isSubmitting} className="hover:bg-muted/50">
               Cancelar
             </Button>

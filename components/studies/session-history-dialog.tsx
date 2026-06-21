@@ -9,7 +9,7 @@ import { History, Search, X, ChevronDown, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogTrigger,
 } from "@/components/ui/dialog";
 import { getSessionHistory } from "@/app/(dashboard)/studies/actions";
 import { type StudySessionWithSubject, formatDuration } from "./study-session-utils";
@@ -67,8 +67,8 @@ export function SessionHistoryDialog({ totalSessions }: { totalSessions: number 
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg">
-        <DialogHeader className="shrink-0 border-b border-border/40 bg-muted/10 p-5">
+      <DialogContent size="md">
+        <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <History className="h-4 w-4 text-primary" /> Histórico de sessões
           </DialogTitle>
@@ -100,7 +100,7 @@ export function SessionHistoryDialog({ totalSessions }: { totalSessions: number 
           </div>
         </DialogHeader>
 
-        <div className="custom-scrollbar flex-1 overflow-y-auto p-4">
+        <DialogBody className="custom-scrollbar p-4">
           {!loaded && isLoading ? (
             <div className="flex items-center justify-center py-16">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -134,7 +134,7 @@ export function SessionHistoryDialog({ totalSessions }: { totalSessions: number 
               ✦ Primeira sessão registrada ✦
             </p>
           )}
-        </div>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );
