@@ -221,6 +221,7 @@ export async function generateDeckCardsWithAi(
   deckId: string,
   source: string,
   count = 8,
+  images: string[] = [],
 ): Promise<GenerateCardsResult> {
   try {
     const userId = await requireUserId();
@@ -233,13 +234,20 @@ export async function generateDeckCardsWithAi(
     if (!deck) return { success: false, message: "Baralho não encontrado." };
 
     const text = String(source ?? "").trim();
-    if (text.length < 12) {
-      return { success: false, message: "Descreva o tema ou cole um texto (mín. ~12 caracteres)." };
+
+    // Só imagens válidas (data URL) e dentro do limite de tamanho. Visão é
+    // opcional: com imagem, o texto vira contexto e pode ficar vazio.
+    const validImages = (Array.isArray(images) ? images : [])
+      .filter((u) => typeof u === "string" && u.startsWith("data:image/") && u.length <= MAX_IMAGE_CHARS)
+      .slice(0, 4);
+
+    if (text.length < 12 && validImages.length === 0) {
+      return { success: false, message: "Descreva o tema, cole um texto ou anexe uma imagem." };
     }
 
     // Import dinâmico: o motor de IA é pesado e só carrega quando realmente gera.
     const { aiCardsFromText } = await import("@/lib/ai-creative");
-    const result = await aiCardsFromText(userId, deck.title, text, count);
+    const result = await aiCardsFromText(userId, deck.title || "Estudo", text, count, validImages);
     if (result.erro) return { success: false, message: result.erro };
 
     const cards = result.cards ?? [];

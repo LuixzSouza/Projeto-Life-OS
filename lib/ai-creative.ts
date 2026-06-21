@@ -13,8 +13,9 @@ import { runOneShotAi } from "@/app/(dashboard)/ai/actions/oneshot";
    ============================================================================ */
 
 const FLASHCARD_SYSTEM =
-  "Você gera flashcards de estudo. A partir do conteúdo fornecido (um tema OU um texto), devolva APENAS um array JSON " +
+  "Você gera flashcards de estudo. A partir do conteúdo fornecido (um tema, um texto E/OU uma imagem), devolva APENAS um array JSON " +
   '(sem cercas) de no máximo N cards: [{"term":"pergunta/conceito curto","definition":"resposta objetiva"}]. ' +
+  "Quando houver imagem (foto de quadro, página, anotação), leia o conteúdo dela e gere cards sobre o que ela ensina. " +
   "Cards devem testar entendimento (não cópia literal), em PT-BR, curtos e autossuficientes.";
 
 interface RawCard { term?: unknown; definition?: unknown }
@@ -31,16 +32,25 @@ export interface AiCardsResult {
  * (app/(dashboard)/flashcards/actions.ts > generateDeckCardsWithAi). Não toca o
  * banco — quem chama decide onde gravar.
  */
-export async function aiCardsFromText(userId: string, title: string, source: string, count = 8): Promise<AiCardsResult> {
+export async function aiCardsFromText(
+  userId: string,
+  title: string,
+  source: string,
+  count = 8,
+  images: string[] = [],
+): Promise<AiCardsResult> {
   const n = Math.min(Math.max(Math.floor(count), 3), 15);
   const plain = source.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 6000);
-  if (plain.length < 12) return { erro: "Conteúdo curto demais para gerar flashcards." };
+  // Com imagem, o texto é opcional (a foto é a fonte). Sem imagem, exige texto.
+  if (plain.length < 12 && images.length === 0) {
+    return { erro: "Conteúdo curto demais para gerar flashcards." };
+  }
 
-  const raw = await runOneShotAi(
-    userId,
-    FLASHCARD_SYSTEM.replace("N", String(n)),
-    `Tema/Conteúdo "${title}":\n\n${plain}`
-  );
+  const userMessage = images.length
+    ? `Tema/Contexto "${title}".${plain ? `\n\nTexto:\n${plain}` : ""}\n\nGere os flashcards a partir da(s) imagem(ns) anexada(s)${plain ? " e do texto acima" : ""}.`
+    : `Tema/Conteúdo "${title}":\n\n${plain}`;
+
+  const raw = await runOneShotAi(userId, FLASHCARD_SYSTEM.replace("N", String(n)), userMessage, images);
   if (!raw) return { erro: "A IA não está conectada — flashcards automáticos precisam dela. Configure em Configurações → IA." };
 
   try {

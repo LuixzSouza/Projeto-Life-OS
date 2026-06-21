@@ -167,6 +167,9 @@ export default async function DeckEditPage({ params }: DeckEditPageProps) {
                                     required
                                     className="min-h-[120px] resize-none bg-background focus:ring-primary/20 border-border/60 leading-relaxed"
                                 />
+                                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                                    Dica: cole um link do <strong>YouTube, Vimeo ou .mp4</strong> aqui e ele vira um vídeo na revisão.
+                                </p>
                             </div>
 
                             <CardImageField />

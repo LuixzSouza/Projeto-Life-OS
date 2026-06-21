@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { reviewFlashcard } from "@/app/(dashboard)/flashcards/actions"; // O servidor que alimenta a IA de revisão
 import { previewLabel, type ReviewRating } from "@/lib/srs";
+import { findVideoEmbed } from "@/lib/media-embed";
+import { VideoEmbed } from "@/components/flashcards/video-embed";
 
 /* -------------------------------------------------------------------------- */
 /* TYPES                                                                      */
@@ -100,6 +102,10 @@ export function StudySession({ deck, cards: initialCards }: StudySessionProps) {
       EASY: previewLabel(currentCard, "EASY", now),
     } satisfies Record<ReviewRating, string>;
   }, [currentCard]);
+
+  // Vídeos detectados no texto (link do YouTube/Vimeo/MP4 vira player).
+  const frontVideo = useMemo(() => findVideoEmbed(currentCard?.term), [currentCard]);
+  const backVideo = useMemo(() => findVideoEmbed(currentCard?.definition), [currentCard]);
 
   // --- ATALHOS DE TECLADO ---
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -279,6 +285,7 @@ export function StudySession({ deck, cards: initialCards }: StudySessionProps) {
                                 className="mx-auto mt-5 max-h-[40vh] w-auto rounded-xl border border-border/50 object-contain shadow-sm"
                             />
                         )}
+                        {frontVideo && <VideoEmbed embed={frontVideo} />}
                     </div>
                     {!isFlipped && (
                         <div className="absolute bottom-8 sm:bottom-12 left-0 right-0 flex justify-center animate-pulse">
@@ -296,6 +303,7 @@ export function StudySession({ deck, cards: initialCards }: StudySessionProps) {
                     </Badge>
                     <div className="w-full">
                         <RichTextDisplay text={currentCard?.definition} isDark={true} />
+                        {backVideo && <VideoEmbed embed={backVideo} dark />}
                     </div>
                 </div>
             </div>

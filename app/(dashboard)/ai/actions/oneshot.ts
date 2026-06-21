@@ -9,7 +9,7 @@ import { decryptKey } from "@/lib/settings-crypto";
 import { getAiStatus, providerMeta, normalizeProvider, setupMessage } from "@/lib/ai-help";
 import { isEphemeralServerless } from "@/lib/db-config";
 import { callAIProvider } from "./providers";
-import type { AIKeys } from "./types";
+import type { AIKeys, ChatAttachment } from "./types";
 
 // Configuração resolvida para chamar a IA fora do chat (jobs, reuniões...).
 // Centraliza o padrão settings → chaves decifradas → status, que estava
@@ -58,12 +58,28 @@ export async function runOneShotAi(
   userId: string,
   systemPrompt: string,
   userMessage: string,
+  images: string[] = [],
 ): Promise<string | null> {
   try {
     const config = await getAiCallConfig(userId);
     if (!config.configured) return null;
 
-    const res = await callAIProvider(config.provider, config.model, systemPrompt, userMessage, [], config.keys);
+    // Visão (opcional): imagens viram anexos multimodais. Só passam data URLs
+    // de imagem válidas — o provider (OpenAI-like/Gemini) já sabe lidar com elas.
+    // Modelos sem visão simplesmente ignoram/erram, e quem chama tem fallback.
+    const attachments: ChatAttachment[] = images
+      .filter((u) => typeof u === "string" && u.startsWith("data:image/"))
+      .map((dataUrl, i) => ({ kind: "image", dataUrl, name: `img-${i + 1}` }));
+
+    const res = await callAIProvider(
+      config.provider,
+      config.model,
+      systemPrompt,
+      userMessage,
+      [],
+      config.keys,
+      attachments,
+    );
     const text = res.text?.trim();
     return text ? text : null;
   } catch (error) {
