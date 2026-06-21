@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogBody } from "@/components/ui/dialog";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -170,30 +170,27 @@ export function AgendaHeader({ date, userName }: AgendaHeaderProps) {
 
       {/* DIÁLOGO: tarefa rápida (título + Enter — fricção zero) */}
       <Dialog open={dialog === "task"} onOpenChange={(o) => { if (!o && !taskPending) setDialog(null); }}>
-        <DialogContent className="w-[95%] max-w-[420px] rounded-[2rem] p-6">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 border border-emerald-500/20">
-              <ListTodo className="h-5 w-5" />
+        <DialogContent size="sm">
+          <DialogHeader
+            icon={<ListTodo />}
+            iconClassName="bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+            title="Tarefa rápida"
+            description={<span className="capitalize">vence {format(date, "EEEE, d 'de' MMMM", { locale: ptBR })}</span>}
+          />
+          <DialogBody>
+            <div className="flex items-center gap-2">
+              <Input
+                value={taskTitle}
+                onChange={(e) => setTaskTitle(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); createQuickTask(); } }}
+                placeholder="O que precisa ser feito?"
+                autoFocus
+              />
+              <Button onClick={createQuickTask} disabled={taskPending || !taskTitle.trim()} className="shrink-0 rounded-xl">
+                {taskPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Criar"}
+              </Button>
             </div>
-            <div>
-              <DialogTitle className="text-lg font-black uppercase tracking-tighter">Tarefa rápida</DialogTitle>
-              <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5 capitalize">
-                vence {format(date, "EEEE, d 'de' MMMM", { locale: ptBR })}
-              </DialogDescription>
-            </div>
-          </div>
-          <div className="mt-4 flex items-center gap-2">
-            <Input
-              value={taskTitle}
-              onChange={(e) => setTaskTitle(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); createQuickTask(); } }}
-              placeholder="O que precisa ser feito?"
-              autoFocus
-            />
-            <Button onClick={createQuickTask} disabled={taskPending || !taskTitle.trim()} className="shrink-0 rounded-xl">
-              {taskPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Criar"}
-            </Button>
-          </div>
+          </DialogBody>
         </DialogContent>
       </Dialog>
     </header>
