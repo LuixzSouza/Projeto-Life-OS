@@ -16,9 +16,10 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+import Link from "next/link";
 import {
   Clock, Calendar, Gauge, Target, Trash2, AlertTriangle, Loader2,
-  Layers, BarChart3, History, GraduationCap, CheckCircle2, BookOpen,
+  Layers, BarChart3, History, GraduationCap, CheckCircle2, BookOpen, Zap,
 } from "lucide-react";
 
 import { toast } from "sonner";
@@ -46,6 +47,7 @@ type SessionDetail = {
 
 type SubTopic = { id: string; title: string; icon?: string | null; color?: string | null };
 type ParentTopic = { id: string; title: string };
+type DeckLite = { id: string; title: string; total: number; due: number };
 
 type SubjectDetails = {
   subjectTitle: string;
@@ -56,6 +58,7 @@ type SubjectDetails = {
   sessions: SessionDetail[];
   subTopics?: SubTopic[];
   parentTopic?: ParentTopic | null;
+  decks?: DeckLite[];
 };
 
 interface SubjectDetailsModalProps {
@@ -80,7 +83,7 @@ const formatDateTime = (iso: string | Date) => {
     const d = new Date(iso);
     return {
       date: d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }),
-      time: d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      time: d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
     };
   } catch {
     return { date: "—", time: "—" };
@@ -140,6 +143,7 @@ function SessionItem({
             <Button
               size="icon"
               variant="ghost"
+              aria-label="Excluir sessão"
               className="h-6 w-6 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
               disabled={deletingId === session.id}
             >
@@ -322,6 +326,46 @@ export function SubjectDetailsModal({ subjectId, open, onClose }: SubjectDetails
                         {st.icon ? <span>{st.icon}</span> : <BookOpen className="h-3.5 w-3.5 text-muted-foreground" />}
                         {st.title}
                       </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* FLASHCARDS DA MATÉRIA (ponte estudar → revisar) */}
+              {details?.decks && details.decks.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                      <GraduationCap className="h-3.5 w-3.5" /> Flashcards ({details.decks.length})
+                    </p>
+                    {subjectId && details.decks.some((d) => d.due > 0) && (
+                      <Link
+                        href={`/flashcards/review?subject=${subjectId}`}
+                        className="shrink-0 text-[11px] font-semibold text-primary hover:underline"
+                      >
+                        Revisar tudo
+                      </Link>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {details.decks.map((d) => (
+                      <Link
+                        key={d.id}
+                        href={d.due > 0 ? `/flashcards/${d.id}/study?mode=smart` : `/flashcards/${d.id}/edit`}
+                        className="group flex items-center gap-2 rounded-lg border border-border/50 bg-card px-3 py-2 text-sm transition-colors hover:border-primary/30 hover:bg-muted/30"
+                      >
+                        <Layers className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <span className="min-w-0 truncate font-medium text-foreground">{d.title}</span>
+                        <span className="ml-auto shrink-0">
+                          {d.due > 0 ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+                              <Zap className="h-3 w-3" /> {d.due}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground/60">{d.total} {d.total === 1 ? "cartão" : "cartões"}</span>
+                          )}
+                        </span>
+                      </Link>
                     ))}
                   </div>
                 </div>

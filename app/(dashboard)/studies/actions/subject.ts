@@ -105,6 +105,20 @@ export async function getSubjectDetails(subjectId: string) {
         return { success: false, message: "Matéria não encontrada." };
     }
 
+    // Baralhos da matéria (ponte estudo passivo → ativo): total + vencidos.
+    const now = Date.now();
+    const decksRaw = await prisma.flashcardDeck.findMany({
+        where: { userId, studySubjectId: subjectId },
+        select: { id: true, title: true, cards: { select: { nextReview: true } } },
+        orderBy: { createdAt: "desc" },
+    });
+    const decks = decksRaw.map((d) => ({
+        id: d.id,
+        title: d.title,
+        total: d.cards.length,
+        due: d.cards.filter((c) => !c.nextReview || new Date(c.nextReview).getTime() <= now).length,
+    }));
+
     return {
         success: true,
         data: {
@@ -115,7 +129,8 @@ export async function getSubjectDetails(subjectId: string) {
             totalDuration: totalDuration,
             sessions: sessions,
             subTopics: subject.children,
-            parentTopic: subject.parent
+            parentTopic: subject.parent,
+            decks,
         }
     };
   } catch (error) {
