@@ -4,11 +4,12 @@ import { useState } from "react";
 import { 
     Dialog, 
     DialogContent, 
-    DialogHeader, 
-    DialogTitle, 
-    DialogDescription, 
-    DialogTrigger, 
-    DialogFooter 
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogTrigger,
+    DialogBody,
+    DialogFooter
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -85,8 +86,9 @@ export function NewProjectDialog() {
                 </Button>
             </DialogTrigger>
             
-            <DialogContent className="fixed left-[50%] top-[50%] z-50 grid w-[95vw] sm:max-w-[440px] translate-x-[-50%] translate-y-[-50%] p-0 overflow-hidden border-border/40 shadow-2xl rounded-[2rem] bg-background">
-                <DialogHeader className="p-8 pb-4">
+            <DialogContent size="sm">
+                <form action={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+                <DialogHeader>
                     <div className="flex items-center gap-4">
                         <div className={cn(
                             "h-12 w-12 rounded-2xl flex items-center justify-center shadow-inner transition-colors duration-500",
@@ -102,7 +104,7 @@ export function NewProjectDialog() {
                     </div>
                 </DialogHeader>
 
-                <form action={handleSubmit} className="p-8 pt-2 space-y-6">
+                <DialogBody className="space-y-6">
                     {/* Nome do Projeto */}
                     <div className={cn("space-y-2 transition-all duration-300", selectedColor.ringClass)}>
                         <Label htmlFor="title" className="text-[10px] font-black text-muted-foreground uppercase tracking-widest ml-1">
@@ -193,10 +195,11 @@ export function NewProjectDialog() {
                             ))}
                         </div>
                     </div>
+                    </DialogBody>
 
-                    <DialogFooter className="pt-4">
-                        <Button 
-                            type="submit" 
+                    <DialogFooter>
+                        <Button
+                            type="submit"
                             disabled={isLoading} 
                             className={cn(
                                 "w-full h-14 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl transition-all duration-500",
