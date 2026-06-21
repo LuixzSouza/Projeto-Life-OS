@@ -10,6 +10,7 @@ import { ptBR } from "date-fns/locale";
 import { ChevronLeft, ChevronRight, CalendarDays, LayoutList, ArrowLeft, CalendarRange, Pencil, CalendarPlus, Trash2, Loader2, Plus, Search, X, Download, Repeat, CalendarOff } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { onActivate } from "@/lib/a11y";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -262,8 +263,8 @@ export function UnifiedAgenda({ items, selectedDateISO, themedDays = [], events 
                 <ArrowLeft className="h-4 w-4" /> Mês
               </Button>
               <div className="flex items-center gap-1">
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => goDay(-1)}><ChevronLeft className="h-4 w-4" /></Button>
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => goDay(1)}><ChevronRight className="h-4 w-4" /></Button>
+                <Button variant="outline" size="icon" aria-label="Dia anterior" className="h-8 w-8" onClick={() => goDay(-1)}><ChevronLeft className="h-4 w-4" /></Button>
+                <Button variant="outline" size="icon" aria-label="Próximo dia" className="h-8 w-8" onClick={() => goDay(1)}><ChevronRight className="h-4 w-4" /></Button>
               </div>
               <h2 className="ml-1 text-base font-bold capitalize">
                 {format(day, "EEEE, d 'de' MMMM", { locale: ptBR })}
@@ -272,8 +273,8 @@ export function UnifiedAgenda({ items, selectedDateISO, themedDays = [], events 
           ) : view === "week" ? (
             <>
               <div className="flex items-center gap-1">
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => goWeek(-1)}><ChevronLeft className="h-4 w-4" /></Button>
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => goWeek(1)}><ChevronRight className="h-4 w-4" /></Button>
+                <Button variant="outline" size="icon" aria-label="Semana anterior" className="h-8 w-8" onClick={() => goWeek(-1)}><ChevronLeft className="h-4 w-4" /></Button>
+                <Button variant="outline" size="icon" aria-label="Próxima semana" className="h-8 w-8" onClick={() => goWeek(1)}><ChevronRight className="h-4 w-4" /></Button>
               </div>
               <h2 className="ml-1 text-base font-bold">
                 {format(weekDays[0], "d MMM", { locale: ptBR })} – {format(weekDays[6], "d MMM yyyy", { locale: ptBR })}
@@ -282,8 +283,8 @@ export function UnifiedAgenda({ items, selectedDateISO, themedDays = [], events 
           ) : (
             <>
               <div className="flex items-center gap-1">
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => goMonth(-1)}><ChevronLeft className="h-4 w-4" /></Button>
-                <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => goMonth(1)}><ChevronRight className="h-4 w-4" /></Button>
+                <Button variant="outline" size="icon" aria-label="Mês anterior" className="h-8 w-8" onClick={() => goMonth(-1)}><ChevronLeft className="h-4 w-4" /></Button>
+                <Button variant="outline" size="icon" aria-label="Próximo mês" className="h-8 w-8" onClick={() => goMonth(1)}><ChevronRight className="h-4 w-4" /></Button>
               </div>
               <h2 className="ml-1 text-base font-bold capitalize">{format(cursor, "MMMM 'de' yyyy", { locale: ptBR })}</h2>
             </>
@@ -425,7 +426,7 @@ export function UnifiedAgenda({ items, selectedDateISO, themedDays = [], events 
 
       {/* DIÁLOGO ÚNICO de edição de evento (mesmo padrão da grade de Blocos). */}
       <Dialog open={!!editingEvent} onOpenChange={(o) => { if (!o) setEditingEvent(null); }}>
-        <DialogContent size="md" className="p-0">
+        <DialogContent size="md">
           {editingEvent && (
             <>
               <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/40 bg-muted/10 px-5 py-4 pr-14 sm:px-8">
@@ -463,7 +464,7 @@ export function UnifiedAgenda({ items, selectedDateISO, themedDays = [], events 
 
       {/* SELETOR "série vs só esta ocorrência" (diálogo único, padrão do arquivo) */}
       <Dialog open={!!occurrence} onOpenChange={(o) => { if (!o && !occBusy) setOccurrence(null); }}>
-        <DialogContent size="sm" className="rounded-[2rem]">
+        <DialogContent size="sm">
           {occurrence && (
             <>
               <div className="flex items-center gap-3">
@@ -535,7 +536,7 @@ export function UnifiedAgenda({ items, selectedDateISO, themedDays = [], events 
 
       {/* DIÁLOGO ÚNICO de criação contextual (#1): nasce no dia que se está vendo. */}
       <Dialog open={!!creatingDay} onOpenChange={(o) => { if (!o) setCreatingDay(null); }}>
-        <DialogContent size="md" className="p-0">
+        <DialogContent size="md">
           {creatingDay && (
             <>
               <div className="flex shrink-0 items-center gap-3 border-b border-border/40 bg-muted/10 px-5 py-4 pr-14 sm:px-8">
@@ -601,7 +602,7 @@ function MonthGrid({
                 role="button"
                 tabIndex={0}
                 onClick={() => onOpenDay(d)}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenDay(d); } }}
+                onKeyDown={onActivate(() => onOpenDay(d))}
                 style={inMonth && theme ? { backgroundColor: `${theme.color}0d` } : undefined}
                 className={cn(
                   "group flex min-h-[64px] cursor-pointer flex-col gap-1 border-b border-r border-border/30 p-1.5 text-left transition-colors hover:bg-muted/40 sm:min-h-[96px]",
@@ -698,7 +699,7 @@ function WeekGrid({
                 role="button"
                 tabIndex={0}
                 onClick={() => onOpenDay(d)}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenDay(d); } }}
+                onKeyDown={onActivate(() => onOpenDay(d))}
                 className="group sticky top-0 z-10 flex cursor-pointer items-center justify-between gap-1 border-b border-border/40 bg-background/95 px-2 py-2 backdrop-blur transition-colors hover:bg-muted/40"
               >
                 <span className="flex items-center gap-1.5">

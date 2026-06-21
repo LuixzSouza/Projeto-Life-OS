@@ -472,8 +472,8 @@ export function TimeBlockingDay({ events, tasks, themedDays, selectedDateISO }: 
       <div className="flex items-center justify-between gap-3 border-b border-border/40 bg-muted/10 px-4 py-3">
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1">
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => goDay(-1)}><ChevronLeft className="h-4 w-4" /></Button>
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => goDay(1)}><ChevronRight className="h-4 w-4" /></Button>
+            <Button variant="outline" size="icon" aria-label="Dia anterior" className="h-8 w-8" onClick={() => goDay(-1)}><ChevronLeft className="h-4 w-4" /></Button>
+            <Button variant="outline" size="icon" aria-label="Próximo dia" className="h-8 w-8" onClick={() => goDay(1)}><ChevronRight className="h-4 w-4" /></Button>
           </div>
           <h2 className="ml-1 text-base font-bold capitalize" style={themeColor ? { color: themeColor } : undefined}>
             {format(day, "EEEE, d 'de' MMM", { locale: ptBR })}
@@ -742,7 +742,7 @@ export function TimeBlockingDay({ events, tasks, themedDays, selectedDateISO }: 
       {/* DIÁLOGO ÚNICO: criar ou editar. O "excluir" fica no cabeçalho da edição
           (não empilha altura abaixo do form, que já tem seu próprio scroll). */}
       <Dialog open={dialogOpen} onOpenChange={(o) => { if (!o) closeDialog(); }}>
-        <DialogContent size="md" className="p-0">
+        <DialogContent size="md">
           {editing ? (
             <>
               <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/40 bg-muted/10 px-5 py-4 pr-14 sm:px-8">
