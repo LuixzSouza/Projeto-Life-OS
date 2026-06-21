@@ -629,3 +629,47 @@ export async function restoreNoteVersion(
     return { success: false, message: "Falha ao restaurar a versão." };
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/* FLASHCARDS RELACIONADOS (ponte Nota -> Matéria -> Baralhos)                */
+/* -------------------------------------------------------------------------- */
+
+export interface RelatedDeck {
+  id: string;
+  title: string;
+  total: number;
+  due: number;
+}
+
+/**
+ * Baralhos ligados à MATÉRIA desta nota (com total e quantos estão vencidos).
+ * Liga o estudo passivo (ler a nota) ao ativo (revisar). Vazio se a nota não
+ * tem matéria. Escala pessoal: carregar os ids dos cartões é barato.
+ */
+export async function getNoteRelatedDecks(noteId: string): Promise<RelatedDeck[]> {
+  try {
+    const userId = await requireUserId();
+    const note = await prisma.studyNote.findFirst({
+      where: { id: noteId, userId },
+      select: { subjectId: true },
+    });
+    if (!note?.subjectId) return [];
+
+    const now = Date.now();
+    const decks = await prisma.flashcardDeck.findMany({
+      where: { userId, studySubjectId: note.subjectId },
+      select: { id: true, title: true, cards: { select: { nextReview: true } } },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return decks.map((d) => ({
+      id: d.id,
+      title: d.title,
+      total: d.cards.length,
+      due: d.cards.filter((c) => !c.nextReview || new Date(c.nextReview).getTime() <= now).length,
+    }));
+  } catch (error) {
+    console.error("Erro ao buscar baralhos da nota:", error);
+    return [];
+  }
+}

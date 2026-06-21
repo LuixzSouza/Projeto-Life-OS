@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getNote, getNotes, getNoteSubjects, getNoteProjects, getNoteBacklinks } from "../actions";
+import { getNote, getNotes, getNoteSubjects, getNoteProjects, getNoteBacklinks, getNoteRelatedDecks } from "../actions";
 import { getNotebooks } from "../notebook-actions";
 import { getPaletteTasks } from "../../palette-actions";
 import { NoteFullEditor } from "@/components/notes/note-full-editor";
@@ -13,13 +13,14 @@ export default async function NoteEditPage(props: { params: Promise<{ id: string
   const note = await getNote(id);
   if (!note) return notFound();
 
-  const [notebooks, subjects, projects, allNotes, tasks, backlinks] = await Promise.all([
+  const [notebooks, subjects, projects, allNotes, tasks, backlinks, relatedDecks] = await Promise.all([
     getNotebooks(),
     getNoteSubjects(),
     getNoteProjects(),
     getNotes(),
     getPaletteTasks(),
     getNoteBacklinks(id),
+    getNoteRelatedDecks(id),
   ]);
 
   // Notas para o menu "@" (sem a atual; só id + título).
@@ -41,6 +42,7 @@ export default async function NoteEditPage(props: { params: Promise<{ id: string
       mentionTasks={tasks}
       backlinks={backlinks}
       related={related}
+      relatedDecks={relatedDecks}
     />
   );
 }

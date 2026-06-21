@@ -39,6 +39,7 @@ export function NoteFullEditor({
   mentionTasks,
   backlinks,
   related = [],
+  relatedDecks = [],
 }: {
   note: NoteData;
   notebooks: NotebookData[];
@@ -52,6 +53,8 @@ export function NoteFullEditor({
   backlinks: { id: string; title: string }[];
   /** Serendipidade (#14): notas antigas que se conectam ao tema desta. */
   related?: { id: string; title: string; reason: string }[];
+  /** Baralhos da matéria desta nota (ponte ler → revisar). */
+  relatedDecks?: { id: string; title: string; total: number; due: number }[];
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(note.title);
@@ -289,7 +292,7 @@ export function NoteFullEditor({
           {/* Menu: exportar / excluir */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0">
+              <Button variant="ghost" size="icon" aria-label="Mais ações" className="h-9 w-9 shrink-0">
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -454,6 +457,41 @@ export function NoteFullEditor({
                   <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <span className="truncate">{b.title}</span>
                   <ExternalLink className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground/40 transition-opacity opacity-0 group-hover:opacity-100" />
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Ponte ler → revisar: baralhos da matéria desta nota, com vencidos. */}
+        {relatedDecks.length > 0 && (
+          <div className="space-y-2 rounded-xl border border-border/40 bg-card p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-2">
+              <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                <Layers className="h-3.5 w-3.5 text-primary" /> Flashcards da matéria
+              </p>
+              {subjectId !== "none" && (
+                <Link href={`/flashcards/review?subject=${subjectId}`} className="shrink-0 text-[11px] font-semibold text-primary hover:underline">
+                  Revisar tudo
+                </Link>
+              )}
+            </div>
+            <div className="flex flex-col">
+              {relatedDecks.map((d) => (
+                <Link
+                  key={d.id}
+                  href={d.due > 0 ? `/flashcards/${d.id}/study?mode=smart` : `/flashcards/${d.id}/edit`}
+                  className="group flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-foreground transition-colors hover:bg-muted/40"
+                >
+                  <Layers className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{d.title}</span>
+                  <span className="ml-auto shrink-0">
+                    {d.due > 0 ? (
+                      <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold text-primary">{d.due} a revisar</span>
+                    ) : (
+                      <span className="text-[10px] text-muted-foreground/60">{d.total} {d.total === 1 ? "cartão" : "cartões"}</span>
+                    )}
+                  </span>
                 </Link>
               ))}
             </div>
