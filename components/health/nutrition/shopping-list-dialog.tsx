@@ -49,7 +49,7 @@ export function ShoppingListDialog({ plan }: { plan: MealPlanSlot[] }) {
         </Button>
       </DialogTrigger>
 
-      <DialogContent size="md" className="p-0 gap-0">
+      <DialogContent size="md">
         <DialogHeader
           icon={<ShoppingCart />}
           title="Lista de Compras"

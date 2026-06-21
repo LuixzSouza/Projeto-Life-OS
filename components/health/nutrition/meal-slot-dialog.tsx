@@ -32,7 +32,7 @@ export function MealSlotDialog(props: MealSlotDialogProps) {
         </Button>
       </DialogTrigger>
 
-      <DialogContent size="lg" className="bg-card p-0 gap-0">
+      <DialogContent size="lg">
         <DialogHeader
           icon={<Icon />}
           title={`Planejar ${props.label}`}

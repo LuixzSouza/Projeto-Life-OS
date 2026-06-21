@@ -26,7 +26,7 @@ export function SkillTreeDialog({ open, onOpenChange }: { open: boolean; onOpenC
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="md" className="p-0">
+      <DialogContent size="md">
         <DialogHeader className="border-0 pb-0">
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" /> Árvore de habilidades

@@ -78,7 +78,7 @@ export function LogSleepDialog({ goal = DEFAULT_SLEEP_GOAL }: { goal?: number })
         </Card>
       </DialogTrigger>
 
-      <DialogContent size="md" className="p-0 gap-0">
+      <DialogContent size="md">
         <DialogHeader
           icon={<Moon />}
           title="Registrar Sono"

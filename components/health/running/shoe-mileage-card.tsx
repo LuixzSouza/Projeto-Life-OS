@@ -172,7 +172,7 @@ export function ShoeMileageCard({ shoes }: { shoes: ShoeWithMileage[] }) {
 
       {/* Form de cadastro/edição */}
       <Dialog open={editing !== null} onOpenChange={(o) => !o && closeForm()}>
-        <DialogContent className="sm:max-w-sm rounded-2xl">
+        <DialogContent size="sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><Footprints className="h-5 w-5 text-primary" /> {editing?.id ? "Editar tênis" : "Cadastrar tênis"}</DialogTitle>
             <DialogDescription>Defina a meta de km para receber o alerta de troca (80% âmbar · 100% vermelho).</DialogDescription>
