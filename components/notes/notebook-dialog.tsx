@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter,
 } from "@/components/ui/dialog";
 import {
   createNotebook, updateNotebook, deleteNotebook, type NotebookData,
@@ -68,7 +68,7 @@ export function NotebookDialog({
 
   return (
     <Dialog open={state !== null} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-[420px]">
+      <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Editar caderno" : "Novo caderno"}</DialogTitle>
           <DialogDescription>
@@ -76,7 +76,7 @@ export function NotebookDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <DialogBody className="space-y-4">
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -103,7 +103,7 @@ export function NotebookDialog({
               ))}
             </div>
           </div>
-        </div>
+        </DialogBody>
 
         <DialogFooter className="gap-2 sm:justify-between">
           {isEdit && !nb?.isInbox ? (

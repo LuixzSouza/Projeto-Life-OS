@@ -135,8 +135,8 @@ export function NoteHistoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-[760px] max-h-[85vh] overflow-hidden p-0">
-        <DialogHeader className="border-b border-border/40 p-5 pb-4">
+      <DialogContent size="xl">
+        <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <History className="h-4 w-4" /> Histórico de versões
           </DialogTitle>

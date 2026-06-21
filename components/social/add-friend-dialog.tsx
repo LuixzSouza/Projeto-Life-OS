@@ -205,8 +205,8 @@ export function FriendFormDialog({ mode, initialData, open: controlledOpen, onOp
         </Button>
       )}
       
-      <DialogContent className="sm:max-w-2xl p-0 overflow-hidden bg-background border-border/40 shadow-2xl rounded-2xl">
-        <DialogHeader className="p-6 pb-4 border-b border-border/40 bg-muted/10 text-left">
+      <DialogContent size="lg">
+        <DialogHeader className="text-left">
           <DialogTitle className="text-xl">
             {mode === "create" ? "Adicionar Conexão" : "Editar Perfil"}
           </DialogTitle>
@@ -215,7 +215,7 @@ export function FriendFormDialog({ mode, initialData, open: controlledOpen, onOp
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col max-h-[75vh]">
+        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
           <Tabs defaultValue="perfil" className="flex flex-col h-full">
             <div className="px-6 pt-4 shrink-0">
               <TabsList className="grid w-full grid-cols-3 bg-muted/50 p-1 rounded-lg">
@@ -406,11 +406,11 @@ export function FriendFormDialog({ mode, initialData, open: controlledOpen, onOp
                 </TabsContent>
             </div>
 
-            <DialogFooter className="p-6 border-t border-border/40 bg-muted/5 shrink-0 flex-row justify-end gap-3">
-              <Button type="button" variant="ghost" onClick={() => setOpen(false)} className="rounded-lg h-10 px-6">
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isSubmitting} className="min-w-[140px] rounded-lg h-10 shadow-sm">
+              <Button type="submit" disabled={isSubmitting} className="min-w-[140px] shadow-sm">
                 {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                 Salvar Perfil
               </Button>
