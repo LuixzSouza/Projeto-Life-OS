@@ -9,8 +9,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogTitle,
-  DialogDescription,
+  DialogHeader,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -89,7 +88,7 @@ export function RoutineManager({ items }: { items: RoutineItem[] }) {
           {items.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="h-11 w-11 rounded-xl hover:bg-muted border-border/60">
+                <Button variant="outline" size="icon" aria-label="Mais ações" className="h-11 w-11 rounded-xl hover:bg-muted border-border/60">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -188,18 +187,12 @@ export function RoutineManager({ items }: { items: RoutineItem[] }) {
 
       {/* MODAL DE CRIAÇÃO (NOVO DESIGN) */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] max-w-[500px] p-0 bg-background border-border/40 shadow-2xl rounded-[2.5rem] z-[100] overflow-hidden flex flex-col max-h-[90vh]">
-          <div className="p-6 border-b border-border/40 bg-muted/10 shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner border border-primary/20">
-                <CalendarDays className="h-6 w-6" />
-              </div>
-              <div>
-                <DialogTitle className="text-xl font-black uppercase tracking-tighter">Novo Bloco Fixo</DialogTitle>
-                <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">Configure um hábito recorrente</DialogDescription>
-              </div>
-            </div>
-          </div>
+        <DialogContent size="md">
+          <DialogHeader
+            icon={<CalendarDays />}
+            title="Novo Bloco Fixo"
+            description="Configure um hábito recorrente"
+          />
           <RoutineForm onClose={() => setIsDialogOpen(false)} />
         </DialogContent>
       </Dialog>
