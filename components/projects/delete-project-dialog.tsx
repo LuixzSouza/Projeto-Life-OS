@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Trash2, Loader2, RotateCcw } from "lucide-react";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { deleteProject, restoreProject } from "@/app/(dashboard)/projects/actions";
@@ -53,8 +53,8 @@ export function DeleteProjectDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[440px] p-0 overflow-hidden rounded-[2rem] border-border/40 shadow-2xl gap-0">
-        <DialogHeader className="p-7 pb-0 space-y-4 items-center text-center">
+      <DialogContent size="sm">
+        <DialogHeader className="flex flex-col items-center gap-4 text-center">
           <div className="h-16 w-16 rounded-3xl bg-destructive/10 border border-destructive/20 flex items-center justify-center text-destructive">
             <Trash2 className="h-8 w-8" />
           </div>
@@ -66,7 +66,7 @@ export function DeleteProjectDialog({
           </div>
         </DialogHeader>
 
-        <div className="px-7 pt-5">
+        <DialogBody>
           <div className="rounded-2xl border border-border/50 bg-muted/30 p-4 text-left">
             <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground mb-2">O que acontece</p>
             <ul className="space-y-1.5 text-xs text-muted-foreground/90">
@@ -77,26 +77,26 @@ export function DeleteProjectDialog({
               <li className="flex gap-1.5"><span className="text-primary">•</span> Você pode desfazer logo após confirmar.</li>
             </ul>
           </div>
-        </div>
+        </DialogBody>
 
-        <div className="p-7 flex gap-3">
+        <DialogFooter>
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={loading}
-            className="flex-1 h-12 rounded-xl font-bold"
+            className="font-bold"
           >
             Cancelar
           </Button>
           <Button
             onClick={handleDelete}
             disabled={loading}
-            className="flex-1 h-12 rounded-xl font-bold bg-destructive hover:bg-destructive/90 text-white gap-2"
+            className="gap-2 bg-destructive font-bold text-white hover:bg-destructive/90"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
             Mover
           </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
