@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogBody, DialogFooter } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -218,19 +218,14 @@ export function StudyTimer({ subjects }: { subjects: (StudySubject & { totalMinu
 
       {/* DIALOG DE SALVAR SESSÃO */}
       <Dialog open={isSaveDialogOpen} onOpenChange={setIsSaveDialogOpen}>
-        <DialogContent className="sm:max-w-xl p-0 overflow-hidden border-border/60 shadow-2xl">
-          <div className="p-6 bg-gradient-to-r from-primary/10 to-background border-b border-border/40">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-2xl font-bold">
-                <Award className="h-6 w-6 text-primary" /> Relatório da Sessão
-              </DialogTitle>
-              <DialogDescription>
-                Você focou por <strong className="text-foreground">{sessionDurationMinutes} minutos</strong> em {selectedSubject?.title}. Como foi?
-              </DialogDescription>
-            </DialogHeader>
-          </div>
+        <DialogContent size="lg">
+          <DialogHeader
+            icon={<Award />}
+            title="Relatório da sessão"
+            description={<>Você focou por <strong className="text-foreground">{sessionDurationMinutes} minutos</strong> em {selectedSubject?.title}. Como foi?</>}
+          />
 
-          <div className="p-6 space-y-6 bg-background">
+          <DialogBody className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-3">
                 <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Nível de Foco (1-5)</Label>
@@ -271,13 +266,14 @@ export function StudyTimer({ subjects }: { subjects: (StudySubject & { totalMinu
               />
             </div>
 
-            <div className="flex gap-3 pt-2">
-              <Button variant="outline" onClick={() => setIsSaveDialogOpen(false)} className="flex-1 h-12">Descartar</Button>
-              <Button onClick={handleSaveSession} className="flex-1 h-12 bg-primary font-bold shadow-lg shadow-primary/20 text-md">
-                <CheckCircle2 className="h-5 w-5 mr-2" /> Salvar Evolução
-              </Button>
-            </div>
-          </div>
+          </DialogBody>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSaveDialogOpen(false)}>Descartar</Button>
+            <Button onClick={handleSaveSession} className="font-bold shadow-sm">
+              <CheckCircle2 className="h-5 w-5 mr-2" /> Salvar evolução
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

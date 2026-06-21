@@ -262,7 +262,7 @@ export function SubjectDetailsModal({ subjectId, open, onClose }: SubjectDetails
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent size="lg" className="p-0 gap-0 max-h-[88vh]">
+      <DialogContent size="lg">
         <DialogHeader
           icon={details?.icon ? <span className="text-lg leading-none">{details.icon}</span> : <GraduationCap />}
           title={details?.subjectTitle ?? "Carregando…"}
