@@ -8,6 +8,7 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogDescription,
+  DialogBody,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ShieldPlus, Lock, KeyRound } from "lucide-react";
@@ -33,7 +34,7 @@ export function AccessDialog() {
       </DialogTrigger>
 
       {/* CONTEÚDO DO MODAL (O design já vem do componente base Dialog) */}
-      <DialogContent className="p-0">
+      <DialogContent>
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner border border-primary/20 relative">
@@ -50,10 +51,10 @@ export function AccessDialog() {
           </div>
         </DialogHeader>
 
-        {/* CONTAINER DO FORMULÁRIO (Com rolagem segura) */}
-        <div className="p-6 max-h-[75vh] overflow-y-auto custom-scrollbar">
+        {/* CONTAINER DO FORMULÁRIO (rolagem segura via DialogBody) */}
+        <DialogBody className="custom-scrollbar">
           <AccessForm onClose={() => setOpen(false)} />
-        </div>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );

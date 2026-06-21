@@ -1,6 +1,6 @@
 "use client";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody } from "@/components/ui/dialog";
 import { Fingerprint } from "lucide-react";
 import { AccessForm, type AccessData } from "./access-form";
 
@@ -13,7 +13,7 @@ interface AccessEditDialogProps {
 export function AccessEditDialog({ open, onOpenChange, item }: AccessEditDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="p-0">
+      <DialogContent>
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-inner border border-primary/20">
@@ -26,9 +26,9 @@ export function AccessEditDialog({ open, onOpenChange, item }: AccessEditDialogP
           </div>
         </DialogHeader>
 
-        <div className="p-6">
+        <DialogBody>
           <AccessForm item={item} onClose={() => onOpenChange(false)} />
-        </div>
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );
