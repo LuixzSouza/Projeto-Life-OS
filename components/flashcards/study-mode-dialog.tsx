@@ -17,7 +17,7 @@ export function StudyModeDialog({ deck, onClose }: StudyModeDialogProps) {
   const total = deck?.cards.length ?? 0;
   return (
     <Dialog open={!!deck} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent size="lg">
+      <DialogContent size="xl">
           <DialogHeader
             icon={<BrainCircuit />}
             title="Central de aprendizado"

@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTitle, DialogTrigger, DialogHeader, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogBody } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dumbbell, Plus, LayoutList, LineChart as LineChartIcon, Images } from "lucide-react";
 import { format } from "date-fns";
@@ -15,9 +15,10 @@ import { PlanBuilder } from "./plan-builder";
 import { VolumeChart } from "./volume-chart";
 import { MuscleFrequencyCard } from "./muscle-frequency-card";
 import { MuscleRecoveryCard } from "./muscle-recovery-card";
+import { PersonalRecordsCard } from "./personal-records-card";
 import { WorkoutCard } from "./workout-card";
 import type { GymWorkout, VolumePoint, MuscleCount } from "./gym-types";
-import type { MuscleRecovery } from "./session/session-types";
+import { loadMultiplier, type MuscleRecovery, type Equipment } from "./session/session-types";
 
 export type { Exercise, GymWorkout } from "./gym-types";
 
@@ -37,16 +38,19 @@ export function GymDashboard({ workouts, recovery = [] }: { workouts: GymWorkout
     return workouts.slice(0, 10).reverse().map(w => {
       let totalLoad = 0;
       w.exercises.forEach(ex => {
-        // Sessão ao vivo: soma real das séries feitas. Senão, resumo legado.
+        // Halter = carga por mão → volume conta ×2 (mesma regra da sessão ao vivo
+        // e do mapa de recuperação, via loadMultiplier).
+        const mult = loadMultiplier(ex.equipment as Equipment | undefined);
+        // Sessão ao vivo: soma real das séries de TRABALHO feitas (ignora aquecimento).
         if (ex.setLog && ex.setLog.length > 0) {
           ex.setLog.forEach(s => {
-            if (s.done) totalLoad += (parseFloat(s.weight) || 0) * (parseFloat(s.reps) || 0);
+            if (s.done && s.type !== "warmup") totalLoad += (parseFloat(s.weight) || 0) * (parseFloat(s.reps) || 0) * mult;
           });
         } else {
           const weight = parseFloat(ex.weight) || 0;
           const sets = parseFloat(ex.sets) || 0;
           const reps = parseFloat(ex.reps) || 0;
-          totalLoad += (weight * sets * reps);
+          totalLoad += (weight * sets * reps * mult);
         }
       });
       return {
@@ -108,16 +112,11 @@ export function GymDashboard({ workouts, recovery = [] }: { workouts: GymWorkout
                 <Plus className="h-4 w-4" /> Registrar Sessão
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden border-border/40 shadow-xl rounded-2xl">
-              <DialogHeader className="px-6 pt-6 pb-2">
-                <DialogTitle className="text-xl">Novo Treino</DialogTitle>
-                <DialogDescription>
-                  Registre as cargas e volumes da sua sessão de hoje.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="px-6 pb-6 overflow-y-auto max-h-[80vh] custom-scrollbar">
+            <DialogContent size="md">
+              <DialogHeader icon={<Dumbbell />} title="Novo Treino" description="Registre as cargas e volumes da sua sessão de hoje." />
+              <DialogBody className="custom-scrollbar">
                 <GymForm onSuccess={() => setIsAddOpen(false)} />
-              </div>
+              </DialogBody>
             </DialogContent>
           </Dialog>
           </div>
@@ -131,6 +130,7 @@ export function GymDashboard({ workouts, recovery = [] }: { workouts: GymWorkout
             <div className="min-w-0 lg:col-span-4 space-y-6">
               <MuscleRecoveryCard recovery={recovery} />
               <VolumeChart data={volumeData} />
+              <PersonalRecordsCard workouts={workouts} />
               <MuscleFrequencyCard distribution={muscleDistribution} />
             </div>
 
