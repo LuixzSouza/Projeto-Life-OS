@@ -172,7 +172,7 @@ export function AddMediaDialog() {
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-3xl p-0 gap-0 overflow-hidden border-border/40 shadow-2xl rounded-2xl">
+      <DialogContent size="xl" className="p-0 gap-0">
         <div className="p-6 pb-4 bg-muted/10 border-b border-border/40">
           <DialogHeader>
             <DialogTitle className="text-xl">Explorar Catálogo</DialogTitle>
