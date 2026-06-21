@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Dialog, DialogContent, DialogTitle, DialogDescription,
+  Dialog, DialogContent, DialogHeader, DialogBody, DialogFooter,
 } from "@/components/ui/dialog";
 import { DAYS } from "./routine-config";
 import { seedCleaningRotation } from "@/app/(dashboard)/agenda/actions";
@@ -60,22 +60,15 @@ export function CleaningRotationDialog({ open, onClose }: CleaningRotationDialog
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="w-[95%] max-w-[480px] rounded-[2.5rem] border-border/40 p-0 overflow-hidden">
-        <div className="border-b border-border/40 bg-muted/10 p-6">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/10 text-amber-500 shadow-inner">
-              <BrushCleaning className="h-6 w-6" />
-            </div>
-            <div>
-              <DialogTitle className="text-xl font-black uppercase tracking-tighter">Limpeza Programada</DialogTitle>
-              <DialogDescription className="mt-0.5 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                Um pedaço da casa por dia, em rodízio
-              </DialogDescription>
-            </div>
-          </div>
-        </div>
+      <DialogContent size="md">
+        <DialogHeader
+          icon={<BrushCleaning />}
+          iconClassName="bg-amber-500/10 text-amber-500 border-amber-500/20"
+          title="Limpeza Programada"
+          description="Um pedaço da casa por dia, em rodízio"
+        />
 
-        <div className="space-y-5 p-6">
+        <DialogBody className="space-y-5">
           {/* CÔMODOS */}
           <div className="space-y-2">
             <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Cômodos / áreas (na ordem)</p>
@@ -154,7 +147,9 @@ export function CleaningRotationDialog({ open, onClose }: CleaningRotationDialog
               />
             </div>
           </div>
+        </DialogBody>
 
+        <DialogFooter>
           <Button
             onClick={submit}
             disabled={isPending || rooms.length === 0 || days.length === 0}
@@ -163,7 +158,7 @@ export function CleaningRotationDialog({ open, onClose }: CleaningRotationDialog
             {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <BrushCleaning className="h-4 w-4" />}
             Criar rodízio ({rooms.length} cômodos · {days.length} dias)
           </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

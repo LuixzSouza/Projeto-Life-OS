@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -102,7 +102,7 @@ export function AgendaHeader({ date, userName }: AgendaHeaderProps) {
           
           {/* Navegador de Dias (Control Group) */}
           <div className="flex items-center bg-muted/30 p-1 rounded-xl border border-border/40 shadow-inner">
-            <Button variant="ghost" size="icon" onClick={handlePrevDay} className="h-8 w-8 rounded-lg hover:bg-background hover:shadow-sm text-muted-foreground hover:text-foreground transition-all">
+            <Button variant="ghost" size="icon" aria-label="Dia anterior" onClick={handlePrevDay} className="h-8 w-8 rounded-lg hover:bg-background hover:shadow-sm text-muted-foreground hover:text-foreground transition-all">
               <ChevronLeft className="h-4 w-4" />
             </Button>
             
@@ -115,7 +115,7 @@ export function AgendaHeader({ date, userName }: AgendaHeaderProps) {
               Hoje
             </Button>
 
-            <Button variant="ghost" size="icon" onClick={handleNextDay} className="h-8 w-8 rounded-lg hover:bg-background hover:shadow-sm text-muted-foreground hover:text-foreground transition-all">
+            <Button variant="ghost" size="icon" aria-label="Próximo dia" onClick={handleNextDay} className="h-8 w-8 rounded-lg hover:bg-background hover:shadow-sm text-muted-foreground hover:text-foreground transition-all">
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -155,22 +155,12 @@ export function AgendaHeader({ date, userName }: AgendaHeaderProps) {
 
       {/* DIÁLOGO ÚNICO: Evento ou Bloco agora (mesmo form, defaultStart diferente) */}
       <Dialog open={dialog === "event" || dialog === "block"} onOpenChange={(o) => { if (!o) setDialog(null); }}>
-        <DialogContent className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95%] max-w-[500px] p-0 bg-background border-border/40 shadow-2xl rounded-[2.5rem] z-[100] overflow-hidden flex flex-col max-h-[90vh]">
-          <div className="p-6 border-b border-border/40 bg-muted/10 shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-inner border border-primary/20">
-                <CalendarPlus className="h-5 w-5" />
-              </div>
-              <div>
-                <DialogTitle className="text-lg font-black uppercase tracking-tighter">
-                  {dialog === "block" ? "Bloco agora" : "Novo Evento"}
-                </DialogTitle>
-                <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">
-                  Alocação de Tempo
-                </DialogDescription>
-              </div>
-            </div>
-          </div>
+        <DialogContent size="md">
+          <DialogHeader
+            icon={<CalendarPlus />}
+            title={dialog === "block" ? "Bloco agora" : "Novo Evento"}
+            description="Alocação de Tempo"
+          />
           {/* EventForm se auto-gerencia na rolagem */}
           {dialog === "block"
             ? <EventForm onClose={() => setDialog(null)} defaultStart={blockStart()} />

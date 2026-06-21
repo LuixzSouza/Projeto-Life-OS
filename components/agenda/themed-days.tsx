@@ -125,7 +125,7 @@ export function ThemedDays({ themedDays, weekday }: { themedDays: ThemedDayData[
 
       {/* DIÁLOGO: editar os 7 dias */}
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent size="lg" className="p-0">
+        <DialogContent size="lg">
           <DialogHeader
             icon={<Palette className="h-5 w-5" />}
             title="Dias Temáticos"
@@ -142,7 +142,7 @@ export function ThemedDays({ themedDays, weekday }: { themedDays: ThemedDayData[
                     <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">{WEEKDAYS[d]}</span>
                     <div className="flex items-center gap-1.5">
                       {hasTheme && (
-                        <Button variant="ghost" size="icon" onClick={() => clearDay(d)} disabled={saving} className="h-9 w-9 md:h-7 md:w-7 text-muted-foreground hover:text-rose-500">
+                        <Button variant="ghost" size="icon" aria-label="Limpar dia" onClick={() => clearDay(d)} disabled={saving} className="h-9 w-9 md:h-7 md:w-7 text-muted-foreground hover:text-rose-500">
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       )}
