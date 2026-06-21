@@ -12,6 +12,8 @@ import {
   Keyboard,
   PenLine,
   CornerDownLeft,
+  Shuffle,
+  ArrowLeftRight,
 } from "lucide-react";
 import Link from "next/link";
 import { Flashcard, FlashcardDeck } from "@prisma/client";
@@ -95,6 +97,9 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
   const [typedAnswer, setTypedAnswer] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Estudo invertido: mostra a definição e você lembra o termo (memória nos dois sentidos).
+  const [reverse, setReverse] = useState(false);
+
   // Estatísticas Visuais
   const [stats, setStats] = useState({ again: 0, hard: 0, good: 0, easy: 0 });
 
@@ -115,16 +120,31 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
     } satisfies Record<ReviewRating, string>;
   }, [currentCard]);
 
-  // Vídeos detectados no texto (link do YouTube/Vimeo/MP4 vira player).
-  const frontVideo = useMemo(() => findVideoEmbed(currentCard?.term), [currentCard]);
-  const backVideo = useMemo(() => findVideoEmbed(currentCard?.definition), [currentCard]);
+  // Blocos de conteúdo: a imagem e o vídeo "seguem" seu texto. No estudo
+  // invertido (reverse) a definição vira a pergunta e o termo a resposta.
+  const termBlock = useMemo(
+    () =>
+      currentCard
+        ? { text: currentCard.term, image: currentCard.imageUrl, video: findVideoEmbed(currentCard.term) }
+        : null,
+    [currentCard],
+  );
+  const defBlock = useMemo(
+    () =>
+      currentCard
+        ? { text: currentCard.definition, image: null as string | null, video: findVideoEmbed(currentCard.definition) }
+        : null,
+    [currentCard],
+  );
+  const front = reverse ? defBlock : termBlock;
+  const back = reverse ? termBlock : defBlock;
 
   // Modo Escrita: dica de quão perto a resposta digitada ficou (só auxílio — a
-  // nota final é do usuário). Sugere a nota ao revelar.
+  // nota final é do usuário). Compara com a RESPOSTA (verso atual). Sugere a nota.
   const matchHint = useMemo(() => {
-    if (!written || !currentCard || !typedAnswer.trim()) return null;
-    return matchLevel(typedAnswer, currentCard.definition);
-  }, [written, currentCard, typedAnswer]);
+    if (!written || !back || !typedAnswer.trim()) return null;
+    return matchLevel(typedAnswer, back.text);
+  }, [written, back, typedAnswer]);
   const suggestedRating: ReviewRating | null =
     matchHint === "match" ? "GOOD" : matchHint === "close" ? "HARD" : matchHint === "off" ? "AGAIN" : null;
 
@@ -200,6 +220,26 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
 
   const restartFull = () => {
     window.location.reload(); // O método mais limpo para resetar servidor e cliente juntos aqui
+  };
+
+  // Embaralha só os cartões que ainda VÊM (mantém o atual e os já vistos no lugar).
+  const shuffleRemaining = () => {
+    setQueue((prev) => {
+      const head = prev.slice(0, currentIndex + 1);
+      const tail = prev.slice(currentIndex + 1);
+      for (let i = tail.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [tail[i], tail[j]] = [tail[j], tail[i]];
+      }
+      return [...head, ...tail];
+    });
+  };
+
+  // Inverte termo/definição: volta a mostrar a "pergunta" (verso oculto de novo).
+  const toggleReverse = () => {
+    setReverse((r) => !r);
+    setIsFlipped(false);
+    setTypedAnswer("");
   };
 
   /* -------------------------------------------------------------------------- */
@@ -295,7 +335,25 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
                 </div>
             </div>
 
-            <div className="w-12" /> {/* Spacer */}
+            <div className="flex items-center gap-1.5">
+                <Button
+                    variant="outline" size="icon" onClick={shuffleRemaining}
+                    title="Embaralhar os próximos cartões"
+                    className="h-12 w-12 rounded-xl text-muted-foreground shadow-sm transition-colors hover:text-primary hover:bg-primary/10"
+                >
+                    <Shuffle className="h-5 w-5" />
+                </Button>
+                <Button
+                    variant="outline" size="icon" onClick={toggleReverse}
+                    title={reverse ? "Voltar ao normal (termo → definição)" : "Inverter (definição → termo)"}
+                    className={cn(
+                        "h-12 w-12 rounded-xl shadow-sm transition-colors",
+                        reverse ? "border-primary/40 bg-primary/10 text-primary" : "text-muted-foreground hover:text-primary hover:bg-primary/10",
+                    )}
+                >
+                    <ArrowLeftRight className="h-5 w-5" />
+                </Button>
+            </div>
         </div>
 
         <div className="w-full bg-muted/60 h-2 rounded-full overflow-hidden shadow-inner">
@@ -317,18 +375,18 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
                     <Badge variant="outline" className="absolute top-8 left-8 uppercase tracking-[0.2em] text-[10px] font-black text-muted-foreground border-border/60 px-3 py-1.5">
                         Frente
                     </Badge>
-                    <SpeakButton text={currentCard?.term} className="absolute top-6 right-6" />
+                    <SpeakButton text={front?.text} className="absolute top-6 right-6" />
                     <div className="w-full">
-                        <RichTextDisplay text={currentCard?.term} />
-                        {currentCard?.imageUrl && (
+                        <RichTextDisplay text={front?.text ?? ""} />
+                        {front?.image && (
                             // eslint-disable-next-line @next/next/no-img-element -- base64 local (images.unoptimized)
                             <img
-                                src={currentCard.imageUrl}
+                                src={front.image}
                                 alt="Imagem do cartão"
                                 className="mx-auto mt-5 max-h-[40vh] w-auto rounded-xl border border-border/50 object-contain shadow-sm"
                             />
                         )}
-                        {frontVideo && <VideoEmbed embed={frontVideo} />}
+                        {front?.video && <VideoEmbed embed={front.video} />}
 
                         {/* MODO ESCRITA: digita a resposta antes de revelar. */}
                         {written && !isFlipped && (
@@ -363,7 +421,7 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
                     <Badge variant="outline" className="absolute top-8 left-8 uppercase tracking-[0.2em] text-[10px] font-black border-primary/30 text-primary/80 bg-primary/10 px-3 py-1.5">
                         Verso
                     </Badge>
-                    <SpeakButton text={currentCard?.definition} className="absolute top-6 right-6 text-slate-400 hover:bg-white/10 hover:text-white" />
+                    <SpeakButton text={back?.text} className="absolute top-6 right-6 text-slate-400 hover:bg-white/10 hover:text-white" />
                     <div className="w-full">
                         {/* MODO ESCRITA: o que você digitou + dica de proximidade. */}
                         {written && (
@@ -386,8 +444,16 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
                                 )}
                             </div>
                         )}
-                        <RichTextDisplay text={currentCard?.definition} isDark={true} />
-                        {backVideo && <VideoEmbed embed={backVideo} dark />}
+                        <RichTextDisplay text={back?.text ?? ""} isDark={true} />
+                        {back?.image && (
+                            // eslint-disable-next-line @next/next/no-img-element -- base64 local (images.unoptimized)
+                            <img
+                                src={back.image}
+                                alt="Imagem do cartão"
+                                className="mx-auto mt-5 max-h-[40vh] w-auto rounded-xl border border-slate-700 object-contain shadow-sm"
+                            />
+                        )}
+                        {back?.video && <VideoEmbed embed={back.video} dark />}
                     </div>
                 </div>
             </div>
