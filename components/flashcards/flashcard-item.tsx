@@ -21,7 +21,7 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle,
+  DialogBody,
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
@@ -159,19 +159,10 @@ export function FlashcardItem({ card, index, total, deckId }: FlashcardItemProps
       {/* DIALOG DE EDIÇÃO */}
       {/* -------------------------------------------------------- */}
       <Dialog open={isEditing} onOpenChange={setIsEditing}>
-        <DialogContent className="sm:max-w-xl p-0 overflow-hidden border-border/60 shadow-2xl rounded-2xl">
-          <div className="p-6 border-b border-border/40 bg-muted/10">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2 text-xl font-bold">
-                  <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                    <Edit2 className="h-5 w-5" />
-                  </div>
-                  Editar Cartão #{(total - index).toString().padStart(2, "0")}
-                </DialogTitle>
-              </DialogHeader>
-          </div>
+        <DialogContent size="lg">
+          <DialogHeader icon={<Edit2 />} title={`Editar cartão #${(total - index).toString().padStart(2, "0")}`} />
 
-          <div className="p-6 space-y-6 bg-background">
+          <DialogBody className="space-y-6">
             <div className="space-y-2">
               <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Frente (Pergunta)</Label>
               <Input 
@@ -194,9 +185,9 @@ export function FlashcardItem({ card, index, total, deckId }: FlashcardItemProps
               <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Imagem (opcional)</Label>
               <ImagePaster defaultValue={imageUrl} onImageChange={setImageUrl} />
             </div>
-          </div>
+          </DialogBody>
 
-          <DialogFooter className="p-4 bg-muted/10 border-t border-border/40 flex justify-end gap-3 shrink-0">
+          <DialogFooter>
             <Button variant="ghost" onClick={() => setIsEditing(false)} className="hover:bg-muted/50">
               Cancelar
             </Button>
