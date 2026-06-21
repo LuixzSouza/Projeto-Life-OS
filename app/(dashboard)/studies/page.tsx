@@ -11,6 +11,7 @@ import { GamificationHero } from "@/components/studies/gamification-hero";
 import { StudyAnalytics } from "@/components/studies/study-analytics";
 import { DailyReviewBanner } from "@/components/studies/daily-review-banner";
 import { CreateSubjectButton } from "@/components/studies/create-subject-button";
+import { StudyHeatmap } from "@/components/studies/study-heatmap";
 import { formatHours } from "@/components/studies/studies-helpers";
 import { buildDailyActivity, computeStudyStats, type SessionLite, type DailyPoint, type StudyStats } from "@/lib/studies-math";
 import { computeElo, sessionsToDays, type EloResult } from "@/lib/studies-elo";
@@ -67,6 +68,9 @@ export default async function StudiesPage() {
   let totalFlashcards = 0;
   // Vencidos por matéria (revisão por matéria nos cards de matéria).
   const dueBySubject = new Map<string, number>();
+
+  // Heatmap de constância: minutos por dia (reusa o histórico do ELO).
+  const heatmapData: Record<string, number> = {};
 
   let subjectsWithStats: SubjectWithStats[] = [];
   let dailyActivity: DailyPoint[] = [];
@@ -188,6 +192,13 @@ export default async function StudiesPage() {
     // agora é o ELO (PDL com decaimento — lib/studies-elo.ts).
     totalXP = totalMinutes * 10;
     elo = computeElo(sessionsToDays(eloSessions ?? []));
+
+    // Minutos por dia para o heatmap (chave ISO local YYYY-MM-DD).
+    for (const s of eloSessions ?? []) {
+      const d = new Date(s.date);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      heatmapData[key] = (heatmapData[key] ?? 0) + (s.durationMinutes ?? 0);
+    }
 
     totalHours = formatHours(totalMinutes);
     hasActivity = totalSessions > 0;
@@ -313,6 +324,9 @@ export default async function StudiesPage() {
             </CardContent>
           </Card>
         </section>
+
+        {/* CONSTÂNCIA: heatmap dos últimos meses (regularidade > intensidade) */}
+        {hasActivity && <StudyHeatmap data={heatmapData} streak={studyStats.streak} />}
 
         {/* ANÁLISE: KPIs de cadência + gráfico (no fim, sem competir com o foco) */}
         {hasActivity && <StudyAnalytics daily={dailyActivity} stats={studyStats} />}
