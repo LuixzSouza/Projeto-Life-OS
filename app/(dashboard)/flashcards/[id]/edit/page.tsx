@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { FlashcardItem } from "@/components/flashcards/flashcard-item"; // IMPORT NOVO
+import { AiDeckGenerator } from "@/components/flashcards/ai-deck-generator";
+import { CardImageField } from "@/components/flashcards/card-image-field";
 import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
 
 /* Tipagem correta para App Router */
@@ -128,6 +130,9 @@ export default async function DeckEditPage({ params }: DeckEditPageProps) {
             
             {/* COLUNA ESQUERDA: FORMULÁRIO (Sticky) */}
             <aside className="lg:sticky lg:top-8 order-2 lg:order-1 space-y-6">
+                {/* Caminho rápido: a IA preenche o baralho a partir de um tema/texto. */}
+                <AiDeckGenerator deckId={deck.id} />
+
                 <Card className="border-primary/20 shadow-lg shadow-primary/5 overflow-hidden">
                     <div className="h-1.5 w-full bg-gradient-to-r from-primary via-primary/60 to-primary/20" />
                     
@@ -163,6 +168,8 @@ export default async function DeckEditPage({ params }: DeckEditPageProps) {
                                     className="min-h-[120px] resize-none bg-background focus:ring-primary/20 border-border/60 leading-relaxed"
                                 />
                             </div>
+
+                            <CardImageField />
 
                             <Button type="submit" className="w-full font-semibold shadow-sm" variant="secondary">
                                 Adicionar à pilha <ArrowRight className="ml-2 h-4 w-4 opacity-50" />

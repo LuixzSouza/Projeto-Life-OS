@@ -85,6 +85,18 @@ const SUBJECT_COLORS = [
 const minutesToHours = (minutes: number) => minutes / 60;
 const hoursToMinutes = (hours: number) => Math.round(hours * 60);
 
+// Texto legível (preto/branco) sobre uma cor de fundo — corrige o botão de
+// salvar, que tinha `text-white` fixo e sumia em cores claras (âmbar, teal).
+function readableTextOn(hex: string): string {
+  const h = hex.replace("#", "");
+  if (h.length < 6) return "#ffffff";
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6 ? "#1a1a1a" : "#ffffff";
+}
+
 export function SubjectFormDialog({
   open,
   onClose,
@@ -206,44 +218,55 @@ export function SubjectFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent className="sm:max-w-md bg-background border-border/60 shadow-2xl p-0 overflow-hidden rounded-2xl">
-        
-        {/* HEADER COM COR DINÂMICA */}
-        <div className="p-6 pb-4 border-b border-border/40" style={{ backgroundColor: `${color}15` }}>
-            <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl font-bold" style={{ color: color }}>
-                <div className="p-2 rounded-xl bg-background shadow-sm border border-border/50">
-                    {isEditing ? <HashIcon className="w-5 h-5" /> : <FolderTree className="w-5 h-5" />}
-                </div>
-                {isEditing ? `Editar Tópico` : "Novo Tópico"}
-            </DialogTitle>
-            <DialogDescription className="text-foreground/60">
-                {isEditing ? "Ajuste os detalhes desta matéria." : "Crie uma nova matéria raiz ou subtópico de estudos."}
-            </DialogDescription>
-            </DialogHeader>
-        </div>
+      <DialogContent className="gap-0 overflow-hidden rounded-2xl border-border/60 p-0 shadow-2xl sm:max-w-md">
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6" noValidate>
-          
-          <div className="space-y-2">
-            <Label htmlFor="subject-title" className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-              Título da Matéria <span className="text-red-500">*</span>
+        {/* Barra de acento na cor escolhida (identidade sem fundo pesado). */}
+        <div
+          className="h-1.5 w-full transition-colors"
+          style={{ background: `linear-gradient(90deg, ${color}, ${color}66)` }}
+        />
+
+        {/* HEADER com PRÉVIA AO VIVO da matéria (avatar reflete ícone + cor). */}
+        <DialogHeader className="space-y-0 px-6 pb-4 pt-5 text-left">
+          <div className="flex items-center gap-3">
+            <div
+              className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl text-2xl transition-colors"
+              style={{ backgroundColor: `${color}1f`, color, boxShadow: `inset 0 0 0 1px ${color}33` }}
+            >
+              {icon ? <span className="leading-none">{icon}</span> : <FolderTree className="h-5 w-5" />}
+            </div>
+            <div className="min-w-0">
+              <DialogTitle className="truncate text-lg font-bold leading-tight">
+                {title.trim() || (isEditing ? "Editar tópico" : "Novo tópico")}
+              </DialogTitle>
+              <DialogDescription className="text-xs text-muted-foreground">
+                {isEditing ? "Ajuste os detalhes desta matéria." : "Crie uma matéria raiz ou um subtópico."}
+              </DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-5 px-6 pb-6" noValidate>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="subject-title" className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              Título da matéria <span className="text-destructive">*</span>
             </Label>
             <Input
               id="subject-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ex: React Query, Cálculo I, Inglês..."
+              placeholder="Ex: React Query, Cálculo I, Inglês…"
               autoFocus
-              className={cn("h-11 text-base bg-muted/20 focus-visible:ring-1", errors.title && "border-destructive focus-visible:ring-destructive")}
+              className={cn("h-11 bg-muted/30 text-base focus-visible:ring-1", errors.title && "border-destructive focus-visible:ring-destructive")}
             />
-            {errors.title && <p className="text-xs text-destructive mt-1 font-medium">{errors.title}</p>}
+            {errors.title && <p className="text-xs font-medium text-destructive">{errors.title}</p>}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <FolderTree className="h-3.5 w-3.5" /> Pertence a...
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <FolderTree className="h-3.5 w-3.5" /> Pertence a
               </Label>
               {/* Combobox com busca: com muitas matérias raiz, achar o pai é digitar */}
               <SubjectCombobox
@@ -251,67 +274,70 @@ export function SubjectFormDialog({
                 value={parentId}
                 onChange={setParentId}
                 allowRoot
-                className="h-10 bg-muted/20"
+                className="h-10 bg-muted/30"
               />
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 <HashIcon className="h-3.5 w-3.5" /> Categoria
               </Label>
-              <Input 
-                value={category} 
-                onChange={(e) => setCategory(e.target.value)} 
-                placeholder="Ex: Tecnologia" 
-                className="bg-muted/20 h-10"
+              <Input
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                placeholder="Ex: Tecnologia"
+                className="h-10 bg-muted/30"
               />
             </div>
           </div>
 
-          {/* SELETOR DE CORES E EMOJI */}
-          <div className="grid grid-cols-5 gap-4">
-            <div className="col-span-1 space-y-2">
-                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block text-center">Ícone</Label>
-                <Input
-                    value={icon}
-                    onChange={(e) => setIcon(e.target.value)}
-                    placeholder="⚛️"
-                    className="h-10 text-center text-xl bg-muted/20 p-0"
-                />
-            </div>
-            
-            <div className="col-span-4 space-y-2">
-                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    <Palette className="h-3.5 w-3.5" /> Cor da Matéria
-                </Label>
-                <div className="flex flex-wrap gap-2 pt-1">
-                    {SUBJECT_COLORS.map((c) => (
-                        <button
-                            key={c.hex}
-                            type="button"
-                            onClick={() => setColor(c.hex)}
-                            className={cn(
-                                "h-8 w-8 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 shadow-sm",
-                                // 🟢 CORREÇÃO: Usando outline nativo em vez de ring do tailwind
-                                color === c.hex ? "outline outline-2 outline-offset-2 scale-110" : "opacity-80 hover:opacity-100"
-                            )}
-                            style={{ backgroundColor: c.hex, outlineColor: c.hex }}
-                            title={c.name}
-                        >
-                            {color === c.hex && <Check className="h-4 w-4 text-white drop-shadow-md" />}
-                        </button>
-                    ))}
-                </div>
+          {/* ÍCONE + COR numa linha só, alinhados (era um grid de 5 col. torto). */}
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              <Palette className="h-3.5 w-3.5" /> Ícone & cor
+            </Label>
+            <div className="flex items-center gap-3">
+              <Input
+                value={icon}
+                onChange={(e) => setIcon(e.target.value)}
+                placeholder="⚛️"
+                aria-label="Emoji do ícone"
+                className="h-10 w-12 shrink-0 bg-muted/30 p-0 text-center text-xl"
+              />
+              <div className="flex flex-1 flex-wrap gap-2">
+                {SUBJECT_COLORS.map((c) => {
+                  const selected = color === c.hex;
+                  return (
+                    <button
+                      key={c.hex}
+                      type="button"
+                      onClick={() => setColor(c.hex)}
+                      className="grid h-8 w-8 place-items-center rounded-full transition-transform hover:scale-110 active:scale-95"
+                      style={{
+                        backgroundColor: c.hex,
+                        // Anel offset na própria cor, lendo o fundo do modal — limpo
+                        // e sem depender das vars de ring do Tailwind.
+                        boxShadow: selected ? `0 0 0 2px hsl(var(--background)), 0 0 0 4px ${c.hex}` : undefined,
+                      }}
+                      title={c.name}
+                      aria-label={`Cor ${c.name}`}
+                      aria-pressed={selected}
+                    >
+                      {selected && <Check className="h-4 w-4 text-white drop-shadow" />}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
           <div className="h-px bg-border/50" />
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                <span className="flex items-center gap-1.5"><Target className="h-3.5 w-3.5" /> Meta Total</span>
-                <span className="text-[10px] lowercase text-muted-foreground font-normal">{hoursToMinutes(goalHours)} min</span>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                <span className="flex items-center gap-1.5"><Target className="h-3.5 w-3.5" /> Meta total</span>
+                <span className="text-[10px] font-normal lowercase text-muted-foreground/70">{hoursToMinutes(goalHours)} min</span>
               </Label>
               <div className="relative">
                 <Input
@@ -320,18 +346,19 @@ export function SubjectFormDialog({
                   step={1}
                   value={goalHours}
                   onChange={handleGoalHoursChange}
-                  className={cn("font-bold text-base pr-8 bg-muted/20 h-10", errors.goalHours && "border-destructive")}
+                  className={cn("h-10 bg-muted/30 pr-8 text-base font-bold", errors.goalHours && "border-destructive")}
                 />
-                <span className="absolute right-3 top-2.5 text-sm text-muted-foreground font-bold">h</span>
+                <span className="absolute right-3 top-2.5 text-sm font-bold text-muted-foreground">h</span>
               </div>
+              {errors.goalHours && <p className="text-xs font-medium text-destructive">{errors.goalHours}</p>}
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 <Gauge className="h-3.5 w-3.5" /> Dificuldade
               </Label>
               <Select value={difficulty} onValueChange={setDifficulty}>
-                <SelectTrigger className="bg-muted/20 h-10">
+                <SelectTrigger className="h-10 bg-muted/30">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -345,18 +372,18 @@ export function SubjectFormDialog({
             </div>
           </div>
 
-          <DialogFooter className="pt-4 mt-2">
+          <DialogFooter className="gap-2 pt-2 sm:gap-2">
             <Button type="button" variant="ghost" onClick={handleClose} disabled={isSubmitting} className="hover:bg-muted/50">
               Cancelar
             </Button>
             <Button
               type="submit"
               disabled={isSubmitting}
-              className="shadow-lg min-w-[140px] text-white"
-              style={{ backgroundColor: color }}
+              className="min-w-[150px] shadow-sm transition-opacity hover:opacity-90"
+              style={{ backgroundColor: color, color: readableTextOn(color) }}
             >
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              {isEditing ? "Salvar Alterações" : "Criar Tópico"}
+              {isEditing ? "Salvar alterações" : "Criar tópico"}
             </Button>
           </DialogFooter>
         </form>

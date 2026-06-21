@@ -13,14 +13,51 @@ import { runOneShotAi } from "@/app/(dashboard)/ai/actions/oneshot";
    ============================================================================ */
 
 const FLASHCARD_SYSTEM =
-  "Você gera flashcards de estudo. A partir da nota fornecida, devolva APENAS um array JSON " +
+  "Você gera flashcards de estudo. A partir do conteúdo fornecido (um tema OU um texto), devolva APENAS um array JSON " +
   '(sem cercas) de no máximo N cards: [{"term":"pergunta/conceito curto","definition":"resposta objetiva"}]. ' +
   "Cards devem testar entendimento (não cópia literal), em PT-BR, curtos e autossuficientes.";
 
 interface RawCard { term?: unknown; definition?: unknown }
 
-export async function generateFlashcards(userId: string, noteId: string, count = 8): Promise<Record<string, unknown>> {
+export interface AiCardsResult {
+  cards?: { term: string; definition: string }[];
+  erro?: string;
+}
+
+/**
+ * Núcleo reutilizável: pede à IA e devolve cards já validados (ou um erro).
+ * Serve tanto para `generateFlashcards` (a partir de uma nota) quanto para a
+ * geração direta num baralho a partir de um tema/texto colado
+ * (app/(dashboard)/flashcards/actions.ts > generateDeckCardsWithAi). Não toca o
+ * banco — quem chama decide onde gravar.
+ */
+export async function aiCardsFromText(userId: string, title: string, source: string, count = 8): Promise<AiCardsResult> {
   const n = Math.min(Math.max(Math.floor(count), 3), 15);
+  const plain = source.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 6000);
+  if (plain.length < 12) return { erro: "Conteúdo curto demais para gerar flashcards." };
+
+  const raw = await runOneShotAi(
+    userId,
+    FLASHCARD_SYSTEM.replace("N", String(n)),
+    `Tema/Conteúdo "${title}":\n\n${plain}`
+  );
+  if (!raw) return { erro: "A IA não está conectada — flashcards automáticos precisam dela. Configure em Configurações → IA." };
+
+  try {
+    const fenced = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+    const match = fenced.match(/\[[\s\S]*\]/);
+    const parsed = JSON.parse(match ? match[0] : fenced) as RawCard[];
+    const cards = parsed
+      .filter((c): c is { term: string; definition: string } => typeof c.term === "string" && typeof c.definition === "string" && !!c.term.trim() && !!c.definition.trim())
+      .slice(0, n)
+      .map((c) => ({ term: c.term.trim().slice(0, 300), definition: c.definition.trim().slice(0, 600) }));
+    return { cards };
+  } catch {
+    return { erro: "A IA respondeu num formato inesperado. Tente de novo." };
+  }
+}
+
+export async function generateFlashcards(userId: string, noteId: string, count = 8): Promise<Record<string, unknown>> {
   const note = await prisma.studyNote.findFirst({
     where: { id: noteId, userId },
     select: { id: true, title: true, content: true, notebook: { select: { name: true } } },
@@ -30,25 +67,9 @@ export async function generateFlashcards(userId: string, noteId: string, count =
   const plain = note.content.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 6000);
   if (plain.length < 40) return { erro: "A nota é curta demais para gerar flashcards." };
 
-  const raw = await runOneShotAi(
-    userId,
-    FLASHCARD_SYSTEM.replace("N", String(n)),
-    `Nota "${note.title}":\n\n${plain}`
-  );
-  if (!raw) return { erro: "A IA não está conectada — flashcards automáticos precisam dela. Configure em Configurações → IA." };
-
-  let cards: { term: string; definition: string }[] = [];
-  try {
-    const fenced = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-    const match = fenced.match(/\[[\s\S]*\]/);
-    const parsed = JSON.parse(match ? match[0] : fenced) as RawCard[];
-    cards = parsed
-      .filter((c): c is { term: string; definition: string } => typeof c.term === "string" && typeof c.definition === "string" && !!c.term.trim() && !!c.definition.trim())
-      .slice(0, n)
-      .map((c) => ({ term: c.term.trim().slice(0, 300), definition: c.definition.trim().slice(0, 600) }));
-  } catch {
-    return { erro: "A IA respondeu num formato inesperado. Tente de novo." };
-  }
+  const result = await aiCardsFromText(userId, note.title, plain, count);
+  if (result.erro) return { erro: result.erro };
+  const cards = result.cards ?? [];
   if (cards.length === 0) return { erro: "Nenhum card aproveitável foi gerado. Tente uma nota com mais conteúdo." };
 
   // Reusa o deck da nota (mesmo título) ou cria um novo.

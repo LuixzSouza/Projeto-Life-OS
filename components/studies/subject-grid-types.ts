@@ -4,6 +4,8 @@ export interface RichSubject extends StudySubject {
   totalMinutes: number;
   sessionCount?: number;
   lastStudied?: Date | string | null;
+  /** Cartões vencidos nos baralhos ligados a esta matéria (revisão por matéria). */
+  dueFlashcards?: number;
 }
 
 export interface SubjectListProps {

@@ -412,6 +412,29 @@ export async function getAgendaItems(rangeStart: Date, rangeEnd: Date, forUserId
     const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
     reviewsByDay.set(key, (reviewsByDay.get(key) ?? 0) + 1);
   }
+
+  // Atrasados (vencidos antes da janela) e novos (nextReview nula) são "para
+  // revisar AGORA" — rolam para o balde de HOJE quando a janela começa hoje
+  // (dashboard, feed pra frente). Sem isto, o resumo do dashboard contava só os
+  // que vencem exatamente hoje e escondia a fila real (atrasados + novos). Em
+  // visões de calendário que começam no passado, não mexemos. Intervalos
+  // disjuntos (< rangeStart vs. o `range` gte/lte) → sem dupla contagem.
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
+  const windowStartsToday =
+    rangeStart.getTime() >= startOfToday.getTime() && rangeStart.getTime() <= endOfToday.getTime();
+  if (windowStartsToday) {
+    const backlog = await prisma.flashcard.count({
+      where: { userId, OR: [{ nextReview: null }, { nextReview: { lt: rangeStart } }] },
+    });
+    if (backlog > 0) {
+      const tk = `${startOfToday.getFullYear()}-${startOfToday.getMonth()}-${startOfToday.getDate()}`;
+      reviewsByDay.set(tk, (reviewsByDay.get(tk) ?? 0) + backlog);
+    }
+  }
+
   for (const [key, count] of reviewsByDay) {
     const [yy, mm, dd] = key.split("-").map(Number);
     const occ = new Date(yy, mm, dd, 12, 0, 0);

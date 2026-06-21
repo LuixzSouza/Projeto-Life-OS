@@ -7,9 +7,10 @@
 // espremia o layout em colunas estreitas.
 
 import React, { useMemo } from "react";
+import Link from "next/link";
 import { StudySubject } from "@prisma/client";
 import {
-  MoreVertical, Edit, Trash2, BookOpen, Folder, CheckCircle2, Play,
+  MoreVertical, Edit, Trash2, BookOpen, Folder, CheckCircle2, Play, Zap,
 } from "lucide-react";
 
 import {
@@ -33,6 +34,8 @@ export interface RichSubject extends StudySubject {
   totalMinutes: number;
   sessionCount?: number;
   lastStudied?: Date | string | null;
+  /** Cartões vencidos nos baralhos desta matéria (revisão por matéria). */
+  dueFlashcards?: number;
 }
 
 interface SubjectCardProps {
@@ -165,9 +168,11 @@ export function SubjectCard({
     };
   }, [subject]);
 
+  const due = subject.dueFlashcards ?? 0;
+
   const handleCardClick: React.MouseEventHandler = (e) => {
     const t = e.target as HTMLElement;
-    if (t.closest("button") || t.closest("[role='menuitem']")) return;
+    if (t.closest("button") || t.closest("a") || t.closest("[role='menuitem']")) return;
     onDetailsClick(subject.id);
   };
 
@@ -185,6 +190,7 @@ export function SubjectCard({
         <Button
           variant="ghost"
           size="icon"
+          aria-label="Mais ações"
           className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
           onClick={(e) => e.stopPropagation()}
         >
@@ -247,6 +253,8 @@ export function SubjectCard({
             </span>
           </div>
 
+          {due > 0 && <ReviewPill subjectId={subject.id} due={due} />}
+
           <Button
             size="sm"
             variant="outline"
@@ -290,6 +298,7 @@ export function SubjectCard({
           </ProgressRing>
 
           <div className="flex items-center gap-1">
+            {due > 0 && <ReviewPill subjectId={subject.id} due={due} />}
             <Button
               size="sm"
               variant="outline"
@@ -348,6 +357,20 @@ export function SubjectCard({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+/** Atalho de revisão por matéria: leva à fila filtrada (/flashcards/review?subject=). */
+function ReviewPill({ subjectId, due }: { subjectId: string; due: number }) {
+  return (
+    <Link
+      href={`/flashcards/review?subject=${subjectId}`}
+      onClick={(e) => e.stopPropagation()}
+      title={`Revisar ${due} ${due === 1 ? "cartão vencido" : "cartões vencidos"} desta matéria`}
+      className="flex h-8 shrink-0 items-center gap-1 rounded-lg border border-primary/30 bg-primary/10 px-2.5 text-[10px] font-black uppercase tracking-wider text-primary transition-colors hover:bg-primary/20"
+    >
+      <Zap className="h-3 w-3" /> {due}
+    </Link>
   );
 }
 

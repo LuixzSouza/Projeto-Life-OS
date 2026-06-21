@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Repeat,
@@ -15,6 +15,7 @@ import { Flashcard, FlashcardDeck } from "@prisma/client";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { reviewFlashcard } from "@/app/(dashboard)/flashcards/actions"; // O servidor que alimenta a IA de revisão
+import { previewLabel, type ReviewRating } from "@/lib/srs";
 
 /* -------------------------------------------------------------------------- */
 /* TYPES                                                                      */
@@ -25,8 +26,6 @@ interface StudySessionProps {
   deck: Pick<FlashcardDeck, "title">;
   cards: Flashcard[];
 }
-
-type ReviewRating = "AGAIN" | "HARD" | "GOOD" | "EASY";
 
 /* -------------------------------------------------------------------------- */
 /* UTILS (Renderização de Texto)                                              */
@@ -88,6 +87,20 @@ export function StudySession({ deck, cards: initialCards }: StudySessionProps) {
   const currentCard = queue[currentIndex];
   const progress = queue.length > 0 ? ((currentIndex) / queue.length) * 100 : 0;
 
+  // Prévia do intervalo de cada nota ("Errei · 10 min", "Bom · 4 dias"). Usa o
+  // MESMO motor (lib/srs.ts) que o servidor grava — a prévia nunca mente. Fixa o
+  // `now` por cartão para os 4 rótulos saírem do mesmo instante.
+  const previews = useMemo(() => {
+    if (!currentCard) return null;
+    const now = new Date();
+    return {
+      AGAIN: previewLabel(currentCard, "AGAIN", now),
+      HARD: previewLabel(currentCard, "HARD", now),
+      GOOD: previewLabel(currentCard, "GOOD", now),
+      EASY: previewLabel(currentCard, "EASY", now),
+    } satisfies Record<ReviewRating, string>;
+  }, [currentCard]);
+
   // --- ATALHOS DE TECLADO ---
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (isFinished || isSaving) return;
@@ -123,19 +136,24 @@ export function StudySession({ deck, cards: initialCards }: StudySessionProps) {
     // 2. Registra no Servidor
     await reviewFlashcard(currentCard.id, rating);
 
-    // 3. Se errou (AGAIN), joga para o fim da fila para forçar revisão na mesma sessão
+    // 3. Reaprendizado: se errou, o cartão volta algumas posições à frente (não
+    // no fim) — reforça ainda nesta sessão, mas sem reaparecer na cara.
+    let nextQueue = queue;
     if (rating === "AGAIN") {
-      setQueue((prev) => [...prev, currentCard]);
+      const insertAt = Math.min(currentIndex + 4, queue.length);
+      nextQueue = [...queue.slice(0, insertAt), currentCard, ...queue.slice(insertAt)];
+      setQueue(nextQueue);
     }
 
-    // 4. Próxima Carta
-    if (currentIndex + 1 >= queue.length) {
+    // 4. Avança ou encerra. Usa o tamanho da fila JÁ atualizada — senão errar a
+    // última carta encerraria a sessão sem reaprendê-la.
+    if (currentIndex + 1 >= nextQueue.length) {
       setIsFinished(true);
     } else {
       setIsFlipped(false);
       setTimeout(() => setCurrentIndex((prev) => prev + 1), 150); // Timeout leve para animação 3D
     }
-    
+
     setIsSaving(false);
   };
 
@@ -253,6 +271,14 @@ export function StudySession({ deck, cards: initialCards }: StudySessionProps) {
                     </Badge>
                     <div className="w-full">
                         <RichTextDisplay text={currentCard?.term} />
+                        {currentCard?.imageUrl && (
+                            // eslint-disable-next-line @next/next/no-img-element -- base64 local (images.unoptimized)
+                            <img
+                                src={currentCard.imageUrl}
+                                alt="Imagem do cartão"
+                                className="mx-auto mt-5 max-h-[40vh] w-auto rounded-xl border border-border/50 object-contain shadow-sm"
+                            />
+                        )}
                     </div>
                     {!isFlipped && (
                         <div className="absolute bottom-8 sm:bottom-12 left-0 right-0 flex justify-center animate-pulse">
@@ -279,24 +305,28 @@ export function StudySession({ deck, cards: initialCards }: StudySessionProps) {
         <div className={cn("mt-8 sm:mt-10 shrink-0 transition-all duration-500 w-full max-w-3xl mx-auto", isFlipped ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8 pointer-events-none')}>
             <div className="flex flex-wrap justify-center gap-3 sm:gap-4 pb-4">
                 
-                <Button size="lg" disabled={isSaving} onClick={() => handleRate("AGAIN")} className="flex-1 h-20 sm:h-24 rounded-[1.5rem] bg-rose-500/10 text-rose-600 hover:bg-rose-500 hover:text-white border border-rose-500/20 font-bold transition-all hover:scale-105 active:scale-95 flex flex-col gap-1 shadow-sm">
+                <Button size="lg" disabled={isSaving} onClick={() => handleRate("AGAIN")} className="flex-1 h-20 sm:h-24 rounded-[1.5rem] bg-rose-500/10 text-rose-600 hover:bg-rose-500 hover:text-white border border-rose-500/20 font-bold transition-all hover:scale-105 active:scale-95 flex flex-col gap-0.5 shadow-sm">
                   <span className="text-base sm:text-lg">Errei</span>
-                  <span className="text-[10px] opacity-70 font-mono hidden sm:block tracking-widest mt-1">Aperte 1</span>
-                </Button>
-                
-                <Button size="lg" disabled={isSaving} onClick={() => handleRate("HARD")} className="flex-1 h-20 sm:h-24 rounded-[1.5rem] bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white border border-amber-500/20 font-bold transition-all hover:scale-105 active:scale-95 flex flex-col gap-1 shadow-sm">
-                  <span className="text-base sm:text-lg">Difícil</span>
-                  <span className="text-[10px] opacity-70 font-mono hidden sm:block tracking-widest mt-1">Aperte 2</span>
-                </Button>
-                
-                <Button size="lg" disabled={isSaving} onClick={() => handleRate("GOOD")} className="flex-1 h-20 sm:h-24 rounded-[1.5rem] bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500 hover:text-white border border-emerald-500/20 font-bold transition-all hover:scale-105 active:scale-95 flex flex-col gap-1 shadow-sm">
-                  <span className="text-base sm:text-lg">Bom</span>
-                  <span className="text-[10px] opacity-70 font-mono hidden sm:block tracking-widest mt-1">Aperte 3</span>
+                  <span className="text-[11px] font-bold opacity-90 tabular-nums">{previews?.AGAIN}</span>
+                  <span className="text-[9px] opacity-50 font-mono hidden sm:block tracking-widest">tecla 1</span>
                 </Button>
 
-                <Button size="lg" disabled={isSaving} onClick={() => handleRate("EASY")} className="flex-1 h-20 sm:h-24 rounded-[1.5rem] bg-blue-500/10 text-blue-600 hover:bg-blue-500 hover:text-white border border-blue-500/20 font-bold transition-all hover:scale-105 active:scale-95 flex flex-col gap-1 shadow-sm">
+                <Button size="lg" disabled={isSaving} onClick={() => handleRate("HARD")} className="flex-1 h-20 sm:h-24 rounded-[1.5rem] bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white border border-amber-500/20 font-bold transition-all hover:scale-105 active:scale-95 flex flex-col gap-0.5 shadow-sm">
+                  <span className="text-base sm:text-lg">Difícil</span>
+                  <span className="text-[11px] font-bold opacity-90 tabular-nums">{previews?.HARD}</span>
+                  <span className="text-[9px] opacity-50 font-mono hidden sm:block tracking-widest">tecla 2</span>
+                </Button>
+
+                <Button size="lg" disabled={isSaving} onClick={() => handleRate("GOOD")} className="flex-1 h-20 sm:h-24 rounded-[1.5rem] bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500 hover:text-white border border-emerald-500/20 font-bold transition-all hover:scale-105 active:scale-95 flex flex-col gap-0.5 shadow-sm">
+                  <span className="text-base sm:text-lg">Bom</span>
+                  <span className="text-[11px] font-bold opacity-90 tabular-nums">{previews?.GOOD}</span>
+                  <span className="text-[9px] opacity-50 font-mono hidden sm:block tracking-widest">tecla 3</span>
+                </Button>
+
+                <Button size="lg" disabled={isSaving} onClick={() => handleRate("EASY")} className="flex-1 h-20 sm:h-24 rounded-[1.5rem] bg-blue-500/10 text-blue-600 hover:bg-blue-500 hover:text-white border border-blue-500/20 font-bold transition-all hover:scale-105 active:scale-95 flex flex-col gap-0.5 shadow-sm">
                   <span className="text-base sm:text-lg">Fácil</span>
-                  <span className="text-[10px] opacity-70 font-mono hidden sm:block tracking-widest mt-1">Aperte 4</span>
+                  <span className="text-[11px] font-bold opacity-90 tabular-nums">{previews?.EASY}</span>
+                  <span className="text-[9px] opacity-50 font-mono hidden sm:block tracking-widest">tecla 4</span>
                 </Button>
 
             </div>

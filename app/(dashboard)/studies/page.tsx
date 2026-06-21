@@ -9,6 +9,8 @@ import { SessionHistoryDialog } from "@/components/studies/session-history-dialo
 import { SubjectGrid } from "@/components/studies/subject-grid";
 import { GamificationHero } from "@/components/studies/gamification-hero";
 import { StudyAnalytics } from "@/components/studies/study-analytics";
+import { DailyReviewBanner } from "@/components/studies/daily-review-banner";
+import { CreateSubjectButton } from "@/components/studies/create-subject-button";
 import { formatHours } from "@/components/studies/studies-helpers";
 import { buildDailyActivity, computeStudyStats, type SessionLite, type DailyPoint, type StudyStats } from "@/lib/studies-math";
 import { computeElo, sessionsToDays, type EloResult } from "@/lib/studies-elo";
@@ -35,6 +37,7 @@ export interface SubjectWithStats extends StudySubject {
   totalMinutes: number;
   sessionCount: number;
   lastStudied: Date | null;
+  dueFlashcards: number;
 }
 
 // Payload de sessão com subject incluído
@@ -59,6 +62,12 @@ export default async function StudiesPage() {
   let totalHours = "0.0";
   let hasActivity = false;
 
+  // Revisão de flashcards (conecta o foco à memória de longo prazo).
+  let dueFlashcards = 0;
+  let totalFlashcards = 0;
+  // Vencidos por matéria (revisão por matéria nos cards de matéria).
+  const dueBySubject = new Map<string, number>();
+
   let subjectsWithStats: SubjectWithStats[] = [];
   let dailyActivity: DailyPoint[] = [];
   let studyStats: StudyStats = {
@@ -75,7 +84,10 @@ export default async function StudiesPage() {
     activityWindowStart.setHours(0, 0, 0, 0);
 
     // Carrega em paralelo: matérias, sessões recentes, estatísticas, tempo agrupado e atividade.
-    const [subjectsData, recentSessionsData, statsData, aggregatedTimeData, lastStudiedData, activitySessions, eloSessions] =
+    // "Agora" para a fila de revisão (cartões vencidos = nextReview nula ou no passado).
+    const reviewNow = new Date();
+
+    const [subjectsData, recentSessionsData, statsData, aggregatedTimeData, lastStudiedData, activitySessions, eloSessions, dueFlashcardsCount, totalFlashcardsCount, decksWithDueData] =
       await Promise.all([
         prisma.studySubject.findMany({
           where: { userId },
@@ -129,7 +141,38 @@ export default async function StudiesPage() {
           orderBy: { date: "asc" },
           take: 20000,
         }),
+
+        // Cartões vencidos hoje (mesma regra do /flashcards/review): nextReview
+        // nula (cartão novo) ou no passado. `count` é barato — não carrega o acervo.
+        prisma.flashcard.count({
+          where: { userId, OR: [{ nextReview: null }, { nextReview: { lte: reviewNow } }] },
+        }),
+
+        // Total de cartões — distingue "tudo em dia" de "ainda não tem flashcard".
+        prisma.flashcard.count({ where: { userId } }),
+
+        // Vencidos POR matéria: baralhos ligados a uma matéria + seus cartões
+        // devidos. Escala pessoal (poucos baralhos) → carregar os ids é barato.
+        prisma.flashcardDeck.findMany({
+          where: { userId, studySubjectId: { not: null } },
+          select: {
+            studySubjectId: true,
+            cards: {
+              where: { OR: [{ nextReview: null }, { nextReview: { lte: reviewNow } }] },
+              select: { id: true },
+            },
+          },
+        }),
       ]);
+
+    dueFlashcards = dueFlashcardsCount ?? 0;
+    totalFlashcards = totalFlashcardsCount ?? 0;
+
+    // Mapa matéria → nº de cartões vencidos (soma de todos os baralhos da matéria).
+    for (const d of decksWithDueData ?? []) {
+      if (!d.studySubjectId) continue;
+      dueBySubject.set(d.studySubjectId, (dueBySubject.get(d.studySubjectId) ?? 0) + d.cards.length);
+    }
 
     // Mapa subjectId → última data estudada (substitui o _max do groupBy).
     const lastStudiedMap = new Map<string, Date>(
@@ -167,6 +210,7 @@ export default async function StudiesPage() {
         totalMinutes: st?.minutes ?? 0,
         sessionCount: st?.count ?? 0,
         lastStudied: st?.last ?? null,
+        dueFlashcards: dueBySubject.get(s.id) ?? 0,
       };
     });
 
@@ -215,6 +259,9 @@ export default async function StudiesPage() {
       />
 
       <PageContainer className="space-y-8">
+        {/* REVISÃO DO DIA: gatilho do hábito — cartões vencidos em 1 clique. */}
+        <DailyReviewBanner due={dueFlashcards} totalCards={totalFlashcards} />
+
         {/* ELO DE ESTUDOS (PDL + decaimento — substitui o antigo Nível) */}
         <GamificationHero
           elo={elo}
@@ -237,9 +284,7 @@ export default async function StudiesPage() {
                   Cadastre sua primeira matéria para abrir o modo foco.
                 </p>
                 <div className="mt-5 flex justify-center">
-                  <Link href="/studies/new">
-                    <Button>Criar matéria</Button>
-                  </Link>
+                  <CreateSubjectButton withIcon />
                 </div>
               </div>
             ) : (

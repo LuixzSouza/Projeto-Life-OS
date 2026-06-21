@@ -14,9 +14,25 @@ export const dynamic = "force-dynamic";
  * mais atrasados primeiro (o StudySession já ordena por nextReview). Mata o
  * ritual de abrir baralho por baralho quando a fila do dia está espalhada.
  */
-export default async function GlobalReviewPage() {
+export default async function GlobalReviewPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ subject?: string }>;
+}) {
   const userId = await getCurrentUserId();
   const now = new Date();
+
+  // Revisão por matéria (?subject=<id>): restringe a fila aos baralhos ligados
+  // àquela matéria. Sem o parâmetro, é a Revisão Geral (todos os baralhos).
+  const { subject: subjectId } = await searchParams;
+
+  // Só usa a matéria se for do próprio usuário (evita filtrar por id alheio).
+  const subject = userId && subjectId
+    ? await prisma.studySubject.findFirst({
+        where: { id: subjectId, userId },
+        select: { id: true, title: true },
+      })
+    : null;
 
   // Vencidos = nextReview nula (cartão novo) ou no passado. Mesma regra do
   // filterDue do client, traduzida para o banco (não carrega o acervo inteiro).
@@ -26,10 +42,13 @@ export default async function GlobalReviewPage() {
         where: {
           userId,
           OR: [{ nextReview: null }, { nextReview: { lte: now } }],
+          ...(subject ? { deck: { studySubjectId: subject.id } } : {}),
         },
         orderBy: { nextReview: "asc" },
         take: 500,
       });
+
+  const reviewTitle = subject ? `Revisão · ${subject.title}` : "Revisão Geral";
 
   if (dueCards.length === 0) {
     return (
@@ -42,7 +61,9 @@ export default async function GlobalReviewPage() {
           <div className="space-y-3">
             <h2 className="text-3xl font-extrabold tracking-tight text-foreground">Tudo em dia! 🎉</h2>
             <p className="text-base leading-relaxed text-muted-foreground">
-              Nenhum cartão vencido em nenhum baralho. Sua memória agradece — volte quando a curva do esquecimento cobrar.
+              {subject
+                ? `Nenhum cartão vencido em "${subject.title}". Sua memória agradece — volte quando a curva do esquecimento cobrar.`
+                : "Nenhum cartão vencido em nenhum baralho. Sua memória agradece — volte quando a curva do esquecimento cobrar."}
             </p>
           </div>
           <Link href="/flashcards" className="block">
@@ -57,7 +78,7 @@ export default async function GlobalReviewPage() {
 
   return (
     <div className="min-h-screen bg-background animate-in fade-in duration-700">
-      <StudySession deck={{ title: "Revisão Geral" }} cards={dueCards} />
+      <StudySession deck={{ title: reviewTitle }} cards={dueCards} />
     </div>
   );
 }

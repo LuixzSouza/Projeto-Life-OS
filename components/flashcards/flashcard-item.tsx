@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { ImagePaster } from "@/components/ui/image-paster";
 import {
   Dialog,
   DialogContent,
@@ -51,6 +52,7 @@ export function FlashcardItem({ card, index, total, deckId }: FlashcardItemProps
   // Estados locais para o formulário de edição
   const [term, setTerm] = useState(card.term);
   const [definition, setDefinition] = useState(card.definition);
+  const [imageUrl, setImageUrl] = useState<string | null>(card.imageUrl);
 
   async function handleSave() {
     setIsSaving(true);
@@ -58,6 +60,7 @@ export function FlashcardItem({ card, index, total, deckId }: FlashcardItemProps
     formData.append("cardId", card.id);
     formData.append("term", term);
     formData.append("definition", definition);
+    formData.append("image", imageUrl ?? "");
 
     const result = await updateCard(deckId, formData);
 
@@ -106,6 +109,14 @@ export function FlashcardItem({ card, index, total, deckId }: FlashcardItemProps
             <p className="font-semibold text-foreground text-base md:text-lg leading-relaxed whitespace-pre-wrap">
               {card.term}
             </p>
+            {card.imageUrl && (
+              // eslint-disable-next-line @next/next/no-img-element -- base64 local (images.unoptimized), next/image não otimiza
+              <img
+                src={card.imageUrl}
+                alt="Imagem do cartão"
+                className="mt-1 max-h-40 w-auto rounded-lg border border-border/50 object-contain"
+              />
+            )}
           </div>
 
           {/* VERSO */}
@@ -172,11 +183,16 @@ export function FlashcardItem({ card, index, total, deckId }: FlashcardItemProps
             
             <div className="space-y-2">
               <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Verso (Resposta Detalhada)</Label>
-              <Textarea 
-                value={definition} 
-                onChange={(e) => setDefinition(e.target.value)} 
+              <Textarea
+                value={definition}
+                onChange={(e) => setDefinition(e.target.value)}
                 className="min-h-[160px] resize-none leading-relaxed text-base bg-muted/20 border-border/60 focus-visible:ring-primary/30 p-4"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Imagem (opcional)</Label>
+              <ImagePaster defaultValue={imageUrl} onImageChange={setImageUrl} />
             </div>
           </div>
 
