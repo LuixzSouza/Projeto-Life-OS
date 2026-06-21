@@ -1,14 +1,17 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Repeat,
   X,
   Code2,
   BrainCircuit,
   Trophy,
-  Keyboard
+  Keyboard,
+  PenLine,
+  CornerDownLeft,
 } from "lucide-react";
 import Link from "next/link";
 import { Flashcard, FlashcardDeck } from "@prisma/client";
@@ -16,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { reviewFlashcard } from "@/app/(dashboard)/flashcards/actions"; // O servidor que alimenta a IA de revisão
 import { previewLabel, type ReviewRating } from "@/lib/srs";
+import { matchLevel } from "@/lib/text-similarity";
 import { findVideoEmbed } from "@/lib/media-embed";
 import { VideoEmbed } from "@/components/flashcards/video-embed";
 
@@ -27,6 +31,8 @@ interface StudySessionProps {
   /** Só o título é usado — permite sessões sintéticas (ex.: Revisão Geral). */
   deck: Pick<FlashcardDeck, "title">;
   cards: Flashcard[];
+  /** "flip" (padrão): vira e auto-avalia. "written": digita a resposta (recall ativo). */
+  mode?: "flip" | "written";
 }
 
 /* -------------------------------------------------------------------------- */
@@ -68,7 +74,8 @@ function RichTextDisplay({ text, isDark = false }: { text: string; isDark?: bool
 /* COMPONENTE PRINCIPAL                                                       */
 /* -------------------------------------------------------------------------- */
 
-export function StudySession({ deck, cards: initialCards }: StudySessionProps) {
+export function StudySession({ deck, cards: initialCards, mode = "flip" }: StudySessionProps) {
+  const written = mode === "written";
   // Fila de estudos (Para Repetição Espaçada é ideal revisar os mais atrasados primeiro)
   const [queue, setQueue] = useState<Flashcard[]>(() => {
     return [...initialCards].sort((a, b) => {
@@ -82,6 +89,10 @@ export function StudySession({ deck, cards: initialCards }: StudySessionProps) {
   const [isFlipped, setIsFlipped] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [isSaving, setIsSaving] = useState(false); // Previne duplo clique
+
+  // Modo Escrita: resposta digitada do cartão atual + foco automático no input.
+  const [typedAnswer, setTypedAnswer] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Estatísticas Visuais
   const [stats, setStats] = useState({ again: 0, hard: 0, good: 0, easy: 0 });
@@ -107,12 +118,34 @@ export function StudySession({ deck, cards: initialCards }: StudySessionProps) {
   const frontVideo = useMemo(() => findVideoEmbed(currentCard?.term), [currentCard]);
   const backVideo = useMemo(() => findVideoEmbed(currentCard?.definition), [currentCard]);
 
+  // Modo Escrita: dica de quão perto a resposta digitada ficou (só auxílio — a
+  // nota final é do usuário). Sugere a nota ao revelar.
+  const matchHint = useMemo(() => {
+    if (!written || !currentCard || !typedAnswer.trim()) return null;
+    return matchLevel(typedAnswer, currentCard.definition);
+  }, [written, currentCard, typedAnswer]);
+  const suggestedRating: ReviewRating | null =
+    matchHint === "match" ? "GOOD" : matchHint === "close" ? "HARD" : matchHint === "off" ? "AGAIN" : null;
+
+  // Revela a resposta (vira o cartão) — usado no Modo Escrita pelo Enter/botão.
+  const reveal = useCallback(() => setIsFlipped(true), []);
+
+  // Foca o input ao trocar de cartão no Modo Escrita.
+  useEffect(() => {
+    if (written && !isFlipped) {
+      const t = setTimeout(() => inputRef.current?.focus(), 60);
+      return () => clearTimeout(t);
+    }
+  }, [written, isFlipped, currentIndex]);
+
   // --- ATALHOS DE TECLADO ---
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (isFinished || isSaving) return;
 
     if (!isFlipped) {
-      if (e.code === "Space" || e.code === "Enter") {
+      // No Modo Escrita o atalho de virar é desligado — o input recebe o Espaço
+      // e o Enter (que revela). Só o modo flip vira com a barra/Enter global.
+      if (!written && (e.code === "Space" || e.code === "Enter")) {
         e.preventDefault();
         setIsFlipped(true);
       }
@@ -123,7 +156,7 @@ export function StudySession({ deck, cards: initialCards }: StudySessionProps) {
       if (e.key === "4") handleRate("EASY");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFlipped, isFinished, isSaving, currentIndex]);
+  }, [isFlipped, isFinished, isSaving, currentIndex, written]);
 
   useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);
@@ -157,6 +190,7 @@ export function StudySession({ deck, cards: initialCards }: StudySessionProps) {
       setIsFinished(true);
     } else {
       setIsFlipped(false);
+      setTypedAnswer(""); // limpa a resposta digitada para o próximo cartão
       setTimeout(() => setCurrentIndex((prev) => prev + 1), 150); // Timeout leve para animação 3D
     }
 
@@ -244,9 +278,16 @@ export function StudySession({ deck, cards: initialCards }: StudySessionProps) {
             </div>
             
             <div className="text-center space-y-1">
-                <Badge variant="secondary" className="bg-primary/10 text-primary border-none text-[10px] uppercase font-bold tracking-widest px-3">
-                    {deck.title}
-                </Badge>
+                <div className="flex items-center justify-center gap-2">
+                    <Badge variant="secondary" className="bg-primary/10 text-primary border-none text-[10px] uppercase font-bold tracking-widest px-3">
+                        {deck.title}
+                    </Badge>
+                    {written && (
+                        <Badge variant="secondary" className="gap-1 border-none bg-amber-500/10 text-amber-600 px-2 text-[10px] font-bold uppercase tracking-widest">
+                            <PenLine className="h-3 w-3" /> Escrita
+                        </Badge>
+                    )}
+                </div>
                 <div className="font-mono text-sm font-bold text-muted-foreground">
                     <span className="text-foreground text-lg">{currentIndex + 1}</span>
                     <span className="mx-1.5 opacity-30">/</span>{queue.length}
@@ -266,8 +307,8 @@ export function StudySession({ deck, cards: initialCards }: StudySessionProps) {
         <div className="flex-1 relative w-full max-w-3xl mx-auto">
             
             <div
-                className={cn("w-full h-full relative transition-all duration-700 ease-out cursor-pointer transform-style-3d", isFlipped ? "rotate-y-180" : "hover:-translate-y-2 hover:shadow-2xl")}
-                onClick={() => !isFlipped && setIsFlipped(true)}
+                className={cn("w-full h-full relative transition-all duration-700 ease-out transform-style-3d", isFlipped ? "rotate-y-180" : "hover:-translate-y-2 hover:shadow-2xl", written ? "cursor-default" : "cursor-pointer")}
+                onClick={() => !written && !isFlipped && setIsFlipped(true)}
                 style={{ transformStyle: "preserve-3d" }}
             >
                 {/* --- FRENTE (PERGUNTA) --- */}
@@ -286,8 +327,27 @@ export function StudySession({ deck, cards: initialCards }: StudySessionProps) {
                             />
                         )}
                         {frontVideo && <VideoEmbed embed={frontVideo} />}
+
+                        {/* MODO ESCRITA: digita a resposta antes de revelar. */}
+                        {written && !isFlipped && (
+                            <div className="mx-auto mt-8 w-full max-w-xl" onClick={(e) => e.stopPropagation()}>
+                                <Input
+                                    ref={inputRef}
+                                    value={typedAnswer}
+                                    onChange={(e) => setTypedAnswer(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter") { e.preventDefault(); reveal(); }
+                                    }}
+                                    placeholder="Digite sua resposta…"
+                                    className="h-14 rounded-xl border-border/60 bg-background text-center text-lg shadow-sm focus-visible:ring-primary/30"
+                                />
+                                <Button onClick={reveal} className="mt-3 h-11 w-full gap-2 rounded-xl font-bold shadow-sm">
+                                    <CornerDownLeft className="h-4 w-4" /> Verificar resposta
+                                </Button>
+                            </div>
+                        )}
                     </div>
-                    {!isFlipped && (
+                    {!written && !isFlipped && (
                         <div className="absolute bottom-8 sm:bottom-12 left-0 right-0 flex justify-center animate-pulse">
                             <span className="text-xs font-bold text-muted-foreground/80 flex items-center gap-2 bg-muted/80 px-5 py-2.5 rounded-full border border-border/50 backdrop-blur-sm shadow-sm">
                                 <Keyboard className="h-4 w-4" /> Toque ou aperte <strong className="text-foreground">Espaço</strong> para virar
@@ -302,6 +362,27 @@ export function StudySession({ deck, cards: initialCards }: StudySessionProps) {
                         Verso
                     </Badge>
                     <div className="w-full">
+                        {/* MODO ESCRITA: o que você digitou + dica de proximidade. */}
+                        {written && (
+                            <div className="mx-auto mb-6 w-full max-w-xl rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-left">
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Sua resposta</p>
+                                <p className="mt-1 text-base text-slate-100">
+                                    {typedAnswer.trim() || <span className="italic text-slate-500">— (em branco)</span>}
+                                </p>
+                                {matchHint && (
+                                    <span
+                                        className={cn(
+                                            "mt-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold",
+                                            matchHint === "match" && "bg-emerald-500/15 text-emerald-400",
+                                            matchHint === "close" && "bg-amber-500/15 text-amber-400",
+                                            matchHint === "off" && "bg-rose-500/15 text-rose-400",
+                                        )}
+                                    >
+                                        {matchHint === "match" ? "✓ Parece certo" : matchHint === "close" ? "≈ Quase lá" : "✗ Confira a resposta"}
+                                    </span>
+                                )}
+                            </div>
+                        )}
                         <RichTextDisplay text={currentCard?.definition} isDark={true} />
                         {backVideo && <VideoEmbed embed={backVideo} dark />}
                     </div>
@@ -313,19 +394,19 @@ export function StudySession({ deck, cards: initialCards }: StudySessionProps) {
         <div className={cn("mt-8 sm:mt-10 shrink-0 transition-all duration-500 w-full max-w-3xl mx-auto", isFlipped ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8 pointer-events-none')}>
             <div className="flex flex-wrap justify-center gap-3 sm:gap-4 pb-4">
                 
-                <Button size="lg" disabled={isSaving} onClick={() => handleRate("AGAIN")} className="flex-1 h-20 sm:h-24 rounded-[1.5rem] bg-rose-500/10 text-rose-600 hover:bg-rose-500 hover:text-white border border-rose-500/20 font-bold transition-all hover:scale-105 active:scale-95 flex flex-col gap-0.5 shadow-sm">
+                <Button size="lg" disabled={isSaving} onClick={() => handleRate("AGAIN")} className={cn("flex-1 h-20 sm:h-24 rounded-[1.5rem] bg-rose-500/10 text-rose-600 hover:bg-rose-500 hover:text-white border border-rose-500/20 font-bold transition-all hover:scale-105 active:scale-95 flex flex-col gap-0.5 shadow-sm", suggestedRating === "AGAIN" && "ring-2 ring-rose-400 ring-offset-2 ring-offset-background")}>
                   <span className="text-base sm:text-lg">Errei</span>
                   <span className="text-[11px] font-bold opacity-90 tabular-nums">{previews?.AGAIN}</span>
                   <span className="text-[9px] opacity-50 font-mono hidden sm:block tracking-widest">tecla 1</span>
                 </Button>
 
-                <Button size="lg" disabled={isSaving} onClick={() => handleRate("HARD")} className="flex-1 h-20 sm:h-24 rounded-[1.5rem] bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white border border-amber-500/20 font-bold transition-all hover:scale-105 active:scale-95 flex flex-col gap-0.5 shadow-sm">
+                <Button size="lg" disabled={isSaving} onClick={() => handleRate("HARD")} className={cn("flex-1 h-20 sm:h-24 rounded-[1.5rem] bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white border border-amber-500/20 font-bold transition-all hover:scale-105 active:scale-95 flex flex-col gap-0.5 shadow-sm", suggestedRating === "HARD" && "ring-2 ring-amber-400 ring-offset-2 ring-offset-background")}>
                   <span className="text-base sm:text-lg">Difícil</span>
                   <span className="text-[11px] font-bold opacity-90 tabular-nums">{previews?.HARD}</span>
                   <span className="text-[9px] opacity-50 font-mono hidden sm:block tracking-widest">tecla 2</span>
                 </Button>
 
-                <Button size="lg" disabled={isSaving} onClick={() => handleRate("GOOD")} className="flex-1 h-20 sm:h-24 rounded-[1.5rem] bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500 hover:text-white border border-emerald-500/20 font-bold transition-all hover:scale-105 active:scale-95 flex flex-col gap-0.5 shadow-sm">
+                <Button size="lg" disabled={isSaving} onClick={() => handleRate("GOOD")} className={cn("flex-1 h-20 sm:h-24 rounded-[1.5rem] bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500 hover:text-white border border-emerald-500/20 font-bold transition-all hover:scale-105 active:scale-95 flex flex-col gap-0.5 shadow-sm", suggestedRating === "GOOD" && "ring-2 ring-emerald-400 ring-offset-2 ring-offset-background")}>
                   <span className="text-base sm:text-lg">Bom</span>
                   <span className="text-[11px] font-bold opacity-90 tabular-nums">{previews?.GOOD}</span>
                   <span className="text-[9px] opacity-50 font-mono hidden sm:block tracking-widest">tecla 3</span>

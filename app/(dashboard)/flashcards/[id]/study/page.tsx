@@ -147,8 +147,9 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
   /* ----------------------------- STUDY MODE ------------------------------- */
 
   // Modo Inteligente (smart): só cartões vencidos (curva de esquecimento).
-  // Modo Prova (cram) ou padrão: todo o baralho.
+  // Modo Prova (cram), Escrita (written) ou padrão: todo o baralho.
   const isSmart = mode === "smart";
+  const isWritten = mode === "written";
   const cards = isSmart ? filterDue(deck.cards) : deck.cards;
 
   // Modo Inteligente sem cartões devidos: nada a revisar hoje.
@@ -187,7 +188,7 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
   // Se tudo estiver certo, renderiza o ambiente de foco
   return (
     <div className="min-h-screen bg-background animate-in fade-in duration-700">
-      <StudySession deck={deck} cards={cards} />
+      <StudySession deck={deck} cards={cards} mode={isWritten ? "written" : "flip"} />
     </div>
   );
 }
