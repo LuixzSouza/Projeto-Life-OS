@@ -12,6 +12,7 @@ import { StudyAnalytics } from "@/components/studies/study-analytics";
 import { DailyReviewBanner } from "@/components/studies/daily-review-banner";
 import { CreateSubjectButton } from "@/components/studies/create-subject-button";
 import { StudyHeatmap } from "@/components/studies/study-heatmap";
+import { StudyPlanCard, type PlanSubject } from "@/components/studies/study-plan-card";
 import { formatHours } from "@/components/studies/studies-helpers";
 import { buildDailyActivity, computeStudyStats, type SessionLite, type DailyPoint, type StudyStats } from "@/lib/studies-math";
 import { computeElo, sessionsToDays, type EloResult } from "@/lib/studies-elo";
@@ -71,6 +72,9 @@ export default async function StudiesPage() {
 
   // Heatmap de constância: minutos por dia (reusa o histórico do ELO).
   const heatmapData: Record<string, number> = {};
+
+  // Plano do dia: matérias a atacar (abaixo da meta, mais esquecidas primeiro).
+  let planSuggestions: PlanSubject[] = [];
 
   let subjectsWithStats: SubjectWithStats[] = [];
   let dailyActivity: DailyPoint[] = [];
@@ -228,6 +232,25 @@ export default async function StudiesPage() {
     // Ordena por tempo (decrescente) para dar prioridade visual às mais estudadas
     subjectsWithStats.sort((a, b) => b.totalMinutes - a.totalMinutes);
 
+    // Sugestões do "Plano de hoje": matérias abaixo da meta, mais esquecidas
+    // (menos recentemente estudadas / nunca) primeiro. Até 3.
+    planSuggestions = subjectsWithStats
+      .map((s) => ({
+        id: s.id,
+        title: s.title,
+        icon: s.icon,
+        color: s.color,
+        lastStudied: s.lastStudied,
+        progress: s.goalMinutes > 0 ? Math.min(100, Math.round((s.totalMinutes / s.goalMinutes) * 100)) : 0,
+      }))
+      .filter((s) => s.progress < 100)
+      .sort((a, b) => {
+        const ta = a.lastStudied ? new Date(a.lastStudied).getTime() : 0;
+        const tb = b.lastStudied ? new Date(b.lastStudied).getTime() : 0;
+        return ta - tb;
+      })
+      .slice(0, 3);
+
     // Analytics (gráfico + KPIs) a partir das sessões recentes
     const lite: SessionLite[] = (activitySessions ?? []).map((s) => ({
       date: s.date,
@@ -272,6 +295,15 @@ export default async function StudiesPage() {
       <PageContainer className="space-y-8">
         {/* REVISÃO DO DIA: gatilho do hábito — cartões vencidos em 1 clique. */}
         <DailyReviewBanner due={dueFlashcards} totalCards={totalFlashcards} />
+
+        {/* PLANO DE HOJE: meta diária + ofensiva + matérias a atacar agora. */}
+        {subjects.length > 0 && (
+          <StudyPlanCard
+            todayMinutes={studyStats.todayMinutes}
+            streak={studyStats.streak}
+            suggestions={planSuggestions}
+          />
+        )}
 
         {/* ELO DE ESTUDOS (PDL + decaimento — substitui o antigo Nível) */}
         <GamificationHero
