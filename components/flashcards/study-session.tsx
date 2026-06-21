@@ -22,6 +22,7 @@ import { previewLabel, type ReviewRating } from "@/lib/srs";
 import { matchLevel } from "@/lib/text-similarity";
 import { findVideoEmbed } from "@/lib/media-embed";
 import { VideoEmbed } from "@/components/flashcards/video-embed";
+import { SpeakButton } from "@/components/flashcards/speak-button";
 
 /* -------------------------------------------------------------------------- */
 /* TYPES                                                                      */
@@ -316,6 +317,7 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
                     <Badge variant="outline" className="absolute top-8 left-8 uppercase tracking-[0.2em] text-[10px] font-black text-muted-foreground border-border/60 px-3 py-1.5">
                         Frente
                     </Badge>
+                    <SpeakButton text={currentCard?.term} className="absolute top-6 right-6" />
                     <div className="w-full">
                         <RichTextDisplay text={currentCard?.term} />
                         {currentCard?.imageUrl && (
@@ -361,6 +363,7 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
                     <Badge variant="outline" className="absolute top-8 left-8 uppercase tracking-[0.2em] text-[10px] font-black border-primary/30 text-primary/80 bg-primary/10 px-3 py-1.5">
                         Verso
                     </Badge>
+                    <SpeakButton text={currentCard?.definition} className="absolute top-6 right-6 text-slate-400 hover:bg-white/10 hover:text-white" />
                     <div className="w-full">
                         {/* MODO ESCRITA: o que você digitou + dica de proximidade. */}
                         {written && (
