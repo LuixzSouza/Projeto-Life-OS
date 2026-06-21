@@ -1,0 +1,30 @@
+import type { MetadataRoute } from "next";
+
+// Domínio de produção (mesmo fallback do app/layout.tsx). Sobrescreva com
+// NEXT_PUBLIC_SITE_URL nas env vars do deploy.
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://life-os.vercel.app";
+
+// Só as páginas públicas e estáveis entram no sitemap: a landing e as
+// institucionais do rodapé (grupo (marketing)). Rotas de auth, dashboard e
+// links por token NÃO entram — são privadas ou efêmeras (ver app/robots.ts).
+const PUBLIC_PATHS: ReadonlyArray<{
+  path: string;
+  changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"];
+  priority: number;
+}> = [
+  { path: "/", changeFrequency: "weekly", priority: 1 },
+  { path: "/changelog", changeFrequency: "weekly", priority: 0.7 },
+  { path: "/privacy", changeFrequency: "monthly", priority: 0.4 },
+  { path: "/terms", changeFrequency: "monthly", priority: 0.4 },
+  { path: "/contact", changeFrequency: "monthly", priority: 0.5 },
+];
+
+export default function sitemap(): MetadataRoute.Sitemap {
+  const lastModified = new Date();
+  return PUBLIC_PATHS.map(({ path, changeFrequency, priority }) => ({
+    url: `${SITE_URL}${path === "/" ? "" : path}`,
+    lastModified,
+    changeFrequency,
+    priority,
+  }));
+}
