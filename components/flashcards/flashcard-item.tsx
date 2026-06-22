@@ -90,7 +90,7 @@ export function FlashcardItem({ card, index, total, deckId }: FlashcardItemProps
 
   return (
     <>
-      <div className="group relative flex flex-col md:flex-row gap-0 rounded-2xl border border-border/60 bg-card hover:border-primary/40 hover:shadow-xl transition-all duration-300 overflow-hidden mt-4">
+      <div className="group relative flex flex-col md:flex-row gap-0 rounded-2xl border border-border/60 bg-card hover:border-primary/40 hover:shadow-xl transition-all duration-300 overflow-hidden mt-4 animate-in fade-in slide-in-from-top-2">
         
         {/* NÚMERO DO CARD */}
         <div className="md:w-16 bg-muted/40 md:border-r border-b md:border-b-0 border-border/40 flex items-center justify-center py-3 md:py-0 transition-colors group-hover:bg-primary/5 group-hover:border-primary/20 shrink-0">

@@ -3,12 +3,8 @@ export const dynamic = "force-dynamic";
 
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserId } from "@/lib/auth";
-import { createCard } from "../../actions"; // deleteCard não é mais necessário aqui diretamente
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
   ArrowLeft,
@@ -16,14 +12,13 @@ import {
   PlayCircle,
   Layers,
   Sparkles,
-  ArrowRight,
   Library,
   BookOpen
 } from "lucide-react";
 import Link from "next/link";
 import { FlashcardItem } from "@/components/flashcards/flashcard-item"; // IMPORT NOVO
 import { AiDeckGenerator } from "@/components/flashcards/ai-deck-generator";
-import { CardImageField } from "@/components/flashcards/card-image-field";
+import { NewCardForm } from "@/components/flashcards/new-card-form";
 import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
 
 /* Tipagem correta para App Router */
@@ -77,12 +72,6 @@ export default async function DeckEditPage({ params }: DeckEditPageProps) {
         </Link>
       </div>
     );
-  }
-
-  /* Server Action de Adicionar (Inline) */
-  async function addCardAction(formData: FormData) {
-    "use server";
-    await createCard(deckId, formData);
   }
 
   const hasCards = deck.cards.length > 0;
@@ -147,55 +136,7 @@ export default async function DeckEditPage({ params }: DeckEditPageProps) {
                     </CardHeader>
                     
                     <CardContent className="pt-6">
-                        <form action={addCardAction} className="space-y-5">
-                            <div className="space-y-2">
-                                <Label className="text-xs font-bold uppercase text-muted-foreground tracking-wider ml-1">
-                                    Frente (Pergunta)
-                                </Label>
-                                <Input
-                                    name="term"
-                                    placeholder="Ex: O que é useState?"
-                                    required
-                                    className="bg-background focus:ring-primary/20 border-border/60 font-medium"
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label className="text-xs font-bold uppercase text-muted-foreground tracking-wider ml-1">
-                                    Verso (Resposta)
-                                </Label>
-                                <Textarea
-                                    name="definition"
-                                    placeholder="Ex: Um hook do React para gerenciar estado..."
-                                    required
-                                    className="min-h-[120px] resize-none bg-background focus:ring-primary/20 border-border/60 leading-relaxed"
-                                />
-                                <p className="text-[11px] leading-relaxed text-muted-foreground">
-                                    Dica: cole um link do <strong>YouTube, Vimeo ou .mp4</strong> aqui e ele vira um vídeo na revisão.
-                                </p>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label className="text-xs font-bold uppercase text-muted-foreground tracking-wider ml-1">
-                                    Dica (opcional)
-                                </Label>
-                                <Input
-                                    name="hint"
-                                    placeholder="Ex: começa com 'u' e guarda valor entre renders"
-                                    maxLength={500}
-                                    className="bg-background focus:ring-primary/20 border-border/60"
-                                />
-                                <p className="text-[11px] leading-relaxed text-muted-foreground">
-                                    Aparece na frente sob demanda (botão <strong>Dica</strong>) — ajuda sem entregar a resposta.
-                                </p>
-                            </div>
-
-                            <CardImageField />
-
-                            <Button type="submit" className="w-full font-semibold shadow-sm" variant="secondary">
-                                Adicionar à pilha <ArrowRight className="ml-2 h-4 w-4 opacity-50" />
-                            </Button>
-                        </form>
+                        <NewCardForm deckId={deck.id} />
                     </CardContent>
                 </Card>
 
