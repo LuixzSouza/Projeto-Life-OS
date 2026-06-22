@@ -78,3 +78,6 @@ life-os-config.json.bak
 
 # backups automaticos do banco (contem dados pessoais e chaves) - NUNCA versionar
 /prisma/backups/
+
+# Arquivos temporarios do Prisma (migrate diff / generate)
+prisma/.tmp.*
