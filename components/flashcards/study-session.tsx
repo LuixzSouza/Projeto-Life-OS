@@ -15,6 +15,7 @@ import {
   Shuffle,
   ArrowLeftRight,
   Lightbulb,
+  Check,
 } from "lucide-react";
 import Link from "next/link";
 import { Flashcard, FlashcardDeck } from "@prisma/client";
@@ -95,6 +96,9 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
   const [isSaving, setIsSaving] = useState(false); // Previne duplo clique
   // Dica revelada sob demanda na frente (zera a cada novo cartão / inversão).
   const [hintShown, setHintShown] = useState(false);
+  // Avaliação em 2 passos: "choose" mostra Errei/Acertei; ao acertar, revela as
+  // 3 notas (Difícil/Bom/Fácil) — carga mental baixa sem perder a precisão do SRS.
+  const [gradeStep, setGradeStep] = useState<"choose" | "correct">("choose");
 
   // Modo Escrita: resposta digitada do cartão atual + foco automático no input.
   const [typedAnswer, setTypedAnswer] = useState("");
@@ -173,14 +177,21 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
         e.preventDefault();
         setIsFlipped(true);
       }
-    } else {
+    } else if (gradeStep === "choose") {
+      // Passo 1: errei (1) ou acertei (2 / Enter / Espaço → revela as 3 notas).
       if (e.key === "1") handleRate("AGAIN");
-      if (e.key === "2") handleRate("HARD");
-      if (e.key === "3") handleRate("GOOD");
-      if (e.key === "4") handleRate("EASY");
+      if (e.key === "2" || e.code === "Enter" || e.code === "Space") {
+        e.preventDefault();
+        setGradeStep("correct");
+      }
+    } else {
+      // Passo 2 (acertou): grau de facilidade.
+      if (e.key === "1") handleRate("HARD");
+      if (e.key === "2") handleRate("GOOD");
+      if (e.key === "3") handleRate("EASY");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFlipped, isFinished, isSaving, currentIndex, written]);
+  }, [isFlipped, isFinished, isSaving, currentIndex, written, gradeStep]);
 
   useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);
@@ -216,6 +227,7 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
       setIsFlipped(false);
       setTypedAnswer(""); // limpa a resposta digitada para o próximo cartão
       setHintShown(false); // esconde a dica para o próximo cartão
+      setGradeStep("choose"); // volta para Errei/Acertei no próximo cartão
       setTimeout(() => setCurrentIndex((prev) => prev + 1), 150); // Timeout leve para animação 3D
     }
 
@@ -245,6 +257,7 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
     setIsFlipped(false);
     setTypedAnswer("");
     setHintShown(false);
+    setGradeStep("choose");
   };
 
   /* -------------------------------------------------------------------------- */
@@ -491,33 +504,52 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
 
         {/* CONTROLES DE AVALIAÇÃO (Aparecem quando o cartão vira) */}
         <div className={cn("mt-8 sm:mt-10 shrink-0 transition-all duration-500 w-full max-w-3xl mx-auto", isFlipped ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8 pointer-events-none')}>
-            <div className="flex flex-wrap justify-center gap-3 sm:gap-4 pb-4">
-                
-                <Button size="lg" disabled={isSaving} onClick={() => handleRate("AGAIN")} className={cn("flex-1 h-20 sm:h-24 rounded-[1.5rem] bg-rose-500/10 text-rose-600 hover:bg-rose-500 hover:text-white border border-rose-500/20 font-bold transition-all hover:scale-105 active:scale-95 flex flex-col gap-0.5 shadow-sm", suggestedRating === "AGAIN" && "ring-2 ring-rose-400 ring-offset-2 ring-offset-background")}>
-                  <span className="text-base sm:text-lg">Errei</span>
-                  <span className="text-[11px] font-bold opacity-90 tabular-nums">{previews?.AGAIN}</span>
-                  <span className="text-[9px] opacity-50 font-mono hidden sm:block tracking-widest">tecla 1</span>
-                </Button>
+            {gradeStep === "choose" ? (
+                /* PASSO 1: errei ou acertei (Acertei revela as 3 notas). */
+                <div className="flex flex-wrap justify-center gap-3 sm:gap-4 pb-4">
+                    <Button size="lg" disabled={isSaving} onClick={() => handleRate("AGAIN")} className={cn("flex-1 h-20 sm:h-24 rounded-[1.5rem] bg-rose-500/10 text-rose-600 hover:bg-rose-500 hover:text-white border border-rose-500/20 font-bold transition-all hover:scale-105 active:scale-95 flex flex-col items-center justify-center gap-0.5 shadow-sm", suggestedRating === "AGAIN" && "ring-2 ring-rose-400 ring-offset-2 ring-offset-background")}>
+                      <span className="flex items-center gap-1.5 text-base sm:text-lg"><X className="h-4 w-4" /> Errei</span>
+                      <span className="text-[11px] font-bold opacity-90 tabular-nums">{previews?.AGAIN}</span>
+                      <span className="hidden font-mono text-[9px] tracking-widest opacity-50 sm:block">tecla 1</span>
+                    </Button>
 
-                <Button size="lg" disabled={isSaving} onClick={() => handleRate("HARD")} className={cn("flex-1 h-20 sm:h-24 rounded-[1.5rem] bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white border border-amber-500/20 font-bold transition-all hover:scale-105 active:scale-95 flex flex-col gap-0.5 shadow-sm", suggestedRating === "HARD" && "ring-2 ring-amber-400 ring-offset-2 ring-offset-background")}>
-                  <span className="text-base sm:text-lg">Difícil</span>
-                  <span className="text-[11px] font-bold opacity-90 tabular-nums">{previews?.HARD}</span>
-                  <span className="text-[9px] opacity-50 font-mono hidden sm:block tracking-widest">tecla 2</span>
-                </Button>
+                    <Button size="lg" disabled={isSaving} onClick={() => setGradeStep("correct")} className={cn("flex-1 h-20 sm:h-24 rounded-[1.5rem] bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500 hover:text-white border border-emerald-500/20 font-bold transition-all hover:scale-105 active:scale-95 flex flex-col items-center justify-center gap-0.5 shadow-sm", suggestedRating && suggestedRating !== "AGAIN" && "ring-2 ring-emerald-400 ring-offset-2 ring-offset-background")}>
+                      <span className="flex items-center gap-1.5 text-base sm:text-lg"><Check className="h-4 w-4" /> Acertei</span>
+                      <span className="text-[11px] font-medium opacity-80">escolher dificuldade →</span>
+                      <span className="hidden font-mono text-[9px] tracking-widest opacity-50 sm:block">tecla 2 / Espaço</span>
+                    </Button>
+                </div>
+            ) : (
+                /* PASSO 2 (acertou): grau de facilidade — alimenta o SRS. */
+                <div className="space-y-3 pb-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
+                        <Button size="lg" disabled={isSaving} onClick={() => handleRate("HARD")} className={cn("flex-1 h-20 sm:h-24 rounded-[1.5rem] bg-amber-500/10 text-amber-600 hover:bg-amber-500 hover:text-white border border-amber-500/20 font-bold transition-all hover:scale-105 active:scale-95 flex flex-col items-center justify-center gap-0.5 shadow-sm", suggestedRating === "HARD" && "ring-2 ring-amber-400 ring-offset-2 ring-offset-background")}>
+                          <span className="text-base sm:text-lg">Difícil</span>
+                          <span className="text-[11px] font-bold opacity-90 tabular-nums">{previews?.HARD}</span>
+                          <span className="hidden font-mono text-[9px] tracking-widest opacity-50 sm:block">tecla 1</span>
+                        </Button>
 
-                <Button size="lg" disabled={isSaving} onClick={() => handleRate("GOOD")} className={cn("flex-1 h-20 sm:h-24 rounded-[1.5rem] bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500 hover:text-white border border-emerald-500/20 font-bold transition-all hover:scale-105 active:scale-95 flex flex-col gap-0.5 shadow-sm", suggestedRating === "GOOD" && "ring-2 ring-emerald-400 ring-offset-2 ring-offset-background")}>
-                  <span className="text-base sm:text-lg">Bom</span>
-                  <span className="text-[11px] font-bold opacity-90 tabular-nums">{previews?.GOOD}</span>
-                  <span className="text-[9px] opacity-50 font-mono hidden sm:block tracking-widest">tecla 3</span>
-                </Button>
+                        <Button size="lg" disabled={isSaving} onClick={() => handleRate("GOOD")} className={cn("flex-1 h-20 sm:h-24 rounded-[1.5rem] bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500 hover:text-white border border-emerald-500/20 font-bold transition-all hover:scale-105 active:scale-95 flex flex-col items-center justify-center gap-0.5 shadow-sm", suggestedRating === "GOOD" && "ring-2 ring-emerald-400 ring-offset-2 ring-offset-background")}>
+                          <span className="text-base sm:text-lg">Bom</span>
+                          <span className="text-[11px] font-bold opacity-90 tabular-nums">{previews?.GOOD}</span>
+                          <span className="hidden font-mono text-[9px] tracking-widest opacity-50 sm:block">tecla 2</span>
+                        </Button>
 
-                <Button size="lg" disabled={isSaving} onClick={() => handleRate("EASY")} className="flex-1 h-20 sm:h-24 rounded-[1.5rem] bg-blue-500/10 text-blue-600 hover:bg-blue-500 hover:text-white border border-blue-500/20 font-bold transition-all hover:scale-105 active:scale-95 flex flex-col gap-0.5 shadow-sm">
-                  <span className="text-base sm:text-lg">Fácil</span>
-                  <span className="text-[11px] font-bold opacity-90 tabular-nums">{previews?.EASY}</span>
-                  <span className="text-[9px] opacity-50 font-mono hidden sm:block tracking-widest">tecla 4</span>
-                </Button>
+                        <Button size="lg" disabled={isSaving} onClick={() => handleRate("EASY")} className="flex-1 h-20 sm:h-24 rounded-[1.5rem] bg-blue-500/10 text-blue-600 hover:bg-blue-500 hover:text-white border border-blue-500/20 font-bold transition-all hover:scale-105 active:scale-95 flex flex-col items-center justify-center gap-0.5 shadow-sm">
+                          <span className="text-base sm:text-lg">Fácil</span>
+                          <span className="text-[11px] font-bold opacity-90 tabular-nums">{previews?.EASY}</span>
+                          <span className="hidden font-mono text-[9px] tracking-widest opacity-50 sm:block">tecla 3</span>
+                        </Button>
+                    </div>
 
-            </div>
+                    {/* Salvaguarda: clicou Acertei sem querer? Volta para errei. */}
+                    <div className="flex justify-center">
+                        <button type="button" onClick={() => setGradeStep("choose")} className="text-xs text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline">
+                          ← na verdade, errei
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
       </div>
     </div>
