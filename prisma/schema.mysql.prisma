@@ -1,0 +1,1822 @@
+// ===================================================================
+// ARQUIVO GERADO por scripts/derive-schemas.mjs - NAO EDITAR A MAO.
+// Fonte da verdade: prisma/schema.prisma (sqlite). Mude la e rode
+// "npm run db:derive" (ou db:baseline:all) para regenerar.
+// ===================================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+  output          = "../node_modules/@lifeos/client-mysql"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// =========================================================
+// MÓDULO 1: USUÁRIO E ESTATÍSTICAS
+// =========================================================
+
+model User {
+  id       String @id @default(uuid())
+  name     String @db.LongText
+  email    String @unique
+  password String @db.LongText
+
+  // --- CAMPO NOVO ADICIONADO ---
+  role String @default("USER")
+  // -----------------------------
+
+  // Versão do token de sessão: JWTs carregam `tv` e só valem se bater com este
+  // valor. "Desconectar outros dispositivos" (aba Segurança) incrementa aqui e
+  // reemite apenas o cookie do dispositivo atual.
+  tokenVersion Int @default(0)
+
+  avatarUrl String? @db.LongText
+  coverUrl  String? @db.LongText
+  bio       String? @db.LongText
+  salary    Decimal? @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relacionamentos Gerais (MANTIDOS INTACTOS)
+  accounts         Account[]
+  projects         Project[]
+  jobApplications  JobApplication[]
+  accessItem       AccessItem[]
+  friends          Friend[]
+  wardrobe         WardrobeItem[]
+  stats            UserStats?
+  settings         Settings?
+  portfolio        Portfolio?
+  bodyMeasurements BodyMeasurement[]
+  clients          Client[]
+  mediaItems       MediaItem[]
+
+  // --- Multi-user: relações adicionadas na migração de isolamento ---
+  transactions      Transaction[]
+  recurringExpenses RecurringExpense[]
+  recurringCharges  RecurringCharge[]
+  recurringExpensePayments RecurringExpensePayment[]
+  wishlistItems     WishlistItem[]
+  tasks             Task[]
+  workouts          Workout[]
+  workoutPlans      WorkoutPlan[]
+  workoutPhotos     WorkoutPhoto[]
+  energyCheckins    EnergyCheckin[]
+  themedDays        ThemedDay[]
+  habits            Habit[]
+  habitLogs         HabitLog[]
+  healthMetrics     HealthMetric[]
+  meals             Meal[]
+  mealPlans         MealPlan[]
+  events            Event[]
+  routineItems      RoutineItem[]
+  studySubjects     StudySubject[]
+  studySessions     StudySession[]
+  studyNotes        StudyNote[]
+  studyNoteVersions StudyNoteVersion[]
+  noteImages        NoteImage[]
+  notebooks         Notebook[]
+  studyContents     StudyContent[]
+  learningGoals     LearningGoal[]
+  learningTasks     LearningTask[]
+  flashcardDecks    FlashcardDeck[]
+  flashcards        Flashcard[]
+  managedSites      ManagedSite[]
+  sitePages         SitePage[]
+  meetings          Meeting[]
+  aiChats           AiChat[]
+  aiMessages        AiMessage[]
+  aiMemories        AiMemory[]
+  aiAutomations     AiAutomation[]
+  aiEmbeddings      AiEmbedding[]
+  savedLinks        SavedLink[]
+  billings          Billing[]
+  invoices          Invoice[]
+  backupLogs        BackupLog[]
+  challenges        Challenge[]
+  challengeCheckins ChallengeCheckin[]
+  investmentHoldings InvestmentHolding[]
+  shoes             Shoe[]
+  jobEvents         JobEvent[]
+
+  // --- Tecido conectivo central (cross-módulo) ---
+  tags          Tag[]
+  taggables     Taggable[]
+  categories    Category[]
+  notifications Notification[]
+  activityLogs  ActivityLog[]
+  attachments   Attachment[]
+  entityLinks   EntityLink[]
+  focusSessions FocusSession[]
+}
+
+model UserStats {
+  id String @id @default(uuid())
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  currentStreak    Int       @default(0)
+  lastStudyDate    DateTime?
+  dailyGoalMinutes Int       @default(60)
+
+  badges String? @db.LongText
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// =========================================================
+// MÓDULO 2: ESTUDOS (COMPATÍVEL + UPGRADE)
+// =========================================================
+
+// Tipos de Conteúdo (Novo) — taxonomia global (sem dono).
+model ContentType {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  icon      String? @db.LongText
+  color     String? @db.LongText
+  createdAt DateTime @default(now())
+
+  contents StudyContent[]
+}
+
+// MANTIDO O NOME 'StudySubject' PARA NÃO QUEBRAR SEU CÓDIGO
+// Mas adicionamos a hierarquia (Parent/Child) aqui dentro
+model StudySubject {
+  id    String @id @default(uuid())
+  title String @db.LongText
+
+  // --- Upgrade de Hierarquia ---
+  parentId String?
+  parent   StudySubject?  @relation("SubjectHierarchy", fields: [parentId], references: [id])
+  children StudySubject[] @relation("SubjectHierarchy")
+
+  // Metadados
+  description String? @db.LongText
+  category    String? @db.LongText
+  color       String? @default("blue")
+  icon        String? @db.LongText
+  difficulty  Int     @default(3)
+  status      String  @default("ACTIVE")
+
+  goalMinutes Int @default(3600)
+
+  // Relacionamentos
+  contents StudyContent[]
+  sessions StudySession[] // Mantido o relacionamento com sessões
+  decks    FlashcardDeck[]
+  notes    StudyNote[]
+  goals    LearningGoal[]
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([parentId])
+}
+
+// Conteúdos específicos (Novo)
+model StudyContent {
+  id    String @id @default(uuid())
+  title String @db.LongText
+
+  typeId String
+  type   ContentType @relation(fields: [typeId], references: [id])
+
+  url      String? @db.LongText
+  duration Int?
+  author   String? @db.LongText
+  source   String? @db.LongText
+
+  isCompleted Boolean @default(false)
+  progress    Float   @default(0)
+
+  // Relacionado ao Subject
+  subjectId String
+  subject   StudySubject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  notes StudyNote[]
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([subjectId])
+  @@index([typeId])
+}
+
+// Sessões de Estudo (COMPATÍVEL)
+model StudySession {
+  id              String   @id @default(uuid())
+  durationMinutes Int
+  date            DateTime @default(now())
+
+  focusLevel Int     @default(3)
+  notesRaw   String? @db.LongText
+
+  // MANTIDO 'subject' E 'subjectId' PARA O CÓDIGO ANTIGO FUNCIONAR
+  subjectId String
+  subject   StudySubject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  notes StudyNote[]
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([subjectId])
+  @@index([userId, date])
+}
+
+// Sistema de Anotações (Novo e Conectado)
+model StudyNote {
+  id      String  @id @default(uuid())
+  title   String @db.LongText
+  content String @db.LongText
+  summary String? @db.LongText
+
+  tags       String? @db.LongText
+  isFavorite Boolean @default(false)
+
+  // Caderno (organização principal das notas). Sem caderno = Entrada/Inbox.
+  notebookId String?
+  notebook   Notebook? @relation(fields: [notebookId], references: [id], onDelete: SetNull)
+
+  // Projeto vinculado (opcional): a nota aparece também na página do projeto.
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  // Conexões
+  subjectId String?
+  subject   StudySubject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+
+  contentId    String?
+  studyContent StudyContent? @relation(fields: [contentId], references: [id], onDelete: SetNull)
+
+  sessionId String?
+  session   StudySession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  lastReviewed DateTime?
+  reviewCount  Int       @default(0)
+
+  versions StudyNoteVersion[]
+  images   NoteImage[]
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([subjectId])
+  @@index([notebookId])
+  @@index([projectId])
+  @@index([userId, deletedAt])
+}
+
+// Imagem incorporada numa nota: guarda o Base64 fora do texto (markdown limpo).
+// Servida por /api/note-image/[id]; o conteúdo referencia só a URL curta.
+model NoteImage {
+  id   String @id @default(uuid())
+  mime String @db.LongText
+  data String // Base64 puro (sem o prefixo data:) @db.LongText
+
+  noteId String?
+  note   StudyNote? @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([noteId])
+  @@index([userId])
+}
+
+// Caderno: agrupador livre de anotações (Trabalho, Pessoal, Ideias…).
+// O caderno com isInbox=true é a "Entrada" padrão para captura rápida.
+model Notebook {
+  id      String  @id @default(uuid())
+  name    String @db.LongText
+  color   String? @default("#6366f1")
+  icon    String? @db.LongText
+  isInbox Boolean @default(false)
+  position Int    @default(0)
+
+  // Taxonomia PARA (#10): null = não classificado.
+  paraType String? @db.LongText
+
+  notes StudyNote[]
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// Histórico de versões de uma anotação (snapshot antes de cada edição).
+model StudyNoteVersion {
+  id      String @id @default(uuid())
+  title   String @db.LongText
+  content String @db.LongText
+
+  noteId String
+  note   StudyNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([noteId, createdAt])
+  @@index([userId])
+}
+
+// Objetivos de Aprendizado (Novo)
+model LearningGoal {
+  id          String  @id @default(uuid())
+  title       String @db.LongText
+  description String? @db.LongText
+
+  targetDate DateTime?
+  status     String    @default("IN_PROGRESS")
+  priority   Int       @default(3)
+
+  subjectId String?
+  subject   StudySubject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+
+  tasks LearningTask[]
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  deletedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([subjectId])
+  @@index([userId, deletedAt])
+}
+
+model LearningTask {
+  id         String  @id @default(uuid())
+  title      String @db.LongText
+  isDone     Boolean @default(false)
+  orderIndex Int     @default(0)
+
+  goalId String
+  goal   LearningGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([goalId])
+}
+
+// =========================================================
+// MÓDULO 3: FLASHCARDS (COMPATÍVEL)
+// =========================================================
+
+model FlashcardDeck {
+  id          String  @id @default(uuid())
+  title       String @db.LongText
+  description String? @db.LongText
+
+  algorithm String  @default("LEITNER")
+  isPublic  Boolean @default(false)
+  shareCode String? @unique
+
+  masteredCount Int @default(0)
+
+  // MANTIDO relacionamento com Subject
+  studySubjectId String?
+  studySubject   StudySubject? @relation(fields: [studySubjectId], references: [id], onDelete: SetNull)
+
+  cards Flashcard[]
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([studySubjectId])
+}
+
+model Flashcard {
+  id         String  @id @default(uuid())
+  term       String @db.LongText
+  definition String @db.LongText
+  imageUrl   String? @db.LongText
+
+  box        Int   @default(1)
+  easeFactor Float @default(2.5)
+  interval   Int   @default(0)
+
+  nextReview   DateTime?
+  lastReviewed DateTime?
+  reviewCount  Int       @default(0)
+
+  deckId String
+  deck   FlashcardDeck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([deckId])
+  @@index([userId, nextReview])
+}
+
+// =========================================================
+// MÓDULO 4: FINANCEIRO
+// =========================================================
+
+model Account {
+  id      String  @id @default(uuid())
+  name    String @db.LongText
+  type    String @db.LongText
+  balance Decimal @default(0.00)
+  color   String? @default("#000000")
+
+  isConnected Boolean @default(false)
+  provider    String? @db.LongText
+  externalId  String? @db.LongText
+
+  transactions Transaction[]
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  description String @db.LongText
+  amount      Decimal
+  type        String @db.LongText
+  category    String // rótulo legado (texto livre) — mantido p/ compatibilidade @db.LongText
+  date        DateTime @default(now())
+
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  // Categoria normalizada (nova) — opcional, convive com o rótulo legado.
+  categoryId  String?
+  categoryRef Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  // Fatura de Negócios que originou este lançamento (quando aplicável)
+  invoice Invoice?
+
+  // Pagamento de custo fixo que originou este lançamento (quando aplicável)
+  recurringExpensePayment RecurringExpensePayment?
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([accountId])
+  @@index([categoryId])
+  @@index([userId, date])
+  @@index([userId, deletedAt, date])
+}
+
+model RecurringExpense {
+  id         String  @id @default(uuid())
+  title      String @db.LongText
+  amount     Decimal
+  dayOfMonth Int
+  category   String // rótulo legado @db.LongText
+  active     Boolean @default(true)
+
+  // Recorrência dinâmica: WEEKLY | MONTHLY | QUARTERLY | SEMIANNUAL | ANNUAL.
+  // startDate = âncora da 1ª ocorrência (define o mês p/ frequências não-mensais).
+  // endDate   = quando a recorrência encerra (null = sem fim).
+  frequency String    @default("MONTHLY")
+  startDate DateTime?
+  endDate   DateTime?
+
+  // Parcelamento (opcional): compra finita em N parcelas. Com installments != null o
+  // endDate é calculado automaticamente. paidInstallments = parcelas já quitadas.
+  installments     Int?
+  paidInstallments Int  @default(0)
+
+  categoryId  String?
+  categoryRef Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  payments RecurringExpensePayment[] // pagamentos lançados (1 por ocorrência paga)
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([categoryId])
+}
+
+// Pagamento de UMA ocorrência de custo fixo (espelho da Invoice paga, lado despesa).
+// Marca o vencimento como pago e amarra o lançamento real no Financeiro (estornável).
+model RecurringExpensePayment {
+  id                 String           @id @default(uuid())
+  recurringExpenseId String
+  recurringExpense   RecurringExpense @relation(fields: [recurringExpenseId], references: [id], onDelete: Cascade)
+
+  dueDate DateTime // a ocorrência (vencimento) que foi paga
+  amount  Decimal
+  paidAt  DateTime @default(now())
+
+  // Lançamento financeiro gerado (permite estorno e evita duplicidade).
+  transactionId String?      @unique
+  transaction   Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([recurringExpenseId, dueDate]) // idempotência: uma ocorrência só é paga uma vez
+  @@index([userId])
+  @@index([recurringExpenseId])
+}
+
+// Cobranças recorrentes (receitas a RECEBER todo mês) — espelho de RecurringExpense
+// para o lado das entradas. Ex.: "cobrar R$ X do cliente Y no dia Z".
+// Separado de RecurringExpense para não corromper o total de custos fixos.
+model RecurringCharge {
+  id         String  @id @default(uuid())
+  title      String @db.LongText
+  amount     Decimal
+  dayOfMonth Int
+  category   String  @default("Cobrança")
+  clientName String? // nome cacheado do cliente (sobrevive se o cliente for removido) @db.LongText
+  active     Boolean @default(true)
+
+  // Recorrência dinâmica: WEEKLY | MONTHLY | QUARTERLY | SEMIANNUAL | ANNUAL.
+  // startDate = âncora da 1ª cobrança a acompanhar; endDate = quando encerra (null = sem fim).
+  frequency String    @default("MONTHLY")
+  startDate DateTime?
+  endDate   DateTime?
+
+  // Parcelamento (opcional): plano finito de N parcelas. Quando installments != null o
+  // endDate é calculado automaticamente (não precisa pensar no dia que encerra).
+  // paidInstallments = parcelas já quitadas antes de cadastrar (ex.: serviço já em andamento).
+  installments     Int?
+  paidInstallments Int  @default(0)
+
+  // Vínculo com o Cliente (Negócios) — conecta a cobrança à Finança e, via Client.friend,
+  // às Conexões. SetNull para não apagar a cobrança se o cliente for removido.
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  // Contrato RECURRING gerado/mantido para esta cobrança (origem das Invoices mensais).
+  billingId String?
+  billing   Billing? @relation(fields: [billingId], references: [id], onDelete: SetNull)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, active])
+  @@index([clientId])
+  @@index([billingId])
+}
+
+model WishlistItem {
+  id       String  @id @default(uuid())
+  name     String @db.LongText
+  price    Decimal
+  saved    Decimal @default(0.00)
+  priority String  @default("MEDIUM")
+
+  imageUrl   String? @db.LongText
+  productUrl String? @db.LongText
+
+  status String @default("SAVING")
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([userId, deletedAt])
+}
+
+// =========================================================
+// MÓDULO 4.1: CATEGORIAS DE FINANÇAS (NOVO — orçamento/cor/ícone)
+// =========================================================
+
+model Category {
+  id    String  @id @default(uuid())
+  name  String
+  type  String  @default("EXPENSE") // INCOME | EXPENSE
+  color String? @default("#6366f1")
+  icon  String? @db.LongText
+
+  monthlyBudget Decimal? // teto mensal opcional (orçamento)
+
+  // Subcategorias (hierarquia)
+  parentId String?
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryTree")
+
+  transactions      Transaction[]
+  recurringExpenses RecurringExpense[]
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, name, type])
+  @@index([userId])
+  @@index([parentId])
+}
+
+// =========================================================
+// MÓDULO 5: PROJETOS & TAREFAS
+// =========================================================
+
+model Project {
+  id          String   @id @default(uuid())
+  title       String @db.LongText
+  slug        String   @unique
+  description String? // resumo curto ("Sobre") @db.LongText
+  notes       String? // documento rico (markdown) editado na aba Notas @db.LongText
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+  color       String?  @default("#6366f1")
+
+  // Taxonomia PARA (Fase 2 — #10), aditiva: PROJECT | AREA | RESOURCE | ARCHIVE.
+  // null = ainda não classificado (compatível com dados existentes).
+  paraType String? @db.LongText
+
+  // Prazo do PROJETO (≠ prazo de tarefa): countdown no card/board e presença
+  // na Agenda via lib/agenda-aggregator.ts. null = sem prazo.
+  dueDate DateTime?
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tasks    Task[]
+  events   Event[]
+  meetings Meeting[]
+
+  linkedNotes StudyNote[] // notas do módulo /notes vinculadas a este projeto
+
+  jobApplications JobApplication[]
+
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  deletedAt DateTime?
+
+  @@index([userId])
+  @@index([clientId])
+  @@index([userId, deletedAt])
+}
+
+// Reunião: notas rápidas + resumo gerado por IA (vira checklist/tarefas).
+model Meeting {
+  id       String  @id @default(uuid())
+  title    String @db.LongText
+  rawNotes String  @default("")
+  summary  String? @db.LongText
+  image    String? // legado: 1ª imagem (compat). Galeria completa fica em `images`. @db.LongText
+  images   String? // JSON: array de data URLs (anexos da reunião) @db.LongText
+
+  participants String? // JSON: array de nomes dos participantes @db.LongText
+  tags         String? // JSON: array de etiquetas @db.LongText
+  decisions    String? // JSON: array de decisões destacadas @db.LongText
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([projectId])
+}
+
+model Task {
+  id            String    @id @default(cuid())
+  title         String @db.LongText
+  description   String? @db.LongText
+  isDone        Boolean   @default(false)
+  priority      String    @default("LOW") // HIGH, MEDIUM, LOW
+  status        String    @default("TODO") // TODO, IN_PROGRESS, REVIEW, DONE
+  dueDate       DateTime?
+  image         String? @db.LongText
+  projectId     String?
+  project       Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  isPinned      Boolean   @default(false)
+  isStarred     Boolean   @default(false)
+  twoMin        Boolean   @default(false) // "faça agora (2 min)" — Regra dos 2 minutos (#1)
+  progress      Int       @default(0)
+  estimatedTime Int? // em minutos
+  // Checklist/subtarefas dentro da tarefa — JSON '[{ id, text, done }]'
+  // (mesmo padrão de WorkoutPlan.content: editada como um todo no cliente,
+  // tipada em TS — normalizar em tabela só adicionaria upsert/ordenação).
+  checklist     String? @db.LongText
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
+  order         Float     @default(0)
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Blocos de tempo (Agenda) agendados a partir desta tarefa.
+  scheduledEvents Event[]
+
+  deletedAt DateTime?
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([userId, isDone])
+  @@index([userId, deletedAt])
+}
+
+// =========================================================
+// MÓDULO 6: JOB TRACKER
+// =========================================================
+
+model JobApplication {
+  id           String  @id @default(uuid())
+  company      String @db.LongText
+  role         String @db.LongText
+  status       String @db.LongText
+  jobUrl       String? @db.LongText
+  salary       String? @db.LongText
+  location     String? @db.LongText
+  requirements String? @db.LongText
+
+  // --- Campos profissionais (gestão de candidaturas) ---
+  contactName  String? @db.LongText
+  contactEmail String? @db.LongText
+  followUpDate DateTime?
+  priority     String? @db.LongText
+
+  // --- IA persistida (não regenerar sempre) ---
+  coverLetter String? // última carta de apresentação gerada @db.LongText
+  matchScore  Int? // % de compatibilidade da última análise (ordenação por fit)
+
+  type String @default("JOB")
+
+  appliedDate DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // --- Conexão com o módulo de Projetos ---
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  // Histórico de estágios (timeline do funil)
+  events JobEvent[]
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([projectId])
+}
+
+// Evento de mudança de estágio de uma candidatura (timeline / tempo em cada fase).
+model JobEvent {
+  id        String         @id @default(cuid())
+  jobId     String
+  job       JobApplication @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  status    String @db.LongText
+  createdAt DateTime       @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([userId])
+}
+
+// =========================================================
+// MÓDULO 6.1: CURRÍCULO / PORTFÓLIO (Builder Engine)
+// =========================================================
+
+model Portfolio {
+  id        String   @id @default(uuid())
+  // JSON serializado de PortfolioData (SQLite armazena como String para portabilidade total).
+  data      String @db.LongText
+  updatedAt DateTime @updatedAt
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Posição da carteira de investimentos do usuário (ações, FIIs, ETFs, cripto).
+// O preço atual é buscado ao vivo via brapi/AwesomeAPI; aqui guardamos só
+// quantidade e preço médio de compra (cost basis).
+model InvestmentHolding {
+  id        String   @id @default(uuid())
+  ticker    String // ex.: PETR4, MXRF11, IVVB11, BTC @db.LongText
+  type      String   @default("STOCK") // STOCK | FII | ETF | CRYPTO
+  quantity  Decimal
+  avgPrice  Decimal // preço médio de compra (custo)
+  note      String? @db.LongText
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// =========================================================
+// MÓDULO 7.1: DESAFIOS & PROGRAMAS DE TREINO
+// =========================================================
+
+model Challenge {
+  id           String   @id @default(uuid())
+  title        String @db.LongText
+  description  String? @db.LongText
+  category     String? // STRENGTH | CARDIO | MOBILITY | HABIT @db.LongText
+  durationDays Int      @default(30)
+  startDate    DateTime @default(now())
+  color        String? @db.LongText
+  icon         String? // emoji de destaque do desafio (ex.: "💪", "💧") @db.LongText
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  userId   String
+  user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  checkins ChallengeCheckin[]
+
+  @@index([userId])
+}
+
+model ChallengeCheckin {
+  id       String   @id @default(uuid())
+  dayIndex Int // dia 0..durationDays-1
+  date     DateTime @default(now())
+  note     String? @db.LongText
+
+  challengeId String
+  challenge   Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([challengeId, dayIndex])
+  @@index([userId])
+}
+
+// =========================================================
+// MÓDULO 7: SAÚDE & CORPO
+// =========================================================
+
+model Workout {
+  id    String @id @default(uuid())
+  title String @db.LongText
+  type  String @db.LongText
+
+  duration  Int
+  intensity String @db.LongText
+  feeling   String? @db.LongText
+  notes     String? @db.LongText
+
+  distance Float?
+  pace     String? @db.LongText
+
+  // Corrida estruturada (String pois SQLite/Prisma não suporta enum nativo):
+  // terrain ∈ ROAD | TREADMILL | TRAIL | TRACK · shoeName = tênis (análise de desgaste)
+  terrain  String? @db.LongText
+  shoeName String? @db.LongText
+
+  muscleGroup String? @db.LongText
+  exercises   String? @db.LongText
+
+  // --- Importação externa (GPX/TCX/CSV) ---
+  source     String? // Ex: "MANUAL", "STRAVA_CSV", "GPX", "TCX" @db.LongText
+  externalId String? // ID original do arquivo para deduplicação @db.LongText
+
+  date DateTime @default(now())
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, date])
+}
+
+// Registro de tênis de corrida (gestão de hardware / prevenção de lesão).
+// A quilometragem é SOMADA do histórico de Workout por shoeName (não duplicada aqui).
+model Shoe {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  maxDistance Float? // km — meta de troca (opcional). 80% = alerta âmbar, 100% = vermelho
+  retired     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+// Ficha de treino estruturada (Plano → Divisões A/B/C → Exercícios + Metas tipadas).
+// A hierarquia fica num JSON em `content` (mesmo padrão de Workout.exercises): a ficha
+// é sempre editada/carregada como um todo no cliente, então normalizar em 3 tabelas
+// só adicionaria complexidade de ordenação/upsert sem ganho. A tipagem estrita vive
+// nas interfaces TS (plan-types.ts) e é validada ao salvar.
+model WorkoutPlan {
+  id        String   @id @default(uuid())
+  name      String @db.LongText
+  goal      String   @default("general") // hypertrophy | strength | endurance | general
+  content   String   // JSON: { v, divisions: [{ label, muscleGroups, exercises: [{ name, target... }] }] } @db.LongText
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, updatedAt])
+}
+
+// Foto de um treino (galeria). Guardada como base64 NO BANCO (não em IndexedDB local)
+// para SINCRONIZAR entre dispositivos via Turso — mesma filosofia de portabilidade dos
+// avatares/guarda-roupa. A imagem já vem comprimida (≤1280px JPEG) do cliente.
+model WorkoutPhoto {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workoutId   String? // liga ao Workout da sessão (opcional) @db.LongText
+  dataUrl     String // base64 JPEG comprimido @db.LongText
+  title       String @db.LongText
+  date        DateTime @default(now())
+  volume      Int? // kg (snapshot do treino, p/ o card de compartilhamento)
+  durationMin Int?
+  sets        Int?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, date])
+}
+
+// Check-in de Energia/Metacognição (Fase 0 do roadmap — base do Motor de Correlação).
+// Um registro por dia (escala 1–5). Alimenta insights futuros (sono × treino × energia)
+// e o regulador adaptativo de carga. `date` é o dia normalizado (meia-noite local).
+model EnergyCheckin {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      DateTime // dia (00:00) — chave do upsert diário
+  energy    Int // 1–5 (energia mental)
+  mood      Int? // 1–5 (humor — opcional, p/ evolução)
+  note      String? @db.LongText
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId, date])
+}
+
+// Hábito recorrente diário (Fase 0). Diferente de Challenge (que é finito/durationDays):
+// hábito é contínuo, com streak indefinido. O LOG de FALHA guarda o MOTIVO (fricção),
+// matéria-prima do Vetor de Fricção (#15) e do Reset Semanal.
+model Habit {
+  id        String     @id @default(uuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String @db.LongText
+  icon      String? // emoji @db.LongText
+  color     String? @db.LongText
+  archived  Boolean    @default(false)
+  sortOrder Int        @default(0)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  logs      HabitLog[]
+
+  @@index([userId])
+}
+
+// Registro diário de um hábito. status: DONE | FAILED. `reason` (só p/ FAILED):
+// TIME | ENERGY | ENVIRONMENT | EMERGENCY. Sem log = pendente. `date` em T12:00:00Z.
+model HabitLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  habitId   String
+  habit     Habit    @relation(fields: [habitId], references: [id], onDelete: Cascade)
+  date      DateTime
+  status    String @db.LongText
+  reason    String? @db.LongText
+  createdAt DateTime @default(now())
+
+  @@unique([habitId, date])
+  @@index([userId, date])
+  @@index([habitId])
+}
+
+model HealthMetric {
+  id    String   @id @default(uuid())
+  type  String
+  value Float
+  date  DateTime @default(now())
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, type, date])
+}
+
+model BodyMeasurement {
+  id   String   @id @default(uuid())
+  date DateTime @default(now())
+
+  weight    Float
+  height    Float
+  gender    String @db.LongText
+  activity  Float     @default(1.2)
+  birthDate DateTime?
+
+  neck  Float?
+  waist Float?
+  hip   Float?
+
+  shoulders    Float?
+  chest        Float?
+  armLeft      Float?
+  armRight     Float?
+  forearmLeft  Float?
+  forearmRight Float?
+
+  thighLeft  Float?
+  thighRight Float?
+  calfLeft   Float?
+  calfRight  Float?
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([date])
+}
+
+model Meal {
+  id       String   @id @default(uuid())
+  title    String @db.LongText
+  items    String @db.LongText
+  calories Int?
+  // Macros em gramas (opcionais — nem todo registro detalha proteína/carbo/gordura)
+  protein  Float?
+  carbs    Float?
+  fat      Float?
+  type     String @db.LongText
+  date     DateTime @default(now())
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, date])
+}
+
+// Modelo para o Planejador Semanal
+model MealPlan {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dayOfWeek   Int // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
+  mealType    String // "BREAKFAST", "LUNCH", "SNACK", "DINNER" @db.LongText
+  title       String // Ex: "Café da Manhã Forte" @db.LongText
+  items       String // Ex: "Ovos, Aveia, Banana" @db.LongText
+  calories    Int? // Estimativa
+  isCompleted Boolean  @default(false) // Para checkar se seguiu o plano
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, dayOfWeek])
+}
+
+// =========================================================
+// MÓDULO 8: AGENDA & ROTINA
+// =========================================================
+
+model Event {
+  id          String    @id @default(uuid())
+  title       String @db.LongText
+  startTime   DateTime
+  endTime     DateTime?
+  isAllDay    Boolean   @default(false)
+  description String? @db.LongText
+  category    String    @default("general")
+
+  location   String? @db.LongText
+  color      String? @default("#6366f1")
+  // emailAlert = "Lembrete local" (#12 do AGENDA_ROADMAP): nome legado mantido
+  // por compatibilidade de dados/réplica; nada envia e-mail — é o gate do
+  // poller in-app (reminder-actions.ts) e do toast/notificação do navegador.
+  emailAlert Boolean @default(true)
+
+  // Recorrência (#2 do AGENDA_ROADMAP) — reusa o motor de lib/recurrence.ts.
+  // frequency: WEEKLY | MONTHLY | QUARTERLY | SEMIANNUAL | ANNUAL (null = não repete).
+  // recurrenceEnd: última data da série (null = sem fim). A âncora é o startTime.
+  // recurrenceExceptions: JSON '["yyyy-MM-dd", …]' — ocorrências puladas ou
+  // desvinculadas ("só esta ocorrência"); o agregador não expande essas datas.
+  frequency            String? @db.LongText
+  recurrenceEnd        DateTime?
+  recurrenceExceptions String? @db.LongText
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  // Bloco gerado ao AGENDAR uma tarefa na grade de Time-Blocking (Fase 1). SetNull:
+  // excluir a tarefa não apaga o bloco já reservado na linha do tempo.
+  taskId String?
+  task   Task?   @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([projectId])
+  @@index([taskId])
+  @@index([userId, startTime])
+  @@index([userId, deletedAt, startTime])
+}
+
+model RoutineItem {
+  id          String  @id @default(uuid())
+  title       String @db.LongText
+  startTime   String @db.LongText
+  endTime     String @db.LongText
+  description String? @db.LongText
+  category    String @db.LongText
+
+  daysOfWeek String @db.LongText
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+// Dia Temático (Fase 1) — identidade recorrente de cada dia da semana (ex.: Segunda
+// = "Deep Work", Sexta = "Admin"). Um registro por (userId, weekday). `focus` é a
+// intenção curta do dia. Aparece na grade de Time-Blocking como banner/realce.
+model ThemedDay {
+  id      String  @id @default(uuid())
+  userId  String
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weekday Int // 0=Domingo … 6=Sábado
+  name    String @db.LongText
+  color   String  @default("#6366f1")
+  icon    String? // emoji @db.LongText
+  focus   String? // intenção/lema do dia (texto curto) @db.LongText
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, weekday])
+  @@index([userId])
+}
+
+// Sessão de Foco (Pomodoro / cronômetro) — Fase 1 do roadmap (Time-Blocking + Foco).
+// Cada registro = um intervalo de FOCO concluído (não conta as pausas). Alimenta a
+// inteligência futura (foco × energia #8, vetor de fricção #15) e o relatório de tempo.
+// taskId/eventId são referências leves (sem FK rígida, padrão do tecido conectivo) ao
+// que foi focado — a tarefa/bloco pode ser removido sem apagar o histórico de foco.
+model FocusSession {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  label   String? // o que foi focado (texto livre, ex.: "Estudo React") @db.LongText
+  minutes Int // minutos de foco concluídos
+  mode    String  @default("POMODORO") // POMODORO | STOPWATCH
+  cycles  Int     @default(1) // ciclos de foco concluídos nesta sessão
+
+  taskId  String? // tarefa vinculada (referência leve) @db.LongText
+  eventId String? // bloco de tempo vinculado (referência leve) @db.LongText
+
+  startedAt DateTime
+  endedAt   DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, endedAt])
+}
+
+// =========================================================
+// MÓDULO 9: CONFIGURAÇÕES & SISTEMA
+// =========================================================
+
+model Settings {
+  id          String @id @default(uuid())
+  theme       String @default("system")
+  accentColor String @default("zinc")
+  language    String @default("pt-BR")
+  currency    String @default("BRL")
+
+  // Horários de trabalho
+  workStart String @default("09:00")
+  workEnd   String @default("18:00")
+
+  // Antecedência (minutos) do lembrete de blocos da Agenda. Ver pollBlockReminders.
+  reminderLeadMinutes Int @default(30)
+
+  // Cobrança / Negócios (usado nas mensagens de cobrança do módulo Business)
+  pixKey       String? @db.LongText
+  businessName String? @db.LongText
+
+  // Inteligência Artificial
+  aiProvider String  @default("ollama")
+  aiModel    String  @default("llama3")
+  aiPersona  String? @db.LongText
+  aiUsage    String? // Dica: use Json para estatísticas complexas se preferir @db.LongText
+
+  // IA — briefing diário proativo (cache JSON {date, text}; 1 geração por dia)
+  aiBriefing String? @db.LongText
+
+  // IA — privacidade e roteamento (todos OPT-IN, desligados por padrão)
+  aiWebAccess      Boolean @default(false) // permite tools de web (busca/leitura de URL)
+  aiPrivacyRouting Boolean @default(false) // assuntos sensíveis vão para o Ollama local
+  aiCostRouting    Boolean @default(false) // perguntas triviais vão para modelo mais barato
+  aiVoiceReply     Boolean @default(false) // ler respostas da IA em voz alta (speechSynthesis)
+
+  // Chaves de API (Removido @map para simplificar e evitar confusão no código)
+  openaiKey         String? @db.LongText
+  groqKey           String? @db.LongText
+  googleKey         String? @db.LongText
+  deepseekKey       String? @db.LongText
+  mistralKey        String? @db.LongText
+  anthropicKey      String? // Claude (Anthropic) @db.LongText
+  xaiKey            String? // Grok (xAI) @db.LongText
+  openrouterKey     String? // OpenRouter (agregador multi-modelo) @db.LongText
+  tmdbApiKey        String? @db.LongText
+  rawgApiKey        String? @db.LongText
+  googleBooksApiKey String? @db.LongText
+  pluggyClientId    String? @db.LongText
+  pluggySecret      String? @db.LongText
+  brapiToken        String? // brapi.dev — cotações da B3 (ações/FIIs/ETFs). Token grátis. @db.LongText
+  marketWatchlist   String? // JSON: tickers favoritados no Terminal de Mercado @db.LongText
+
+  // Nutrição: busca online de alimentos (Open Food Facts — gratuita, sem chave)
+  foodApiEnabled Boolean @default(true)
+
+  // Metas de saúde (centralizadas no perfil — sincronizam entre dispositivos)
+  sleepGoalHours      Float? // meta de sono em horas/noite (ex.: 8). null = padrão do sistema
+  calorieGoalOverride Int?   // override manual da meta calórica diária. null = usar sugestão do perfil (TDEE)
+
+  // Localização de dados (Cuidado com caminhos absolutos como D:/ se for rodar em Linux/Docker)
+  storagePath String? @default("D:/LifeOS_Data")
+
+  // Metadados e Segurança
+  updatedAt           DateTime @updatedAt
+  onboardingCompleted Boolean  @default(false)
+  autoLockMinutes     Int      @default(15)
+  privacyMode         Boolean  @default(false)
+
+  // Relacionamento (Tornado obrigatório para garantir integridade)
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// =========================================================
+// MÓDULO 10: CMS & OUTROS
+// =========================================================
+
+model ManagedSite {
+  id        String   @id @default(uuid())
+  name      String @db.LongText
+  url       String? @db.LongText
+  apiKey    String   @unique @default(uuid())
+  createdAt DateTime @default(now())
+
+  pages SitePage[]
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model SitePage {
+  id        String      @id @default(uuid())
+  slug      String @db.LongText
+  content   String @db.LongText
+  siteId    String
+  site      ManagedSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  updatedAt DateTime    @updatedAt
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([siteId])
+}
+
+model AiChat {
+  id        String      @id @default(uuid())
+  title     String      @default("Nova Conversa")
+  createdAt DateTime    @default(now())
+  messages  AiMessage[]
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model AiMessage {
+  id        String   @id @default(uuid())
+  role      String @db.LongText
+  content   String @db.LongText
+  provider  String? @db.LongText
+  model     String? @db.LongText
+  chatId    String
+  chat      AiChat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([chatId])
+}
+
+// Memória persistente da IA: fatos curtos que sobrevivem entre conversas
+// ("lembre que..."). Sempre visíveis e apagáveis nas Configurações.
+model AiMemory {
+  id        String   @id @default(uuid())
+  content   String @db.LongText
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Automação agendada da IA ("toda sexta me mande o resumo financeiro").
+// O resultado vira Notification com link para conversar a respeito.
+model AiAutomation {
+  id        String    @id @default(uuid())
+  title     String @db.LongText
+  prompt    String @db.LongText
+  schedule  String // DAILY | WEEKLY:<0-6> | MONTHLY:<1-28> @db.LongText
+  hour      Int       @default(8)
+  enabled   Boolean   @default(true)
+  lastRunAt DateTime?
+  createdAt DateTime  @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Índice semântico (RAG local): vetor JSON por registro indexado. SQLite não
+// tem pgvector — busca por cosseno em memória (escala pessoal, <50k registros).
+model AiEmbedding {
+  id         String   @id @default(uuid())
+  entityType String // TRANSACTION | NOTE | TASK | MEAL | WORKOUT
+  entityId   String
+  text       String // projeção compacta do registro (o que foi vetorizado) @db.LongText
+  vector     String // JSON: number[] @db.LongText
+  updatedAt  DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, entityType, entityId])
+  @@index([userId, entityType])
+}
+
+model AccessItem {
+  id        String   @id @default(uuid())
+  title     String @db.LongText
+  username  String? @db.LongText
+  password  String @db.LongText
+  url       String? @db.LongText
+  category  String @db.LongText
+  notes     String? @db.LongText
+  client    String?  @map("client_name") @db.LongText
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model SavedLink {
+  id          String  @id @default(uuid())
+  title       String @db.LongText
+  url         String @db.LongText
+  description String? @db.LongText
+  imageUrl    String? @db.LongText
+  category    String? @db.LongText
+  isFavorite  Boolean @default(false)
+
+  // Taxonomia PARA (#10): null = não classificado.
+  paraType String? @db.LongText
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([userId, deletedAt])
+}
+
+model MediaItem {
+  id     String  @id @default(uuid())
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // --- Identificação Básica ---
+  title  String @db.LongText
+  type   String @db.LongText
+  status String @default("PLAN_TO_WATCH")
+
+  // --- Metadados ---
+  overview    String? @map("subtitle") // 🟢 SALVA-VIDAS: Preserva seus subtítulos! @db.LongText
+  coverUrl    String? @db.LongText
+  genres      String? @map("category") // 🟢 SALVA-VIDAS: Preserva suas categorias! @db.LongText
+  creator     String? @db.LongText
+  releaseYear String? @db.LongText
+  externalId  String? @db.LongText
+
+  // --- Interação Pessoal ---
+  rating Int     @default(0)
+  notes  String? @db.LongText
+
+  // --- Sistema ---
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([userId, deletedAt])
+}
+
+model Friend {
+  id        String    @id @default(cuid())
+  name      String @db.LongText
+  nickname  String? @db.LongText
+  email     String? @db.LongText
+  phone     String? @db.LongText
+  tags      String? @db.LongText
+  birthday  DateTime?
+  instagram String? @db.LongText
+  linkedin  String? @db.LongText
+  twitter   String? @db.LongText
+  jobTitle  String? @db.LongText
+  company   String? @db.LongText
+  proximity String    @default("CASUAL")
+  pixKey    String? @db.LongText
+  address   String? @db.LongText
+  notes     String? @db.LongText
+  imageUrl  String? @db.LongText
+  giftIdeas String? @db.LongText
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clients   Client[] // Clientes (Negócios) que apontam para esta conexão
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([userId, deletedAt])
+}
+
+model WardrobeItem {
+  id         String    @id @default(uuid())
+  name       String @db.LongText
+  imageUrl   String? @db.LongText
+  brand      String? @db.LongText
+  color      String? @db.LongText
+  size       String? @db.LongText
+  category   String @db.LongText
+  season     String? @db.LongText
+  price      Decimal?
+  wearCount  Int       @default(0)
+  lastWorn   DateTime?
+  isFavorite Boolean   @default(false)
+  status     String    @default("IN_CLOSET")
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deletedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([userId, deletedAt])
+}
+
+// =========================================================
+// MÓDULO 11: NEGÓCIOS & CLIENTES (NOVO)
+// =========================================================
+
+model Client {
+  id       String  @id @default(uuid())
+  name     String // Nome do contato ou da empresa @db.LongText
+  company  String? // Nome Fantasia (opcional) @db.LongText
+  imageUrl String? // Logo/foto da empresa (Base64 ou URL) @db.LongText
+  website  String? // Site da empresa @db.LongText
+  phone    String? // Para o botão de WhatsApp @db.LongText
+  email    String? @db.LongText
+  document String? // CPF ou CNPJ @db.LongText
+  address  String? @db.LongText
+  notes    String? @db.LongText
+
+  status String @default("ACTIVE") // ACTIVE, INACTIVE, LEAD
+
+  // Vínculo opcional com uma Conexão (pessoa de contato do cliente)
+  friendId String?
+  friend   Friend? @relation(fields: [friendId], references: [id], onDelete: SetNull)
+
+  // Relacionamentos
+  userId String? // Opcional para não quebrar seeders antigos, mas ideal vincular
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  projects Project[] // Projetos vinculados a este cliente
+  billings Billing[] // Contratos/Cobranças gerais
+  recurringCharges RecurringCharge[] // Cobranças recorrentes (Finanças) apontando para este cliente
+
+  deletedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([friendId])
+  @@index([userId, deletedAt])
+}
+
+// O "Contrato" ou "Acordo". Ex: "Criação de Site" ou "Manutenção Mensal"
+model Billing {
+  id          String  @id @default(uuid())
+  title       String // Ex: "Desenvolvimento E-commerce" @db.LongText
+  description String? @db.LongText
+
+  totalValue Decimal // Valor total do acordo
+
+  // Configuração de Pagamento
+  type         String @default("ONE_OFF") // ONE_OFF (Parcelado ou à vista) ou RECURRING (Mensalidade)
+  installments Int    @default(1) // Número de parcelas (se for ONE_OFF)
+
+  billingDay Int? // Dia de vencimento preferencial (ex: dia 10)
+  startDate  DateTime @default(now()) // Quando começa a valer
+
+  lastRemindedAt DateTime? // Última vez que uma cobrança foi enviada (Central de Cobranças)
+
+  status String @default("ACTIVE") // ACTIVE, COMPLETED, CANCELED
+
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  invoices Invoice[] // As faturas geradas (parcelas)
+  recurringCharges RecurringCharge[] // Cobranças recorrentes (Finanças) que alimentam este contrato
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([clientId])
+}
+
+// A "Fatura" ou "Parcela" específica. Ex: "Parcela 1/3"
+model Invoice {
+  id      String   @id @default(uuid())
+  title   String // Ex: "Parcela 1/3" ou "Mensalidade Janeiro" @db.LongText
+  value   Decimal // Valor desta fatura específica
+  dueDate DateTime // Data de Vencimento
+
+  status String    @default("PENDING") // PENDING, PAID, OVERDUE, CANCELED
+  paidAt DateTime? // Data do pagamento (para fluxo de caixa)
+
+  billingId String
+  billing   Billing @relation(fields: [billingId], references: [id], onDelete: Cascade)
+
+  linkUrl String? // Link do boleto ou comprovante se houver @db.LongText
+
+  // Lançamento financeiro gerado quando a fatura é recebida (evita duplicidade e permite estorno)
+  transactionId String?      @unique
+  transaction   Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([billingId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([userId, status, dueDate])
+}
+
+model BackupLog {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+  fileName  String @db.LongText
+  path      String @db.LongText
+  size      String // Ex: "2.5 MB" @db.LongText
+  type      String // "MANUAL" | "AUTO" @db.LongText
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// =========================================================
+// MÓDULO 12: TECIDO CONECTIVO CENTRAL (cross-módulo, escalável)
+// =========================================================
+
+// Tag universal — vocabulário compartilhado entre todos os módulos.
+model Tag {
+  id    String  @id @default(uuid())
+  name  String
+  color String? @default("#6366f1")
+  icon  String? @db.LongText
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  taggables Taggable[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+// Ligação polimórfica Tag <-> qualquer entidade (entityType + entityId).
+// Ex.: ("task", "<id>"), ("note", "<id>"), ("transaction", "<id>")...
+model Taggable {
+  id String @id @default(uuid())
+
+  tagId String
+  tag   Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  entityType String
+  entityId   String
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([tagId, entityType, entityId])
+  @@index([entityType, entityId])
+  @@index([userId])
+}
+
+// Notificação / Lembrete central — qualquer módulo enfileira aqui.
+model Notification {
+  id    String  @id @default(uuid())
+  type  String // INVOICE_DUE | EVENT | BIRTHDAY | FLASHCARD_REVIEW | CHALLENGE | TASK_DUE | SYSTEM @db.LongText
+  title String @db.LongText
+  body  String? @db.LongText
+
+  // Referência leve à entidade de origem (sem FK rígida = flexível p/ qualquer módulo).
+  entityType String? @db.LongText
+  entityId   String? @db.LongText
+  actionUrl  String? @db.LongText
+
+  priority String    @default("NORMAL") // LOW | NORMAL | HIGH
+  dueAt    DateTime?
+  readAt   DateTime?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, readAt])
+  @@index([userId, dueAt])
+}
+
+// Log de atividades (auditoria / linha do tempo entre módulos).
+model ActivityLog {
+  id      String  @id @default(uuid())
+  action  String // CREATE | UPDATE | DELETE | COMPLETE | LOGIN | ... @db.LongText
+  module  String // finance | tasks | studies | health | ... @db.LongText
+  summary String? @db.LongText
+
+  entityType String?
+  entityId   String?
+  meta       String? // JSON serializado (detalhes) @db.LongText
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([entityType, entityId])
+}
+
+// Anexo polimórfico — arquivos/imagens num lugar só (em vez de base64 inline).
+model Attachment {
+  id   String  @id @default(uuid())
+  name String? @db.LongText
+  kind String  @default("IMAGE") // IMAGE | FILE | LINK
+
+  // Conteúdo: URL externa OU base64 (portável). Um dos dois.
+  url       String? @db.LongText
+  blob      String? @db.LongText
+  mimeType  String? @db.LongText
+  sizeBytes Int?
+
+  entityType String
+  entityId   String
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([userId])
+}
+
+// Relacionamento genérico entre quaisquer entidades (grafo flexível).
+// Ex.: liga uma Transaction a um Project, uma Task a um LearningGoal, etc.
+model EntityLink {
+  id String @id @default(uuid())
+
+  fromType String
+  fromId   String
+  toType   String
+  toId     String
+  kind     String @default("RELATED") // RELATED | BLOCKS | DERIVED_FROM | REFERENCES
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([fromType, fromId, toType, toId, kind])
+  @@index([fromType, fromId])
+  @@index([toType, toId])
+  @@index([userId])
+}

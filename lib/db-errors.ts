@@ -44,6 +44,28 @@ export function friendlyDbError(error: unknown, profile?: DbProfile | null): str
     }
   }
 
+  // --- MySQL / MariaDB ---
+  if (provider === "mysql") {
+    if (low.includes("access denied") || low.includes("er_access_denied") || low.includes("1045")) {
+      return "O MySQL recusou usuário/senha (Access denied). Confira o usuário e a senha na connection string (mysql://usuario:senha@host:porta/banco) e se esse usuário tem permissão a partir do seu host.";
+    }
+    if (low.includes("unknown database") || low.includes("1049")) {
+      return "O banco informado na connection string não existe no MySQL. Crie-o (CREATE DATABASE) ou corrija o nome após a última barra da URL.";
+    }
+    if (low.includes("enotfound") || low.includes("getaddrinfo")) {
+      return "Host do MySQL não encontrado. Confira o endereço na connection string e se o servidor está acessível pela rede.";
+    }
+    if (low.includes("econnrefused")) {
+      return "Conexão recusada pelo MySQL. Confira a porta (padrão 3306), se o servidor está no ar e se aceita conexões externas (bind-address).";
+    }
+    if (low.includes("etimedout") || low.includes("timeout")) {
+      return "A conexão com o MySQL expirou. Confira firewall/rede e se o servidor não está sobrecarregado — tente de novo em alguns segundos.";
+    }
+    if (low.includes("ssl") || low.includes("certificate")) {
+      return "Problema de SSL/TLS na conexão com o MySQL. Bancos gerenciados exigem TLS; ajuste os parâmetros de SSL na connection string conforme o provedor.";
+    }
+  }
+
   // Réplica também fala com o Turso (espelho), então herda o mapeamento da nuvem.
   if (provider === "turso" || mode === "replica") {
     if (low.includes("401") || low.includes("unauthor")) {

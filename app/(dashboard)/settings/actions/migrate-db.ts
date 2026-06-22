@@ -31,8 +31,8 @@ import { copyDatabase, type CopyReport } from "@/lib/db-copy";
 import { buildFullBackup } from "@/lib/full-backup";
 
 export interface MigrationTargetInput {
-  kind: "turso" | "postgres" | "local";
-  /** turso: libsql://… · postgres: postgresql://user:senha@host/db */
+  kind: "turso" | "postgres" | "mysql" | "local";
+  /** turso: libsql://… · postgres: postgresql://… · mysql: mysql://user:senha@host:porta/db */
   url?: string;
   /** turso: JWT eyJ… */
   authToken?: string;
@@ -58,6 +58,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   turso: "Turso",
   postgres: "PostgreSQL",
   supabase: "Supabase",
+  mysql: "MySQL",
 };
 
 /** Valida o formulário e o transforma num DbProfile de destino. */
@@ -93,6 +94,18 @@ function resolveTargetProfile(input: MigrationTargetInput): DbProfile {
     const detected = detectProviderFromUrl(url);
     const provider = detected === "supabase" || detected === "postgres" ? detected : "postgres";
     return { mode: "cloud", provider, url };
+  }
+
+  if (input.kind === "mysql") {
+    const url = (input.url ?? "").trim();
+    if (!url) throw new Error("Informe a connection string do MySQL (mysql://…).");
+    if (/^eyJ/.test(url)) {
+      throw new Error("Isso parece uma API key (JWT), não a connection string. Use mysql://usuario:senha@host:porta/banco.");
+    }
+    if (!/^mysql:\/\//i.test(url)) {
+      throw new Error("URL inválida. Use o formato mysql://usuario:senha@host:porta/banco.");
+    }
+    return { mode: "cloud", provider: "mysql", url };
   }
 
   // local: pasta (cria life_os.db) ou arquivo .db direto.

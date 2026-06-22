@@ -23,6 +23,7 @@ import {
   ArrowRightLeft,
   Cloud,
   Server,
+  Database,
   HardDrive,
   PlugZap,
   ShieldCheck,
@@ -35,6 +36,7 @@ type TargetKind = MigrationTargetInput["kind"];
 const KINDS: { id: TargetKind; label: string; icon: typeof Cloud }[] = [
   { id: "turso", label: "Turso", icon: Cloud },
   { id: "postgres", label: "Postgres / Supabase", icon: Server },
+  { id: "mysql", label: "MySQL", icon: Database },
   { id: "local", label: "Arquivo local", icon: HardDrive },
 ];
 
@@ -142,13 +144,19 @@ export function MigrateDbCard() {
             </Label>
             <Input
               id="migUrl"
-              type={kind === "postgres" ? "password" : "text"}
+              type={kind === "postgres" || kind === "mysql" ? "password" : "text"}
               value={url}
               onChange={(e) => {
                 setUrl(e.target.value);
                 resetTest();
               }}
-              placeholder={kind === "turso" ? "libsql://seu-banco.turso.io" : "postgresql://usuario:senha@host:5432/banco"}
+              placeholder={
+                kind === "turso"
+                  ? "libsql://seu-banco.turso.io"
+                  : kind === "mysql"
+                    ? "mysql://usuario:senha@host:3306/banco"
+                    : "postgresql://usuario:senha@host:5432/banco"
+              }
               className="bg-background font-mono text-xs h-10"
             />
           </div>

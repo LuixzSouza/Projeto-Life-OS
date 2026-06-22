@@ -12,7 +12,17 @@ import type { DbDialect } from "./db-dialect";
 const BASELINE_BY_DIALECT: Partial<Record<DbDialect, string>> = {
   sqlite: path.join(process.cwd(), "prisma", "baseline.sql"),
   postgres: path.join(process.cwd(), "prisma", "baseline.postgres.sql"),
+  mysql: path.join(process.cwd(), "prisma", "baseline.mysql.sql"),
 };
+
+/**
+ * Caractere de citação de IDENTIFICADOR por dialeto. SQLite e Postgres usam
+ * aspas duplas (`"User"`); o MySQL usa crases (`` `User` ``). Todo parse/geração
+ * de SQL cru neste módulo decide a citação por AQUI — nunca assume aspas duplas.
+ */
+function identQuote(dialect: DbDialect): string {
+  return dialect === "mysql" ? "`" : '"';
+}
 
 /**
  * Divide o arquivo SQL em statements individuais.
@@ -42,10 +52,15 @@ function isAlreadyExistsError(error: unknown): boolean {
  * Prisma não loga `prisma:error ... already exists`) — a operação fica silenciosa
  * e idempotente de verdade.
  */
-function withIfNotExists(stmt: string): string {
-  return stmt
-    .replace(/^(\s*CREATE\s+TABLE\s+)(?!IF\s+NOT\s+EXISTS)/i, "$1IF NOT EXISTS ")
-    .replace(/^(\s*CREATE\s+(?:UNIQUE\s+)?INDEX\s+)(?!IF\s+NOT\s+EXISTS)/i, "$1IF NOT EXISTS ");
+function withIfNotExists(stmt: string, dialect: DbDialect = "sqlite"): string {
+  let out = stmt.replace(/^(\s*CREATE\s+TABLE\s+)(?!IF\s+NOT\s+EXISTS)/i, "$1IF NOT EXISTS ");
+  // `CREATE INDEX IF NOT EXISTS` NÃO existe no MySQL (erro de sintaxe). No MySQL
+  // os índices já vêm DENTRO do CREATE TABLE; um eventual CREATE INDEX solto é
+  // deixado cru e a idempotência fica por conta do catch de "duplicate".
+  if (dialect !== "mysql") {
+    out = out.replace(/^(\s*CREATE\s+(?:UNIQUE\s+)?INDEX\s+)(?!IF\s+NOT\s+EXISTS)/i, "$1IF NOT EXISTS ");
+  }
+  return out;
 }
 
 interface ParsedTable {
@@ -59,17 +74,23 @@ interface ParsedTable {
  * (`    "col" TIPO ...,`), então um parse linha-a-linha é confiável. Linhas de
  * constraint (CONSTRAINT/FOREIGN KEY/PRIMARY KEY de tabela) são ignoradas.
  */
-function parseTables(tableStatements: string[]): ParsedTable[] {
+function parseTables(tableStatements: string[], dialect: DbDialect = "sqlite"): ParsedTable[] {
+  const q = identQuote(dialect);
+  // Escapa o caractere de citação para uso seguro dentro de uma RegExp.
+  const qe = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const nameRe = new RegExp(`CREATE TABLE\\s+${qe}([^${qe}]+)${qe}`, "i");
+  const colRe = new RegExp(`^${qe}([^${qe}]+)${qe}`);
   const parsed: ParsedTable[] = [];
   for (const stmt of tableStatements) {
-    const nameMatch = stmt.match(/CREATE TABLE\s+"([^"]+)"/i);
+    const nameMatch = stmt.match(nameRe);
     if (!nameMatch) continue;
     const columns: { name: string; def: string }[] = [];
     for (const rawLine of stmt.split("\n")) {
       const line = rawLine.trim();
-      // Só linhas de coluna começam com aspas; pula `CREATE TABLE (`, `)`, CONSTRAINT…
-      if (!line.startsWith('"')) continue;
-      const colMatch = line.match(/^"([^"]+)"/);
+      // Só linhas de coluna começam com a citação; pula `CREATE TABLE (`, `)`,
+      // CONSTRAINT, UNIQUE INDEX, PRIMARY KEY (MySQL inline)…
+      if (!line.startsWith(q)) continue;
+      const colMatch = line.match(colRe);
       if (!colMatch) continue;
       parsedColumnPush(columns, colMatch[1], line);
     }
@@ -100,9 +121,16 @@ async function listColumns(
   table: string,
   dialect: DbDialect
 ): Promise<{ name: string }[]> {
+  const safeTable = table.replace(/'/g, "''");
   if (dialect === "postgres") {
     return client.$queryRawUnsafe<{ name: string }[]>(
-      `SELECT column_name AS name FROM information_schema.columns WHERE table_name = '${table.replace(/'/g, "''")}' AND table_schema = current_schema()`
+      `SELECT column_name AS name FROM information_schema.columns WHERE table_name = '${safeTable}' AND table_schema = current_schema()`
+    );
+  }
+  if (dialect === "mysql") {
+    // MySQL: o "schema" é o nome do banco — database() resolve para o banco ativo.
+    return client.$queryRawUnsafe<{ name: string }[]>(
+      `SELECT column_name AS name FROM information_schema.columns WHERE table_name = '${safeTable}' AND table_schema = database()`
     );
   }
   // SQLite/libSQL: PRAGMA (gate de dialeto — não existe fora da família SQLite).
@@ -125,10 +153,13 @@ async function reconcileColumns(
     if (!Array.isArray(info) || info.length === 0) continue;
 
     const existing = new Set(info.map((c) => c.name));
+    const q = identQuote(dialect);
     for (const col of columns) {
       if (existing.has(col.name)) continue;
       try {
-        await client.$executeRawUnsafe(`ALTER TABLE "${table}" ADD COLUMN ${col.def}`);
+        // col.def já traz o nome da coluna com a citação do baseline (crase no
+        // MySQL); só a citação do NOME DA TABELA precisa do dialeto aqui.
+        await client.$executeRawUnsafe(`ALTER TABLE ${q}${table}${q} ADD COLUMN ${col.def}`);
         console.log(`🧩 [ensureSchema] Coluna adicionada: ${table}.${col.name}`);
       } catch (error) {
         if (!isAlreadyExistsError(error)) {
@@ -171,7 +202,7 @@ export async function ensureSchema(
   // 1. Tabelas (CREATE TABLE IF NOT EXISTS — silencioso se já existir).
   for (const statement of statements.filter(isCreateTable)) {
     try {
-      await client.$executeRawUnsafe(withIfNotExists(statement));
+      await client.$executeRawUnsafe(withIfNotExists(statement, dialect));
     } catch (error) {
       if (isAlreadyExistsError(error)) continue;
       throw error;
@@ -179,13 +210,14 @@ export async function ensureSchema(
   }
 
   // 2. Colunas faltantes (schema antigo → atual, aditivo).
-  await reconcileColumns(client, parseTables(statements.filter(isCreateTable)), dialect);
+  await reconcileColumns(client, parseTables(statements.filter(isCreateTable), dialect), dialect);
 
-  // 3. Índices e demais statements (CREATE INDEX IF NOT EXISTS — silencioso).
-  // Falha de índice é tolerada (índice ausente é perf, não correção).
+  // 3. Índices/constraints e demais statements. No MySQL, as FKs vêm como
+  // ALTER TABLE ADD CONSTRAINT — falha por "duplicate" no rerun é tolerada.
+  // Falha de índice/constraint é tolerada (é perf/integridade, não estrutura).
   for (const statement of statements.filter((s) => !isCreateTable(s))) {
     try {
-      await client.$executeRawUnsafe(withIfNotExists(statement));
+      await client.$executeRawUnsafe(withIfNotExists(statement, dialect));
     } catch (error) {
       if (isAlreadyExistsError(error)) continue;
       console.warn("⚠️ [ensureSchema] Índice/statement ignorado:", error);

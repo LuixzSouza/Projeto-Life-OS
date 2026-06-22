@@ -15,7 +15,10 @@ const nextConfig: NextConfig = {
   // Postgres (DATABASE_ROADMAP Fase 1): o client derivado é gerado em
   // node_modules/@lifeos/client-postgres e carregado em runtime (require),
   // como o libsql — fora do bundle, resolvido do node_modules.
-  serverExternalPackages: ["@libsql/client", "libsql", "pg", "@lifeos/client-postgres", "@prisma/adapter-pg"],
+  // MySQL (DATABASE_ROADMAP Fase 4): o client derivado @lifeos/client-mysql usa
+  // o ENGINE NATIVO do Prisma (não há driver adapter de MySQL no Prisma 5.22) e
+  // é carregado em runtime via require — também fica fora do bundle do webpack.
+  serverExternalPackages: ["@libsql/client", "libsql", "pg", "@lifeos/client-postgres", "@prisma/adapter-pg", "@lifeos/client-mysql"],
 
   // Configurações de imagem
   images: {
@@ -51,7 +54,7 @@ const nextConfig: NextConfig = {
   // de fora da função serverless e o setup quebrava com 500 ("Baseline não
   // encontrado"). Forçamos a inclusão do arquivo no bundle de toda rota.
   outputFileTracingIncludes: {
-    "/**": ["./prisma/baseline.sql", "./prisma/baseline.postgres.sql"],
+    "/**": ["./prisma/baseline.sql", "./prisma/baseline.postgres.sql", "./prisma/baseline.mysql.sql"],
   },
 };
 

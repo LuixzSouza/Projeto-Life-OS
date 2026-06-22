@@ -120,6 +120,20 @@ function loadPostgresDeps(): {
 }
 
 /**
+ * Carrega em runtime o client gerado de MySQL (@lifeos/client-mysql), fora do
+ * bundle (serverExternalPackages). Diferente do Postgres, NÃO há driver adapter
+ * de MySQL no Prisma 5.22 (o @prisma/adapter-mariadb só existe no Prisma 7) —
+ * então este client roda pelo ENGINE NATIVO do Prisma, conectando direto pela
+ * URL `mysql://…`, exatamente como o SQLite local. Funciona em processo Node
+ * (desktop/VPS); o engine nativo não roda no Edge runtime (nem é o alvo aqui).
+ */
+function loadMysqlDeps(): { MysqlPrismaClient: typeof PrismaClient } {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const generated = require("@lifeos/client-mysql") as { PrismaClient: typeof PrismaClient };
+  return { MysqlPrismaClient: generated.PrismaClient };
+}
+
+/**
  * SSL do Postgres: bancos gerenciados (Supabase/Neon/...) exigem TLS, mas os
  * certificados de pooler costumam falhar na cadeia padrão do Node — o ajuste
  * de mercado é `rejectUnauthorized: false`. Local (localhost) fica sem SSL,
@@ -150,10 +164,21 @@ export function buildAdapterClient(profile: DbProfile): BuiltClient {
     return { client, libsql: null };
   }
 
-  if (profile.mode === "cloud" && (profile.provider === "mysql" || profile.provider === "mongodb")) {
+  if (profile.mode === "cloud" && profile.provider === "mysql") {
+    const { MysqlPrismaClient } = loadMysqlDeps();
+    // Engine nativo (sem adapter): a URL `mysql://…` vai direto ao datasource,
+    // como o SQLite local. O pool/timeout fica a cargo do driver nativo do Prisma.
+    const client = new MysqlPrismaClient({
+      datasources: { db: { url: profile.url } },
+      log: logLevels,
+    }) as PrismaClient;
+    return { client, libsql: null };
+  }
+
+  if (profile.mode === "cloud" && profile.provider === "mongodb") {
     throw new Error(
-      `O provedor "${profile.provider}" ainda não é suportado (roadmap multi-banco, fases 4/5). ` +
-      `Use Turso, Postgres/Supabase, ou o modo local/híbrido.`
+      `O provedor "mongodb" ainda não é suportado (roadmap multi-banco, fase 5). ` +
+      `Use Turso, Postgres/Supabase, MySQL, ou o modo local/híbrido.`
     );
   }
 

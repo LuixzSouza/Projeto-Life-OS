@@ -6,8 +6,12 @@
 #   npm run db:smoke:postgres -- "postgresql://postgres:lifeos@localhost:55432/lifeos"
 #   docker compose -f docker-compose.db.yml down -v
 #
-# MySQL/Mongo entram aqui quando as Fases 4/5 destravarem (MySQL exige o
-# upgrade p/ Prisma 6 — ver decisão 0.5 no roadmap).
+#   docker compose -f docker-compose.db.yml up -d mysql
+#   npm run db:smoke:mysql -- "mysql://lifeos:lifeos@localhost:53306/lifeos"
+#   docker compose -f docker-compose.db.yml down -v
+#
+# MySQL (Fase 4) entregue via ENGINE NATIVO do Prisma (sem driver adapter — o
+# @prisma/adapter-mariadb so existe no Prisma 7). Mongo entra na Fase 5.
 
 services:
   postgres:
@@ -23,3 +27,22 @@ services:
       interval: 2s
       timeout: 3s
       retries: 15
+
+  mysql:
+    image: mysql:8.4
+    container_name: lifeos-mysql-smoke
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: lifeos
+      MYSQL_USER: lifeos
+      MYSQL_PASSWORD: lifeos
+    # Porta 53306 no host (evita colidir com um MySQL local na 3306).
+    ports:
+      - "53306:3306"
+    # max_allowed_packet folgado: o smoke grava ~200 KB num LONGTEXT.
+    command: ["--max-allowed-packet=64M"]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
