@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Check, Plus, Minus, Trash2, X, Timer, ChevronDown, ChevronUp, History, Flag, Trophy,
   List, Target, ChevronLeft, ChevronRight, CircleCheck, Replace, Volume2, VolumeX, AlertTriangle,
-  EyeOff, MoreVertical, Pause, Lock, Play, Droplets, MapPin, Bell, BellOff, LogOut,
+  EyeOff, MoreVertical, Pause, Lock, Play, Droplets, MapPin, Bell, BellOff, LogOut, StickyNote, TrendingDown, Flame,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -19,16 +19,20 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useWakeLock } from "./use-wake-lock";
-import { sessionStats, estimatedOneRepMax, elapsedSeconds, isExercisePR, EQUIPMENT_META, SET_TYPE_META, type Equipment, type SetType, type LiveSession, type LastPerf, type ExerciseHistoryPoint, type LiveTarget } from "./session-types";
+import { sessionStats, estimatedOneRepMax, elapsedSeconds, isExercisePR, isWorkingSet, EQUIPMENT_META, SET_TYPE_META, type Equipment, type SetType, type LiveSession, type LastPerf, type ExerciseHistoryPoint, type LiveTarget } from "./session-types";
 import { RestOverlay } from "./rest-overlay";
 import { WarmupOverlay } from "./warmup-overlay";
 import { ExerciseDemoModal } from "./exercise-demo-modal";
 import { ExerciseThumb } from "./exercise-thumb";
+import { PlateHint } from "./plate-hint";
+import { buildWarmupRamp } from "./warmup-sets";
 import { MusicButton } from "./music-button";
 import { getAllMedia, persistMedia, mediaFor, setVideoFor, type MediaMap } from "./exercise-media";
 import { isNotifyEnabled, isNotifySupported, setNotifyEnabled, showSessionNotification } from "./session-notify";
-import { isSfxMuted, setSfxMuted, playSuccess, playRestEnd, playFinish, playCountdown, playWaterReminder, primeAudio, hapticTick, hapticExerciseDone, hapticRestEnd, vibrate } from "./sfx";
+import { isSfxMuted, setSfxMuted, playSuccess, playRestEnd, playFinish, playCountdown, playWaterReminder, announceRestOver, announceWarmupOver, primeAudio, hapticTick, hapticExerciseDone, hapticRestEnd, vibrate } from "./sfx";
 
+// Preferência do modo de visão da sessão (list | focus), persistida localmente.
+const VIEW_KEY = "lifeos:gym:view-mode";
 // Preferência do lembrete de água (minutos; 0 = desligado), persistida localmente.
 const WATER_KEY = "lifeos:gym:water-min";
 const WATER_STEPS = [20, 30, 45, 0] as const;
@@ -39,6 +43,38 @@ function loadWaterMinutes(): number {
 }
 
 type Ex = LiveSession["exercises"][number];
+
+// Anotação rápida por exercício na sessão (ex.: "reduzi a carga", "dor no ombro").
+// Fica recolhida até existir texto ou o usuário tocar — não polui a tela de quem
+// só quer marcar séries. Persiste junto do treino (StoredExercise.note).
+function ExerciseNoteField({ ex, controls }: { ex: Ex; controls: SessionControls }) {
+  const [open, setOpen] = useState(() => !!ex.note?.trim());
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground/70 transition-colors hover:text-foreground"
+      >
+        <StickyNote className="h-3.5 w-3.5" /> Anotar (reduzi a carga, dor, técnica…)
+      </button>
+    );
+  }
+  return (
+    <div className="flex items-start gap-1.5">
+      <StickyNote className="mt-2 h-3.5 w-3.5 shrink-0 text-amber-500" />
+      <textarea
+        value={ex.note ?? ""}
+        onChange={(e) => controls.setExerciseNote(ex.id, e.target.value)}
+        onBlur={() => { if (!ex.note?.trim()) setOpen(false); }}
+        placeholder="Anotação deste exercício…"
+        rows={2}
+        autoFocus={!ex.note}
+        className="flex-1 resize-none rounded-lg border border-border/50 bg-card px-2.5 py-1.5 text-xs outline-none focus:border-primary/50"
+      />
+    </div>
+  );
+}
 
 function clock(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds));
@@ -101,10 +137,13 @@ export interface SessionControls {
   renameExercise: (exId: string, name: string) => void;
   replaceExercise: (exId: string, name: string, group?: string, equipment?: Equipment) => void;
   setExerciseEquipment: (exId: string, equipment: Equipment) => void;
+  setExerciseNote: (exId: string, note: string) => void;
   setRestSeconds: (seconds: number) => void;
   addExercise: (name: string, group?: string) => void;
   removeExercise: (exId: string) => void;
   addSet: (exId: string) => void;
+  dropSet: (exId: string, afterSetId: string) => void;
+  addWarmupSets: (exId: string, sets: { weight: string; reps: string }[]) => void;
   removeSet: (exId: string, setId: string) => void;
   updateSet: (exId: string, setId: string, field: "reps" | "weight", value: string) => void;
   toggleSetDone: (exId: string, setId: string) => void;
@@ -139,7 +178,16 @@ export function SessionActive({
     return -1;
   };
 
-  const [mode, setMode] = useState<"list" | "focus">("list");
+  // Modo de visão: começa no FOCO (um exercício por vez, melhor pra treinar) e
+  // lembra a última escolha do usuário entre sessões.
+  const [mode, setMode] = useState<"list" | "focus">(() => {
+    if (typeof window === "undefined") return "focus";
+    return window.localStorage.getItem(VIEW_KEY) === "list" ? "list" : "focus";
+  });
+  const setViewMode = (m: "list" | "focus") => {
+    setMode(m);
+    try { window.localStorage.setItem(VIEW_KEY, m); } catch { /* ignora */ }
+  };
   const [focusIdx, setFocusIdx] = useState(0);
   // Direção da navegação no modo Foco (1 = avançar, -1 = voltar) — anima o slide.
   const [dir, setDir] = useState(1);
@@ -184,6 +232,15 @@ export function SessionActive({
 
   // Contagem regressiva falada: lembra o último segundo anunciado (sem repetir).
   const countedRef = useRef<number | null>(null);
+  // Nome do próximo exercício para o anúncio falado ao fim do descanso (lido dentro
+  // do tick por ref, já que o efeito do timer roda com deps vazias).
+  const nextNameRef = useRef<string | undefined>(undefined);
+  // Fim do aquecimento (epoch ms) enquanto ainda não concluído — lido no tick para
+  // anunciar uma vez ao zerar (mesmo padrão de espelhamento do nextNameRef).
+  const warmupEndsRef = useRef<number | null>(null);
+  const warmupAnnouncedRef = useRef(false);
+  // Recordes já comemorados nesta sessão (1 destaque por exercício, sem repetir).
+  const prCelebratedRef = useRef<Set<string>>(new Set());
   // Lembrete de água: minutos entre avisos (0 = desligado) e o último aviso.
   const [waterMinutes, setWaterMinutes] = useState(20);
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -221,7 +278,18 @@ export function SessionActive({
           countedRef.current = null;
           hapticRestEnd();
           playRestEnd();
+          announceRestOver(nextNameRef.current);
         }
+      }
+      // Aquecimento: anuncia uma vez quando o tempo previsto zera (celular longe/no bolso).
+      const we = warmupEndsRef.current;
+      if (we !== null) {
+        if (n >= we && !warmupAnnouncedRef.current) {
+          warmupAnnouncedRef.current = true;
+          announceWarmupOver();
+        }
+      } else {
+        warmupAnnouncedRef.current = false;
       }
       // Hidratação: aviso periódico (não atrapalha descanso em tela cheia: toast + voz).
       const w = waterRef.current;
@@ -322,6 +390,19 @@ export function SessionActive({
       }
       controls.toggleSetDone(exId, setId);
       playSuccess();
+      // Comemora recorde EM TEMPO REAL: se concluir esta série de trabalho criou um
+      // PR que ainda não existia, destaca uma vez por exercício na sessão.
+      if (ex && set && isWorkingSet(set)) {
+        const last = lastPerf[ex.name.toLowerCase()];
+        const after = { ...ex, sets: ex.sets.map((s) => (s.id === setId ? { ...s, done: true } : s)) };
+        if (last && isPR(after, last) && !isPR(ex, last) && !prCelebratedRef.current.has(ex.id)) {
+          prCelebratedRef.current.add(ex.id);
+          toast.success(`🏆 Novo recorde em ${ex.name}!`, {
+            description: `${numOf(set.weight)}${ex.equipment === "dumbbell" ? "kg/mão" : "kg"} × ${numOf(set.reps)} reps — melhor que da última vez.`,
+          });
+          vibrate([60, 40, 60, 40, 140]);
+        }
+      }
       // Feedback tátil: toque curto na série; vibração dupla se fechou o exercício.
       const willComplete = !!ex && ex.sets.every((s) => (s.id === setId ? true : s.done));
       if (willComplete) hapticExerciseDone();
@@ -358,7 +439,7 @@ export function SessionActive({
   const enterFocus = () => {
     const i = firstIncomplete();
     setFocusIdx(i === -1 ? 0 : i);
-    setMode("focus");
+    setViewMode("focus");
   };
 
   // Bi-set: pula pro parceiro durante o descanso (faz B no descanso de A). O
@@ -387,6 +468,10 @@ export function SessionActive({
     return { ...nextEx, last: lastPerf[key], history: volumeHistory?.[key] ?? [] };
   }, [nextEx, lastPerf, volumeHistory]);
   const partner = useMemo(() => supersetPartner(exercises, restExId), [exercises, restExId]);
+  useEffect(() => {
+    nextNameRef.current = nextEx?.name;
+    warmupEndsRef.current = session.warmupEndsAt && !session.warmupDone ? session.warmupEndsAt : null;
+  }, [nextEx, session.warmupEndsAt, session.warmupDone]);
   const demoId = demoFor ? mediaFor(media, demoFor)?.youtubeId : undefined;
 
   const idx = Math.min(focusIdx, Math.max(0, exercises.length - 1));
@@ -526,7 +611,7 @@ export function SessionActive({
           <div className="inline-flex rounded-lg border border-border/50 bg-muted/30 p-0.5">
             <button
               type="button"
-              onClick={() => setMode("list")}
+              onClick={() => setViewMode("list")}
               className={cn("inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold transition-colors", mode === "list" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground")}
             >
               <List className="h-3.5 w-3.5" /> Lista
@@ -789,6 +874,24 @@ function SetRows({ ex, controls, onToggle, big = false, last }: {
   const suggestKg = !bodyweight && lastW > 0 && lastR >= (target?.maxReps ?? 12) && !ex.sets.some((s) => s.done)
     ? Math.round((lastW + 2.5) * 100) / 100
     : null;
+  // Drop set: alvo é a série atual ou, se tudo concluído, a última — desde que seja
+  // de trabalho (não aquecimento) e tenha carga (não faz sentido em peso corporal puro).
+  const dropBase = activeIdx !== -1 ? ex.sets[activeIdx] : ex.sets[ex.sets.length - 1];
+  const dropTargetId = !bodyweight && dropBase && dropBase.type !== "warmup" && numOf(dropBase.weight) > 0 ? dropBase.id : null;
+  // Calculadora de anilhas: só faz sentido com BARRA (halter/máquina/cabo têm
+  // semântica diferente). Lê a carga da série ativa (ou da última, se tudo feito).
+  const plateWeight = ex.equipment === "barbell" ? numOf(dropBase?.weight ?? "") : 0;
+  // Aquecimento automático: carga de trabalho = 1ª série com carga (ou última vez).
+  // Oferece rampa só quando há referência de peso e ainda não há série de aquecimento.
+  const hasWarmup = ex.sets.some((s) => s.type === "warmup");
+  const workWeight = bodyweight ? 0 : numOf(ex.sets.find((s) => s.type !== "warmup" && numOf(s.weight) > 0)?.weight ?? last?.weight ?? "");
+  const warmupRamp = !hasWarmup && workWeight > 0 ? buildWarmupRamp(workWeight, ex.equipment) : [];
+  const addWarmup = () => {
+    controls.addWarmupSets(ex.id, warmupRamp);
+    toast.info("Aquecimento adicionado 🔥", {
+      description: `${warmupRamp.length} séries leves antes das de trabalho — não contam no volume.`,
+    });
+  };
   return (
     <>
       {target && (
@@ -802,6 +905,7 @@ function SetRows({ ex, controls, onToggle, big = false, last }: {
           <Trophy className="h-3 w-3" /> Você fechou {lastR} reps com {last?.weight}kg — tente {suggestKg}{perHand ? "kg/mão" : "kg"} hoje!
         </div>
       )}
+      {plateWeight > 0 && <PlateHint total={plateWeight} />}
       <div className="grid grid-cols-[1.75rem_1.4fr_1fr_2.5rem_1.75rem] items-center gap-1.5 px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
         <span className="text-center">Tipo</span>
         <span className="text-center">{perHand ? "Carga/mão" : bodyweight ? "+kg (opcional)" : "Carga (kg)"}</span>
@@ -861,9 +965,33 @@ function SetRows({ ex, controls, onToggle, big = false, last }: {
           );
         })}
       </div>
-      <Button type="button" variant="ghost" onClick={() => controls.addSet(ex.id)} className="mt-1.5 w-full gap-1.5 border border-dashed border-border/50 text-xs font-semibold text-muted-foreground hover:border-primary/40 hover:text-foreground">
-        <Plus className="h-4 w-4" /> Adicionar série <span className="text-muted-foreground/50">(clona a anterior)</span>
-      </Button>
+      <div className="mt-1.5 flex gap-1.5">
+        <Button type="button" variant="ghost" onClick={() => controls.addSet(ex.id)} className="flex-1 gap-1.5 border border-dashed border-border/50 text-xs font-semibold text-muted-foreground hover:border-primary/40 hover:text-foreground">
+          <Plus className="h-4 w-4" /> Adicionar série
+        </Button>
+        {warmupRamp.length > 0 && (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={addWarmup}
+            className="gap-1.5 border border-dashed border-orange-400/40 text-xs font-semibold text-orange-600 hover:border-orange-400/60 hover:bg-orange-500/5 hover:text-orange-600"
+            title="Cria uma rampa de séries leves (50/70/85%) antes das séries de trabalho"
+          >
+            <Flame className="h-4 w-4" /> Aquecer
+          </Button>
+        )}
+        {dropTargetId && (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => controls.dropSet(ex.id, dropTargetId)}
+            className="gap-1.5 border border-dashed border-orange-500/40 text-xs font-semibold text-orange-600 hover:border-orange-500/60 hover:bg-orange-500/5 hover:text-orange-600"
+            title="Não aguentou o peso? Cria uma série com ~80% da carga para continuar."
+          >
+            <TrendingDown className="h-4 w-4" /> Reduzi a carga
+          </Button>
+        )}
+      </div>
     </>
   );
 }
@@ -973,6 +1101,9 @@ function ExerciseCard({ ex, last, youtubeId, controls, onToggle, onOpenDemo }: {
             {ex.name && <SwapControl ex={ex} controls={controls} />}
           </div>
           <SetRows ex={ex} controls={controls} onToggle={onToggle} last={last} />
+          <div className="px-1 pt-0.5">
+            <ExerciseNoteField ex={ex} controls={controls} />
+          </div>
         </div>
       )}
     </section>
@@ -1088,6 +1219,11 @@ function FocusView({ ex, dir, index, total, doneFlags, last, youtubeId, controls
       {/* Séries (grandes) */}
       <div className="mt-3 rounded-2xl border border-border/40 bg-card p-3 shadow-sm">
         <SetRows ex={ex} controls={controls} onToggle={onToggle} big last={last} />
+      </div>
+
+      {/* Anotação rápida deste exercício */}
+      <div className="mt-2.5 px-1">
+        <ExerciseNoteField ex={ex} controls={controls} />
       </div>
 
       {/* Aviso de série incompleta */}

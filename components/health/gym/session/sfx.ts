@@ -134,6 +134,22 @@ export function playCountdown(second: number): void {
   }
 }
 
+/** Anúncio falado APÓS os beeps do fim do descanso ("Bora! Agora: Supino Reto.").
+ *  Atraso de ~1,1s para não atropelar o alarme; com nome do próximo exercício,
+ *  avisa qual é — útil com o celular no bolso/longe. */
+export function announceRestOver(nextName?: string): void {
+  if (isSfxMuted() || typeof window === "undefined") return;
+  window.setTimeout(() => {
+    speak(nextName ? `Bora! Agora: ${nextName}.` : "Bora! Hora da próxima série.", 1.05);
+  }, 1100);
+}
+
+/** Anúncio falado ao zerar o timer do aquecimento. */
+export function announceWarmupOver(): void {
+  if (isSfxMuted()) return;
+  speak("Aquecimento concluído. Bora treinar!", 1.05);
+}
+
 /** Lembrete de hidratação (voz + beep suave). */
 export function playWaterReminder(): void {
   if (isSfxMuted()) return;

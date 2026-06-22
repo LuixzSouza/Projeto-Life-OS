@@ -74,15 +74,18 @@ export function LiveSession({
     renameExercise: s.renameExercise,
     replaceExercise: s.replaceExercise,
     setExerciseEquipment: s.setExerciseEquipment,
+    setExerciseNote: s.setExerciseNote,
     setRestSeconds: s.setRestSeconds,
     addExercise: s.addExercise,
     removeExercise: s.removeExercise,
     addSet: s.addSet,
+    dropSet: s.dropSet,
+    addWarmupSets: s.addWarmupSets,
     removeSet: s.removeSet,
     updateSet: s.updateSet,
     toggleSetDone: s.toggleSetDone,
     setSetType: s.setSetType,
-  }), [s.renameExercise, s.replaceExercise, s.setExerciseEquipment, s.setRestSeconds, s.addExercise, s.removeExercise, s.addSet, s.removeSet, s.updateSet, s.toggleSetDone, s.setSetType]);
+  }), [s.renameExercise, s.replaceExercise, s.setExerciseEquipment, s.setExerciseNote, s.setRestSeconds, s.addExercise, s.removeExercise, s.addSet, s.dropSet, s.addWarmupSets, s.removeSet, s.updateSet, s.toggleSetDone, s.setSetType]);
 
   // "Iniciar" a partir de uma Ficha (builder) deixa a divisão escolhida no
   // pending-start; ao abrir a sessão sem treino ativo, dispara automaticamente.

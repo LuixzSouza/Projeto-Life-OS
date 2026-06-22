@@ -33,13 +33,15 @@ export function guessEquipment(name: string): Equipment {
 }
 
 /** Tipo da série — aquecimento NÃO conta para volume/recorde/1RM (só séries de
- *  trabalho refletem evolução). "failure" = série de trabalho levada à falha/drop. */
-export type SetType = "warmup" | "normal" | "failure";
+ *  trabalho refletem evolução). "failure" = série levada à falha; "drop" = série
+ *  com carga REDUZIDA por não aguentar o peso planejado (drop set / continuação). */
+export type SetType = "warmup" | "normal" | "failure" | "drop";
 
 export const SET_TYPE_META: Record<SetType, { label: string; short: string; tone: string }> = {
-  warmup:  { label: "Aquecimento", short: "A", tone: "text-amber-600 bg-amber-400/15 border-amber-400/40" },
-  normal:  { label: "Normal",      short: "N", tone: "text-muted-foreground bg-muted border-border/50" },
-  failure: { label: "Falha/Drop",  short: "F", tone: "text-red-600 bg-red-500/15 border-red-500/40" },
+  warmup:  { label: "Aquecimento",  short: "A", tone: "text-amber-600 bg-amber-400/15 border-amber-400/40" },
+  normal:  { label: "Normal",       short: "N", tone: "text-muted-foreground bg-muted border-border/50" },
+  failure: { label: "Falha",        short: "F", tone: "text-red-600 bg-red-500/15 border-red-500/40" },
+  drop:    { label: "Carga reduzida", short: "D", tone: "text-orange-600 bg-orange-500/15 border-orange-500/40" },
 };
 
 /** Só séries de trabalho (não-aquecimento) contam para métricas de evolução. */
@@ -138,7 +140,7 @@ export interface LastPerf {
 // ---- Formato persistido dentro de Workout.exercises (JSON) ----
 // Mantém os campos-resumo legados (sets/reps/weight) para os gráficos e o card de
 // histórico continuarem funcionando, e adiciona `setLog` com as séries detalhadas.
-export interface StoredSet { reps: string; weight: string; done: boolean; type?: SetType }
+export interface StoredSet { reps: string; weight: string; done: boolean; type?: SetType; doneAt?: number }
 export interface StoredExercise {
   name: string;
   sets: string;
@@ -147,6 +149,8 @@ export interface StoredExercise {
   equipment?: Equipment;
   setLog: StoredSet[];
   isCompleted: boolean;
+  /** Anotação da sessão (ex.: reduções de carga no meio do treino). */
+  note?: string;
 }
 
 /** Ponto do histórico de volume de um exercício (sparkline da tela de descanso). */
@@ -232,6 +236,26 @@ export function volumeByGroup(exercises: LiveExercise[]): { group: string; volum
   return Array.from(map, ([group, volume]) => ({ group, volume: Math.round(volume) })).sort((a, b) => b.volume - a.volume);
 }
 
+/** Tempo médio de TROCA de exercício (s): da última série feita de um exercício
+ *  até a primeira do seguinte, na ordem do treino. Inclui o descanso pós-última
+ *  série + deslocamento/montagem — é o custo real de transição. Null sem dados.
+ *  Ignora < 5s (cliques em sequência) e > 30 min (pausa/abandono). */
+export function averageExerciseTransitionSeconds(exercises: LiveExercise[]): number | null {
+  const gaps: number[] = [];
+  let prevLast: number | null = null;
+  for (const ex of exercises) {
+    const stamps = ex.sets.filter((s) => s.done && s.doneAt).map((s) => s.doneAt as number).sort((a, b) => a - b);
+    if (stamps.length === 0) continue;
+    if (prevLast !== null) {
+      const gap = (stamps[0] - prevLast) / 1000;
+      if (gap >= 5 && gap <= 1800) gaps.push(gap);
+    }
+    prevLast = stamps[stamps.length - 1];
+  }
+  if (gaps.length === 0) return null;
+  return Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length);
+}
+
 /** Ritmo médio entre séries concluídas (s), via carimbos doneAt. Null sem dados.
  *  Ignora intervalos < 5s (cliques em sequência) e > 15 min (pausa/abandono). */
 export function averageSetGapSeconds(exercises: LiveExercise[]): number | null {
@@ -264,7 +288,7 @@ export function toStoredExercises(exercises: LiveExercise[]): StoredExercise[] {
   return exercises
     .filter((ex) => ex.name.trim())
     .map((ex) => {
-      const setLog: StoredSet[] = ex.sets.map((s) => ({ reps: s.reps || "0", weight: s.weight || "0", done: s.done, type: s.type ?? "normal" }));
+      const setLog: StoredSet[] = ex.sets.map((s) => ({ reps: s.reps || "0", weight: s.weight || "0", done: s.done, type: s.type ?? "normal", ...(s.doneAt ? { doneAt: s.doneAt } : {}) }));
       const done = setLog.filter((s) => s.done);
       // Resumo de evolução vem só das séries de TRABALHO feitas (ignora aquecimento).
       const working = done.filter(isWorkingSet);
@@ -277,6 +301,7 @@ export function toStoredExercises(exercises: LiveExercise[]): StoredExercise[] {
         equipment: ex.equipment,
         setLog,
         isCompleted: done.length > 0 && done.length === ex.sets.length,
+        ...(ex.note?.trim() ? { note: ex.note.trim() } : {}),
       };
     });
 }

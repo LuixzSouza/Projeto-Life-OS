@@ -5,28 +5,61 @@ import { motion } from "framer-motion";
 import { Flame, Plus, Play, SkipForward, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ExerciseThumb } from "./exercise-thumb";
 import { playClick, playSuccess, hapticTick } from "./sfx";
 
 // Sugestões de aquecimento por grupo muscular (curtas, sem equipamento especial).
-const WARMUP_BY_GROUP: Record<string, string[]> = {
-  Peito: ["Flexão leve (1×10)", "Círculos de braço (30s)", "Abertura com elástico ou sem carga (1×15)"],
-  Costas: ["Barra fixa assistida ou remada leve (1×12)", "Alongamento de lat no apoio (30s/lado)", "Retração de escápulas (1×15)"],
-  Ombros: ["Rotação externa com elástico (1×15/lado)", "Elevação lateral sem carga (1×15)", "Círculos de braço (30s)"],
-  Biceps: ["Rosca com barra vazia (1×15)", "Alongamento de punho/antebraço (30s)"],
-  Triceps: ["Tríceps no cabo bem leve (1×15)", "Alongamento de tríceps acima da cabeça (30s/lado)"],
-  Pernas: ["Agachamento livre sem carga (1×15)", "Avanço alternado (1×10/perna)", "Mobilidade de tornozelo e quadril (45s)"],
-  Abdomen: ["Prancha (30s)", "Dead bug (1×10/lado)"],
-  Cardio: ["Esteira ou bike em ritmo leve (3-5 min)"],
+// `ex` = nome de exercício "thumbável" (busca a demonstração animada; sem match,
+// cai no gradiente com inicial — nunca quebra).
+interface WarmupTip { text: string; ex: string }
+const WARMUP_BY_GROUP: Record<string, WarmupTip[]> = {
+  Peito: [
+    { text: "Flexão leve (1×10)", ex: "Flexão de Braço" },
+    { text: "Círculos de braço (30s)", ex: "Círculos de Braço" },
+    { text: "Abertura com elástico ou sem carga (1×15)", ex: "Crucifixo" },
+  ],
+  Costas: [
+    { text: "Barra fixa assistida ou remada leve (1×12)", ex: "Barra Fixa" },
+    { text: "Alongamento de lat no apoio (30s/lado)", ex: "Alongamento de Costas" },
+    { text: "Retração de escápulas (1×15)", ex: "Remada Baixa" },
+  ],
+  Ombros: [
+    { text: "Rotação externa com elástico (1×15/lado)", ex: "Rotação Externa" },
+    { text: "Elevação lateral sem carga (1×15)", ex: "Elevação Lateral" },
+    { text: "Círculos de braço (30s)", ex: "Círculos de Braço" },
+  ],
+  Biceps: [
+    { text: "Rosca com barra vazia (1×15)", ex: "Rosca Direta" },
+    { text: "Alongamento de punho/antebraço (30s)", ex: "Rosca de Punho" },
+  ],
+  Triceps: [
+    { text: "Tríceps no cabo bem leve (1×15)", ex: "Tríceps Corda" },
+    { text: "Alongamento de tríceps acima da cabeça (30s/lado)", ex: "Tríceps Francês" },
+  ],
+  Pernas: [
+    { text: "Agachamento livre sem carga (1×15)", ex: "Agachamento Livre" },
+    { text: "Avanço alternado (1×10/perna)", ex: "Afundo (Passada)" },
+    { text: "Mobilidade de tornozelo e quadril (45s)", ex: "Mobilidade de Quadril" },
+  ],
+  Abdomen: [
+    { text: "Prancha (30s)", ex: "Prancha" },
+    { text: "Dead bug (1×10/lado)", ex: "Dead Bug" },
+  ],
+  Cardio: [{ text: "Esteira ou bike em ritmo leve (3-5 min)", ex: "Esteira" }],
 };
 
-const GENERIC = ["Esteira/bike leve (3-5 min)", "Mobilidade articular geral (1 min)", "1ª série de cada exercício com ~50% da carga"];
+const GENERIC: WarmupTip[] = [
+  { text: "Esteira/bike leve (3-5 min)", ex: "Esteira" },
+  { text: "Mobilidade articular geral (1 min)", ex: "Mobilidade Geral" },
+  { text: "1ª série de cada exercício com ~50% da carga", ex: "Aquecimento" },
+];
 
-function suggestionsFor(groups: string[]): string[] {
-  const out: string[] = [];
+function suggestionsFor(groups: string[]): WarmupTip[] {
+  const out: WarmupTip[] = [];
   const seen = new Set<string>();
   for (const g of groups) {
     for (const s of WARMUP_BY_GROUP[g] ?? []) {
-      if (!seen.has(s)) { seen.add(s); out.push(s); }
+      if (!seen.has(s.text)) { seen.add(s.text); out.push(s); }
     }
   }
   return out.length > 0 ? out.slice(0, 6) : GENERIC;
@@ -97,7 +130,7 @@ export function WarmupOverlay({
 
       {/* Checklist interativo (gerado pelos grupos musculares de hoje) */}
       <div className="mt-5 w-full max-w-sm rounded-2xl border border-border/40 bg-card p-3.5 text-left shadow-sm">
-        <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="mb-1 flex items-center justify-between gap-2">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Checklist de aquecimento
           </p>
@@ -105,6 +138,7 @@ export function WarmupOverlay({
             {doneCount}/{tips.length}
           </span>
         </div>
+        <p className="mb-2 text-[10px] text-muted-foreground/70">Toque em cada item para marcar o que já fez 👇</p>
 
         {/* Barra de progresso do checklist */}
         <div className="mb-2.5 h-1 w-full overflow-hidden rounded-full bg-muted/60">
@@ -118,25 +152,26 @@ export function WarmupOverlay({
           {tips.map((t, i) => {
             const isDone = checked[i];
             return (
-              <li key={t}>
+              <li key={t.text}>
                 <button
                   type="button"
                   onClick={() => toggle(i)}
                   className={cn(
-                    "flex w-full items-start gap-2.5 rounded-lg px-1.5 py-2 text-left text-sm transition-colors active:bg-muted/50",
-                    isDone && "opacity-55",
+                    "flex w-full items-center gap-2.5 rounded-lg border px-1.5 py-1.5 text-left text-sm transition-colors active:bg-muted/50",
+                    isDone ? "border-emerald-500/40 bg-emerald-500/5 opacity-70" : "border-border/40 bg-muted/20 hover:border-orange-400/50",
                   )}
                   aria-pressed={isDone}
                 >
+                  <ExerciseThumb name={t.ex} showPlay={false} className="h-9 w-9 rounded-md" />
+                  <span className={cn("min-w-0 flex-1 leading-snug", isDone && "line-through")}>{t.text}</span>
                   <span
                     className={cn(
-                      "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-all",
-                      isDone ? "border-orange-500 bg-orange-500 text-white" : "border-border text-transparent",
+                      "flex h-6 w-6 shrink-0 items-center justify-center rounded-md border-2 transition-all",
+                      isDone ? "border-emerald-500 bg-emerald-500 text-white" : "border-orange-400/60 bg-background text-transparent",
                     )}
                   >
-                    <Check className="h-3 w-3" />
+                    <Check className="h-3.5 w-3.5" />
                   </span>
-                  <span className={cn("leading-snug", isDone && "line-through")}>{t}</span>
                 </button>
               </li>
             );

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Play, Trash2, X, Dumbbell, Star, Search, ArrowUp, ArrowDown, ClipboardList, Zap, ChevronLeft, Flame, Layers } from "lucide-react";
+import { Plus, Play, Trash2, X, Dumbbell, Star, Search, ArrowUp, ArrowDown, ClipboardList, Zap, ChevronLeft, Flame, Layers, Minus, Sparkles, Check } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -9,6 +10,7 @@ import { MuscleBodyIcon } from "../muscle-body-icon";
 import { EXERCISES_BY_GROUP, MUSCLE_GROUPS } from "../exercise-db";
 import { ExerciseThumb } from "./exercise-thumb";
 import { EQUIPMENT_META, guessEquipment, type Equipment, type Routine } from "./session-types";
+import { smartOrder } from "./exercise-order";
 import { playClick, primeAudio } from "./sfx";
 import { RoutineShareButton, ImportRoutineButton } from "./routine-share-ui";
 import { divisionToStart, planToStart } from "./plan-start";
@@ -16,11 +18,15 @@ import type { SharedPlan } from "./plan-share";
 import type { PlanDivision, WorkoutPlan } from "./plan-types";
 import type { StartOptions } from "./use-active-session";
 
-const REST_OPTIONS = [60, 90, 120, 180];
-
 type StartMode = "planned" | "free";
 
 const GROUP_LABEL: Record<string, string> = Object.fromEntries(MUSCLE_GROUPS.map((g) => [g.value, g.label]));
+
+// Catálogo achatado (nome + grupo) p/ o autocomplete da busca "Adicionar outro".
+const ALL_EXERCISES: { name: string; group: string }[] = Object.entries(EXERCISES_BY_GROUP)
+  .flatMap(([group, names]) => names.map((name) => ({ name, group })));
+// Sem acento/caixa: "triceps" acha "Tríceps", "supino" acha "Supino Reto".
+const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 // Nome sugerido a partir dos grupos (estilo dos apps: Push / Pull / Legs / Upper / Full Body).
 function suggestSessionName(groups: string[]): string {
@@ -58,7 +64,9 @@ export function SessionSetup({
   const [titleEdited, setTitleEdited] = useState(false); // não sobrescreve nome manual
   const [groups, setGroups] = useState<string[]>([]);
   const [picked, setPicked] = useState<PickedExercise[]>([]);
-  const [rest, setRest] = useState(90);
+  // Descanso padrão DIGITÁVEL (segundos) — sem fileira de presets.
+  const [restText, setRestText] = useState("90");
+  const rest = Math.min(600, Math.max(10, parseInt(restText, 10) || 90));
   const [custom, setCustom] = useState("");
   // Tela inicial: escolher entre treino planejado (rotina salva) ou treino livre.
   const [startMode, setStartMode] = useState<StartMode | null>(null);
@@ -122,6 +130,16 @@ export function SessionSetup({
     setCustom("");
   };
 
+  // Autocomplete do campo "Adicionar outro": casa por nome (sem acento) no catálogo
+  // inteiro, mostra capa de cada um — quem não conhece pelo nome reconhece pelo movimento.
+  const customMatches = useMemo(() => {
+    const q = normalize(custom.trim());
+    if (q.length < 2) return [];
+    return ALL_EXERCISES
+      .filter(({ name }) => normalize(name).includes(q) && !pickedNames.has(name.toLowerCase()))
+      .slice(0, 6);
+  }, [custom, pickedNames]);
+
   const setSets = (i: number, delta: number) =>
     setPicked((prev) => prev.map((p, idx) => (idx === i ? { ...p, sets: Math.max(1, p.sets + delta) } : p)));
 
@@ -133,6 +151,15 @@ export function SessionSetup({
       const next = keys[(keys.indexOf(p.equipment) + 1) % keys.length];
       return { ...p, equipment: next };
     }));
+
+  // Ordenação automática: compostos e grupos grandes primeiro (ver exercise-order.ts).
+  const autoSort = () => {
+    playClick();
+    setPicked((prev) => smartOrder(prev));
+    toast.success("Treino ordenado!", {
+      description: "Compostos e grupos grandes primeiro; abdômen e cardio no fim — você rende mais enquanto está fresco.",
+    });
+  };
 
   const move = (i: number, dir: -1 | 1) =>
     setPicked((prev) => {
@@ -466,17 +493,18 @@ export function SessionSetup({
           </div>
         </section>
 
-        {/* Sugestões */}
+        {/* Sugestões — com IMAGEM de demonstração: quem não conhece o exercício pelo
+            nome reconhece pelo movimento (a capa anima os 2 frames). */}
         {suggestions.length > 0 && (
           <section className="space-y-2.5 rounded-xl border border-primary/15 bg-primary/[0.03] p-3">
             <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-primary/80">
               <Plus className="h-3 w-3" /> Toque para adicionar
             </p>
-            <div className="max-h-[200px] space-y-2.5 overflow-y-auto pr-1 custom-scrollbar">
+            <div className="max-h-[320px] space-y-2.5 overflow-y-auto pr-1 custom-scrollbar">
               {suggestions.map(({ group, items }) => (
                 <div key={group} className="space-y-1.5">
                   <span className="text-[10px] font-semibold text-muted-foreground">{group}</span>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
                     {items.map((name) => {
                       const added = pickedNames.has(name.toLowerCase());
                       return (
@@ -485,11 +513,20 @@ export function SessionSetup({
                           type="button"
                           onClick={() => toggleExercise(name, group)}
                           className={cn(
-                            "rounded-lg border px-2.5 py-1 text-[11px] font-medium transition-all",
-                            added ? "border-primary bg-primary text-primary-foreground" : "border-border/50 bg-background hover:border-primary/50 hover:bg-primary/5",
+                            "flex items-center gap-2 rounded-xl border p-1.5 text-left transition-all",
+                            added ? "border-primary bg-primary/10 ring-1 ring-primary/30" : "border-border/50 bg-background hover:border-primary/50 hover:bg-primary/5",
                           )}
                         >
-                          {added ? "✓ " : "+ "}{name}
+                          <ExerciseThumb name={name} group={group} showPlay={false} className="h-11 w-11 rounded-lg" />
+                          <span className="min-w-0 flex-1 text-[11px] font-medium leading-tight">{name}</span>
+                          <span
+                            className={cn(
+                              "mr-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border",
+                              added ? "border-primary bg-primary text-primary-foreground" : "border-border/60 text-muted-foreground/60",
+                            )}
+                          >
+                            {added ? <Check className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                          </span>
                         </button>
                       );
                     })}
@@ -500,27 +537,58 @@ export function SessionSetup({
           </section>
         )}
 
-        {/* Exercício personalizado */}
+        {/* Exercício personalizado — com autocomplete ILUSTRADO do catálogo */}
         <section className="space-y-2">
-          <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Adicionar outro</label>
+          <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Buscar exercício</label>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               value={custom}
               onChange={(e) => setCustom(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustom(); } }}
-              placeholder="Exercício fora da lista… (Enter)"
+              placeholder="Digite o nome… (Enter para adicionar)"
               className="h-11 pl-9"
             />
           </div>
+          {customMatches.length > 0 && (
+            <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-border/40 bg-card/60 p-2 sm:grid-cols-3">
+              {customMatches.map(({ name, group }) => (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => { toggleExercise(name, group); setCustom(""); }}
+                  className="flex items-center gap-2 rounded-lg border border-border/50 bg-background p-1.5 text-left transition-all hover:border-primary/50 hover:bg-primary/5"
+                >
+                  <ExerciseThumb name={name} group={group} showPlay={false} className="h-10 w-10 rounded-lg" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[11px] font-medium leading-tight">{name}</span>
+                    <span className="block truncate text-[9px] text-muted-foreground">{GROUP_LABEL[group] ?? group}</span>
+                  </span>
+                  <Plus className="h-3.5 w-3.5 shrink-0 text-primary" />
+                </button>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* Selecionados (reordenáveis — define a ordem do treino) */}
         {picked.length > 0 && (
           <section className="space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Ordem do treino ({picked.length})</p>
-              <p className="text-[10px] text-muted-foreground/70">use ↑ ↓ para reordenar</p>
+              <div className="flex items-center gap-2">
+                <p className="hidden text-[10px] text-muted-foreground/70 sm:block">↑ ↓ reordenam</p>
+                {picked.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={autoSort}
+                    className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/5 px-2.5 py-1 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/10"
+                    title="Compostos e grupos grandes primeiro, abdômen/cardio no fim"
+                  >
+                    <Sparkles className="h-3 w-3" /> Ordenar pra mim
+                  </button>
+                )}
+              </div>
             </div>
             <ul className="divide-y divide-border/40 overflow-hidden rounded-xl border border-border/40">
               {picked.map((p, i) => (
@@ -560,23 +628,39 @@ export function SessionSetup({
           </section>
         )}
 
-        {/* Descanso padrão */}
+        {/* Descanso padrão — você digita o tempo (sem fileira de presets) */}
         <section className="space-y-2">
           <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Descanso padrão entre séries</label>
-          <div className="flex gap-2">
-            {REST_OPTIONS.map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setRest(r)}
-                className={cn(
-                  "flex-1 rounded-xl border py-2 text-sm font-semibold transition-all",
-                  rest === r ? "border-primary bg-primary/5 text-primary ring-1 ring-primary/30" : "border-border/40 text-muted-foreground hover:border-primary/40",
-                )}
-              >
-                {r < 60 ? `${r}s` : `${Math.floor(r / 60)}:${String(r % 60).padStart(2, "0")}`}
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setRestText(String(Math.max(10, rest - 15)))}
+              className="flex h-11 w-14 items-center justify-center gap-0.5 rounded-xl border border-border/60 bg-card text-sm font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+              aria-label="Diminuir 15 segundos"
+            >
+              <Minus className="h-3.5 w-3.5" />15
+            </button>
+            <div className="relative flex-1">
+              <Input
+                inputMode="numeric"
+                value={restText}
+                onChange={(e) => setRestText(e.target.value.replace(/[^\d]/g, ""))}
+                placeholder="90"
+                className="h-11 pr-24 text-center font-mono text-lg font-bold tabular-nums"
+                aria-label="Descanso em segundos"
+              />
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                seg · {Math.floor(rest / 60)}:{String(rest % 60).padStart(2, "0")}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setRestText(String(Math.min(600, rest + 15)))}
+              className="flex h-11 w-14 items-center justify-center gap-0.5 rounded-xl border border-border/60 bg-card text-sm font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+              aria-label="Aumentar 15 segundos"
+            >
+              <Plus className="h-3.5 w-3.5" />15
+            </button>
           </div>
         </section>
       </div>

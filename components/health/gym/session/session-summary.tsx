@@ -2,12 +2,13 @@
 
 import { useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Loader2, Save, Star, Trophy, Timer, Layers, Dumbbell, ChevronLeft, Check, Camera, ImagePlus, Share2, X, Gauge, MapPin } from "lucide-react";
+import { Loader2, Save, Star, Trophy, Timer, Layers, Dumbbell, ChevronLeft, Check, Camera, ImagePlus, Share2, X, Gauge, MapPin, Repeat2, StickyNote, TrendingDown, Activity } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { sessionStats, elapsedSeconds, isExercisePR, volumeByGroup, averageSetGapSeconds, type LastPerf, type LiveSession } from "./session-types";
+import { sessionStats, elapsedSeconds, isExercisePR, isWorkingSet, loadMultiplier, volumeByGroup, averageSetGapSeconds, averageExerciseTransitionSeconds, type LastPerf, type LiveSession } from "./session-types";
+import { ExerciseThumb } from "./exercise-thumb";
 import { compressToDataUrl } from "./gym-gallery";
 import { shareWorkoutCard } from "./gym-share";
 
@@ -67,8 +68,44 @@ export function SessionSummary({
   const maxGroupVolume = groups[0]?.volume ?? 0;
   // Ritmo médio entre séries (carimbos doneAt de quando cada série foi concluída).
   const pace = useMemo(() => averageSetGapSeconds(session.exercises), [session.exercises]);
+  // Tempo médio de troca entre exercícios (última série de um → primeira do próximo).
+  const transition = useMemo(() => averageExerciseTransitionSeconds(session.exercises), [session.exercises]);
   // Exercícios totalmente concluídos vs. iniciados.
   const completedEx = session.exercises.filter((e) => e.name.trim() && e.sets.length > 0 && e.sets.every((s) => s.done)).length;
+  // Densidade do treino: volume movido por minuto. Quanto maior, mais trabalho no
+  // mesmo tempo (intensidade real da sessão, não só duração). Só com volume > 0.
+  const density = stats.volume > 0 ? Math.round(stats.volume / durationMin) : 0;
+
+  // Recap por exercício: o que você de fato fez (melhor série, volume, recorde,
+  // nota e se houve redução de carga). Fecha o ciclo dos dados capturados na sessão.
+  const recap = useMemo(() => {
+    const num = (v: string) => parseFloat((v || "").replace(",", ".")) || 0;
+    return session.exercises
+      .filter((e) => e.name.trim() && e.sets.some((s) => s.done))
+      .map((ex) => {
+        const mult = loadMultiplier(ex.equipment);
+        const working = ex.sets.filter((s) => s.done && isWorkingSet(s));
+        let topW = 0, topR = 0, volume = 0;
+        for (const s of working) {
+          const w = num(s.weight), r = num(s.reps);
+          volume += w * mult * r;
+          if (w > topW || (w === topW && r > topR)) { topW = w; topR = r; }
+        }
+        return {
+          id: ex.id,
+          name: ex.name.trim(),
+          group: ex.group,
+          doneCount: ex.sets.filter((s) => s.done).length,
+          total: ex.sets.length,
+          topW, topR,
+          volume: Math.round(volume),
+          perHand: ex.equipment === "dumbbell",
+          note: ex.note?.trim() || "",
+          hasDrop: ex.sets.some((s) => s.type === "drop"),
+          pr: isExercisePR(ex, lastPerf[ex.name.toLowerCase()]),
+        };
+      });
+  }, [session.exercises, lastPerf]);
 
   const saveRoutine = () => {
     const name = routineName.trim();
@@ -178,11 +215,21 @@ export function SessionSummary({
       )}
 
       {/* Destaques: ritmo, exercícios completos e local */}
-      {(pace !== null || session.location || named > 0) && (
+      {(pace !== null || transition !== null || density > 0 || session.location || named > 0) && (
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          {density > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2 py-1 text-[11px] font-semibold text-rose-600" title="Densidade: volume total dividido pela duração — quanto mais trabalho no mesmo tempo, mais intenso o treino">
+              <Activity className="h-3 w-3" /> {density.toLocaleString("pt-BR")} kg/min
+            </span>
+          )}
           {pace !== null && (
             <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary" title="Tempo médio entre séries concluídas">
               <Gauge className="h-3 w-3" /> ~{Math.floor(pace / 60)}:{String(pace % 60).padStart(2, "0")} entre séries
+            </span>
+          )}
+          {transition !== null && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-1 text-[11px] font-semibold text-amber-600" title="Tempo médio de troca de exercício (última série de um até a primeira do próximo)">
+              <Repeat2 className="h-3 w-3" /> ~{Math.floor(transition / 60)}:{String(transition % 60).padStart(2, "0")} trocando de exercício
             </span>
           )}
           <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-[11px] font-semibold text-muted-foreground">
@@ -213,6 +260,46 @@ export function SessionSummary({
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Recap por exercício — o que você fez, com melhor série, recorde, nota e drop */}
+      {recap.length > 0 && (
+        <div className="mt-4 rounded-2xl border border-border/40 bg-card p-3.5 shadow-sm">
+          <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Resumo por exercício</p>
+          <ul className="space-y-2">
+            {recap.map((r) => (
+              <li key={r.id} className="flex items-center gap-2.5">
+                <ExerciseThumb name={r.name} group={r.group} showPlay={false} className="h-10 w-10 rounded-lg" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-sm font-semibold">{r.name}</span>
+                    {r.pr && (
+                      <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-amber-400/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-500">
+                        <Trophy className="h-2.5 w-2.5" /> Recorde
+                      </span>
+                    )}
+                    {r.hasDrop && (
+                      <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-orange-500/15 px-1.5 py-0.5 text-[9px] font-bold text-orange-600" title="Houve redução de carga">
+                        <TrendingDown className="h-2.5 w-2.5" /> Drop
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    {r.doneCount}/{r.total} séries
+                    {r.topW > 0 && <> · melhor {r.topW}{r.perHand ? "kg/mão" : "kg"} × {r.topR}</>}
+                    {r.volume > 0 && <> · {r.volume.toLocaleString("pt-BR")} kg</>}
+                  </p>
+                  {r.note && (
+                    <p className="mt-0.5 flex items-start gap-1 text-[10px] italic leading-snug text-muted-foreground/80">
+                      <StickyNote className="mt-px h-2.5 w-2.5 shrink-0 text-amber-500" />
+                      <span className="line-clamp-2">{r.note}</span>
+                    </p>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

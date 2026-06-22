@@ -157,6 +157,32 @@ export function useActiveSession() {
     ));
   }, [mutate]);
 
+  // "Não aguentei o peso" → insere uma série de CARGA REDUZIDA (~80%, arredondada a
+  // 2,5 kg) logo após a série atual, marcada como drop. O usuário só ajusta as reps.
+  const dropSet = useCallback((exId: string, afterSetId: string) => {
+    mutate((exs) => exs.map((e) => {
+      if (e.id !== exId) return e;
+      const idx = e.sets.findIndex((s) => s.id === afterSetId);
+      if (idx === -1) return e;
+      const base = e.sets[idx];
+      const w = parseFloat(String(base.weight).replace(",", ".")) || 0;
+      const reduced = w > 0 ? Math.max(0, Math.round((w * 0.8) / 2.5) * 2.5) : 0;
+      const dropped = { id: uid("set"), reps: "", weight: reduced ? String(reduced) : "", done: false, type: "drop" as const };
+      return { ...e, sets: [...e.sets.slice(0, idx + 1), dropped, ...e.sets.slice(idx + 1)] };
+    }));
+  }, [mutate]);
+
+  // Prepende uma rampa de séries de AQUECIMENTO (type "warmup") antes das séries de
+  // trabalho. Não conta para volume/recorde; o aquecimento vem antes na execução.
+  const addWarmupSets = useCallback((exId: string, sets: { weight: string; reps: string }[]) => {
+    if (sets.length === 0) return;
+    mutate((exs) => exs.map((e) => {
+      if (e.id !== exId) return e;
+      const warm: LiveSet[] = sets.map((w) => ({ id: uid("set"), reps: w.reps, weight: w.weight, done: false, type: "warmup" as const }));
+      return { ...e, sets: [...warm, ...e.sets] };
+    }));
+  }, [mutate]);
+
   const removeSet = useCallback((exId: string, setId: string) => {
     mutate((exs) => exs.map((e) =>
       e.id === exId ? { ...e, sets: e.sets.filter((s) => s.id !== setId) } : e,
@@ -195,6 +221,6 @@ export function useActiveSession() {
     togglePause, endWarmup, extendWarmup, setLocation,
     setTitle, setRestSeconds,
     addExercise, removeExercise, renameExercise, replaceExercise, setExerciseEquipment, setExerciseNote,
-    addSet, removeSet, updateSet, toggleSetDone, setSetType,
+    addSet, dropSet, addWarmupSets, removeSet, updateSet, toggleSetDone, setSetType,
   };
 }

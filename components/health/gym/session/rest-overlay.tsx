@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Minus, Plus, Play, Timer, Repeat2, ChevronRight, Minimize2, History, TrendingUp, TrendingDown, Lock } from "lucide-react";
+import { Minus, Plus, Play, Timer, Repeat2, ChevronRight, Minimize2, History, TrendingUp, TrendingDown, Lock, Gamepad2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { playClick } from "./sfx";
 import { ExerciseThumb } from "./exercise-thumb";
+import { RestMiniGame } from "./rest-minigame";
 import type { ExerciseHistoryPoint, LastPerf } from "./session-types";
 
 function fmt(totalSeconds: number): string {
@@ -27,8 +28,6 @@ function relDays(iso?: string): string | null {
   if (weeks < 5) return `há ${weeks}sem`;
   return `há ${Math.max(1, Math.floor(days / 30))}m`;
 }
-
-const PRESETS = [45, 60, 90, 120, 180];
 
 interface NextInfo { name: string; group?: string; last?: LastPerf; history?: ExerciseHistoryPoint[] }
 
@@ -94,6 +93,8 @@ export function RestOverlay({
   const offset = C * (1 - frac);
 
   const [custom, setCustom] = useState("");
+  // Minigame opcional para passar o tempo do descanso (para sozinho ao zerar).
+  const [playing, setPlaying] = useState(false);
   const applyCustom = () => {
     const v = Math.round(parseFloat(custom.replace(",", ".")));
     if (Number.isFinite(v) && v > 0) {
@@ -133,85 +134,84 @@ export function RestOverlay({
       )}
 
       {/* Topo flexível: centraliza anel + ajustes; encolhe em telas baixas */}
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4">
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-y-auto py-2">
         <div className="relative flex items-center gap-2 text-sm font-semibold uppercase tracking-widest text-muted-foreground">
           <Timer className="h-4 w-4" />
           {over ? "Tempo extra" : "Descanso"}
+          {playing && <span className={cn("font-mono tabular-nums", over ? "text-red-500" : "text-foreground")}>· {over ? "+" : ""}{fmt(remaining)}</span>}
         </div>
 
-        {/* Anel + número — escala com a largura E a altura (nunca estoura/scrolla) */}
-        <div className="relative flex aspect-square w-[min(56vw,38vh,240px)] items-center justify-center">
-          <svg viewBox="0 0 300 300" className="-rotate-90 h-full w-full">
-            <circle cx="150" cy="150" r={R} fill="none" stroke="currentColor" strokeWidth="14" className="text-muted/20" />
-            <circle
-              cx="150" cy="150" r={R} fill="none" strokeWidth="14" strokeLinecap="round"
-              stroke="currentColor"
-              className={cn("transition-[stroke-dashoffset] duration-1000 ease-linear", over ? "text-red-500" : "text-primary")}
-              strokeDasharray={C}
-              strokeDashoffset={over ? 0 : offset}
-            />
-          </svg>
-          <div className="absolute flex flex-col items-center">
-            <span className={cn("font-mono text-5xl font-bold tabular-nums tracking-tight", over ? "text-red-500" : "text-foreground")}>
-              {over ? "+" : ""}{fmt(remaining)}
-            </span>
-            {over && <span className="mt-1 text-xs font-medium text-red-500/80">passou do tempo</span>}
-          </div>
-        </div>
+        {playing ? (
+          <RestMiniGame active={!over} onExit={() => setPlaying(false)} />
+        ) : (
+          <>
+            {/* Anel + número — escala com a largura E a altura (nunca estoura/scrolla) */}
+            <div className="relative flex aspect-square w-[min(56vw,38vh,240px)] items-center justify-center">
+              <svg viewBox="0 0 300 300" className="-rotate-90 h-full w-full">
+                <circle cx="150" cy="150" r={R} fill="none" stroke="currentColor" strokeWidth="14" className="text-muted/20" />
+                <circle
+                  cx="150" cy="150" r={R} fill="none" strokeWidth="14" strokeLinecap="round"
+                  stroke="currentColor"
+                  className={cn("transition-[stroke-dashoffset] duration-1000 ease-linear", over ? "text-red-500" : "text-primary")}
+                  strokeDasharray={C}
+                  strokeDashoffset={over ? 0 : offset}
+                />
+              </svg>
+              <div className="absolute flex flex-col items-center">
+                <span className={cn("font-mono text-5xl font-bold tabular-nums tracking-tight", over ? "text-red-500" : "text-foreground")}>
+                  {over ? "+" : ""}{fmt(remaining)}
+                </span>
+                {over && <span className="mt-1 text-xs font-medium text-red-500/80">passou do tempo</span>}
+              </div>
+            </div>
 
-        {/* Ajustes rápidos + tempo exato */}
-        <div className="relative flex w-full max-w-sm flex-col items-center gap-2.5">
-        <div className="flex items-center justify-center gap-2">
-          <button
-            type="button"
-            onClick={() => { onAdjust(-15); playClick(); }}
-            className="flex h-10 w-14 items-center justify-center gap-0.5 rounded-xl border border-border/60 bg-card text-sm font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-          >
-            <Minus className="h-3.5 w-3.5" />15
-          </button>
-          {PRESETS.map((p) => (
+            {/* Ajuste do descanso: −15 · digitar o tempo exato · +30 (sem fileira de presets) */}
+            <div className="relative flex w-full max-w-sm flex-col items-center gap-1.5">
+            <div className="flex w-full items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => { onAdjust(-15); playClick(); }}
+                className="flex h-12 w-16 shrink-0 items-center justify-center gap-0.5 rounded-xl border border-border/60 bg-card text-sm font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                aria-label="Diminuir 15 segundos"
+              >
+                <Minus className="h-4 w-4" />15
+              </button>
+              {/* Tempo exato digitável — vira o novo padrão da sessão */}
+              <div className="relative flex-1">
+                <input
+                  inputMode="numeric"
+                  value={custom}
+                  onChange={(e) => setCustom(e.target.value.replace(/[^\d]/g, ""))}
+                  onKeyDown={(e) => { if (e.key === "Enter") { applyCustom(); (e.target as HTMLInputElement).blur(); } }}
+                  onBlur={applyCustom}
+                  placeholder={String(total)}
+                  aria-label="Descanso em segundos"
+                  className="h-12 w-full rounded-xl border border-border/60 bg-card pr-16 text-center font-mono text-xl font-bold tabular-nums text-foreground outline-none transition-colors focus:border-primary/60"
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground">
+                  seg · {Math.floor(total / 60)}:{String(total % 60).padStart(2, "0")}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => { onAdjust(30); playClick(); }}
+                className="flex h-12 w-16 shrink-0 items-center justify-center gap-0.5 rounded-xl border border-border/60 bg-card text-sm font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                aria-label="Aumentar 30 segundos"
+              >
+                <Plus className="h-4 w-4" />30
+              </button>
+            </div>
+            <p className="text-[10px] text-muted-foreground/60">Digite os segundos para mudar o descanso padrão</p>
             <button
-              key={p}
               type="button"
-              onClick={() => { onSetExact(p); playClick(); }}
-              className={cn(
-                "h-10 w-12 rounded-xl border text-xs font-semibold tabular-nums transition-colors",
-                p === total ? "border-primary bg-primary/10 text-primary" : "border-border/60 bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground",
-              )}
+              onClick={() => { setPlaying(true); playClick(); }}
+              className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/10"
             >
-              {p < 60 ? `${p}s` : `${Math.floor(p / 60)}:${String(p % 60).padStart(2, "0")}`}
+              <Gamepad2 className="h-3.5 w-3.5" /> Jogar enquanto descansa
             </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => { onAdjust(30); playClick(); }}
-            className="flex h-10 w-14 items-center justify-center gap-0.5 rounded-xl border border-border/60 bg-card text-sm font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-          >
-            <Plus className="h-3.5 w-3.5" />30
-          </button>
-        </div>
-
-        {/* Tempo exato (digite os segundos) */}
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="uppercase tracking-wider">Tempo exato:</span>
-          <input
-            inputMode="numeric"
-            value={custom}
-            onChange={(e) => setCustom(e.target.value.replace(/[^\d]/g, ""))}
-            onKeyDown={(e) => { if (e.key === "Enter") applyCustom(); }}
-            placeholder="seg"
-            className="h-8 w-16 rounded-lg border border-border/60 bg-card text-center font-mono text-sm text-foreground outline-none focus:border-primary/50"
-          />
-          <button
-            type="button"
-            onClick={applyCustom}
-            disabled={!custom}
-            className="h-8 rounded-lg border border-border/60 bg-card px-2.5 font-semibold transition-colors hover:border-primary/40 hover:text-foreground disabled:opacity-40"
-          >
-            ok
-          </button>
-        </div>
-        </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Rodapé: pareado + próxima + ação — fixo no fim, sempre visível (nunca clipado) */}
