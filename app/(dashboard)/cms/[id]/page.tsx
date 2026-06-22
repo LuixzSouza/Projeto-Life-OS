@@ -1,3 +1,6 @@
+// Conteudo autenticado por-usuario: render por requisicao (nunca prerender no build).
+export const dynamic = "force-dynamic";
+
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { SiteEditor } from "@/components/cms/site-editor"; // Esse componente vamos melhorar no próximo passo!

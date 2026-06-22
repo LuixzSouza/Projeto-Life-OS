@@ -1,3 +1,6 @@
+// Conteudo autenticado por-usuario: render por requisicao (nunca prerender no build).
+export const dynamic = "force-dynamic";
+
 // src/app/dashboard/page.tsx
 import { redirect } from "next/navigation";
 import { Suspense } from "react";

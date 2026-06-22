@@ -1,3 +1,6 @@
+// Conteudo autenticado por-usuario: render por requisicao (nunca prerender no build).
+export const dynamic = "force-dynamic";
+
 import { prisma } from "@/lib/prisma";
 import { Users, Heart, TrendingUp, CalendarHeart, MessageCircleHeart } from "lucide-react";
 import { FriendList } from "@/components/social/friend-list";

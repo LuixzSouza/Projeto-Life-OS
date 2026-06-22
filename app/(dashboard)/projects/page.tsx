@@ -1,3 +1,6 @@
+// Conteudo autenticado por-usuario: render por requisicao (nunca prerender no build).
+export const dynamic = "force-dynamic";
+
 import { prisma } from "@/lib/prisma";
 import { NewProjectDialog } from "@/components/projects/new-project-dialog";
 import { ProjectsExplorer, type ProjectItem, type TaskSummary } from "@/components/projects/projects-explorer";

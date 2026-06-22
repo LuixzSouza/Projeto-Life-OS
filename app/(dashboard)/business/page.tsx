@@ -1,3 +1,6 @@
+// Conteudo autenticado por-usuario: render por requisicao (nunca prerender no build).
+export const dynamic = "force-dynamic";
+
 import { prisma } from "@/lib/prisma"
 import { Metadata } from "next"
 import { BusinessView } from "@/components/business/business-view" 

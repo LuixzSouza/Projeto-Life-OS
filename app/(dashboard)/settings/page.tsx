@@ -1,3 +1,6 @@
+// Conteudo autenticado por-usuario: render por requisicao (nunca prerender no build).
+export const dynamic = "force-dynamic";
+
 import { prisma } from "@/lib/prisma";
 import { getStorageStats, getDbStatus } from "./actions";
 import { Card, CardContent } from "@/components/ui/card";

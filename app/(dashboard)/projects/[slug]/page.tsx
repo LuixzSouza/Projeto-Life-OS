@@ -1,3 +1,6 @@
+// Conteudo autenticado por-usuario: render por requisicao (nunca prerender no build).
+export const dynamic = "force-dynamic";
+
 import { prisma } from "@/lib/prisma";
 import { parseMeetingImages } from "@/lib/meeting-images";
 import { parseStringList } from "@/lib/meeting-meta";

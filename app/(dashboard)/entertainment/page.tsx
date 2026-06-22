@@ -1,3 +1,6 @@
+// Conteudo autenticado por-usuario: render por requisicao (nunca prerender no build).
+export const dynamic = "force-dynamic";
+
 import { prisma } from "@/lib/prisma";
 import { Star } from "lucide-react";
 import { EntertainmentBoard } from "@/components/entertainment/entertainment-board";

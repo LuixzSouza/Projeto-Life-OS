@@ -1,3 +1,6 @@
+// Conteudo autenticado por-usuario: render por requisicao (nunca prerender no build).
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 import { getCurrentUserId } from "@/lib/auth";
 import { buildFullBackup, BACKUP_MODULES, BackupModule } from "@/lib/full-backup";
