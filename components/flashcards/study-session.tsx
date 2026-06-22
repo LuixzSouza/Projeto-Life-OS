@@ -18,6 +18,7 @@ import {
   Check,
 } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { Flashcard, FlashcardDeck } from "@prisma/client";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -99,6 +100,8 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
   // Avaliação em 2 passos: "choose" mostra Errei/Acertei; ao acertar, revela as
   // 3 notas (Difícil/Bom/Fácil) — carga mental baixa sem perder a precisão do SRS.
   const [gradeStep, setGradeStep] = useState<"choose" | "correct">("choose");
+  // Feedback visual do botão Embaralhar (giro breve do ícone).
+  const [shuffling, setShuffling] = useState(false);
 
   // Modo Escrita: resposta digitada do cartão atual + foco automático no input.
   const [typedAnswer, setTypedAnswer] = useState("");
@@ -200,15 +203,22 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
 
 
   // --- AVALIAÇÃO E LÓGICA DO ALGORITMO ---
-  const handleRate = async (rating: ReviewRating) => {
+  // OTIMISTA: avança IMEDIATAMENTE e grava no servidor em segundo plano. Antes,
+  // o `await reviewFlashcard` travava o cartão esperando a escrita — que em modo
+  // nuvem/réplica é um round-trip de rede (lento). Agora o estudo é instantâneo;
+  // se a gravação falhar, avisa (a próxima revisão/sincronização recupera).
+  const handleRate = (rating: ReviewRating) => {
     if (isSaving || !currentCard) return;
     setIsSaving(true);
 
-    // 1. Atualiza Stats locais
+    // 1. Stats locais (otimista).
     setStats((prev) => ({ ...prev, [rating.toLowerCase()]: prev[rating.toLowerCase() as keyof typeof prev] + 1 }));
 
-    // 2. Registra no Servidor
-    await reviewFlashcard(currentCard.id, rating);
+    // 2. Grava no servidor SEM bloquear a navegação.
+    void reviewFlashcard(currentCard.id, rating).catch((e) => {
+      console.error("Falha ao salvar revisão:", e);
+      toast.error("Não consegui salvar essa avaliação — verifique a conexão.");
+    });
 
     // 3. Reaprendizado: se errou, o cartão volta algumas posições à frente (não
     // no fim) — reforça ainda nesta sessão, mas sem reaparecer na cara.
@@ -228,10 +238,12 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
       setTypedAnswer(""); // limpa a resposta digitada para o próximo cartão
       setHintShown(false); // esconde a dica para o próximo cartão
       setGradeStep("choose"); // volta para Errei/Acertei no próximo cartão
-      setTimeout(() => setCurrentIndex((prev) => prev + 1), 150); // Timeout leve para animação 3D
+      // Só a animação 3D de 150ms (debounce de duplo-clique) — não espera a rede.
+      setTimeout(() => {
+        setCurrentIndex((prev) => prev + 1);
+        setIsSaving(false);
+      }, 150);
     }
-
-    setIsSaving(false);
   };
 
   const restartFull = () => {
@@ -240,6 +252,11 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
 
   // Embaralha só os cartões que ainda VÊM (mantém o atual e os já vistos no lugar).
   const shuffleRemaining = () => {
+    const remaining = queue.length - currentIndex - 1;
+    if (remaining < 2) {
+      toast.info("Nada para embaralhar à frente.");
+      return;
+    }
     setQueue((prev) => {
       const head = prev.slice(0, currentIndex + 1);
       const tail = prev.slice(currentIndex + 1);
@@ -249,6 +266,9 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
       }
       return [...head, ...tail];
     });
+    setShuffling(true);
+    setTimeout(() => setShuffling(false), 600);
+    toast.success(`${remaining} próximos cartões embaralhados`, { icon: <Shuffle className="h-4 w-4" />, duration: 1500 });
   };
 
   // Inverte termo/definição: volta a mostrar a "pergunta" (verso oculto de novo).
@@ -357,9 +377,12 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
                 <Button
                     variant="outline" size="icon" onClick={shuffleRemaining}
                     title="Embaralhar os próximos cartões"
-                    className="h-12 w-12 rounded-xl text-muted-foreground shadow-sm transition-colors hover:text-primary hover:bg-primary/10"
+                    className={cn(
+                        "h-12 w-12 rounded-xl shadow-sm transition-colors hover:text-primary hover:bg-primary/10",
+                        shuffling ? "text-primary bg-primary/10" : "text-muted-foreground",
+                    )}
                 >
-                    <Shuffle className="h-5 w-5" />
+                    <Shuffle className={cn("h-5 w-5 transition-transform", shuffling && "animate-spin")} />
                 </Button>
                 <Button
                     variant="outline" size="icon" onClick={toggleReverse}
