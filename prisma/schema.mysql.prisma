@@ -295,7 +295,7 @@ model StudyNote {
 model NoteImage {
   id   String @id @default(uuid())
   mime String @db.LongText
-  data String // Base64 puro (sem o prefixo data:) @db.LongText
+  data String @db.LongText // Base64 puro (sem o prefixo data:)
 
   noteId String?
   note   StudyNote? @relation(fields: [noteId], references: [id], onDelete: Cascade)
@@ -485,7 +485,7 @@ model Transaction {
   description String @db.LongText
   amount      Decimal
   type        String @db.LongText
-  category    String // rótulo legado (texto livre) — mantido p/ compatibilidade @db.LongText
+  category    String @db.LongText // rótulo legado (texto livre) — mantido p/ compatibilidade
   date        DateTime @default(now())
 
   accountId String
@@ -519,7 +519,7 @@ model RecurringExpense {
   title      String @db.LongText
   amount     Decimal
   dayOfMonth Int
-  category   String // rótulo legado @db.LongText
+  category   String @db.LongText // rótulo legado
   active     Boolean @default(true)
 
   // Recorrência dinâmica: WEEKLY | MONTHLY | QUARTERLY | SEMIANNUAL | ANNUAL.
@@ -582,7 +582,7 @@ model RecurringCharge {
   amount     Decimal
   dayOfMonth Int
   category   String  @default("Cobrança")
-  clientName String? // nome cacheado do cliente (sobrevive se o cliente for removido) @db.LongText
+  clientName String? @db.LongText // nome cacheado do cliente (sobrevive se o cliente for removido)
   active     Boolean @default(true)
 
   // Recorrência dinâmica: WEEKLY | MONTHLY | QUARTERLY | SEMIANNUAL | ANNUAL.
@@ -680,8 +680,8 @@ model Project {
   id          String   @id @default(uuid())
   title       String @db.LongText
   slug        String   @unique
-  description String? // resumo curto ("Sobre") @db.LongText
-  notes       String? // documento rico (markdown) editado na aba Notas @db.LongText
+  description String? @db.LongText // resumo curto ("Sobre")
+  notes       String? @db.LongText // documento rico (markdown) editado na aba Notas
   status      String   @default("ACTIVE")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @default(now()) @updatedAt
@@ -722,12 +722,12 @@ model Meeting {
   title    String @db.LongText
   rawNotes String  @default("")
   summary  String? @db.LongText
-  image    String? // legado: 1ª imagem (compat). Galeria completa fica em `images`. @db.LongText
-  images   String? // JSON: array de data URLs (anexos da reunião) @db.LongText
+  image    String? @db.LongText // legado: 1ª imagem (compat). Galeria completa fica em `images`.
+  images   String? @db.LongText // JSON: array de data URLs (anexos da reunião)
 
-  participants String? // JSON: array de nomes dos participantes @db.LongText
-  tags         String? // JSON: array de etiquetas @db.LongText
-  decisions    String? // JSON: array de decisões destacadas @db.LongText
+  participants String? @db.LongText // JSON: array de nomes dos participantes
+  tags         String? @db.LongText // JSON: array de etiquetas
+  decisions    String? @db.LongText // JSON: array de decisões destacadas
 
   projectId String?
   project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
@@ -801,7 +801,7 @@ model JobApplication {
   priority     String? @db.LongText
 
   // --- IA persistida (não regenerar sempre) ---
-  coverLetter String? // última carta de apresentação gerada @db.LongText
+  coverLetter String? @db.LongText // última carta de apresentação gerada
   matchScore  Int? // % de compatibilidade da última análise (ordenação por fit)
 
   type String @default("JOB")
@@ -857,7 +857,7 @@ model Portfolio {
 // quantidade e preço médio de compra (cost basis).
 model InvestmentHolding {
   id        String   @id @default(uuid())
-  ticker    String // ex.: PETR4, MXRF11, IVVB11, BTC @db.LongText
+  ticker    String @db.LongText // ex.: PETR4, MXRF11, IVVB11, BTC
   type      String   @default("STOCK") // STOCK | FII | ETF | CRYPTO
   quantity  Decimal
   avgPrice  Decimal // preço médio de compra (custo)
@@ -879,11 +879,11 @@ model Challenge {
   id           String   @id @default(uuid())
   title        String @db.LongText
   description  String? @db.LongText
-  category     String? // STRENGTH | CARDIO | MOBILITY | HABIT @db.LongText
+  category     String? @db.LongText // STRENGTH | CARDIO | MOBILITY | HABIT
   durationDays Int      @default(30)
   startDate    DateTime @default(now())
   color        String? @db.LongText
-  icon         String? // emoji de destaque do desafio (ex.: "💪", "💧") @db.LongText
+  icon         String? @db.LongText // emoji de destaque do desafio (ex.: "💪", "💧")
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 
@@ -936,8 +936,8 @@ model Workout {
   exercises   String? @db.LongText
 
   // --- Importação externa (GPX/TCX/CSV) ---
-  source     String? // Ex: "MANUAL", "STRAVA_CSV", "GPX", "TCX" @db.LongText
-  externalId String? // ID original do arquivo para deduplicação @db.LongText
+  source     String? @db.LongText // Ex: "MANUAL", "STRAVA_CSV", "GPX", "TCX"
+  externalId String? @db.LongText // ID original do arquivo para deduplicação
 
   date DateTime @default(now())
 
@@ -973,7 +973,7 @@ model WorkoutPlan {
   id        String   @id @default(uuid())
   name      String @db.LongText
   goal      String   @default("general") // hypertrophy | strength | endurance | general
-  content   String   // JSON: { v, divisions: [{ label, muscleGroups, exercises: [{ name, target... }] }] } @db.LongText
+  content   String @db.LongText   // JSON: { v, divisions: [{ label, muscleGroups, exercises: [{ name, target... }] }] }
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -991,8 +991,8 @@ model WorkoutPhoto {
   id          String   @id @default(uuid())
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workoutId   String? // liga ao Workout da sessão (opcional) @db.LongText
-  dataUrl     String // base64 JPEG comprimido @db.LongText
+  workoutId   String? @db.LongText // liga ao Workout da sessão (opcional)
+  dataUrl     String @db.LongText // base64 JPEG comprimido
   title       String @db.LongText
   date        DateTime @default(now())
   volume      Int? // kg (snapshot do treino, p/ o card de compartilhamento)
@@ -1030,7 +1030,7 @@ model Habit {
   userId    String
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   name      String @db.LongText
-  icon      String? // emoji @db.LongText
+  icon      String? @db.LongText // emoji
   color     String? @db.LongText
   archived  Boolean    @default(false)
   sortOrder Int        @default(0)
@@ -1130,9 +1130,9 @@ model MealPlan {
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   dayOfWeek   Int // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
-  mealType    String // "BREAKFAST", "LUNCH", "SNACK", "DINNER" @db.LongText
-  title       String // Ex: "Café da Manhã Forte" @db.LongText
-  items       String // Ex: "Ovos, Aveia, Banana" @db.LongText
+  mealType    String @db.LongText // "BREAKFAST", "LUNCH", "SNACK", "DINNER"
+  title       String @db.LongText // Ex: "Café da Manhã Forte"
+  items       String @db.LongText // Ex: "Ovos, Aveia, Banana"
   calories    Int? // Estimativa
   isCompleted Boolean  @default(false) // Para checkar se seguiu o plano
   createdAt   DateTime @default(now())
@@ -1219,8 +1219,8 @@ model ThemedDay {
   weekday Int // 0=Domingo … 6=Sábado
   name    String @db.LongText
   color   String  @default("#6366f1")
-  icon    String? // emoji @db.LongText
-  focus   String? // intenção/lema do dia (texto curto) @db.LongText
+  icon    String? @db.LongText // emoji
+  focus   String? @db.LongText // intenção/lema do dia (texto curto)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1239,13 +1239,13 @@ model FocusSession {
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  label   String? // o que foi focado (texto livre, ex.: "Estudo React") @db.LongText
+  label   String? @db.LongText // o que foi focado (texto livre, ex.: "Estudo React")
   minutes Int // minutos de foco concluídos
   mode    String  @default("POMODORO") // POMODORO | STOPWATCH
   cycles  Int     @default(1) // ciclos de foco concluídos nesta sessão
 
-  taskId  String? // tarefa vinculada (referência leve) @db.LongText
-  eventId String? // bloco de tempo vinculado (referência leve) @db.LongText
+  taskId  String? @db.LongText // tarefa vinculada (referência leve)
+  eventId String? @db.LongText // bloco de tempo vinculado (referência leve)
 
   startedAt DateTime
   endedAt   DateTime @default(now())
@@ -1281,7 +1281,7 @@ model Settings {
   aiProvider String  @default("ollama")
   aiModel    String  @default("llama3")
   aiPersona  String? @db.LongText
-  aiUsage    String? // Dica: use Json para estatísticas complexas se preferir @db.LongText
+  aiUsage    String? @db.LongText // Dica: use Json para estatísticas complexas se preferir
 
   // IA — briefing diário proativo (cache JSON {date, text}; 1 geração por dia)
   aiBriefing String? @db.LongText
@@ -1298,16 +1298,16 @@ model Settings {
   googleKey         String? @db.LongText
   deepseekKey       String? @db.LongText
   mistralKey        String? @db.LongText
-  anthropicKey      String? // Claude (Anthropic) @db.LongText
-  xaiKey            String? // Grok (xAI) @db.LongText
-  openrouterKey     String? // OpenRouter (agregador multi-modelo) @db.LongText
+  anthropicKey      String? @db.LongText // Claude (Anthropic)
+  xaiKey            String? @db.LongText // Grok (xAI)
+  openrouterKey     String? @db.LongText // OpenRouter (agregador multi-modelo)
   tmdbApiKey        String? @db.LongText
   rawgApiKey        String? @db.LongText
   googleBooksApiKey String? @db.LongText
   pluggyClientId    String? @db.LongText
   pluggySecret      String? @db.LongText
-  brapiToken        String? // brapi.dev — cotações da B3 (ações/FIIs/ETFs). Token grátis. @db.LongText
-  marketWatchlist   String? // JSON: tickers favoritados no Terminal de Mercado @db.LongText
+  brapiToken        String? @db.LongText // brapi.dev — cotações da B3 (ações/FIIs/ETFs). Token grátis.
+  marketWatchlist   String? @db.LongText // JSON: tickers favoritados no Terminal de Mercado
 
   // Nutrição: busca online de alimentos (Open Food Facts — gratuita, sem chave)
   foodApiEnabled Boolean @default(true)
@@ -1412,7 +1412,7 @@ model AiAutomation {
   id        String    @id @default(uuid())
   title     String @db.LongText
   prompt    String @db.LongText
-  schedule  String // DAILY | WEEKLY:<0-6> | MONTHLY:<1-28> @db.LongText
+  schedule  String @db.LongText // DAILY | WEEKLY:<0-6> | MONTHLY:<1-28>
   hour      Int       @default(8)
   enabled   Boolean   @default(true)
   lastRunAt DateTime?
@@ -1430,8 +1430,8 @@ model AiEmbedding {
   id         String   @id @default(uuid())
   entityType String // TRANSACTION | NOTE | TASK | MEAL | WORKOUT
   entityId   String
-  text       String // projeção compacta do registro (o que foi vetorizado) @db.LongText
-  vector     String // JSON: number[] @db.LongText
+  text       String @db.LongText // projeção compacta do registro (o que foi vetorizado)
+  vector     String @db.LongText // JSON: number[]
   updatedAt  DateTime @updatedAt
 
   userId String
@@ -1492,9 +1492,9 @@ model MediaItem {
   status String @default("PLAN_TO_WATCH")
 
   // --- Metadados ---
-  overview    String? @map("subtitle") // 🟢 SALVA-VIDAS: Preserva seus subtítulos! @db.LongText
+  overview    String? @map("subtitle") @db.LongText // 🟢 SALVA-VIDAS: Preserva seus subtítulos!
   coverUrl    String? @db.LongText
-  genres      String? @map("category") // 🟢 SALVA-VIDAS: Preserva suas categorias! @db.LongText
+  genres      String? @map("category") @db.LongText // 🟢 SALVA-VIDAS: Preserva suas categorias!
   creator     String? @db.LongText
   releaseYear String? @db.LongText
   externalId  String? @db.LongText
@@ -1573,13 +1573,13 @@ model WardrobeItem {
 
 model Client {
   id       String  @id @default(uuid())
-  name     String // Nome do contato ou da empresa @db.LongText
-  company  String? // Nome Fantasia (opcional) @db.LongText
-  imageUrl String? // Logo/foto da empresa (Base64 ou URL) @db.LongText
-  website  String? // Site da empresa @db.LongText
-  phone    String? // Para o botão de WhatsApp @db.LongText
+  name     String @db.LongText // Nome do contato ou da empresa
+  company  String? @db.LongText // Nome Fantasia (opcional)
+  imageUrl String? @db.LongText // Logo/foto da empresa (Base64 ou URL)
+  website  String? @db.LongText // Site da empresa
+  phone    String? @db.LongText // Para o botão de WhatsApp
   email    String? @db.LongText
-  document String? // CPF ou CNPJ @db.LongText
+  document String? @db.LongText // CPF ou CNPJ
   address  String? @db.LongText
   notes    String? @db.LongText
 
@@ -1609,7 +1609,7 @@ model Client {
 // O "Contrato" ou "Acordo". Ex: "Criação de Site" ou "Manutenção Mensal"
 model Billing {
   id          String  @id @default(uuid())
-  title       String // Ex: "Desenvolvimento E-commerce" @db.LongText
+  title       String @db.LongText // Ex: "Desenvolvimento E-commerce"
   description String? @db.LongText
 
   totalValue Decimal // Valor total do acordo
@@ -1644,7 +1644,7 @@ model Billing {
 // A "Fatura" ou "Parcela" específica. Ex: "Parcela 1/3"
 model Invoice {
   id      String   @id @default(uuid())
-  title   String // Ex: "Parcela 1/3" ou "Mensalidade Janeiro" @db.LongText
+  title   String @db.LongText // Ex: "Parcela 1/3" ou "Mensalidade Janeiro"
   value   Decimal // Valor desta fatura específica
   dueDate DateTime // Data de Vencimento
 
@@ -1654,7 +1654,7 @@ model Invoice {
   billingId String
   billing   Billing @relation(fields: [billingId], references: [id], onDelete: Cascade)
 
-  linkUrl String? // Link do boleto ou comprovante se houver @db.LongText
+  linkUrl String? @db.LongText // Link do boleto ou comprovante se houver
 
   // Lançamento financeiro gerado quando a fatura é recebida (evita duplicidade e permite estorno)
   transactionId String?      @unique
@@ -1678,8 +1678,8 @@ model BackupLog {
   createdAt DateTime @default(now())
   fileName  String @db.LongText
   path      String @db.LongText
-  size      String // Ex: "2.5 MB" @db.LongText
-  type      String // "MANUAL" | "AUTO" @db.LongText
+  size      String @db.LongText // Ex: "2.5 MB"
+  type      String @db.LongText // "MANUAL" | "AUTO"
 
   userId String?
   user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1733,7 +1733,7 @@ model Taggable {
 // Notificação / Lembrete central — qualquer módulo enfileira aqui.
 model Notification {
   id    String  @id @default(uuid())
-  type  String // INVOICE_DUE | EVENT | BIRTHDAY | FLASHCARD_REVIEW | CHALLENGE | TASK_DUE | SYSTEM @db.LongText
+  type  String @db.LongText // INVOICE_DUE | EVENT | BIRTHDAY | FLASHCARD_REVIEW | CHALLENGE | TASK_DUE | SYSTEM
   title String @db.LongText
   body  String? @db.LongText
 
@@ -1758,13 +1758,13 @@ model Notification {
 // Log de atividades (auditoria / linha do tempo entre módulos).
 model ActivityLog {
   id      String  @id @default(uuid())
-  action  String // CREATE | UPDATE | DELETE | COMPLETE | LOGIN | ... @db.LongText
-  module  String // finance | tasks | studies | health | ... @db.LongText
+  action  String @db.LongText // CREATE | UPDATE | DELETE | COMPLETE | LOGIN | ...
+  module  String @db.LongText // finance | tasks | studies | health | ...
   summary String? @db.LongText
 
   entityType String?
   entityId   String?
-  meta       String? // JSON serializado (detalhes) @db.LongText
+  meta       String? @db.LongText // JSON serializado (detalhes)
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1804,11 +1804,11 @@ model Attachment {
 model EntityLink {
   id String @id @default(uuid())
 
-  fromType String
-  fromId   String
-  toType   String
-  toId     String
-  kind     String @default("RELATED") // RELATED | BLOCKS | DERIVED_FROM | REFERENCES
+  fromType String @db.VarChar(150)
+  fromId   String @db.VarChar(150)
+  toType   String @db.VarChar(150)
+  toId     String @db.VarChar(150)
+  kind     String @default("RELATED") @db.VarChar(150) // RELATED | BLOCKS | DERIVED_FROM | REFERENCES
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
