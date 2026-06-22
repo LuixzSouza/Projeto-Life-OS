@@ -19,18 +19,37 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   // Mantém as faturas das cobranças recorrentes em dia (best-effort, idempotente).
   await syncRecurringChargeInvoices(userId).catch(() => {})
 
-  const rawClient = await prisma.client.findFirst({
-    where: { id, userId, deletedAt: null },
-    include: {
-      friend: {
-        select: { id: true, name: true, imageUrl: true, phone: true, company: true, jobTitle: true },
+  // Cliente, contas, conexões e configurações são independentes — em paralelo
+  // (4 round-trips na nuvem viram 1). O notFound checa rawClient logo depois;
+  // o custo das outras 3 num 404 (raro) compensa a latência no caminho comum.
+  const [rawClient, accounts, friends, userSettings] = await Promise.all([
+    prisma.client.findFirst({
+      where: { id, userId, deletedAt: null },
+      include: {
+        friend: {
+          select: { id: true, name: true, imageUrl: true, phone: true, company: true, jobTitle: true },
+        },
+        billings: {
+          include: { invoices: { orderBy: { dueDate: 'asc' } } },
+          orderBy: { createdAt: 'desc' },
+        },
       },
-      billings: {
-        include: { invoices: { orderBy: { dueDate: 'asc' } } },
-        orderBy: { createdAt: 'desc' },
-      },
-    },
-  })
+    }),
+    prisma.account.findMany({
+      where: { userId },
+      select: { id: true, name: true, color: true, isConnected: true },
+      orderBy: { createdAt: 'asc' },
+    }),
+    prisma.friend.findMany({
+      where: { userId, deletedAt: null },
+      select: { id: true, name: true, imageUrl: true, company: true },
+      orderBy: { name: 'asc' },
+    }),
+    prisma.settings.findUnique({
+      where: { userId },
+      select: { pixKey: true, businessName: true },
+    }),
+  ])
 
   if (!rawClient) notFound()
 
@@ -49,23 +68,6 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
       })),
     })),
   }
-
-  const accounts = await prisma.account.findMany({
-    where: { userId },
-    select: { id: true, name: true, color: true, isConnected: true },
-    orderBy: { createdAt: 'asc' },
-  })
-
-  const friends = await prisma.friend.findMany({
-    where: { userId, deletedAt: null },
-    select: { id: true, name: true, imageUrl: true, company: true },
-    orderBy: { name: 'asc' },
-  })
-
-  const userSettings = await prisma.settings.findUnique({
-    where: { userId },
-    select: { pixKey: true, businessName: true },
-  })
 
   return (
     <PageShell className="bg-background/50">

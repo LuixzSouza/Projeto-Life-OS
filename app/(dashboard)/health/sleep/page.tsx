@@ -34,14 +34,18 @@ export default async function SleepPage() {
     startDate.setDate(startDate.getDate() - 30);
 
     const userId = await getCurrentUserId();
-    const sleepData = await prisma.healthMetric.findMany({
-      where: {
-        type: "SLEEP",
-        date: { gte: startDate, lte: endDate },
-        userId,
-      },
-      orderBy: { date: "asc" },
-    });
+    // Métricas de sono + meta (perfil) são independentes — paralelos.
+    const [sleepData, healthGoals] = await Promise.all([
+      prisma.healthMetric.findMany({
+        where: {
+          type: "SLEEP",
+          date: { gte: startDate, lte: endDate },
+          userId,
+        },
+        orderBy: { date: "asc" },
+      }),
+      getHealthGoals(),
+    ]);
 
     // Serialização
     serializedData = sleepData.map(item => ({
@@ -51,7 +55,7 @@ export default async function SleepPage() {
     }));
 
     // Meta de sono centralizada no perfil (banco).
-    sleepGoal = (await getHealthGoals()).sleepGoalHours;
+    sleepGoal = healthGoals.sleepGoalHours;
 
   } catch (error) {
     console.error("Critical Error in SleepPage:", error);

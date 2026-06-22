@@ -67,7 +67,7 @@ export default async function FinancePage() {
 
     // Despesas do mês atual p/ o Orçamento 75/10/15 (categoria + origem fixa).
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const [monthExpenseTxs, budgetRows, recentCategoryRows] = await Promise.all([
+    const [monthExpenseTxs, budgetRows, recentCategoryRows, recurringPaymentsData] = await Promise.all([
       prisma.transaction.findMany({
         where: { userId, deletedAt: null, type: { not: "INCOME" }, date: { gte: monthStart } },
         select: { amount: true, category: true, recurringExpensePayment: { select: { id: true } } },
@@ -88,6 +88,13 @@ export default async function FinancePage() {
         select: { category: true },
         distinct: ["category"],
       }),
+      // Pagamentos de custos fixos já lançados (marca a ocorrência atual como paga).
+      userId
+        ? prisma.recurringExpensePayment.findMany({
+            where: { userId },
+            select: { recurringExpenseId: true, dueDate: true },
+          })
+        : [],
     ]);
 
     /* ---------------------------------------------------------------------- */
@@ -114,13 +121,6 @@ export default async function FinancePage() {
       image: item.imageUrl ?? null,
     }));
 
-    // Pagamentos de custos fixos já lançados (para marcar a ocorrência atual como paga).
-    const recurringPaymentsData = userId
-      ? await prisma.recurringExpensePayment.findMany({
-          where: { userId },
-          select: { recurringExpenseId: true, dueDate: true },
-        })
-      : [];
     const paidSet = new Set(
       recurringPaymentsData.map((p) => `${p.recurringExpenseId}:${p.dueDate.toISOString().slice(0, 10)}`),
     );

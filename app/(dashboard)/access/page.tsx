@@ -16,13 +16,14 @@ export default async function AccessPage() {
   // REMOVI O 'select'. Agora ele busca tudo (incluindo notes, userId, createdAt)
   // para satisfazer a tipagem do AccessItem e permitir a busca por notas.
   const userId = await getCurrentUserId()
-  const allItems = await prisma.accessItem.findMany({
-    where: { userId },
-    orderBy: { title: "asc" },
-  })
-
-  // 2. Auditoria de segurança (força/reuso) — calculada no servidor.
-  const audit = await getVaultSecurityAudit()
+  // Itens do cofre + auditoria de segurança são independentes — paralelos.
+  const [allItems, audit] = await Promise.all([
+    prisma.accessItem.findMany({
+      where: { userId },
+      orderBy: { title: "asc" },
+    }),
+    getVaultSecurityAudit(),
+  ])
   const { stats } = audit
   const healthColor =
     stats.healthScore >= 75 ? "text-emerald-500"

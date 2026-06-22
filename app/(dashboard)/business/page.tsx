@@ -22,23 +22,44 @@ export default async function BusinessPage() {
   // (best-effort, idempotente) — assim os contratos "simplesmente funcionam" sem clicar no sino.
   if (userId) await syncRecurringChargeInvoices(userId).catch(() => {})
 
-  const rawClients = await prisma.client.findMany({
-    where: { userId, deletedAt: null },
-    include: {
-      friend: {
-        select: { id: true, name: true, imageUrl: true, phone: true, company: true, jobTitle: true }
-      },
-      billings: {
-        include: {
-          invoices: {
-            orderBy: { dueDate: 'asc' }
-          }
+  // Clientes (com cobranças/faturas), conexões e configurações são independentes
+  // entre si — buscamos em paralelo (1 round-trip na nuvem em vez de 3). Roda
+  // DEPOIS do sync acima, que materializa as faturas que rawClients precisa ver.
+  const [rawClients, friends, userSettings] = await Promise.all([
+    prisma.client.findMany({
+      where: { userId, deletedAt: null },
+      include: {
+        friend: {
+          select: { id: true, name: true, imageUrl: true, phone: true, company: true, jobTitle: true }
         },
-        orderBy: { createdAt: 'desc' }
-      }
-    },
-    orderBy: { createdAt: 'desc' }
-  })
+        billings: {
+          include: {
+            invoices: {
+              orderBy: { dueDate: 'asc' }
+            }
+          },
+          orderBy: { createdAt: 'desc' }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    }),
+    // Conexões (para vincular um contato ao cliente). As contas ficam na página
+    // de detalhe (/business/[id]), onde acontecem os recebimentos.
+    userId
+      ? prisma.friend.findMany({
+          where: { userId, deletedAt: null },
+          select: { id: true, name: true, imageUrl: true, company: true },
+          orderBy: { name: 'asc' },
+        })
+      : Promise.resolve([]),
+    // Configurações do usuário (moeda + dados de cobrança).
+    userId
+      ? prisma.settings.findUnique({
+          where: { userId },
+          select: { currency: true, pixKey: true, businessName: true },
+        })
+      : Promise.resolve(null),
+  ])
 
   // 2. Serialização Segura para Client Components
   const clients = rawClients.map(client => ({
@@ -55,16 +76,6 @@ export default async function BusinessPage() {
       }))
     }))
   }))
-
-  // Conexões (para vincular um contato ao cliente). As contas ficam na página
-  // de detalhe (/business/[id]), onde acontecem os recebimentos.
-  const friends = userId
-    ? await prisma.friend.findMany({
-        where: { userId, deletedAt: null },
-        select: { id: true, name: true, imageUrl: true, company: true },
-        orderBy: { name: 'asc' },
-      })
-    : []
 
   const today = new Date()
   today.setHours(0,0,0,0)
@@ -104,13 +115,6 @@ export default async function BusinessPage() {
     return acc + client.billings.filter(b => b.status === 'ACTIVE').length
   }, 0)
 
-  // Configurações do usuário (moeda + dados de cobrança), em uma única query.
-  const userSettings = userId
-    ? await prisma.settings.findUnique({
-        where: { userId },
-        select: { currency: true, pixKey: true, businessName: true },
-      })
-    : null
   const currency = userSettings?.currency || "BRL"
   const formatCurrency = (val: number) => formatCurrencyUtil(val, { currency })
 

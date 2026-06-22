@@ -65,15 +65,19 @@ function HighlightCard({ label, value, subValue, icon: Icon, variant = "default"
 // --- PÁGINA PRINCIPAL ---
 export default async function WardrobePage() {
   const userId = await getCurrentUserId();
-  const items = await prisma.wardrobeItem.findMany({
-    where: { userId: userId ?? "", deletedAt: null },
-    orderBy: { createdAt: 'desc' }
-  });
+  // Queries independentes em paralelo (1 round-trip na nuvem em vez de 2).
+  const [items, settings] = await Promise.all([
+    prisma.wardrobeItem.findMany({
+      where: { userId: userId ?? "", deletedAt: null },
+      orderBy: { createdAt: 'desc' }
+    }),
+    userId
+      ? prisma.settings.findUnique({ where: { userId }, select: { currency: true } })
+      : Promise.resolve(null),
+  ]);
 
   // Moeda escolhida pelo usuário (Configurações > Regional)
-  const currency = (userId
-    ? await prisma.settings.findUnique({ where: { userId }, select: { currency: true } })
-    : null)?.currency || "BRL";
+  const currency = settings?.currency || "BRL";
 
   // --- 🧠 INTELIGÊNCIA DO CLOSET ---
   const totalItems = items.length;

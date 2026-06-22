@@ -12,27 +12,30 @@ import { isReconnectDue } from "@/lib/social-contact";
 export default async function SocialPage() {
   // 1. Data Fetching
   const userId = await getCurrentUserId();
-  const friends = await prisma.friend.findMany({
-    where: { userId: userId ?? "", deletedAt: null },
-    include: {
-      clients: { select: { id: true, name: true, company: true } }
-    },
-    orderBy: { name: 'asc' }
-  });
+  // Amigos + último contato por amigo (ActivityLog) são independentes — paralelos.
+  const [friends, lastContacts] = await Promise.all([
+    prisma.friend.findMany({
+      where: { userId: userId ?? "", deletedAt: null },
+      include: {
+        clients: { select: { id: true, name: true, company: true } }
+      },
+      orderBy: { name: 'asc' }
+    }),
+    getLastContacts(),
+  ]);
 
   // 2. Business Logic
   const currentMonth = new Date().getMonth();
   const totalFriends = friends.length;
-  
+
   const closeFriends = friends.filter(f => f.proximity === 'CLOSE' || f.proximity === 'FAMILY').length;
-  
+
   const birthdaysThisMonth = friends.filter(f => {
     if (!f.birthday) return false;
     return f.birthday.getUTCMonth() === currentMonth;
   }).length;
 
-  // "Manter contato": último registro por amigo (ActivityLog) + quem está vencido.
-  const lastContacts = await getLastContacts();
+  // Quem está vencido para reconectar (usa friends + lastContacts).
   const reconnectCount = friends.filter(f => isReconnectDue(lastContacts[f.id], f.proximity)).length;
 
   // 3. Serialization
