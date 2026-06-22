@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Instagram, Linkedin, Briefcase, Cake, MoreVertical, Pencil, Trash2, MessageCircle, Tag as TagIcon, Mail, ArrowUpRight, Handshake } from "lucide-react";
+import { Instagram, Linkedin, Briefcase, Cake, MoreVertical, Pencil, Trash2, MessageCircle, Tag as TagIcon, Mail, ArrowUpRight, Handshake, PartyPopper } from "lucide-react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -68,13 +68,18 @@ export function FriendCard({ friend, lastContactAt, onContact, onSelect, onEdit,
           <div className="flex flex-col items-end gap-2" onClick={(e) => e.stopPropagation()}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:bg-muted -mr-2 -mt-2">
+                <Button size="icon" variant="ghost" aria-label="Mais ações" className="h-8 w-8 text-muted-foreground hover:bg-muted -mr-2 -mt-2">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40 rounded-xl shadow-xl">
                 <DropdownMenuItem className="text-xs font-medium cursor-pointer" onClick={() => onEdit(friend)}>
                   <Pencil className="h-3.5 w-3.5 mr-2" /> Editar Perfil
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild className="text-xs font-medium cursor-pointer">
+                  <Link href={`/social/celebrar/${friend.id}`}>
+                    <PartyPopper className="h-3.5 w-3.5 mr-2 text-pink-500" /> Celebrar 🎉
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem className="text-xs font-medium cursor-pointer" onClick={() => onConnections({ id: friend.id!, name: friend.name })}>
                   <TagIcon className="h-3.5 w-3.5 mr-2" /> Tags & Anexos
@@ -118,10 +123,12 @@ export function FriendCard({ friend, lastContactAt, onContact, onSelect, onEdit,
 
           {/* ANIVERSÁRIO: alerta forte quando perto; senão, linha sutil com data + idade */}
           {bdayInfo.isSoon ? (
-            <div className="mt-3">
-              <Badge variant="secondary" className="bg-pink-500/10 text-pink-600 hover:bg-pink-500/20 border-none px-2 py-0.5 gap-1.5 text-[10px] font-bold shadow-none">
-                <Cake className="w-3 h-3 fill-pink-500/20" /> {bdayInfo.text}
-              </Badge>
+            <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+              <Link href={`/social/celebrar/${friend.id}`} title="Abrir página de celebração">
+                <Badge variant="secondary" className="bg-pink-500/10 text-pink-600 hover:bg-pink-500/20 border-none px-2 py-0.5 gap-1.5 text-[10px] font-bold shadow-none cursor-pointer transition-colors">
+                  <Cake className="w-3 h-3 fill-pink-500/20" /> {bdayInfo.text} <PartyPopper className="w-3 h-3" />
+                </Badge>
+              </Link>
             </div>
           ) : bdayDate ? (
             <p className="mt-2.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -183,6 +190,7 @@ export function FriendCard({ friend, lastContactAt, onContact, onSelect, onEdit,
             <Button
               size="icon"
               variant="ghost"
+              aria-label="Registrar contato de hoje"
               disabled={contactDays === 0}
               className={cn(
                 "h-8 w-8",
@@ -199,7 +207,7 @@ export function FriendCard({ friend, lastContactAt, onContact, onSelect, onEdit,
         {friend.instagram && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button size="icon" variant="ghost" className="h-8 w-8 text-pink-600 hover:bg-pink-500/10" onClick={() => window.open(`https://instagram.com/${friend.instagram?.replace('@', '')}`, '_blank')}>
+              <Button size="icon" variant="ghost" aria-label="Abrir Instagram" className="h-8 w-8 text-pink-600 hover:bg-pink-500/10" onClick={() => window.open(`https://instagram.com/${friend.instagram?.replace('@', '')}`, '_blank')}>
                 <Instagram className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
@@ -209,7 +217,7 @@ export function FriendCard({ friend, lastContactAt, onContact, onSelect, onEdit,
         {friend.linkedin && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button size="icon" variant="ghost" className="h-8 w-8 text-blue-600 hover:bg-blue-500/10" onClick={() => window.open(friend.linkedin || '', '_blank')}>
+              <Button size="icon" variant="ghost" aria-label="Abrir LinkedIn" className="h-8 w-8 text-blue-600 hover:bg-blue-500/10" onClick={() => window.open(friend.linkedin || '', '_blank')}>
                 <Linkedin className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>

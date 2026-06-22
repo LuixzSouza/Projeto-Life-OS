@@ -11,6 +11,7 @@ import { DashboardHeader } from "@/components/dashboard/dashboard-header";
 import { WelcomeTour } from "@/components/dashboard/welcome-tour";
 import { QuickActionsBar } from "@/components/dashboard/quick-actions-bar";
 import { AiBriefingCard } from "@/components/dashboard/ai-briefing-card";
+import { BirthdayCelebrationCard } from "@/components/dashboard/birthday-celebration-card";
 import { EnergyCheckinCard } from "@/components/health/energy-checkin-card";
 import { HabitsCard } from "@/components/health/habits-card";
 import { QuickCaptureCard } from "@/components/dashboard/quick-capture-card";
@@ -68,6 +69,12 @@ export default async function DashboardPage() {
       {/* Briefing diário proativo: a IA fala primeiro (agenda, prioridades,
           saldo, hábitos). Fora do Modo de Preservação — orienta qualquer dia. */}
       <AiBriefingCard />
+
+      {/* Aniversário hoje: convite festivo para a página de celebração (some
+          sozinho quando não há aniversariante na rede). */}
+      <Suspense fallback={null}>
+        <BirthdayCelebrationCard />
+      </Suspense>
 
       {/* Tela "Hoje": agenda do dia + tarefas vencidas numa olhada (visão de
           chegada). Fora do Modo de Preservação — compromissos não somem. */}

@@ -194,7 +194,7 @@ export async function generateReminders(): Promise<number> {
         type: "BIRTHDAY", title: `Aniversário: ${f.name}`,
         body: next.getTime() === startToday.getTime() ? "É hoje! 🎉" : `Em ${Math.ceil((next.getTime() - startToday.getTime()) / 864e5)} dia(s)`,
         entityType: "friend", entityId: `${f.id}:${next.getFullYear()}`,
-        actionUrl: "/social", dueAt: next,
+        actionUrl: `/social/celebrar/${f.id}`, dueAt: next,
       }));
     }
   }

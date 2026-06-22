@@ -23,7 +23,12 @@ export async function proxy(request: NextRequest) {
   // Verifica se a rota é pública. O feed iCal (/api/calendar/<token>) é
   // autenticado pelo próprio token assinado na URL — calendários externos
   // (Google, iPhone) buscam sem cookie de sessão.
-  const isPublicRoute = publicRoutes.includes(path) || path.startsWith("/api/calendar/");
+  // /celebrar/<token> é a página pública de aniversário: o amigo abre sem conta,
+  // autenticada pelo token assinado na própria URL (lib/celebration.ts).
+  const isPublicRoute =
+    publicRoutes.includes(path) ||
+    path.startsWith("/api/calendar/") ||
+    path.startsWith("/celebrar/");
 
   // 2. Validação da Sessão
   const cookie = request.cookies.get("session")?.value;
