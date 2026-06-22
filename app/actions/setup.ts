@@ -82,6 +82,19 @@ function resolveProfileFromForm(formData: FormData): {
     return { profile: { mode: "cloud", provider, url }, storagePath: "" };
   }
 
+  // --- MySQL / MariaDB (DATABASE_ROADMAP Fase 4 — engine nativo) ---
+  if (mode === "cloud" && dbProvider === "mysql") {
+    const url = ((formData.get("mysqlUrl") as string) || "").trim();
+    if (!url) throw new Error("A connection string do MySQL é obrigatória.");
+    if (/^eyJ/.test(url)) {
+      throw new Error("Isso é uma API key (JWT), não a connection string. Use a URI mysql://usuario:senha@host:porta/banco.");
+    }
+    if (!/^mysql:\/\//i.test(url)) {
+      throw new Error("URL inválida. Use o formato mysql://usuario:senha@host:porta/banco.");
+    }
+    return { profile: { mode: "cloud", provider: "mysql", url }, storagePath: "" };
+  }
+
   if (mode === "cloud") {
     const url = ((formData.get("tursoUrl") as string) || "").trim();
     const authToken = ((formData.get("tursoToken") as string) || "").trim() || undefined;
@@ -212,6 +225,43 @@ export async function testPostgresSetupConnection(
         ? "Conexão com o Supabase validada — pode concluir a instalação."
         : "Conexão com o PostgreSQL validada — pode concluir a instalação.",
     };
+  } catch (error) {
+    return { success: false, message: friendlyDbError(error, profile) };
+  } finally {
+    await built.client.$disconnect().catch(() => {});
+  }
+}
+
+/**
+ * Testa uma connection string de MySQL/MariaDB ANTES de instalar (botão "Testar
+ * conexão" do wizard). Mesma política do teste de Postgres: livre antes de
+ * instalar, exige sessão depois.
+ */
+export async function testMysqlSetupConnection(
+  rawUrl: string
+): Promise<{ success: boolean; message: string }> {
+  const { isSystemInstalled } = await import("@/lib/db-config");
+  if (isSystemInstalled()) {
+    const { getCurrentUserId } = await import("@/lib/auth");
+    if (!(await getCurrentUserId())) {
+      return { success: false, message: "Faça login para testar conexões." };
+    }
+  }
+
+  const url = (rawUrl || "").trim();
+  if (!url) return { success: false, message: "Informe a connection string." };
+  if (/^eyJ/.test(url)) {
+    return { success: false, message: "Isso é uma API key (JWT), não a connection string. Use a URI mysql://… do banco." };
+  }
+  if (!/^mysql:\/\//i.test(url)) {
+    return { success: false, message: "URL inválida. Use o formato mysql://usuario:senha@host:porta/banco." };
+  }
+  const profile: DbProfile = { mode: "cloud", provider: "mysql", url };
+
+  const built = buildAdapterClient(profile);
+  try {
+    await built.client.$queryRawUnsafe("SELECT 1");
+    return { success: true, message: "Conexão com o MySQL validada — pode concluir a instalação." };
   } catch (error) {
     return { success: false, message: friendlyDbError(error, profile) };
   } finally {

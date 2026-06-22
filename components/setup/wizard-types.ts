@@ -46,6 +46,8 @@ export interface SetupFormData {
   tursoToken: string;
   // Connection string do PostgreSQL/Supabase (postgresql://user:senha@host/db).
   pgUrl: string;
+  // Connection string do MySQL/MariaDB (mysql://user:senha@host:porta/db).
+  mysqlUrl: string;
 }
 
 export interface WizardStep {
@@ -142,10 +144,10 @@ export const DB_PROVIDERS: DbProviderMeta[] = [
     name: "MySQL",
     tagline: "Relacional clássico",
     description:
-      "Banco relacional consagrado, presente na maioria das hospedagens. Suporte planejado.",
+      "Banco relacional consagrado, presente na maioria das hospedagens. Cobre MySQL e MariaDB (PlanetScale, Railway, RDS ou self-hosted) — basta a connection string (mysql://...). Roda em servidor Node (desktop/VPS).",
     icon: Database,
-    available: false,
-    badge: "Em breve",
+    available: true,
+    badge: "Novo",
     accent: "text-orange-500",
   },
   {

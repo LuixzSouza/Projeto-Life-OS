@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { testPostgresSetupConnection } from "@/app/actions/setup";
+import { testPostgresSetupConnection, testMysqlSetupConnection } from "@/app/actions/setup";
 import { FolderInput, Cloud, CheckCircle2, Lock, Info, RefreshCw, HardDrive, Database, FilePlus2, PlugZap } from "lucide-react";
 import { FolderPicker } from "@/components/settings/folder-picker";
 import {
@@ -198,6 +198,10 @@ export function StepSystem({ formData, setFormData, setDbProvider, dbFromEnv }: 
 
       {(formData.dbProvider === "postgres" || formData.dbProvider === "supabase") && (
         <PostgresPanel formData={formData} setFormData={setFormData} />
+      )}
+
+      {formData.dbProvider === "mysql" && (
+        <MysqlPanel formData={formData} setFormData={setFormData} />
       )}
 
       {formData.dbProvider === "local" && (
@@ -397,6 +401,75 @@ function PostgresPanel({
         onClick={handleTest}
         disabled={isTesting || !url || looksLikeApiKey}
         className="border-indigo-500/30 hover:bg-indigo-500/10"
+      >
+        <PlugZap className={isTesting ? "h-4 w-4 animate-pulse" : "h-4 w-4"} />
+        {isTesting ? "Conectando..." : "Testar conexão"}
+      </Button>
+    </div>
+  );
+}
+
+// =========================================================
+// PAINEL MYSQL / MARIADB (connection string única, engine nativo)
+// =========================================================
+function MysqlPanel({
+  formData,
+  setFormData,
+}: {
+  formData: SetupFormData;
+  setFormData: React.Dispatch<React.SetStateAction<SetupFormData>>;
+}) {
+  const url = formData.mysqlUrl.trim();
+  const looksLikeApiKey = /^eyJ/.test(url);
+  const [isTesting, startTesting] = useTransition();
+
+  const handleTest = () => {
+    startTesting(async () => {
+      const res = await testMysqlSetupConnection(url);
+      if (res.success) toast.success(res.message, { duration: 6000 });
+      else toast.error(res.message, { duration: 9000 });
+    });
+  };
+
+  return (
+    <div className="space-y-3 p-4 rounded-xl border border-orange-500/30 bg-orange-500/5">
+      <Label className="text-foreground flex items-center gap-2 text-sm font-semibold">
+        <Database className="h-4 w-4 text-orange-500" /> Conexão com o MySQL / MariaDB
+      </Label>
+      <p className="text-xs text-muted-foreground leading-relaxed">
+        Cole a connection string do seu MySQL ou MariaDB (PlanetScale, Railway, RDS ou
+        self-hosted). Roda em servidor Node (app desktop ou VPS) — no deploy serverless
+        (Vercel) prefira o Turso.
+      </p>
+      <div className="grid gap-1.5 pt-1">
+        <Label htmlFor="mysqlUrl" className="text-[11px] font-semibold uppercase text-muted-foreground">
+          Connection string
+        </Label>
+        <Input
+          id="mysqlUrl"
+          type="password"
+          value={formData.mysqlUrl}
+          onChange={(e) => setFormData({ ...formData, mysqlUrl: e.target.value })}
+          placeholder="mysql://usuario:senha@host:3306/banco"
+          className="bg-background font-mono text-xs border-border h-10"
+        />
+        {looksLikeApiKey ? (
+          <p className="text-[10px] text-rose-500">
+            ⚠️ Isso parece uma API key (JWT), não a connection string. Use a URI <code>mysql://...</code> do banco.
+          </p>
+        ) : (
+          <p className="text-[10px] text-muted-foreground">
+            A senha fica embutida na URL — o Life OS a mascara em todos os logs e erros.
+          </p>
+        )}
+      </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={handleTest}
+        disabled={isTesting || !url || looksLikeApiKey}
+        className="border-orange-500/30 hover:bg-orange-500/10"
       >
         <PlugZap className={isTesting ? "h-4 w-4 animate-pulse" : "h-4 w-4"} />
         {isTesting ? "Conectando..." : "Testar conexão"}

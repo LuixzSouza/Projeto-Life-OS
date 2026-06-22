@@ -33,6 +33,7 @@ const DEFAULT_FORM: SetupFormData = {
   tursoUrl: "",
   tursoToken: "",
   pgUrl: "",
+  mysqlUrl: "",
 };
 
 // Campos sensíveis que NÃO são persistidos no localStorage (segredo externo).
@@ -178,6 +179,20 @@ export function SetupWizard({ dbFromEnv = false }: SetupWizardProps) {
           toast.error("URL inválida. Use o formato postgresql://usuario:senha@host:porta/banco.");
           return;
         }
+      } else if (formData.dbProvider === "mysql") {
+        const url = formData.mysqlUrl.trim();
+        if (!url) {
+          toast.error("Informe a connection string do MySQL.");
+          return;
+        }
+        if (/^eyJ/.test(url)) {
+          toast.error("Isso é uma API key, não a connection string. Use a URI do banco (mysql://...).");
+          return;
+        }
+        if (!/^mysql:\/\//i.test(url)) {
+          toast.error("URL inválida. Use o formato mysql://usuario:senha@host:porta/banco.");
+          return;
+        }
       }
     }
     setStep((s) => Math.min(s + 1, 4));
@@ -223,6 +238,7 @@ export function SetupWizard({ dbFromEnv = false }: SetupWizardProps) {
           <input type="hidden" name="tursoUrl" value={formData.tursoUrl} />
           <input type="hidden" name="tursoToken" value={formData.tursoToken} />
           <input type="hidden" name="pgUrl" value={formData.pgUrl} />
+          <input type="hidden" name="mysqlUrl" value={formData.mysqlUrl} />
 
           <div className="space-y-8">
             <div className="flex items-start justify-between gap-4">

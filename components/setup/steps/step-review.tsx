@@ -22,7 +22,10 @@ export function StepReview({ formData, dbFromEnv }: StepReviewProps) {
         : formData.dbProvider === "postgres" || formData.dbProvider === "supabase"
           // Nunca exibir a senha (vive dentro da URL do Postgres) — mascara a credencial.
           ? `${db?.name} • ${formData.pgUrl.trim().replace(/\/\/[^@/]+@/, "//•••@") || "connection string"}`
-          : formData.tursoUrl || db?.name || "Turso";
+          : formData.dbProvider === "mysql"
+            // Idem MySQL: a senha vive na URL — mascara antes de exibir.
+            ? `${db?.name} • ${formData.mysqlUrl.trim().replace(/\/\/[^@/]+@/, "//•••@") || "connection string"}`
+            : formData.tursoUrl || db?.name || "Turso";
 
   return (
     <div className="space-y-6 animate-in slide-in-from-right-8 fade-in duration-300">
