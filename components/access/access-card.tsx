@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Pencil, Trash2, Briefcase, ExternalLink, MoreHorizontal, CalendarClock,
-  ShieldAlert, Repeat2, ShieldX, History,
+  ShieldAlert, Repeat2, ShieldX, History, Share2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { deleteAccess } from "@/app/(dashboard)/access/actions";
@@ -26,9 +26,11 @@ import { CATEGORY_CONFIG, getDomain, formatDate, type CategoryKey } from "./acce
 import { CredentialFields } from "./credential-fields";
 import { AccessEditDialog } from "./access-edit-dialog";
 import { AccessDeleteDialog } from "./access-delete-dialog";
+import { ShareAccessDialog } from "./share-access-dialog";
 
 export function AccessCard({ item, strength, reused = false, breachCount }: { item: AccessItem; strength?: number; reused?: boolean; breachCount?: number }) {
   const [editOpen, setEditOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -100,35 +102,38 @@ export function AccessCard({ item, strength, reused = false, breachCount }: { it
 
           <div className="flex-1 min-w-0 pt-1">
             <div className="flex justify-between items-start">
-              <h3 className="font-black text-sm uppercase tracking-widest text-foreground truncate pr-2" title={item.title}>
+              <h3 className="font-semibold text-sm text-foreground truncate pr-2" title={item.title}>
                 {item.title}
               </h3>
 
               {/* Menu Tático */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 -mr-2 -mt-1 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-lg transition-colors">
+                  <Button variant="ghost" size="icon" aria-label="Mais ações" className="h-7 w-7 -mr-2 -mt-1 text-muted-foreground hover:text-primary hover:bg-primary/5 rounded-lg transition-colors">
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-40 rounded-xl border-border/40 shadow-xl">
-                  <DropdownMenuItem onClick={() => setEditOpen(true)} className="gap-2 font-bold text-xs uppercase tracking-widest cursor-pointer">
+                  <DropdownMenuItem onClick={() => setEditOpen(true)} className="gap-2 text-sm font-medium cursor-pointer">
                     <Pencil className="h-3.5 w-3.5" /> Editar
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShareOpen(true)} className="gap-2 text-sm font-medium cursor-pointer">
+                    <Share2 className="h-3.5 w-3.5" /> Compartilhar
+                  </DropdownMenuItem>
                   {item.url && (
-                    <DropdownMenuItem onClick={() => window.open(item.url?.startsWith("http") ? item.url : `https://${item.url}`, "_blank")} className="gap-2 font-bold text-xs uppercase tracking-widest cursor-pointer">
+                    <DropdownMenuItem onClick={() => window.open(item.url?.startsWith("http") ? item.url : `https://${item.url}`, "_blank")} className="gap-2 text-sm font-medium cursor-pointer">
                       <ExternalLink className="h-3.5 w-3.5" /> Acessar
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuSeparator className="bg-border/40" />
-                  <DropdownMenuItem onClick={() => setDeleteAlertOpen(true)} className="gap-2 font-bold text-xs uppercase tracking-widest cursor-pointer text-rose-500 focus:text-rose-500 focus:bg-rose-500/10">
+                  <DropdownMenuItem onClick={() => setDeleteAlertOpen(true)} className="gap-2 text-sm font-medium cursor-pointer text-rose-500 focus:text-rose-500 focus:bg-rose-500/10">
                     <Trash2 className="h-3.5 w-3.5" /> Excluir
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
 
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest truncate mt-0.5">
+            <p className="text-xs text-muted-foreground truncate mt-0.5">
               {domain || (item.client ? item.client : catConfig.label)}
             </p>
           </div>
@@ -143,7 +148,7 @@ export function AccessCard({ item, strength, reused = false, breachCount }: { it
         <CardFooter className="px-6 py-4 bg-muted/10 border-t border-border/40 flex justify-between items-center gap-2">
           <div className="flex items-center gap-1.5 text-muted-foreground shrink-0" title="Última Sincronização">
             <CalendarClock className="h-3 w-3 opacity-60" />
-            <span className="text-[9px] font-black uppercase tracking-widest">{formatDate(item.updatedAt || new Date())}</span>
+            <span className="text-[11px] font-medium">{formatDate(item.updatedAt || new Date())}</span>
           </div>
 
           <div className="flex items-center gap-1.5 flex-wrap justify-end">
@@ -151,7 +156,7 @@ export function AccessCard({ item, strength, reused = false, breachCount }: { it
             {isBreached && (
               <span className="flex items-center gap-1 bg-rose-600/15 text-rose-600 px-2 py-0.5 rounded-md border border-rose-600/30" title={`Encontrada em ${breachCount?.toLocaleString("pt-BR")} vazamentos — troque imediatamente`}>
                 <ShieldX className="h-2.5 w-2.5" />
-                <span className="text-[8px] font-black uppercase tracking-widest">Vazada</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide">Vazada</span>
               </span>
             )}
 
@@ -159,7 +164,7 @@ export function AccessCard({ item, strength, reused = false, breachCount }: { it
             {isWeak && (
               <span className="flex items-center gap-1 bg-rose-500/10 text-rose-500 px-2 py-0.5 rounded-md border border-rose-500/20" title="Senha fraca — considere trocar">
                 <ShieldAlert className="h-2.5 w-2.5" />
-                <span className="text-[8px] font-black uppercase tracking-widest">Fraca</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide">Fraca</span>
               </span>
             )}
 
@@ -167,7 +172,7 @@ export function AccessCard({ item, strength, reused = false, breachCount }: { it
             {reused && (
               <span className="flex items-center gap-1 bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded-md border border-amber-500/20" title="Senha reutilizada em outra credencial">
                 <Repeat2 className="h-2.5 w-2.5" />
-                <span className="text-[8px] font-black uppercase tracking-widest">Repetida</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide">Repetida</span>
               </span>
             )}
 
@@ -175,14 +180,14 @@ export function AccessCard({ item, strength, reused = false, breachCount }: { it
             {isStale && !isBreached && !isWeak && (
               <span className="flex items-center gap-1 bg-zinc-500/10 text-zinc-500 px-2 py-0.5 rounded-md border border-zinc-500/20" title="Sem alteração há mais de 1 ano — considere rotacionar a senha">
                 <History className="h-2.5 w-2.5" />
-                <span className="text-[8px] font-black uppercase tracking-widest">Antiga</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide">Antiga</span>
               </span>
             )}
 
             {item.notes && (
               <span className="flex items-center gap-1.5 bg-muted text-muted-foreground px-2 py-0.5 rounded-md border border-border/40" title="Possui notas">
                 <span className="block w-1.5 h-1.5 rounded-full bg-muted-foreground/60" />
-                <span className="text-[8px] font-black uppercase tracking-widest">Anotado</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide">Anotado</span>
               </span>
             )}
           </div>
@@ -190,6 +195,7 @@ export function AccessCard({ item, strength, reused = false, breachCount }: { it
       </Card>
 
       <AccessEditDialog open={editOpen} onOpenChange={setEditOpen} item={formData} />
+      <ShareAccessDialog open={shareOpen} onOpenChange={setShareOpen} item={formData} />
       <AccessDeleteDialog open={deleteAlertOpen} onOpenChange={setDeleteAlertOpen} isDeleting={isDeleting} onConfirm={handleDelete} />
     </>
   );

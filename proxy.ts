@@ -15,6 +15,9 @@ const publicRoutes = [
   "/terms",
   "/contact",
   "/changelog",
+  // Receptor de credencial compartilhada: o amigo abre sem ter conta; o segredo é
+  // decifrado 100% no navegador (vem no fragmento da URL, nunca no servidor).
+  "/cofre-compartilhado",
 ];
 
 export async function proxy(request: NextRequest) {
