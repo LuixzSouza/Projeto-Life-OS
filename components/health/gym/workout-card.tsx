@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Calendar, Timer, Flame, Pencil, Trash2 } from "lucide-react";
+import { Calendar, Timer, Flame, Pencil, Trash2, StickyNote } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -101,14 +101,22 @@ export function WorkoutCard({ workout: w }: WorkoutCardProps) {
           <div className="w-full lg:w-[380px] bg-muted/10 rounded-xl border border-border/40 p-3">
             <div className="space-y-1.5">
               {w.exercises.slice(0, 4).map((ex, i) => (
-                <div key={i} className="flex justify-between items-center text-xs p-1.5 rounded hover:bg-muted/50 transition-colors">
-                  <span className="font-medium text-foreground/80 truncate pr-2">{ex.name || "—"}</span>
-                  <div className="flex items-center gap-2 text-muted-foreground font-mono shrink-0">
-                    <span>{ex.sets}x{ex.reps}</span>
-                    {ex.weight && ex.weight !== "0" && (
-                      <span className="bg-background border border-border/50 px-1.5 rounded text-foreground font-semibold">{ex.weight}kg</span>
-                    )}
+                <div key={i} className="rounded p-1.5 hover:bg-muted/50 transition-colors">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-medium text-foreground/80 truncate pr-2">{ex.name || "—"}</span>
+                    <div className="flex items-center gap-2 text-muted-foreground font-mono shrink-0">
+                      <span>{ex.sets}x{ex.reps}</span>
+                      {ex.weight && ex.weight !== "0" && (
+                        <span className="bg-background border border-border/50 px-1.5 rounded text-foreground font-semibold">{ex.weight}kg</span>
+                      )}
+                    </div>
                   </div>
+                  {ex.note && (
+                    <p className="mt-1 flex items-start gap-1 text-[10px] italic leading-snug text-muted-foreground/80">
+                      <StickyNote className="mt-px h-2.5 w-2.5 shrink-0 text-amber-500" />
+                      <span className="line-clamp-2">{ex.note}</span>
+                    </p>
+                  )}
                 </div>
               ))}
               {w.exercises.length === 0 && <p className="text-[11px] text-muted-foreground text-center py-2">Sem exercícios registrados.</p>}

@@ -74,6 +74,7 @@ export function IngredientList({ ingredients, onUpdateAmount, onRemove }: Ingred
                 <Button
                   variant="ghost"
                   size="icon"
+                  aria-label="Remover ingrediente"
                   className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive rounded-md"
                   onClick={() => onRemove(ing.id)}
                 >

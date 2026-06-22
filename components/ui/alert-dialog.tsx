@@ -91,9 +91,10 @@ function AlertDialogContent({
         className={cn(
           // Z-INDEX 110 para a caixa do modal (sempre MAIOR que o overlay)
           "fixed left-[50%] top-[50%] z-[110] translate-x-[-50%] translate-y-[-50%]",
-          "grid w-[95%] max-w-[450px]", 
-          "rounded-[2.5rem] border border-border/40 bg-background shadow-2xl", 
-          "p-0 overflow-hidden flex flex-col",
+          "w-[calc(100%-1.5rem)] max-w-md",
+          // Alinhado ao sistema de Dialog (mesma borda/raio/sombra)
+          "rounded-3xl border border-border/50 bg-background shadow-2xl",
+          "overflow-hidden flex flex-col outline-none",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
           "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
@@ -102,10 +103,10 @@ function AlertDialogContent({
         )}
         {...props}
       >
-        {/* Efeito Glow / Acento Superior Opcional */}
+        {/* Acento superior: tom destrutivo, sinalizando uma ação irreversível. */}
         <div
           aria-hidden
-          className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-primary/50 via-primary to-primary/50 opacity-20"
+          className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-destructive/40 via-destructive to-destructive/40 opacity-40"
         />
         {props.children}
       </AlertDialogPrimitive.Content>
@@ -125,7 +126,7 @@ function AlertDialogHeader({
     <div
       data-slot="alert-dialog-header"
       className={cn(
-        "flex flex-col gap-3 px-8 pt-8 pb-6 text-center sm:text-center items-center bg-muted/5 border-b border-border/40",
+        "flex flex-col items-center gap-3 px-6 pt-8 pb-6 text-center bg-muted/10 border-b border-border/40",
         className
       )}
       {...props}
@@ -145,7 +146,7 @@ function AlertDialogFooter({
     <div
       data-slot="alert-dialog-footer"
       className={cn(
-        "flex flex-col-reverse sm:flex-row sm:justify-center gap-3 px-8 py-6 bg-background",
+        "flex flex-col-reverse sm:flex-row sm:justify-center gap-3 px-6 py-5 bg-background",
         className
       )}
       {...props}
@@ -165,7 +166,7 @@ function AlertDialogTitle({
     <AlertDialogPrimitive.Title
       data-slot="alert-dialog-title"
       className={cn(
-        "text-2xl font-black uppercase tracking-tighter text-foreground leading-none",
+        "text-xl font-black tracking-tight text-foreground leading-tight",
         className
       )}
       {...props}
@@ -185,7 +186,7 @@ function AlertDialogDescription({
     <AlertDialogPrimitive.Description
       data-slot="alert-dialog-description"
       className={cn(
-        "text-xs font-medium leading-relaxed text-muted-foreground max-w-[90%] mx-auto mt-2",
+        "text-sm font-medium leading-relaxed text-muted-foreground",
         className
       )}
       {...props}
@@ -204,9 +205,9 @@ function AlertDialogAction({
   return (
     <AlertDialogPrimitive.Action
       className={cn(
-        buttonVariants({ variant: "default" }),
-        "h-12 w-full sm:w-auto px-8 rounded-xl bg-foreground text-background hover:bg-primary hover:text-white shadow-lg",
-        "font-black uppercase tracking-widest text-[10px] transition-all active:scale-95",
+        buttonVariants({ variant: "destructive" }),
+        "h-11 w-full sm:w-auto px-6 rounded-xl shadow-sm",
+        "font-bold text-sm transition-all active:scale-95",
         className
       )}
       {...props}
@@ -222,8 +223,8 @@ function AlertDialogCancel({
     <AlertDialogPrimitive.Cancel
       className={cn(
         buttonVariants({ variant: "outline" }),
-        "h-12 w-full sm:w-auto px-8 rounded-xl border-border/60 hover:bg-muted text-muted-foreground hover:text-foreground",
-        "font-black uppercase tracking-widest text-[10px] transition-all mt-0", 
+        "h-11 w-full sm:w-auto px-6 rounded-xl border-border/60 hover:bg-muted text-muted-foreground hover:text-foreground",
+        "font-bold text-sm transition-all mt-0",
         className
       )}
       {...props}

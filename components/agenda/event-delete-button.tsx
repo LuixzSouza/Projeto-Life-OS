@@ -59,6 +59,7 @@ export function EventDeleteButton({
         <Button
           variant={variant}
           size={variant === "ghost" ? "icon" : "default"}
+          aria-label="Excluir"
           className={cn(
             "transition-all duration-200",
             "text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10",

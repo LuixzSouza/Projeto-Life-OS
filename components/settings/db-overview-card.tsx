@@ -6,7 +6,7 @@
 // arquivo, último sync (réplica) e último backup.
 
 import { Database, HardDrive, Cloud, RefreshCw, Gauge, Archive, CalendarClock } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatTime, formatDate } from "@/lib/utils";
 
 export interface DbOverview {
   mode: "local" | "replica" | "cloud" | null;
@@ -69,11 +69,11 @@ export function DbOverviewCard({ overview }: { overview: DbOverview }) {
   const lastSync = overview.lastSyncError
     ? "com erro"
     : overview.lastSyncAt
-      ? new Date(overview.lastSyncAt).toLocaleTimeString()
+      ? formatTime(overview.lastSyncAt)
       : overview.mode === "replica" ? "ainda nesta sessão" : "—";
 
   const lastBackup = overview.lastBackupAt
-    ? new Date(overview.lastBackupAt).toLocaleDateString()
+    ? formatDate(overview.lastBackupAt)
     : "nunca";
 
   // Uso vs cota do plano grátis (UX §4): aviso proativo a partir de 80%.

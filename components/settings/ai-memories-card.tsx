@@ -87,7 +87,7 @@ export function AiMemoriesCard({ initialMemories }: { initialMemories: AiMemoryI
           maxLength={280}
           className="text-sm"
         />
-        <Button onClick={() => void add()} disabled={busy || !draft.trim()} size="icon" className="shrink-0">
+        <Button onClick={() => void add()} disabled={busy || !draft.trim()} size="icon" aria-label="Adicionar memória" className="shrink-0">
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
         </Button>
       </div>

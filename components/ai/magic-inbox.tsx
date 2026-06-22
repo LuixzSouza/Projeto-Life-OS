@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody } from "@/components/ui/dialog";
 import { useSpeechInput, formatListenClock } from "@/components/ai/voice";
 import { parseMagicCapture, confirmMagicCapture, type MagicItem } from "@/app/(dashboard)/ai/actions/magic-inbox";
 
@@ -157,7 +157,7 @@ export function MagicInbox() {
     <>
       {/* O gatilho flutuante vive no QuickDock (components/layout/quick-dock.tsx). */}
       <Dialog open={open} onOpenChange={close}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent size="md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2.5">
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -172,6 +172,7 @@ export function MagicInbox() {
             </DialogTitle>
           </DialogHeader>
 
+          <DialogBody>
           {items === null ? (
             <div className="space-y-3">
               <div className="relative">
@@ -328,6 +329,7 @@ export function MagicInbox() {
               </div>
             </div>
           )}
+          </DialogBody>
         </DialogContent>
       </Dialog>
     </>

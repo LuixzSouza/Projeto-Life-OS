@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogBody } from "@/components/ui/dialog";
 import {
     AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -121,18 +121,18 @@ export function RunningDashboard({ runs, bodyWeight = null, shoes = [] }: { runs
                             <Plus className="mr-2 h-5 w-5" /> Registrar Corrida
                         </Button>
                     </DialogTrigger>
-                    <DialogContent className="max-w-lg p-0 gap-0 bg-background border-border shadow-2xl rounded-xl overflow-hidden">
-                        <div className="p-6 border-b border-border/40 bg-muted/10">
+                    <DialogContent size="md">
+                        <DialogHeader>
                             <DialogTitle className="flex items-center gap-2 text-xl">
                                 <div className="p-2 bg-primary/10 rounded-lg text-primary">
                                     <Footprints className="h-5 w-5" />
                                 </div>
                                 Nova Corrida
                             </DialogTitle>
-                        </div>
-                        <div className="p-6">
+                        </DialogHeader>
+                        <DialogBody>
                             <RunForm bodyWeight={bodyWeight} shoeOptions={shoeOptions} onSuccess={() => { setOpen(false); router.refresh(); }} />
-                        </div>
+                        </DialogBody>
                     </DialogContent>
                 </Dialog>
 
@@ -350,16 +350,16 @@ export function RunningDashboard({ runs, bodyWeight = null, shoes = [] }: { runs
 
             {/* Editar corrida (modal único controlado) */}
             <Dialog open={editing !== null} onOpenChange={(o) => !o && setEditing(null)}>
-                <DialogContent className="max-w-lg p-0 gap-0 bg-background border-border shadow-2xl rounded-xl overflow-hidden">
-                    <div className="p-6 border-b border-border/40 bg-muted/10">
+                <DialogContent size="md">
+                    <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-xl">
                             <div className="p-2 bg-primary/10 rounded-lg text-primary">
                                 <Pencil className="h-5 w-5" />
                             </div>
                             Editar Corrida
                         </DialogTitle>
-                    </div>
-                    <div className="p-6">
+                    </DialogHeader>
+                    <DialogBody>
                         {editing && (
                             <RunForm
                                 bodyWeight={bodyWeight}
@@ -377,7 +377,7 @@ export function RunningDashboard({ runs, bodyWeight = null, shoes = [] }: { runs
                                 onSuccess={() => { setEditing(null); router.refresh(); }}
                             />
                         )}
-                    </div>
+                    </DialogBody>
                 </DialogContent>
             </Dialog>
 

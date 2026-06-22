@@ -152,6 +152,7 @@ export function HealthActions() {
                             <Button
                                 variant="ghost"
                                 size="icon"
+                                aria-label="Fechar"
                                 className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-rose-500/10 transition-colors"
                                 onClick={() => setIsNavExpanded(false)}
                             >

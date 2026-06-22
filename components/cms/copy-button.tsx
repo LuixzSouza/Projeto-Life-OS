@@ -22,7 +22,7 @@ export function CopyButton({ text, label }: { text: string; label?: string }) {
       size="sm"
       onClick={handleCopy}
       className={cn(
-        "h-8 gap-2 rounded-lg font-black uppercase tracking-widest text-[9px] transition-all border-border/60",
+        "h-8 gap-1.5 rounded-lg font-semibold text-xs transition-all border-border/60",
         copied ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" : "hover:bg-muted"
       )}
     >

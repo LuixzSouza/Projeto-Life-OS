@@ -124,6 +124,7 @@ export function ImagePaster({ defaultValue, onImageChange }: ImagePasterProps) {
               type="button"
               size="icon"
               variant="destructive"
+              aria-label="Remover imagem"
               className="h-8 w-8"
               onClick={handleRemove}
             >

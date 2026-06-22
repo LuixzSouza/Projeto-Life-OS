@@ -14,6 +14,7 @@ import { Trash2, MoreVertical, Star, Calendar, User, AlignLeft, Loader2, ImageOf
 import { deleteMediaItem, updateMediaStatus, updateMediaDetails } from "@/app/(dashboard)/entertainment/actions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { onActivate } from "@/lib/a11y";
 import { TYPE_CONFIG, STATUS_CONFIG, type MediaItemData } from "./entertainment-config";
 import { EntityConnections } from "@/components/connect/entity-connections";
 
@@ -64,7 +65,11 @@ export function MediaCard({ item }: { item: MediaItemData }) {
 
         {/* ÁREA DA IMAGEM (Clicável para abrir Detalhes) */}
         <div
+          role="button"
+          tabIndex={0}
+          aria-label={`Ver detalhes de ${item.title}`}
           onClick={() => setIsDetailsOpen(true)}
+          onKeyDown={onActivate(() => setIsDetailsOpen(true))}
           className={cn(
             "relative overflow-hidden rounded-xl bg-muted/40 shrink-0 cursor-pointer shadow-sm border border-border/40 transition-all duration-300",
             "group-hover:border-primary/40 group-hover:shadow-lg group-hover:-translate-y-1",
@@ -106,7 +111,7 @@ export function MediaCard({ item }: { item: MediaItemData }) {
           <div className="absolute top-2 right-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10" onClick={(e) => e.stopPropagation()}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="icon" variant="ghost" className="h-7 w-7 bg-black/50 hover:bg-black/80 text-white rounded-md backdrop-blur-sm border border-white/10">
+                <Button size="icon" variant="ghost" aria-label="Mais ações" className="h-7 w-7 bg-black/50 hover:bg-black/80 text-white rounded-md backdrop-blur-sm border border-white/10">
                   <MoreVertical className="h-3.5 w-3.5" />
                 </Button>
               </DropdownMenuTrigger>

@@ -45,6 +45,7 @@ export const UserProfileSection = ({
           <Button
             variant="ghost"
             size="icon"
+            aria-label="Sair"
             onClick={handleLogout}
             disabled={isLoggingOut}
             className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
@@ -58,6 +59,7 @@ export const UserProfileSection = ({
         <Button
           variant="ghost"
           size="icon"
+          aria-label="Sair"
           onClick={handleLogout}
           className="h-9 w-9 mx-auto flex mt-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
         >

@@ -9,7 +9,7 @@ import { Map as MapIcon, Loader2, Hash, GraduationCap } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogBody,
 } from "@/components/ui/dialog";
 import { getMapSources, createContentMap, type MapSource } from "@/app/(dashboard)/notes/map-actions";
 
@@ -52,7 +52,7 @@ export function ContentMapDialog() {
           <MapIcon className="h-3.5 w-3.5" /> Mapa de Conteúdo
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md rounded-2xl">
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MapIcon className="h-4 w-4 text-primary" /> Mapa de Conteúdo
@@ -63,6 +63,7 @@ export function ContentMapDialog() {
           </DialogDescription>
         </DialogHeader>
 
+        <DialogBody>
         {sources === null ? (
           <div className="flex justify-center py-8">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -95,6 +96,7 @@ export function ContentMapDialog() {
             })}
           </div>
         )}
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );

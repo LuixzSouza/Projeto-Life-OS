@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, Activity } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { ChartContainer } from "@/components/ui/chart-container";
+import { formatNumber } from "@/lib/utils";
 import type { VolumePoint } from "./gym-types";
 
 interface VolumeChartProps {
@@ -53,7 +54,7 @@ export function VolumeChart({ data }: VolumeChartProps) {
                         <p className="font-semibold mb-1">{point.fullDate}</p>
                         <div className="flex items-center gap-2 mb-1">
                           <div className="w-2 h-2 rounded-full bg-primary"></div>
-                          <p className="font-bold">{point.load.toLocaleString()} kg</p>
+                          <p className="font-bold">{formatNumber(point.load)} kg</p>
                         </div>
                         <p className="text-muted-foreground truncate max-w-[150px]">{point.title}</p>
                       </div>

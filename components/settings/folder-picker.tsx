@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogBody, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
@@ -68,9 +68,13 @@ export function FolderPicker({ onSelect, currentPath }: FolderPickerProps) {
     }, []);
 
     useEffect(() => {
+        // Intencional: recarrega a listagem apenas ao ABRIR o diálogo, usando o
+        // browsingPath daquele instante. Incluí-lo nas deps recarregaria a cada
+        // navegação de pasta, anulando a navegação do usuário.
         if (open) {
             loadFolders(browsingPath || "ROOT");
         }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, loadFolders]);
 
     // Verifica permissão/acesso do alvo (pasta ou arquivo) ANTES de confirmar.
@@ -128,14 +132,14 @@ export function FolderPicker({ onSelect, currentPath }: FolderPickerProps) {
                     <FolderOpen className="h-4 w-4 text-primary" />
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl bg-background border-border">
+            <DialogContent size="lg">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 text-foreground">
                         <HardDrive className="h-5 w-5 text-primary" /> Explorador de Arquivos
                     </DialogTitle>
                 </DialogHeader>
-                
-                <div className="space-y-4">
+
+                <DialogBody className="space-y-4">
                     {/* Barra de Navegação */}
                     <div className="flex gap-2 items-center">
                         <div className="flex gap-1">
@@ -241,27 +245,27 @@ export function FolderPicker({ onSelect, currentPath }: FolderPickerProps) {
                             </div>
                         </ScrollArea>
                     </div>
+                </DialogBody>
 
-                    <div className="flex justify-between items-center pt-2">
-                        <p className="text-[10px] text-muted-foreground max-w-[260px]">
-                            Clique num <span className="text-emerald-600 font-medium">banco (.db)</span> para conectar,
-                            ou escolha uma pasta para criar um novo. Requer permissão de escrita.
-                        </p>
-                        <div className="flex gap-2">
-                            <Button variant="ghost" onClick={() => setOpen(false)} disabled={verifying}>Cancelar</Button>
-                            <Button onClick={handleSelect} disabled={verifying} className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-md">
-                                {verifying ? (
-                                    <span className="flex items-center gap-2">
-                                        <span className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                                        Verificando…
-                                    </span>
-                                ) : (
-                                    <><Check className="h-4 w-4 mr-2" /> Usar esta pasta</>
-                                )}
-                            </Button>
-                        </div>
+                <DialogFooter className="sm:justify-between">
+                    <p className="text-[10px] text-muted-foreground max-w-[260px]">
+                        Clique num <span className="text-emerald-600 font-medium">banco (.db)</span> para conectar,
+                        ou escolha uma pasta para criar um novo. Requer permissão de escrita.
+                    </p>
+                    <div className="flex gap-2">
+                        <Button variant="ghost" onClick={() => setOpen(false)} disabled={verifying}>Cancelar</Button>
+                        <Button onClick={handleSelect} disabled={verifying} className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-md">
+                            {verifying ? (
+                                <span className="flex items-center gap-2">
+                                    <span className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                                    Verificando…
+                                </span>
+                            ) : (
+                                <><Check className="h-4 w-4 mr-2" /> Usar esta pasta</>
+                            )}
+                        </Button>
                     </div>
-                </div>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

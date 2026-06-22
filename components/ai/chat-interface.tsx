@@ -1526,6 +1526,7 @@ export function ChatInterface({
                             )}
                             <Button
                                 size="icon"
+                                aria-label={editing ? "Salvar edição" : "Enviar mensagem"}
                                 onClick={() => (editing ? handleEditSend(input) : handleSend(input))}
                                 disabled={isLoading || (!input.trim() && attachments.length === 0)}
                                 className={cn(

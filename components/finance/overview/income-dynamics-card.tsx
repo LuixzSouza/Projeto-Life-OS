@@ -63,17 +63,17 @@ export function IncomeDynamicsCard({
           {isEditing ? (
             <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 bg-background p-1.5 rounded-2xl shadow-inner border border-border/50">
               <Input autoFocus value={tempSalary} onChange={e => setTempSalary(e.target.value)} className="w-36 h-10 text-right font-mono text-lg font-bold border-none focus-visible:ring-0 bg-transparent" />
-              <Button size="icon" className="h-10 w-10 rounded-xl shadow-md" onClick={onSaveSalary} disabled={isPending}>
+              <Button size="icon" aria-label="Salvar salário" className="h-10 w-10 rounded-xl shadow-md" onClick={onSaveSalary} disabled={isPending}>
                 {isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />}
               </Button>
-              <Button size="icon" variant="ghost" className="h-10 w-10 rounded-xl hover:bg-destructive/10 hover:text-destructive" onClick={() => setIsEditing(false)}><X className="h-5 w-5" /></Button>
+              <Button size="icon" variant="ghost" aria-label="Cancelar edição" className="h-10 w-10 rounded-xl hover:bg-destructive/10 hover:text-destructive" onClick={() => setIsEditing(false)}><X className="h-5 w-5" /></Button>
             </div>
           ) : (
             <div className="flex items-center gap-4">
               <div className={cn("text-3xl sm:text-4xl font-black font-mono tracking-tighter tabular-nums text-foreground group-hover/salary:text-primary transition-colors", smartView && "blur-md opacity-60")}>
                 {formatMoney(grossSalary)}
               </div>
-              <Button size="icon" variant="outline" className="h-10 w-10 rounded-xl opacity-50 hover:opacity-100 hover:text-primary hover:border-primary/50 shadow-sm transition-all" onClick={() => setIsEditing(true)}>
+              <Button size="icon" variant="outline" aria-label="Editar salário" className="h-10 w-10 rounded-xl opacity-50 hover:opacity-100 hover:text-primary hover:border-primary/50 shadow-sm transition-all" onClick={() => setIsEditing(true)}>
                 <Pencil className="h-4 w-4" />
               </Button>
             </div>

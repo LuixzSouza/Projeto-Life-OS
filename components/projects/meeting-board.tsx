@@ -237,7 +237,7 @@ export function MeetingBoard({ meetings, projectId }: MeetingBoardProps) {
       )}
 
       <Dialog open={!!selected} onOpenChange={(o) => { if (!o) { setSelected(null); router.refresh(); } }}>
-        <DialogContent className="sm:max-w-3xl p-0 overflow-hidden rounded-[2rem] shadow-2xl gap-0">
+        <DialogContent size="xl">
           {selected && <MeetingEditor key={selected.id} meeting={selected} onClose={() => setSelected(null)} />}
         </DialogContent>
       </Dialog>

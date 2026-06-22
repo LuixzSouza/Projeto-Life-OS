@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { PortfolioData } from "@/types/portfolio";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogBody } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Briefcase, Plus, LayoutGrid, List, FileText, Trophy, Rocket, Target, Columns3, Search, CalendarClock, ArrowUpDown } from "lucide-react";
 import {
@@ -167,15 +167,15 @@ export function JobTracker({ jobs, portfolio, projects }: JobTrackerProps) {
                                 <Plus className="h-4 w-4" /> Adicionar {type === 'JOB' ? 'vaga' : 'freela'}
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="sm:max-w-2xl p-0 overflow-hidden rounded-[2rem] shadow-2xl gap-0">
-                            <DialogHeader className="p-6 pb-5 border-b border-border/40 bg-muted/10 text-left">
+                        <DialogContent size="lg">
+                            <DialogHeader>
                                 <DialogTitle className="text-xl font-bold tracking-tight flex items-center gap-2">
                                     <Briefcase className="h-5 w-5 text-primary" /> Novo registro
                                 </DialogTitle>
                             </DialogHeader>
-                            <div className="p-6 overflow-y-auto max-h-[70vh]">
+                            <DialogBody>
                                 <JobForm type={type} />
-                            </div>
+                            </DialogBody>
                         </DialogContent>
                     </Dialog>
                 </div>

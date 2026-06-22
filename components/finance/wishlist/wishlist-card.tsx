@@ -364,7 +364,7 @@ function WishlistCard({ item, accounts, totalBalance }: { item: WishlistData; ac
 
                      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
                         <DialogTrigger asChild>
-                            <Button size="icon" variant="secondary" className="h-8 w-8 rounded-lg bg-background/80 backdrop-blur-md shadow-sm border border-border/50 hover:text-primary transition-all">
+                            <Button size="icon" variant="secondary" aria-label="Editar desejo" className="h-8 w-8 rounded-lg bg-background/80 backdrop-blur-md shadow-sm border border-border/50 hover:text-primary transition-all">
                                 <Pencil className="h-3.5 w-3.5" />
                             </Button>
                         </DialogTrigger>
@@ -382,7 +382,7 @@ function WishlistCard({ item, accounts, totalBalance }: { item: WishlistData; ac
 
                     <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
                         <AlertDialogTrigger asChild>
-                            <Button size="icon" variant="secondary" className="h-8 w-8 rounded-lg bg-background/80 backdrop-blur-md shadow-sm border border-border/50 hover:text-rose-500 transition-all">
+                            <Button size="icon" variant="secondary" aria-label="Excluir desejo" className="h-8 w-8 rounded-lg bg-background/80 backdrop-blur-md shadow-sm border border-border/50 hover:text-rose-500 transition-all">
                                 <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                         </AlertDialogTrigger>

@@ -8,7 +8,7 @@ import { syncBankAccount, createConnectTokenAction, linkAccountToPluggyAction } 
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { PluggyConnect } from "react-pluggy-connect";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogHeader, DialogDescription, DialogBody } from "@/components/ui/dialog";
 
 /* -------------------------------------------------------------------------- */
 /* TYPES E INTERFACES                                                         */
@@ -159,8 +159,8 @@ export function BankConnector({ onOpenImport }: { onOpenImport?: () => void }) {
 
             {/* Modal Nativo do Shadcn UI cuidando do scroll lock e blur de forma correta */}
             <Dialog open={isDialogOpen} onOpenChange={(open) => { if(!open) handleCloseConnection(); }}>
-                <DialogContent className="sm:max-w-[450px] h-[85vh] sm:h-[750px] max-h-[900px] p-0 overflow-hidden flex flex-col rounded-[2rem] border-border/40 shadow-2xl [&>button]:hidden">
-                    
+                <DialogContent showCloseButton={false} className="sm:max-w-[450px] h-[85vh] sm:h-[750px] max-h-[900px] rounded-[2rem]">
+
                     {/* Cabeçalho Customizado */}
                     <div className="flex justify-between items-center p-4 bg-muted/10 border-b border-border/40 shrink-0">
                         <div className="flex items-center gap-2">
@@ -170,7 +170,7 @@ export function BankConnector({ onOpenImport }: { onOpenImport?: () => void }) {
                             </div>
                             <span className="font-extrabold text-sm uppercase tracking-widest text-foreground">Sincronização Bancária</span>
                         </div>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-muted/80" onClick={handleCloseConnection}>
+                        <Button variant="ghost" size="icon" aria-label="Fechar" className="h-8 w-8 rounded-full hover:bg-muted/80" onClick={handleCloseConnection}>
                             <X className="h-5 w-5 text-muted-foreground" />
                         </Button>
                     </div>
@@ -192,16 +192,16 @@ export function BankConnector({ onOpenImport }: { onOpenImport?: () => void }) {
             {/* Orientação quando a Pluggy não está configurada: mostra o caminho
                 gratuito (importar extrato) antes de mandar o usuário pagar API. */}
             <Dialog open={isGuideOpen} onOpenChange={setIsGuideOpen}>
-                <DialogContent className="sm:max-w-[440px] rounded-[2rem] border-border/40 p-6">
-                    <div className="space-y-1.5">
+                <DialogContent size="md">
+                    <DialogHeader>
                         <DialogTitle className="text-lg font-extrabold">Como trazer seus dados bancários</DialogTitle>
-                        <p className="text-sm text-muted-foreground">
+                        <DialogDescription>
                             A sincronização automática usa a Pluggy (Open Finance), que exige uma conta paga.
                             Mas você não precisa dela para importar seus lançamentos:
-                        </p>
-                    </div>
+                        </DialogDescription>
+                    </DialogHeader>
 
-                    <div className="space-y-3 pt-2">
+                    <DialogBody className="space-y-3">
                         <button
                             type="button"
                             onClick={() => { setIsGuideOpen(false); onOpenImport?.(); }}
@@ -242,7 +242,7 @@ export function BankConnector({ onOpenImport }: { onOpenImport?: () => void }) {
                                 </div>
                             </div>
                         </Link>
-                    </div>
+                    </DialogBody>
                 </DialogContent>
             </Dialog>
         </>

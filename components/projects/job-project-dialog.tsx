@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FolderPlus, Link2, Loader2, ArrowRight } from "lucide-react";
@@ -44,8 +44,8 @@ export function JobProjectDialog({ job, projects, onOpenChange }: { job: JobWith
 
     return (
         <Dialog open={!!job} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-md p-0 overflow-hidden rounded-[2rem] shadow-2xl gap-0">
-                <DialogHeader className="p-6 pb-5 border-b border-border/40 bg-muted/10 text-left">
+            <DialogContent size="md">
+                <DialogHeader>
                     <DialogTitle className="text-xl font-bold tracking-tight flex items-center gap-2">
                         <Link2 className="h-5 w-5 text-primary" /> Conectar a um projeto
                     </DialogTitle>
@@ -56,7 +56,7 @@ export function JobProjectDialog({ job, projects, onOpenChange }: { job: JobWith
                     )}
                 </DialogHeader>
 
-                <div className="p-6 space-y-6">
+                <DialogBody className="space-y-6">
                     {/* Criar novo projeto */}
                     <div className="space-y-2">
                         <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Novo projeto</p>
@@ -93,7 +93,7 @@ export function JobProjectDialog({ job, projects, onOpenChange }: { job: JobWith
                             </div>
                         </>
                     )}
-                </div>
+                </DialogBody>
             </DialogContent>
         </Dialog>
     );

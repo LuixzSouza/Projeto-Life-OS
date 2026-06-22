@@ -38,10 +38,10 @@ export default async function SiteDetailsPage(props: SitePageProps) {
             <Link href="/cms" className="h-9 w-9 flex items-center justify-center rounded-xl bg-muted/50 hover:bg-primary/10 hover:text-primary transition-all group">
                 <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
             </Link>
-            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                 <span className="hidden sm:inline">Headless CMS</span>
                 <span className="opacity-40 hidden sm:inline">/</span>
-                <span className="text-foreground">{site.name}</span>
+                <span className="font-semibold text-foreground">{site.name}</span>
             </div>
         </div>
 
@@ -52,27 +52,27 @@ export default async function SiteDetailsPage(props: SitePageProps) {
                     <HardDrive className="h-6 w-6 opacity-80" />
                 </div>
                 
-                <div className="flex flex-col gap-1">
+                <div className="flex flex-col gap-1.5">
                     <div className="flex items-center gap-3">
-                        <h1 className="text-2xl font-black tracking-tight uppercase">
+                        <h1 className="text-2xl font-bold tracking-tight">
                             {site.name}
                         </h1>
-                        <Badge variant="outline" className="text-[9px] uppercase font-black bg-primary/10 text-primary border-primary/20 px-2 h-5">
-                            {site.pages.length} Endpoints
+                        <Badge variant="outline" className="text-[10px] font-semibold bg-primary/10 text-primary border-primary/20 px-2 h-5">
+                            {site.pages.length} {site.pages.length === 1 ? "endpoint" : "endpoints"}
                         </Badge>
                     </div>
 
-                    <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
-                        <Globe className="h-3 w-3 opacity-50" />
+                    <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                        <Globe className="h-3.5 w-3.5 opacity-50" />
                         <span className="font-mono bg-muted/40 px-2 py-0.5 rounded border border-border/40 truncate max-w-[300px]">
                             {site.url || "sys.local/env"}
                         </span>
-                        
+
                         {site.url && (
                             <Link
                                 href={site.url}
                                 target="_blank"
-                                className="inline-flex items-center gap-1 text-primary hover:text-primary/70 transition-colors bg-primary/5 px-2 py-0.5 rounded border border-primary/10 ml-2"
+                                className="inline-flex items-center gap-1 text-primary hover:text-primary/70 transition-colors bg-primary/5 px-2 py-0.5 rounded border border-primary/10 ml-1"
                                 title="Abrir domínio externo"
                             >
                                 <ExternalLink className="h-3 w-3" /> Live
@@ -106,7 +106,7 @@ export default async function SiteDetailsPage(props: SitePageProps) {
       {/* TERMINAL EDITOR */}
       {/* ------------------------------------------------------------------ */}
       <main className="flex-1 w-full px-4 md:px-10 lg:px-14 py-8">
-        <div className="h-[calc(100vh-200px)] rounded-[2rem] border border-border/40 bg-card/80 backdrop-blur-xl shadow-2xl overflow-hidden flex flex-col">
+        <div className="h-[calc(100vh-200px)] rounded-2xl border border-border/40 bg-card/80 backdrop-blur-xl shadow-sm overflow-hidden flex flex-col">
           <SiteEditor site={site} />
         </div>
       </main>

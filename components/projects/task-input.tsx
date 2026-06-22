@@ -181,6 +181,7 @@ export function TaskInput({ projectId }: TaskInputProps) {
                                 type="button"
                                 size="icon"
                                 variant={image ? "default" : "secondary"}
+                                aria-label="Anexar imagem"
                                 className="h-10 w-10 rounded-xl transition-all shadow-inner"
                                 onClick={() => fileInputRef.current?.click()}
                                 disabled={isUploading}
@@ -281,10 +282,11 @@ function ToolbarButton({ icon: Icon, onClick, tooltip }: ToolbarButtonProps) {
     return (
         <Tooltip>
             <TooltipTrigger asChild>
-                <Button 
+                <Button
                     type="button"
-                    variant="ghost" 
-                    size="icon" 
+                    variant="ghost"
+                    size="icon"
+                    aria-label={tooltip}
                     onClick={onClick}
                     className="h-8 w-8 rounded-lg hover:bg-background hover:text-primary transition-all group"
                 >

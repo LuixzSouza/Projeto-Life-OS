@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { JobApplication } from "@prisma/client";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Sparkles, FileText, Target, Loader2, Copy, RefreshCw } from "lucide-react";
@@ -94,28 +94,26 @@ export function JobAiDialog({ job, onOpenChange }: { job: JobApplication | null;
 
     return (
         <Dialog open={!!job} onOpenChange={onOpenChange}>
-            <DialogContent className="fixed left-[50%] top-[50%] z-50 w-[95vw] sm:max-w-2xl translate-x-[-50%] translate-y-[-50%] rounded-[2rem] p-0 overflow-hidden bg-background border-border/50 shadow-2xl">
-                <div className="bg-gradient-to-br from-violet-500/10 to-transparent p-6 border-b border-border/40 shrink-0">
-                    <DialogHeader>
-                        <DialogTitle className="text-2xl font-black uppercase tracking-tighter flex items-center gap-2">
-                            <Sparkles className="h-6 w-6 text-violet-500" /> Assistente de Carreira
-                        </DialogTitle>
-                        {job && (
-                            <div className="flex items-center gap-2 pt-1">
-                                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                                    {job.role} · {job.company}
-                                </p>
-                                {job.matchScore != null && (
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-2 py-0.5 text-[10px] font-black text-violet-600">
-                                        <Target className="h-3 w-3" /> Match {job.matchScore}%
-                                    </span>
-                                )}
-                            </div>
-                        )}
-                    </DialogHeader>
-                </div>
+            <DialogContent size="lg">
+                <DialogHeader className="bg-gradient-to-br from-violet-500/10 to-transparent">
+                    <DialogTitle className="text-2xl font-black uppercase tracking-tighter flex items-center gap-2">
+                        <Sparkles className="h-6 w-6 text-violet-500" /> Assistente de Carreira
+                    </DialogTitle>
+                    {job && (
+                        <div className="flex items-center gap-2 pt-1">
+                            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                                {job.role} · {job.company}
+                            </p>
+                            {job.matchScore != null && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/10 px-2 py-0.5 text-[10px] font-black text-violet-600">
+                                    <Target className="h-3 w-3" /> Match {job.matchScore}%
+                                </span>
+                            )}
+                        </div>
+                    )}
+                </DialogHeader>
 
-                <div className="p-6">
+                <DialogBody>
                     <Tabs defaultValue="cover" className="w-full">
                         <TabsList className="bg-muted/40 p-1.5 rounded-2xl border border-border/40 h-12 w-full mb-6">
                             <TabsTrigger value="cover" className="rounded-xl font-black text-[10px] uppercase tracking-widest data-[state=active]:bg-background data-[state=active]:shadow-md gap-2 h-full flex-1">
@@ -132,7 +130,7 @@ export function JobAiDialog({ job, onOpenChange }: { job: JobApplication | null;
                             {renderPane("match", "Analisar match")}
                         </TabsContent>
                     </Tabs>
-                </div>
+                </DialogBody>
             </DialogContent>
         </Dialog>
     );

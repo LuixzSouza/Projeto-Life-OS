@@ -150,7 +150,7 @@ export function RecurringChargeDialog({ trigger, item, clients }: RecurringCharg
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogTrigger asChild>
                     {trigger ? trigger : (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-emerald-600 rounded-lg transition-colors">
+                        <Button variant="ghost" size="icon" aria-label="Nova cobrança recorrente" className="h-8 w-8 text-muted-foreground hover:text-emerald-600 rounded-lg transition-colors">
                             <Plus className="h-5 w-5" />
                         </Button>
                     )}

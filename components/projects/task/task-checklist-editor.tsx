@@ -82,7 +82,7 @@ export function TaskChecklistEditor({ taskId, initialRaw }: { taskId: string; in
           placeholder="Adicionar subtarefa…"
           className="h-9 text-sm"
         />
-        <Button type="button" size="icon" variant="outline" className="h-9 w-9 shrink-0" onClick={add} disabled={!draft.trim()}>
+        <Button type="button" size="icon" variant="outline" aria-label="Adicionar item" className="h-9 w-9 shrink-0" onClick={add} disabled={!draft.trim()}>
           <Plus className="h-4 w-4" />
         </Button>
       </div>

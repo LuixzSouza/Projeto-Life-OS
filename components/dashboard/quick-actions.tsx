@@ -39,9 +39,10 @@ export function QuickActions() {
                     <Tooltip key={index}>
                         <TooltipTrigger asChild>
                             <Link href={action.href}>
-                                <Button 
-                                    size="icon" 
-                                    variant="outline" 
+                                <Button
+                                    size="icon"
+                                    variant="outline"
+                                    aria-label={action.label}
                                     className={cn(
                                         "h-9 w-9 rounded-full transition-all duration-200 hover:scale-105 shadow-sm",
                                         action.className

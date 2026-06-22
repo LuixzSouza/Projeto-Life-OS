@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import {
     DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -164,7 +164,7 @@ export function JobListItem({ job, mode, onAiClick, onLinkClick }: JobItemProps)
                 </Button>
             )}
             {job.contactEmail && (
-                <Button variant="ghost" size="icon" asChild className="h-8 w-8 rounded-lg text-muted-foreground hover:text-emerald-600 hover:bg-emerald-500/10">
+                <Button variant="ghost" size="icon" aria-label="Enviar e-mail" asChild className="h-8 w-8 rounded-lg text-muted-foreground hover:text-emerald-600 hover:bg-emerald-500/10">
                     <a
                         href={`mailto:${job.contactEmail}?subject=${encodeURIComponent(`Candidatura: ${job.role} — ${job.company}`)}`}
                         onClick={(e) => e.stopPropagation()}
@@ -175,7 +175,7 @@ export function JobListItem({ job, mode, onAiClick, onLinkClick }: JobItemProps)
                 </Button>
             )}
             {job.jobUrl && (
-                <Button variant="ghost" size="icon" asChild className="h-8 w-8 rounded-lg text-muted-foreground hover:text-blue-600 hover:bg-blue-500/10">
+                <Button variant="ghost" size="icon" aria-label="Abrir vaga" asChild className="h-8 w-8 rounded-lg text-muted-foreground hover:text-blue-600 hover:bg-blue-500/10">
                     <a href={job.jobUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}><ExternalLink className="h-4 w-4" /></a>
                 </Button>
             )}
@@ -188,15 +188,15 @@ export function JobListItem({ job, mode, onAiClick, onLinkClick }: JobItemProps)
 
     const editDialogNode = (
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-            <DialogContent className="sm:max-w-2xl p-0 overflow-hidden rounded-[2rem] shadow-2xl gap-0">
-                <DialogHeader className="p-6 pb-5 border-b border-border/40 bg-muted/10 text-left">
+            <DialogContent size="lg">
+                <DialogHeader>
                     <DialogTitle className="text-xl font-bold tracking-tight flex items-center gap-2">
                         <Pencil className="h-5 w-5 text-primary" /> Editar registro
                     </DialogTitle>
                 </DialogHeader>
-                <div className="p-6 overflow-y-auto max-h-[70vh]">
+                <DialogBody>
                     <JobForm defaultValues={job} type={job.type || 'JOB'} mode="edit" events={job.events} onSubmit={() => setIsEditOpen(false)} />
-                </div>
+                </DialogBody>
             </DialogContent>
         </Dialog>
     );

@@ -183,13 +183,13 @@ const APIInputField: React.FC<{
             />
             
             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-              <Button type="button" variant="ghost" size="icon" onClick={() => setRevealed(!revealed)} className="h-8 w-8 rounded-lg hover:bg-muted">
+              <Button type="button" variant="ghost" size="icon" aria-label={revealed ? "Ocultar chave" : "Mostrar chave"} onClick={() => setRevealed(!revealed)} className="h-8 w-8 rounded-lg hover:bg-muted">
                 {revealed ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
               </Button>
-              <Button type="button" variant="ghost" size="icon" onClick={handleCopy} className="h-8 w-8 rounded-lg hover:bg-muted">
+              <Button type="button" variant="ghost" size="icon" aria-label="Copiar chave" onClick={handleCopy} className="h-8 w-8 rounded-lg hover:bg-muted">
                 {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4 text-muted-foreground" />}
               </Button>
-              <Button type="button" variant="ghost" size="icon" onClick={handleTest} disabled={testing || !value} className="h-8 w-8 rounded-lg hover:bg-primary/10 hover:text-primary">
+              <Button type="button" variant="ghost" size="icon" aria-label="Testar conexão" onClick={handleTest} disabled={testing || !value} className="h-8 w-8 rounded-lg hover:bg-primary/10 hover:text-primary">
                 {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <TestTube2 className="h-4 w-4" />}
               </Button>
             </div>

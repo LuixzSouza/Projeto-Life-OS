@@ -86,7 +86,7 @@ export async function createPage(formData: FormData) {
 
   if (exists) throw new Error("A rota '/" + slug + "' já está em uso neste container.");
 
-  await prisma.sitePage.create({
+  const page = await prisma.sitePage.create({
     data: {
       siteId,
       slug,
@@ -96,6 +96,8 @@ export async function createPage(formData: FormData) {
   });
 
   revalidatePath("/cms");
+  revalidatePath(`/cms/${siteId}`);
+  return { id: page.id, slug: page.slug };
 }
 
 // Deletar Página/Rota

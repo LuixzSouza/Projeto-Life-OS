@@ -114,7 +114,7 @@ export function ClientCard({
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted/80">
+            <Button variant="ghost" size="icon" aria-label="Mais ações" className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-muted/80">
               <MoreHorizontal size={18} />
             </Button>
           </DropdownMenuTrigger>

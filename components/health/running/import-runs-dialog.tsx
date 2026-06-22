@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogBody } from "@/components/ui/dialog";
 import { Upload, FileUp, Loader2, Footprints, CheckCircle2, X } from "lucide-react";
 import { toast } from "sonner";
 import { parseRunningFile, ParsedRun } from "@/lib/running-import";
@@ -68,8 +68,8 @@ export function ImportRunsDialog() {
                     <Upload className="h-4 w-4" /> Importar arquivo (GPX/TCX/CSV)
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-lg p-0 overflow-hidden rounded-[2rem] shadow-2xl gap-0">
-                <DialogHeader className="p-6 pb-5 border-b border-border/40 bg-muted/10 text-left">
+            <DialogContent size="md">
+                <DialogHeader>
                     <DialogTitle className="text-xl font-bold tracking-tight flex items-center gap-2">
                         <FileUp className="h-5 w-5 text-primary" /> Importar corridas
                     </DialogTitle>
@@ -78,7 +78,7 @@ export function ImportRunsDialog() {
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="p-6 space-y-5">
+                <DialogBody className="space-y-5">
                     {parsed.length === 0 ? (
                         <label className="flex flex-col items-center justify-center gap-3 py-12 border-2 border-dashed border-border/50 rounded-2xl bg-muted/10 cursor-pointer hover:border-primary/40 hover:bg-primary/[0.02] transition-colors">
                             <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
@@ -123,7 +123,7 @@ export function ImportRunsDialog() {
                             </Button>
                         </div>
                     )}
-                </div>
+                </DialogBody>
             </DialogContent>
         </Dialog>
     );

@@ -158,21 +158,31 @@ function StatCard({
   delta?: React.ReactNode;
 }) {
   return (
-    <Card className="border-border/40 bg-card shadow-sm hover:shadow-md hover:border-primary/30 transition-all">
-      <CardContent className="p-4 space-y-2">
+    <Card className="group rounded-2xl border-border/40 bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md">
+      <CardContent className="flex h-full flex-col p-4">
         <div className="flex items-center gap-2">
-          <span className={cn("flex h-7 w-7 items-center justify-center rounded-lg", tone)}>
-            <Icon className="h-3.5 w-3.5" />
+          <span className={cn("flex h-8 w-8 items-center justify-center rounded-xl transition-transform group-hover:scale-110", tone)}>
+            <Icon className="h-4 w-4" />
           </span>
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground leading-tight">{label}</p>
         </div>
-        <p className="text-2xl font-bold tracking-tight leading-none">{value}</p>
-        <div className="space-y-0.5 min-h-[16px]">
+        <p className="mt-3 text-2xl font-bold tracking-tight leading-none tabular-nums">{value}</p>
+        <div className="mt-auto space-y-1 pt-2">
           {sub && <p className="text-[11px] text-muted-foreground leading-tight">{sub}</p>}
           {delta}
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// Cabeçalho de seção: barra de acento + título, organiza os blocos de cards.
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span className="h-4 w-1 rounded-full bg-primary/60" />
+      <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{children}</h3>
+    </div>
   );
 }
 
@@ -325,16 +335,16 @@ export default async function ReviewPage({
               </Link>
             </Button>
 
-            <div className="text-center space-y-1.5">
+            <div className="flex flex-col items-center gap-2">
               <h2 className="text-lg sm:text-xl font-bold tracking-tight">{periodLabel}</h2>
-              <div className="flex justify-center gap-1">
+              <div className="inline-flex items-center gap-0.5 rounded-full border border-border/50 bg-muted/30 p-0.5">
                 <Link
                   href={monthModeHref}
                   className={cn(
-                    "rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-colors",
+                    "rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors",
                     !isYearMode
-                      ? "border-primary/30 bg-primary/10 text-primary"
-                      : "border-border/50 text-muted-foreground hover:text-foreground"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
                   )}
                 >
                   Mês
@@ -342,10 +352,10 @@ export default async function ReviewPage({
                 <Link
                   href={`/review?year=${year}`}
                   className={cn(
-                    "rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-colors",
+                    "rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors",
                     isYearMode
-                      ? "border-primary/30 bg-primary/10 text-primary"
-                      : "border-border/50 text-muted-foreground hover:text-foreground"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
                   )}
                 >
                   Ano
@@ -374,9 +384,14 @@ export default async function ReviewPage({
             </div>
           )}
 
-          {/* Finanças */}
-          <Card className="border-border/40 bg-card shadow-sm">
-            <CardContent className="p-5 space-y-4">
+          {/* Finanças — saldo em destaque */}
+          <Card className="overflow-hidden rounded-2xl border-border/40 bg-card shadow-sm">
+            <div className={cn(
+              "p-5 sm:p-6",
+              balance >= 0
+                ? "bg-gradient-to-br from-emerald-500/[0.08] via-card to-card"
+                : "bg-gradient-to-br from-rose-500/[0.08] via-card to-card"
+            )}>
               <div className="flex items-center gap-2">
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
                   <Wallet className="h-3.5 w-3.5" />
@@ -385,43 +400,48 @@ export default async function ReviewPage({
                 <span className="ml-auto text-[11px] text-muted-foreground">{stats.txCount} lançamentos</span>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="mt-5 flex flex-wrap items-end justify-between gap-4">
                 <div>
-                  <p className="text-[10px] font-bold uppercase text-muted-foreground">Receitas</p>
-                  <p className="text-lg sm:text-xl font-bold text-emerald-500">{money(stats.income)}</p>
-                  <DeltaBadge compareLabel={cmp} current={stats.income} previous={prev.income} goodWhen="up" format={money} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase text-muted-foreground">Despesas</p>
-                  <p className="text-lg sm:text-xl font-bold text-rose-500">{money(stats.expense)}</p>
-                  <DeltaBadge compareLabel={cmp} current={stats.expense} previous={prev.expense} goodWhen="down" format={money} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase text-muted-foreground">Saldo</p>
-                  <p className={cn("text-lg sm:text-xl font-bold", balance >= 0 ? "text-foreground" : "text-rose-500")}>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Saldo do período</p>
+                  <p className={cn(
+                    "text-3xl sm:text-4xl font-black tracking-tight tabular-nums leading-none mt-1",
+                    balance >= 0 ? "text-emerald-600 dark:text-emerald-500" : "text-rose-500"
+                  )}>
                     {money(balance)}
                   </p>
                 </div>
-              </div>
-
-              {stats.topCategories.length > 0 && (
-                <div className="space-y-2 pt-1">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Onde o dinheiro foi</p>
-                  {stats.topCategories.map((c) => (
-                    <div key={c.category} className="flex items-center gap-3">
-                      <span className="w-28 sm:w-36 truncate text-xs font-medium">{c.category}</span>
-                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary">
-                        <div
-                          className="h-full rounded-full bg-primary/70"
-                          style={{ width: `${maxCategory > 0 ? Math.max((c.total / maxCategory) * 100, 4) : 0}%` }}
-                        />
-                      </div>
-                      <span className="w-24 text-right font-mono text-xs text-muted-foreground">{money(c.total)}</span>
-                    </div>
-                  ))}
+                <div className="flex gap-2.5">
+                  <div className="rounded-xl border border-border/50 bg-background/70 px-3.5 py-2 backdrop-blur-sm">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Receitas</p>
+                    <p className="text-base sm:text-lg font-bold text-emerald-500 tabular-nums">{money(stats.income)}</p>
+                    <DeltaBadge compareLabel={cmp} current={stats.income} previous={prev.income} goodWhen="up" format={money} />
+                  </div>
+                  <div className="rounded-xl border border-border/50 bg-background/70 px-3.5 py-2 backdrop-blur-sm">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Despesas</p>
+                    <p className="text-base sm:text-lg font-bold text-rose-500 tabular-nums">{money(stats.expense)}</p>
+                    <DeltaBadge compareLabel={cmp} current={stats.expense} previous={prev.expense} goodWhen="down" format={money} />
+                  </div>
                 </div>
-              )}
-            </CardContent>
+              </div>
+            </div>
+
+            {stats.topCategories.length > 0 && (
+              <div className="space-y-2.5 border-t border-border/40 p-5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Onde o dinheiro foi</p>
+                {stats.topCategories.map((c) => (
+                  <div key={c.category} className="flex items-center gap-3">
+                    <span className="w-28 sm:w-36 truncate text-xs font-medium">{c.category}</span>
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-secondary">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-primary/60 to-primary"
+                        style={{ width: `${maxCategory > 0 ? Math.max((c.total / maxCategory) * 100, 4) : 0}%` }}
+                      />
+                    </div>
+                    <span className="w-24 text-right font-mono text-xs text-muted-foreground">{money(c.total)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
 
           {/* Tendência financeira de 12 meses */}
@@ -467,80 +487,90 @@ export default async function ReviewPage({
             </Card>
           )}
 
-          {/* Corpo & mente */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard
-              icon={Dumbbell} tone="bg-orange-500/10 text-orange-500" label="Treinos"
-              value={String(stats.workouts)}
-              sub={stats.workoutMinutes > 0 ? `${fmtMinutes(stats.workoutMinutes)} no total` : undefined}
-              delta={<DeltaBadge compareLabel={cmp} current={stats.workouts} previous={prev.workouts} goodWhen="up" />}
-            />
-            <StatCard
-              icon={BookOpen} tone="bg-blue-500/10 text-blue-500" label="Estudos"
-              value={fmtMinutes(stats.studyMinutes)}
-              sub={`${stats.studySessions} sessões`}
-              delta={<DeltaBadge compareLabel={cmp} current={stats.studyMinutes} previous={prev.studyMinutes} goodWhen="up" format={fmtMinutes} />}
-            />
-            <StatCard
-              icon={Timer} tone="bg-violet-500/10 text-violet-500" label="Foco"
-              value={fmtMinutes(stats.focusMinutes)}
-              sub={`${stats.focusSessions} sessões`}
-              delta={<DeltaBadge compareLabel={cmp} current={stats.focusMinutes} previous={prev.focusMinutes} goodWhen="up" format={fmtMinutes} />}
-            />
-            <StatCard
-              icon={Flame} tone="bg-red-500/10 text-red-500" label="Hábitos cumpridos"
-              value={String(stats.habitsDone)}
-              delta={<DeltaBadge compareLabel={cmp} current={stats.habitsDone} previous={prev.habitsDone} goodWhen="up" />}
-            />
-            <StatCard
-              icon={CheckCircle2} tone="bg-yellow-500/10 text-yellow-600" label="Tarefas concluídas"
-              value={String(stats.tasksDone)}
-              delta={<DeltaBadge compareLabel={cmp} current={stats.tasksDone} previous={prev.tasksDone} goodWhen="up" />}
-            />
-            <StatCard
-              icon={Briefcase} tone="bg-indigo-500/10 text-indigo-500" label="Projetos concluídos"
-              value={String(stats.projectsDone)}
-              delta={<DeltaBadge compareLabel={cmp} current={stats.projectsDone} previous={prev.projectsDone} goodWhen="up" />}
-            />
-            <StatCard
-              icon={NotebookPen} tone="bg-teal-500/10 text-teal-500" label="Notas criadas"
-              value={String(stats.notesCreated)}
-              delta={<DeltaBadge compareLabel={cmp} current={stats.notesCreated} previous={prev.notesCreated} goodWhen="up" />}
-            />
-            <StatCard
-              icon={Film} tone="bg-purple-500/10 text-purple-500" label="Mídia concluída"
-              value={String(stats.mediaCompleted)}
-              sub="Filmes, séries, jogos…"
-              delta={<DeltaBadge compareLabel={cmp} current={stats.mediaCompleted} previous={prev.mediaCompleted} goodWhen="neutral" />}
-            />
-            <StatCard
-              icon={Moon} tone="bg-violet-500/10 text-violet-400" label="Sono médio"
-              value={stats.sleepAvg !== null ? `${stats.sleepAvg.toFixed(1).replace(".", ",")}h` : "—"}
-              sub={stats.sleepAvg === null ? "Sem registros no mês" : "por noite registrada"}
-            />
-            <StatCard
-              icon={Scale} tone="bg-cyan-500/10 text-cyan-500" label="Peso"
-              value={
-                stats.weightEnd !== null
-                  ? `${fmtKg(stats.weightEnd)} kg`
-                  : "—"
-              }
-              sub={
-                weightDiff !== null && stats.weightStart !== null
-                  ? `${fmtKg(stats.weightStart)} → ${fmtKg(stats.weightEnd!)} kg (${weightDiff > 0 ? "+" : ""}${fmtKg(weightDiff)})`
-                  : stats.weightEnd === null ? "Sem medições no mês" : undefined
-              }
-            />
-            <StatCard
-              icon={Utensils} tone="bg-emerald-500/10 text-emerald-500" label="Refeições registradas"
-              value={String(stats.mealsCount)}
-              sub={
-                stats.mealsCount > 0 && stats.kcalTotal > 0
-                  ? `média de ${Math.round(stats.kcalTotal / stats.mealsCount)} kcal por refeição`
-                  : undefined
-              }
-              delta={<DeltaBadge compareLabel={cmp} current={stats.mealsCount} previous={prev.mealsCount} goodWhen="neutral" />}
-            />
+          {/* Saúde & Corpo */}
+          <div className="space-y-3">
+            <SectionTitle>Saúde &amp; Corpo</SectionTitle>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard
+                icon={Dumbbell} tone="bg-orange-500/10 text-orange-500" label="Treinos"
+                value={String(stats.workouts)}
+                sub={stats.workoutMinutes > 0 ? `${fmtMinutes(stats.workoutMinutes)} no total` : undefined}
+                delta={<DeltaBadge compareLabel={cmp} current={stats.workouts} previous={prev.workouts} goodWhen="up" />}
+              />
+              <StatCard
+                icon={Flame} tone="bg-red-500/10 text-red-500" label="Hábitos cumpridos"
+                value={String(stats.habitsDone)}
+                delta={<DeltaBadge compareLabel={cmp} current={stats.habitsDone} previous={prev.habitsDone} goodWhen="up" />}
+              />
+              <StatCard
+                icon={Moon} tone="bg-violet-500/10 text-violet-400" label="Sono médio"
+                value={stats.sleepAvg !== null ? `${stats.sleepAvg.toFixed(1).replace(".", ",")}h` : "—"}
+                sub={stats.sleepAvg === null ? "Sem registros no mês" : "por noite registrada"}
+              />
+              <StatCard
+                icon={Scale} tone="bg-cyan-500/10 text-cyan-500" label="Peso"
+                value={
+                  stats.weightEnd !== null
+                    ? `${fmtKg(stats.weightEnd)} kg`
+                    : "—"
+                }
+                sub={
+                  weightDiff !== null && stats.weightStart !== null
+                    ? `${fmtKg(stats.weightStart)} → ${fmtKg(stats.weightEnd!)} kg (${weightDiff > 0 ? "+" : ""}${fmtKg(weightDiff)})`
+                    : stats.weightEnd === null ? "Sem medições no mês" : undefined
+                }
+              />
+              <StatCard
+                icon={Utensils} tone="bg-emerald-500/10 text-emerald-500" label="Refeições registradas"
+                value={String(stats.mealsCount)}
+                sub={
+                  stats.mealsCount > 0 && stats.kcalTotal > 0
+                    ? `média de ${Math.round(stats.kcalTotal / stats.mealsCount)} kcal por refeição`
+                    : undefined
+                }
+                delta={<DeltaBadge compareLabel={cmp} current={stats.mealsCount} previous={prev.mealsCount} goodWhen="neutral" />}
+              />
+            </div>
+          </div>
+
+          {/* Produtividade & Mente */}
+          <div className="space-y-3">
+            <SectionTitle>Produtividade &amp; Mente</SectionTitle>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard
+                icon={BookOpen} tone="bg-blue-500/10 text-blue-500" label="Estudos"
+                value={fmtMinutes(stats.studyMinutes)}
+                sub={`${stats.studySessions} sessões`}
+                delta={<DeltaBadge compareLabel={cmp} current={stats.studyMinutes} previous={prev.studyMinutes} goodWhen="up" format={fmtMinutes} />}
+              />
+              <StatCard
+                icon={Timer} tone="bg-violet-500/10 text-violet-500" label="Foco"
+                value={fmtMinutes(stats.focusMinutes)}
+                sub={`${stats.focusSessions} sessões`}
+                delta={<DeltaBadge compareLabel={cmp} current={stats.focusMinutes} previous={prev.focusMinutes} goodWhen="up" format={fmtMinutes} />}
+              />
+              <StatCard
+                icon={CheckCircle2} tone="bg-yellow-500/10 text-yellow-600" label="Tarefas concluídas"
+                value={String(stats.tasksDone)}
+                delta={<DeltaBadge compareLabel={cmp} current={stats.tasksDone} previous={prev.tasksDone} goodWhen="up" />}
+              />
+              <StatCard
+                icon={Briefcase} tone="bg-indigo-500/10 text-indigo-500" label="Projetos concluídos"
+                value={String(stats.projectsDone)}
+                delta={<DeltaBadge compareLabel={cmp} current={stats.projectsDone} previous={prev.projectsDone} goodWhen="up" />}
+              />
+              <StatCard
+                icon={NotebookPen} tone="bg-teal-500/10 text-teal-500" label="Notas criadas"
+                value={String(stats.notesCreated)}
+                delta={<DeltaBadge compareLabel={cmp} current={stats.notesCreated} previous={prev.notesCreated} goodWhen="up" />}
+              />
+              <StatCard
+                icon={Film} tone="bg-purple-500/10 text-purple-500" label="Mídia concluída"
+                value={String(stats.mediaCompleted)}
+                sub="Filmes, séries, jogos…"
+                delta={<DeltaBadge compareLabel={cmp} current={stats.mediaCompleted} previous={prev.mediaCompleted} goodWhen="neutral" />}
+              />
+            </div>
           </div>
 
           <p className="text-center text-[11px] text-muted-foreground/70">

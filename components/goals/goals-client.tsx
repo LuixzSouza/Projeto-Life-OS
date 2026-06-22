@@ -569,7 +569,7 @@ function GoalDialog({
                   placeholder="Adicionar passo e Enter…"
                   className="h-8 text-sm"
                 />
-                <Button type="button" size="icon" className="h-8 w-8 shrink-0" disabled={!newTask.trim()} onClick={addTask}>
+                <Button type="button" size="icon" aria-label="Adicionar passo" className="h-8 w-8 shrink-0" disabled={!newTask.trim()} onClick={addTask}>
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>

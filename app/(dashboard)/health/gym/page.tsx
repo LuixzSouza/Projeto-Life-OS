@@ -24,6 +24,7 @@ interface GymSet {
   reps: string;
   weight: string;
   done: boolean;
+  type?: string;
 }
 
 interface GymExercise {
@@ -33,6 +34,9 @@ interface GymExercise {
   reps: string;
   isCompleted?: boolean;
   setLog?: GymSet[];
+  equipment?: string;
+  group?: string;
+  note?: string;
 }
 
 interface SerializedWorkout {
@@ -62,13 +66,23 @@ function parseGymExercises(jsonString: string | null): GymExercise[] {
 
       const record = item as Record<string, unknown>;
 
-      // Séries detalhadas (sessão ao vivo), quando presentes.
+      // Séries detalhadas (sessão ao vivo), quando presentes. `type` preserva
+      // aquecimento/drop p/ o volume do gráfico bater com a sessão e a recuperação.
       const setLog = Array.isArray(record.setLog)
         ? (record.setLog as unknown[]).map((s) => {
             const sr = (typeof s === "object" && s !== null ? s : {}) as Record<string, unknown>;
-            return { reps: String(sr.reps ?? "0"), weight: String(sr.weight ?? "0"), done: Boolean(sr.done) };
+            return {
+              reps: String(sr.reps ?? "0"),
+              weight: String(sr.weight ?? "0"),
+              done: Boolean(sr.done),
+              ...(typeof sr.type === "string" ? { type: sr.type } : {}),
+            };
           })
         : undefined;
+
+      const note = typeof record.note === "string" && record.note.trim() ? record.note.trim() : undefined;
+      const equipment = typeof record.equipment === "string" ? record.equipment : undefined;
+      const group = typeof record.group === "string" && record.group.trim() ? record.group.trim() : undefined;
 
       return {
         name: String(record.name || "Exercício"),
@@ -77,6 +91,9 @@ function parseGymExercises(jsonString: string | null): GymExercise[] {
         reps: String(record.reps || "0"),
         isCompleted: Boolean(record.isCompleted),
         ...(setLog ? { setLog } : {}),
+        ...(equipment ? { equipment } : {}),
+        ...(group ? { group } : {}),
+        ...(note ? { note } : {}),
       };
     });
   } catch (e) {

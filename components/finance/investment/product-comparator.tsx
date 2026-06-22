@@ -133,8 +133,8 @@ export function ProductComparator({ cdi }: ComparatorProps) {
                             </DialogTrigger>
                             
                             {/* --- MODAL DE DETALHES --- */}
-                            <DialogContent className="fixed left-[50%] top-[50%] z-50 flex w-[95vw] sm:max-w-2xl max-h-[90vh] flex-col translate-x-[-50%] translate-y-[-50%] p-0 overflow-hidden bg-background border-border/50 shadow-2xl rounded-[2rem]">
-                                
+                            <DialogContent size="lg">
+
                                 {/* Header do Modal Otimizado */}
                                 <div className="bg-card border-b border-border/40 p-6 md:p-8 relative shrink-0">
                                     <DialogHeader className="text-left space-y-4">

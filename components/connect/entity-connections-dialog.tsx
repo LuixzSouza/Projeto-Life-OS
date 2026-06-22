@@ -1,7 +1,7 @@
 "use client";
 
 import { Tag as TagIcon, Paperclip, GitBranch } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { EntityTags } from "./entity-tags";
 import { EntityAttachments } from "./entity-attachments";
@@ -29,13 +29,14 @@ export function EntityConnectionsDialog({
 }) {
   return (
     <Dialog open={!!item} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[460px]">
+      <DialogContent size="md">
         <DialogHeader>
           {/* pr-10 reserva espaço para o X de fechar (right-4, 32px) — evita o título por baixo. */}
           <DialogTitle className="line-clamp-1 pr-10">{item?.title ?? "Conexões"}</DialogTitle>
         </DialogHeader>
         {item && (
-          <Tabs defaultValue="tags" className="mt-1">
+          <DialogBody>
+          <Tabs defaultValue="tags">
             <TabsList className="w-full">
               <TabsTrigger value="tags" className="flex-1 gap-1.5">
                 <TagIcon className="h-4 w-4" /> Tags
@@ -57,6 +58,7 @@ export function EntityConnectionsDialog({
               <EntityLinks entityType={entityType} entityId={item.id} />
             </TabsContent>
           </Tabs>
+          </DialogBody>
         )}
       </DialogContent>
     </Dialog>

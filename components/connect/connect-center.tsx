@@ -168,7 +168,7 @@ function TagsTab({ initialTags }: { initialTags: TagOverview[] }) {
             placeholder="Nova tag…"
             className="h-8 border-none shadow-none focus-visible:ring-0"
           />
-          <Button size="icon" className="h-8 w-8 shrink-0" disabled={pending || !newName.trim()} onClick={create}>
+          <Button size="icon" aria-label="Adicionar tag" className="h-8 w-8 shrink-0" disabled={pending || !newName.trim()} onClick={create}>
             <Plus className="h-4 w-4" />
           </Button>
         </div>

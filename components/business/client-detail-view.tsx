@@ -249,7 +249,7 @@ export function ClientDetailView({ client, accounts, friends, pixKey, businessNa
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg text-muted-foreground hover:bg-muted/80">
+              <Button variant="ghost" size="icon" aria-label="Mais ações" className="h-9 w-9 rounded-lg text-muted-foreground hover:bg-muted/80">
                 <MoreHorizontal size={20} />
               </Button>
             </DropdownMenuTrigger>

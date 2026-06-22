@@ -22,8 +22,8 @@ export function SiteEditor({ site }: { site: SiteWithPages }) {
             <aside className="w-full md:w-64 lg:w-72 border-b md:border-b-0 md:border-r border-border/40 bg-muted/5 flex flex-col shrink-0">
                 <Tabs value={activeTab} onValueChange={setActiveTab} orientation="vertical" className="flex flex-col h-full">
                     <div className="p-5 border-b border-border/40 bg-background/50">
-                        <Button onClick={() => setActiveTab("new-page")} className="w-full gap-2 rounded-xl font-black uppercase tracking-widest text-[10px] shadow-md h-10">
-                            <Plus className="h-4 w-4" /> Novo Endpoint
+                        <Button onClick={() => setActiveTab("new-page")} className="w-full gap-2 rounded-xl font-semibold text-sm shadow-sm h-10">
+                            <Plus className="h-4 w-4" /> Novo endpoint
                         </Button>
                     </div>
 
@@ -32,8 +32,8 @@ export function SiteEditor({ site }: { site: SiteWithPages }) {
 
                             {/* ROTAS */}
                             <div className="space-y-2">
-                                <div className="text-[9px] font-black text-muted-foreground/50 uppercase tracking-[0.2em] px-2 flex items-center gap-2">
-                                    <Database className="h-3 w-3" /> Rotas Ativas
+                                <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider px-2 flex items-center gap-2">
+                                    <Database className="h-3 w-3" /> Rotas ativas
                                 </div>
                                 <TabsList className="flex flex-col h-auto bg-transparent gap-1 p-0">
                                     {site.pages.map(page => (
@@ -52,15 +52,15 @@ export function SiteEditor({ site }: { site: SiteWithPages }) {
 
                             {/* SISTEMA */}
                             <div className="space-y-2">
-                                <div className="text-[9px] font-black text-muted-foreground/50 uppercase tracking-[0.2em] px-2 flex items-center gap-2">
+                                <div className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider px-2 flex items-center gap-2">
                                     <Settings className="h-3 w-3" /> Sistema
                                 </div>
                                 <TabsList className="flex flex-col h-auto bg-transparent gap-1 p-0">
-                                    <TabsTrigger value="api" className="w-full justify-start px-3 py-2.5 rounded-xl text-muted-foreground data-[state=active]:bg-foreground data-[state=active]:text-background transition-all">
+                                    <TabsTrigger value="api" className="w-full justify-start px-3 py-2.5 h-auto text-xs font-semibold rounded-xl text-muted-foreground border border-transparent data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:border-primary/20 transition-all">
                                         <Code2 className="mr-2 h-4 w-4 opacity-70" /> Integração
                                     </TabsTrigger>
-                                    <TabsTrigger value="settings" className="w-full justify-start px-3 py-2.5 rounded-xl text-muted-foreground hover:text-red-600 data-[state=active]:bg-red-500 data-[state=active]:text-white transition-all">
-                                        <AlertCircle className="mr-2 h-4 w-4 opacity-70" /> Danger Zone
+                                    <TabsTrigger value="settings" className="w-full justify-start px-3 py-2.5 h-auto text-xs font-semibold rounded-xl text-muted-foreground border border-transparent hover:text-rose-600 data-[state=active]:bg-rose-500/10 data-[state=active]:text-rose-600 data-[state=active]:border-rose-500/20 transition-all">
+                                        <AlertCircle className="mr-2 h-4 w-4 opacity-70" /> Zona de perigo
                                     </TabsTrigger>
                                 </TabsList>
                             </div>
@@ -83,7 +83,7 @@ export function SiteEditor({ site }: { site: SiteWithPages }) {
 
                     {/* ABA: CRIAR NOVA ROTA */}
                     <TabsContent value="new-page" className="h-full mt-0 overflow-y-auto">
-                        <NewPageForm siteId={site.id} />
+                        <NewPageForm siteId={site.id} onCreated={(pageId) => setActiveTab(pageId)} />
                     </TabsContent>
 
                     {/* ABA: API */}

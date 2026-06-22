@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle,
-    DialogTrigger, DialogDescription,
+    DialogTrigger, DialogDescription, DialogBody,
 } from "@/components/ui/dialog";
 import {
     Moon, Plus, ArrowRight, BedDouble,
@@ -120,8 +120,8 @@ export function SleepCard({ value, targetGoal = 7.5 }: SleepCardProps) {
                             <Plus className="h-4 w-4" />
                         </Button>
                     </DialogTrigger>
-                    <DialogContent className="fixed left-1/2 top-1/2 z-[100] w-[95%] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl border-border/40 bg-card p-6 shadow-lg">
-                        <DialogHeader className="items-center text-center">
+                    <DialogContent size="sm">
+                        <DialogHeader className="flex flex-col items-center text-center">
                             <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-500/10 text-indigo-500">
                                 <Moon className="h-6 w-6" />
                             </div>
@@ -129,7 +129,7 @@ export function SleepCard({ value, targetGoal = 7.5 }: SleepCardProps) {
                             <DialogDescription className="text-sm text-muted-foreground">Quantas horas você dormiu esta noite?</DialogDescription>
                         </DialogHeader>
 
-                        <div className="mt-4 space-y-5">
+                        <DialogBody className="space-y-5">
                             <div className="grid grid-cols-3 gap-2">
                                 {[6, 7, 8].map((val) => (
                                     <Button
@@ -163,7 +163,7 @@ export function SleepCard({ value, targetGoal = 7.5 }: SleepCardProps) {
                             >
                                 {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Registrar"}
                             </Button>
-                        </div>
+                        </DialogBody>
                     </DialogContent>
                 </Dialog>
             </CardHeader>

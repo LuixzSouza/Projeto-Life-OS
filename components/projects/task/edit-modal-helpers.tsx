@@ -24,6 +24,7 @@ export function QuickAction({ icon: Icon, active, color, onClick, tooltip }: { i
           type="button"
           variant="ghost"
           size="icon"
+          aria-label={tooltip}
           className={cn(
             "h-10 w-10 rounded-xl transition-all",
             active ? `${color} bg-background shadow-lg border border-border/10` : "text-muted-foreground hover:bg-muted"

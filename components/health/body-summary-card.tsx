@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
     Dialog, DialogContent, DialogHeader, DialogTitle,
-    DialogTrigger, DialogDescription,
+    DialogTrigger, DialogDescription, DialogBody,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -134,15 +134,16 @@ export function BodySummaryCard({
                             <Pencil className="h-4 w-4" />
                         </Button>
                     </DialogTrigger>
-                    <DialogContent className="fixed left-1/2 top-1/2 z-[100] w-[95%] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl border-border/40 bg-card p-6 shadow-lg">
-                        <DialogHeader className="items-center text-center">
+                    <DialogContent size="sm">
+                        <DialogHeader className="flex flex-col items-center text-center">
                             <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                                 <Scale className="h-6 w-6" />
                             </div>
                             <DialogTitle className="text-lg font-bold">Atualizar medidas</DialogTitle>
                             <DialogDescription className="text-sm text-muted-foreground">Peso e altura atuais para recalcular IMC e metas.</DialogDescription>
                         </DialogHeader>
-                        <form onSubmit={handleSubmit} className="mt-4 space-y-5">
+                        <DialogBody>
+                        <form onSubmit={handleSubmit} className="space-y-5">
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-2">
                                     <Label className="text-xs font-medium text-muted-foreground">Peso (kg)</Label>
@@ -157,6 +158,7 @@ export function BodySummaryCard({
                                 {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar medidas"}
                             </Button>
                         </form>
+                        </DialogBody>
                     </DialogContent>
                 </Dialog>
             </CardHeader>

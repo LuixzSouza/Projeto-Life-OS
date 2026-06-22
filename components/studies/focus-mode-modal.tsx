@@ -123,7 +123,8 @@ export function FocusModeModal({ isOpen, subject, settings, preferences, onFinis
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleAttemptExit(); }}>
       {/* Container principal flexível com restrição estrita de altura */}
       <DialogContent
-          className="max-w-[95vw] w-full max-h-[95vh] h-full md:h-[85vh] p-0 overflow-hidden border-border/50 shadow-2xl [&>button]:hidden flex flex-col bg-background"
+          showCloseButton={false}
+          className="w-[95vw] max-w-[95vw] sm:max-w-3xl lg:max-w-5xl xl:max-w-6xl max-h-[95vh] h-full md:h-[85vh]"
           onInteractOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => { e.preventDefault(); handleAttemptExit(); }}
       >
@@ -165,7 +166,7 @@ export function FocusModeModal({ isOpen, subject, settings, preferences, onFinis
                             <h3 className="mt-3 text-lg md:text-xl font-bold line-clamp-1">{subject?.title}</h3>
                             <p className="text-xs md:text-sm text-muted-foreground">Ciclo: {completedCycles % settings.cycles || settings.cycles} de {settings.cycles}</p>
                         </div>
-                        <Button variant="ghost" size="icon" onClick={handleAttemptExit} className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors shrink-0">
+                        <Button variant="ghost" size="icon" aria-label="Sair do modo foco" onClick={handleAttemptExit} className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors shrink-0">
                             <X className="h-5 w-5" />
                         </Button>
                     </div>

@@ -58,7 +58,7 @@ export function StatementSection({ transactions, recurring, totalRecurring, acco
               Custos Fixos
             </h3>
             <RecurringDialog trigger={
-              <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary/10 hover:text-primary transition-all active:scale-95 border-border/50 shadow-sm">
+              <Button variant="outline" size="icon" aria-label="Adicionar custo fixo" className="h-9 w-9 rounded-xl hover:bg-primary/10 hover:text-primary transition-all active:scale-95 border-border/50 shadow-sm">
                 <Plus className="h-5 w-5" />
               </Button>
             } />

@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Clock, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { formatDate } from "@/lib/utils";
 import type { DashboardTransaction } from "@/components/dashboard/types";
 
 interface TransactionsCardProps {
@@ -26,7 +27,7 @@ export function TransactionsCard({ transactions }: TransactionsCardProps) {
                   </div>
                   <div className="truncate min-w-0">
                     <p className="font-medium text-sm truncate">{t.description}</p>
-                    <p className="text-[10px] text-muted-foreground truncate">{t.account.name} • {new Date(t.date).toLocaleDateString()}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">{t.account.name} • {formatDate(t.date)}</p>
                   </div>
                 </div>
                 <span className={`font-mono text-xs font-medium whitespace-nowrap shrink-0 pl-2 ${t.type === 'INCOME' ? 'text-emerald-600' : 'text-foreground'}`}>

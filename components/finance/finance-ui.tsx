@@ -234,7 +234,7 @@ export function RecurringCard({ total, items, accounts = [] }: { total: number, 
                 <div className="relative z-10">
                     <RecurringDialog 
                         trigger={
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded-lg transition-colors">
+                            <Button size="icon" variant="ghost" aria-label="Custos fixos" className="h-8 w-8 text-muted-foreground hover:bg-primary/10 hover:text-primary rounded-lg transition-colors">
                                 <MoreHorizontal className="h-5 w-5" />
                             </Button>
                         } 

@@ -56,6 +56,7 @@ export function ExperienceForm({ data, onChange }: ExperienceFormProps) {
           <div key={exp.id} className="relative group border border-border/40 bg-card rounded-[2rem] p-8 shadow-xl">
             <Button
               size="icon" variant="destructive"
+              aria-label="Remover experiência"
               className="absolute -top-3 -right-3 h-8 w-8 rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shadow-lg"
               onClick={() => removeExperience(exp.id)}
             >

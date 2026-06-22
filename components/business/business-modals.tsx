@@ -15,6 +15,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { onActivate } from "@/lib/a11y";
 import { compressImageFile } from "@/lib/image";
 import {
   createClient, createBilling, updateClient,
@@ -122,7 +123,7 @@ export function ClientModal({ open, onOpenChange, editingClient, friends, phoneV
                 <div className="space-y-5">
                   {/* Foto da empresa */}
                   <div className="flex items-center gap-4 bg-muted/10 border border-border/40 rounded-2xl p-4">
-                    <div className="relative group/av cursor-pointer shrink-0" onClick={() => fileRef.current?.click()} title="Enviar logo/foto">
+                    <div role="button" tabIndex={0} aria-label="Enviar logo ou foto" className="relative group/av cursor-pointer shrink-0" onClick={() => fileRef.current?.click()} onKeyDown={onActivate(() => fileRef.current?.click())} title="Enviar logo/foto">
                       <Avatar className="h-16 w-16 rounded-2xl border border-border/50 shadow-sm">
                         <AvatarImage src={imageUrl || undefined} className="object-cover" />
                         <AvatarFallback className="rounded-2xl bg-primary/10 text-primary font-bold text-xl">

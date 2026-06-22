@@ -122,6 +122,7 @@ export function ProfileIdentityCard({
           {coverUrl && (
             <Button
               type="button" variant="destructive" size="icon"
+              aria-label="Remover capa"
               className="h-9 w-9 shadow-sm opacity-80 hover:opacity-100 backdrop-blur-md"
               onClick={() => {
                 setCoverUrl("");

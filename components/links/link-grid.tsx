@@ -267,7 +267,7 @@ export function LinkGrid({ links }: { links: SavedLink[] }) {
                 <Plus className="h-4 w-4" /> Novo Recurso
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent size="md">
               <DialogHeader>
                 <DialogTitle>Adicionar Recurso</DialogTitle>
               </DialogHeader>
@@ -343,7 +343,7 @@ export function LinkGrid({ links }: { links: SavedLink[] }) {
                     </Button>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full bg-background/90 backdrop-blur shadow-sm hover:bg-background">
+                            <Button size="icon" variant="secondary" aria-label="Mais ações" className="h-8 w-8 rounded-full bg-background/90 backdrop-blur shadow-sm hover:bg-background">
                                 <MoreVertical className="h-4 w-4" />
                             </Button>
                         </DropdownMenuTrigger>
@@ -440,7 +440,7 @@ export function LinkGrid({ links }: { links: SavedLink[] }) {
 
       {/* === MODAL DE EDIÇÃO === */}
       <Dialog open={!!editingLink} onOpenChange={() => setEditingLink(null)}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent size="md">
             <DialogHeader>
             <DialogTitle>Editar Recurso</DialogTitle>
             </DialogHeader>

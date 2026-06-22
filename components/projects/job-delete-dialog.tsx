@@ -8,7 +8,7 @@ export function DeleteDialog({ onConfirm }: { onConfirm: () => Promise<void> }) 
     return (
         <AlertDialog>
             <AlertDialogTrigger asChild>
-                <Button variant="outline" size="icon" className="h-10 w-10 rounded-xl text-muted-foreground hover:text-rose-600 hover:bg-rose-50 border-border/60"><Trash2 className="h-4.5 w-4.5" /></Button>
+                <Button variant="outline" size="icon" aria-label="Excluir vaga" className="h-10 w-10 rounded-xl text-muted-foreground hover:text-rose-600 hover:bg-rose-50 border-border/60"><Trash2 className="h-4.5 w-4.5" /></Button>
             </AlertDialogTrigger>
             <AlertDialogContent className="rounded-[2rem]">
                 <AlertDialogHeader>

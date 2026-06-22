@@ -27,7 +27,7 @@ export function EducationForm({ data, onChange }: { data: PortfolioData; onChang
       <div className="grid grid-cols-1 gap-6">
         {data.education.map((edu) => (
           <div key={edu.id} className="relative group bg-card border border-border/40 p-6 rounded-[2rem] shadow-lg hover:border-primary/30 transition-all">
-            <Button size="icon" variant="destructive" className="absolute -top-3 -right-3 h-8 w-8 rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shadow-lg" onClick={() => remove(edu.id)}>
+            <Button size="icon" variant="destructive" aria-label="Remover formação" className="absolute -top-3 -right-3 h-8 w-8 rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shadow-lg" onClick={() => remove(edu.id)}>
               <Trash2 className="h-4 w-4" />
             </Button>
             

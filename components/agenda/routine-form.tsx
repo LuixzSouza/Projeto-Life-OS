@@ -16,6 +16,7 @@ import { Clock, Trash2, Loader2 } from "lucide-react";
 import { createRoutineItem, updateRoutineItem, deleteRoutineItem } from "@/app/(dashboard)/agenda/actions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { onActivate } from "@/lib/a11y";
 import { CATEGORIES, DAYS } from "./routine-config";
 
 // --- FORMULÁRIO (CREATE/EDIT) ---
@@ -118,7 +119,11 @@ export function RoutineForm({ item, onClose }: { item?: RoutineItem; onClose: ()
             {DAYS.map((day) => (
                 <div
                 key={day.id}
+                role="button"
+                tabIndex={0}
+                aria-pressed={selectedDays.includes(day.id)}
                 onClick={() => toggleDay(day.id)}
+                onKeyDown={onActivate(() => toggleDay(day.id))}
                 className={cn(
                     "cursor-pointer h-10 px-4 flex items-center justify-center rounded-xl text-[10px] font-black uppercase tracking-widest transition-all select-none border-2",
                     selectedDays.includes(day.id)

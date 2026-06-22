@@ -110,6 +110,7 @@ export function SiteManager({ site }: { site: SiteWithPages }) {
               <Button
                 variant="ghost"
                 size="icon"
+                aria-label="Excluir site"
                 onClick={handleDeleteSite}
                 disabled={isDeleting}
                 className="h-10 w-10 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"

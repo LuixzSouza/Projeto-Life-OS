@@ -227,7 +227,7 @@ function AddHabitDialog({ open, onOpenChange, onCreated }: { open: boolean; onOp
 
   return (
     <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) reset(); }}>
-      <DialogContent className="rounded-2xl">
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>Novo hábito</DialogTitle>
           <DialogDescription>Algo que você quer repetir todo dia.</DialogDescription>

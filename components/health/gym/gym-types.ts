@@ -5,8 +5,15 @@ export interface Exercise {
   sets: string;
   reps: string;
   weight: string;
-  /** Séries detalhadas (sessão ao vivo). Quando presente, o volume usa a soma real. */
-  setLog?: { reps: string; weight: string; done: boolean }[];
+  /** Séries detalhadas (sessão ao vivo). Quando presente, o volume usa a soma real.
+   *  `type` distingue aquecimento (não conta volume) de séries de trabalho. */
+  setLog?: { reps: string; weight: string; done: boolean; type?: string }[];
+  /** Equipamento — define a semântica da carga (halter = por mão → volume ×2). */
+  equipment?: string;
+  /** Grupo muscular (capa colorida / agrupamentos). */
+  group?: string;
+  /** Anotação feita durante a sessão (ex.: reduzi a carga, dor no ombro). */
+  note?: string;
 }
 
 export interface GymWorkout {

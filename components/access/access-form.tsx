@@ -258,6 +258,7 @@ export function AccessForm({ item, onClose }: AccessFormProps) {
                           type="button"
                           size="icon"
                           variant="ghost"
+                          aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                           onClick={() => setShowPassword((v) => !v)}
                           className="absolute right-1 top-1/2 -translate-y-1/2 h-9 w-9 text-muted-foreground hover:text-primary"
                       >

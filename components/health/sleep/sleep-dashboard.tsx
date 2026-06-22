@@ -66,11 +66,11 @@ export function SleepDashboard({ data, initialGoal }: { data: SleepEntry[]; init
           <Moon className="h-4 w-4 text-primary shrink-0" />
           <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Meta de sono</span>
           <div className="flex items-center gap-1.5">
-            <Button type="button" variant="outline" size="icon" className="h-7 w-7 rounded-lg" onClick={() => setGoal(goal - 0.5)}>
+            <Button type="button" variant="outline" size="icon" aria-label="Diminuir meta de sono" className="h-7 w-7 rounded-lg" onClick={() => setGoal(goal - 0.5)}>
               <Minus className="h-3 w-3" />
             </Button>
             <span className="w-14 text-center font-bold font-mono text-sm">{goal}h</span>
-            <Button type="button" variant="outline" size="icon" className="h-7 w-7 rounded-lg" onClick={() => setGoal(goal + 0.5)}>
+            <Button type="button" variant="outline" size="icon" aria-label="Aumentar meta de sono" className="h-7 w-7 rounded-lg" onClick={() => setGoal(goal + 0.5)}>
               <Plus className="h-3 w-3" />
             </Button>
           </div>

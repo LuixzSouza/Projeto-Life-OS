@@ -138,7 +138,7 @@ function EditModalContent({
                 <img src={imageContent} alt="Capa" className="w-full h-44 object-cover" />
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/image:opacity-100 transition-all flex items-center justify-center gap-3">
                   <Button variant="secondary" size="sm" className="rounded-xl font-semibold" onClick={() => fileInputRef.current?.click()}>Alterar</Button>
-                  <Button variant="destructive" size="icon" className="h-9 w-9 rounded-xl" onClick={() => setImageContent(null)}>
+                  <Button variant="destructive" size="icon" aria-label="Remover imagem" className="h-9 w-9 rounded-xl" onClick={() => setImageContent(null)}>
                     <Trash2 size={16} />
                   </Button>
                 </div>

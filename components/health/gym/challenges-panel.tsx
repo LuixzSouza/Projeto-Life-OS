@@ -226,7 +226,7 @@ function ChallengeCard({ challenge, disabled, onRefresh }: { challenge: Serializ
             )}
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 active:bg-destructive/15">
+                <Button variant="ghost" size="icon" aria-label="Excluir desafio" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 active:bg-destructive/15">
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </AlertDialogTrigger>
@@ -357,7 +357,7 @@ function CustomChallengeDialog({ open, onOpenChange, onCreated }: { open: boolea
 
   return (
     <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) reset(); }}>
-      <DialogContent className="rounded-2xl">
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><Sparkles className="h-5 w-5 text-primary" /> Criar desafio</DialogTitle>
           <DialogDescription>Monte um desafio do seu jeito — hábito, treino, leitura, o que for.</DialogDescription>

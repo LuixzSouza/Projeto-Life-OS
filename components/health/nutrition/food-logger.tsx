@@ -230,10 +230,10 @@ function MealRow({ meal, onConnections, onDelete }: { meal: Meal; onConnections:
                 <Badge variant="secondary" className="font-mono font-medium text-xs px-2.5 h-6 bg-background border-border/60">{meal.calories} kcal</Badge>
                 <div className="flex gap-1 md:opacity-0 group-hover:opacity-100 transition-opacity">
                     <MealFormDialog meal={meal}>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary rounded-lg"><Pencil className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" aria-label="Editar refeição" className="h-8 w-8 text-muted-foreground hover:text-primary rounded-lg"><Pencil className="h-4 w-4" /></Button>
                     </MealFormDialog>
                     <Button variant="ghost" size="icon" title="Tags & Anexos" onClick={() => onConnections(meal)} className="h-8 w-8 text-muted-foreground hover:text-primary rounded-lg"><Tags className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" onClick={() => onDelete(meal)} className="h-8 w-8 text-muted-foreground hover:text-rose-500 rounded-lg"><Trash2 className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" aria-label="Excluir refeição" onClick={() => onDelete(meal)} className="h-8 w-8 text-muted-foreground hover:text-rose-500 rounded-lg"><Trash2 className="h-4 w-4" /></Button>
                 </div>
             </div>
         </div>
@@ -373,7 +373,7 @@ function MealFormDialog({ meal, children }: { meal?: Meal; children?: React.Reac
                             <div className="p-1.5 rounded-lg bg-primary/10 text-primary"><Search className="h-3.5 w-3.5" /></div>
                             <h3 className="font-semibold text-sm">Adicionar alimentos</h3>
                         </div>
-                        <Button variant="ghost" size="icon" className="md:hidden h-7 w-7" onClick={() => setShowSearchMobile(false)}>
+                        <Button variant="ghost" size="icon" aria-label="Fechar busca" className="md:hidden h-7 w-7" onClick={() => setShowSearchMobile(false)}>
                             <X className="h-4 w-4" />
                         </Button>
                     </div>
@@ -456,7 +456,7 @@ function MealFormDialog({ meal, children }: { meal?: Meal; children?: React.Reac
                                                 </div>
                                                 {/* Stepper de quantidade */}
                                                 <div className="flex items-center gap-1 shrink-0">
-                                                    <Button type="button" variant="outline" size="icon" className="h-7 w-7 rounded-lg" onClick={() => setQty(food.id, quantity - 1)}>
+                                                    <Button type="button" variant="outline" size="icon" aria-label="Diminuir quantidade" className="h-7 w-7 rounded-lg" onClick={() => setQty(food.id, quantity - 1)}>
                                                         <Minus className="h-3 w-3" />
                                                     </Button>
                                                     <Input
@@ -464,10 +464,10 @@ function MealFormDialog({ meal, children }: { meal?: Meal; children?: React.Reac
                                                         onChange={(e) => setQty(food.id, Number(e.target.value.replace(",", ".")) || 0)}
                                                         className="h-7 w-12 text-center px-1 rounded-lg bg-background border-border/40 font-mono text-sm"
                                                     />
-                                                    <Button type="button" variant="outline" size="icon" className="h-7 w-7 rounded-lg" onClick={() => setQty(food.id, quantity + 1)}>
+                                                    <Button type="button" variant="outline" size="icon" aria-label="Aumentar quantidade" className="h-7 w-7 rounded-lg" onClick={() => setQty(food.id, quantity + 1)}>
                                                         <Plus className="h-3 w-3" />
                                                     </Button>
-                                                    <Button type="button" variant="ghost" size="icon" className="h-7 w-7 rounded-lg text-muted-foreground hover:text-destructive" onClick={() => removeItem(food.id)}>
+                                                    <Button type="button" variant="ghost" size="icon" aria-label="Remover alimento" className="h-7 w-7 rounded-lg text-muted-foreground hover:text-destructive" onClick={() => removeItem(food.id)}>
                                                         <Trash2 className="h-3.5 w-3.5" />
                                                     </Button>
                                                 </div>

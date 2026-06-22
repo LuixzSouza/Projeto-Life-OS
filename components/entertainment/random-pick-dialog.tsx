@@ -16,7 +16,7 @@ interface RandomPickDialogProps {
 export function RandomPickDialog({ item, onClose, onReroll }: RandomPickDialogProps) {
   return (
     <Dialog open={!!item} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-sm text-center border-border shadow-2xl rounded-3xl overflow-hidden p-0">
+      <DialogContent size="sm" className="text-center">
         <div className="bg-gradient-to-b from-primary/10 to-background p-8 pt-10 relative">
             <div className="absolute top-4 right-4 text-primary opacity-50"><Sparkles className="h-6 w-6"/></div>
             <DialogHeader>

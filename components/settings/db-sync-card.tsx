@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { syncDatabaseNow } from "@/app/(dashboard)/settings/actions";
 import { toast } from "sonner";
 import { RefreshCw, Cloud, CheckCircle2, AlertTriangle } from "lucide-react";
+import { formatTime, formatDateTime } from "@/lib/utils";
 
 interface DbSyncCardProps {
   /** URL do Turso espelho (apenas exibição). */
@@ -30,7 +31,7 @@ export function DbSyncCard({ syncUrl, databasePath, lastSyncAt, lastSyncError }:
       if (res.success) {
         toast.success(res.message);
         // Hora local apenas para feedback visual nesta sessão.
-        setLastSync(new Date().toLocaleTimeString());
+        setLastSync(formatTime(new Date()));
       } else {
         toast.error(res.message);
       }
@@ -89,7 +90,7 @@ export function DbSyncCard({ syncUrl, databasePath, lastSyncAt, lastSyncError }:
           ) : lastSyncAt ? (
             <p className="text-[11px] text-emerald-600 flex items-center gap-1.5">
               <CheckCircle2 className="h-3.5 w-3.5" /> Último sync com o espelho:{" "}
-              {new Date(lastSyncAt).toLocaleString()}
+              {formatDateTime(lastSyncAt)}
             </p>
           ) : null}
           {lastSync && (

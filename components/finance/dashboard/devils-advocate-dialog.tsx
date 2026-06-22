@@ -8,7 +8,7 @@ import { useState, useTransition } from "react";
 import { Flame, Loader2, Scale } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogBody,
 } from "@/components/ui/dialog";
 import {
   getDevilsAdvocate, type AdvocateInput, type AdvocateVerdict,
@@ -40,7 +40,7 @@ export function DevilsAdvocateButton({ input }: { input: AdvocateInput }) {
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md rounded-2xl">
+        <DialogContent size="md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Flame className="h-4 w-4 text-rose-500" /> Advogado do Diabo
@@ -50,6 +50,7 @@ export function DevilsAdvocateButton({ input }: { input: AdvocateInput }) {
             </DialogDescription>
           </DialogHeader>
 
+          <DialogBody>
           {pending || !verdict ? (
             <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" /> Reunindo o que você mesmo disse…
@@ -66,6 +67,7 @@ export function DevilsAdvocateButton({ input }: { input: AdvocateInput }) {
               </p>
             </div>
           )}
+          </DialogBody>
         </DialogContent>
       </Dialog>
     </>

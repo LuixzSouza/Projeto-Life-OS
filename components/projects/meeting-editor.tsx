@@ -758,7 +758,7 @@ export function MeetingEditor({ meeting, onClose }: { meeting: MeetingData; onCl
           {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
           PDF
         </Button>
-        <Button onClick={handleDelete} variant="ghost" size="icon" className="ml-auto rounded-xl text-destructive hover:bg-destructive/10">
+        <Button onClick={handleDelete} variant="ghost" size="icon" aria-label="Excluir" className="ml-auto rounded-xl text-destructive hover:bg-destructive/10">
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>

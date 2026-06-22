@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { DialogFooter } from "@/components/ui/dialog";
+import { DialogBody, DialogFooter } from "@/components/ui/dialog";
 import { Loader2, Wand2, Link as LinkIcon } from "lucide-react";
 import { toast } from "sonner";
 import { createLink, updateLink, fetchMetadata } from "@/app/(dashboard)/links/actions";
@@ -101,7 +101,8 @@ export function LinkForm({ onClose, initialData }: { onClose: () => void, initia
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 py-2">
+    <form onSubmit={handleSubmit}>
+      <DialogBody className="space-y-4">
       {/* URL + Magic Button */}
       <div className="space-y-1.5">
         <Label>URL do Site</Label>
@@ -189,8 +190,9 @@ export function LinkForm({ onClose, initialData }: { onClose: () => void, initia
             </div>
         )}
       </div>
+      </DialogBody>
 
-      <DialogFooter className="pt-4">
+      <DialogFooter>
         <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
         <Button type="submit" disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}

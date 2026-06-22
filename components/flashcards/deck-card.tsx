@@ -65,7 +65,7 @@ export function DeckCard({ deck, onStudy, onDelete, onConnections }: DeckCardPro
           <div className="opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="-mr-2 h-8 w-8 text-muted-foreground hover:text-foreground">
+                <Button variant="ghost" size="icon" aria-label="Mais ações" className="-mr-2 h-8 w-8 text-muted-foreground hover:text-foreground">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>

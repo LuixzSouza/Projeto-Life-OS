@@ -157,7 +157,7 @@ export function EntityAttachments({ entityType, entityId }: { entityType: string
           <Button type="button" size="sm" className="h-8" disabled={pending || !linkUrl.trim()} onClick={addLink}>
             Anexar
           </Button>
-          <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setLinkMode(false); setLinkUrl(""); }}>
+          <Button type="button" variant="ghost" size="icon" aria-label="Cancelar" className="h-8 w-8" onClick={() => { setLinkMode(false); setLinkUrl(""); }}>
             <X className="h-4 w-4" />
           </Button>
         </div>
