@@ -77,19 +77,39 @@ function RichTextDisplay({ text, isDark = false }: { text: string; isDark?: bool
 }
 
 /* -------------------------------------------------------------------------- */
+/* PERSISTÊNCIA DA SESSÃO (resiliência a reload / sair da página)             */
+/* -------------------------------------------------------------------------- */
+
+// Versionado: se o formato mudar, bump a versão e sessões antigas são ignoradas.
+const SESSION_STORE_KEY = "lifeos-flashcard-session-v1";
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // resume só dentro de 12h
+
+interface SavedSession {
+  key: string; // deck + modo: distingue qual sessão é esta
+  cardIds: string[]; // ids da sessão original (checagem de sobreposição)
+  doneIds: string[]; // cartões já graduados (não-AGAIN) — não repetem ao retomar
+  stats: { again: number; hard: number; good: number; easy: number };
+  reverse: boolean;
+  ts: number;
+}
+
+/** Ordena os mais atrasados primeiro (nextReview nulo = mais urgente). */
+function sortByDue(cards: Flashcard[]): Flashcard[] {
+  return [...cards].sort((a, b) => {
+    const da = a.nextReview ? new Date(a.nextReview).getTime() : 0;
+    const db = b.nextReview ? new Date(b.nextReview).getTime() : 0;
+    return da - db;
+  });
+}
+
+/* -------------------------------------------------------------------------- */
 /* COMPONENTE PRINCIPAL                                                       */
 /* -------------------------------------------------------------------------- */
 
 export function StudySession({ deck, cards: initialCards, mode = "flip" }: StudySessionProps) {
   const written = mode === "written";
   // Fila de estudos (Para Repetição Espaçada é ideal revisar os mais atrasados primeiro)
-  const [queue, setQueue] = useState<Flashcard[]>(() => {
-    return [...initialCards].sort((a, b) => {
-      const dateA = a.nextReview ? new Date(a.nextReview).getTime() : 0;
-      const dateB = b.nextReview ? new Date(b.nextReview).getTime() : 0;
-      return dateA - dateB;
-    });
-  });
+  const [queue, setQueue] = useState<Flashcard[]>(() => sortByDue(initialCards));
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -102,6 +122,12 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
   const [gradeStep, setGradeStep] = useState<"choose" | "correct">("choose");
   // Feedback visual do botão Embaralhar (giro breve do ícone).
   const [shuffling, setShuffling] = useState(false);
+  // Resiliência: cartões já graduados nesta sessão (p/ retomar sem repetir) e
+  // contador de gravações em voo (otimistas) — evita perder save ao sair.
+  const [doneIds, setDoneIds] = useState<Set<string>>(() => new Set());
+  const [pendingSaves, setPendingSaves] = useState(0);
+  const restoredRef = useRef(false);
+  const sessionKey = `${deck.title}|${mode}`;
 
   // Modo Escrita: resposta digitada do cartão atual + foco automático no input.
   const [typedAnswer, setTypedAnswer] = useState("");
@@ -201,6 +227,105 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
+  // --- RESILIÊNCIA: RETOMAR / PERSISTIR / AVISAR AO SAIR ---
+
+  // 1) RETOMA uma sessão salva (reload, voltou à página, fechou sem querer).
+  //    Roda UMA vez. Defensivo: localStorage indisponível, JSON corrompido,
+  //    sessão de outro baralho, expirada (>12h) ou sem cartões em comum → ignora.
+  useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    try {
+      const raw = localStorage.getItem(SESSION_STORE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as SavedSession;
+      if (!saved || saved.key !== sessionKey) return;
+      if (Date.now() - saved.ts > SESSION_TTL_MS) {
+        localStorage.removeItem(SESSION_STORE_KEY);
+        return;
+      }
+      const done = new Set(Array.isArray(saved.doneIds) ? saved.doneIds : []);
+      if (done.size === 0) return; // nada revisado ainda — começa normal
+      // Sobreposição com os cartões atuais (o baralho pode ter mudado).
+      const currentIds = new Set(initialCards.map((c) => c.id));
+      if (!saved.cardIds?.some((id) => currentIds.has(id))) {
+        localStorage.removeItem(SESSION_STORE_KEY);
+        return;
+      }
+      // Remove os já graduados; reordena os restantes pelos mais atrasados.
+      const remaining = sortByDue(initialCards.filter((c) => !done.has(c.id)));
+      if (remaining.length === 0) {
+        localStorage.removeItem(SESSION_STORE_KEY); // sessão já concluída
+        return;
+      }
+      setQueue(remaining);
+      setCurrentIndex(0);
+      setDoneIds(done);
+      if (saved.stats) setStats(saved.stats);
+      setReverse(!!saved.reverse);
+      // Dá controle ao usuário: retomou, mas pode preferir sessão nova.
+      toast.info(`Retomando de onde você parou — ${done.size} já revisados.`, {
+        duration: 6000,
+        action: {
+          label: "Recomeçar",
+          onClick: () => {
+            try {
+              localStorage.removeItem(SESSION_STORE_KEY);
+            } catch {
+              /* ignora */
+            }
+            setQueue(sortByDue(initialCards));
+            setCurrentIndex(0);
+            setStats({ again: 0, hard: 0, good: 0, easy: 0 });
+            setDoneIds(new Set());
+            setIsFlipped(false);
+            setReverse(false);
+            setHintShown(false);
+            setGradeStep("choose");
+          },
+        },
+      });
+    } catch {
+      /* localStorage bloqueado/privado ou dado corrompido — segue do zero */
+    }
+  }, [sessionKey, initialCards]);
+
+  // 2) PERSISTE o progresso a cada avaliação. Ao terminar, limpa.
+  useEffect(() => {
+    try {
+      if (isFinished) {
+        localStorage.removeItem(SESSION_STORE_KEY);
+        return;
+      }
+      const total = doneIds.size + stats.again;
+      if (total === 0) return; // sem progresso ainda — nada a salvar
+      const payload: SavedSession = {
+        key: sessionKey,
+        cardIds: initialCards.map((c) => c.id),
+        doneIds: [...doneIds],
+        stats,
+        reverse,
+        ts: Date.now(),
+      };
+      localStorage.setItem(SESSION_STORE_KEY, JSON.stringify(payload));
+    } catch {
+      /* cota cheia / modo privado — ignora (a sessão segue na memória) */
+    }
+  }, [doneIds, stats, reverse, isFinished, sessionKey, initialCards]);
+
+  // 3) AVISA antes de fechar/recarregar com progresso ou gravação em voo
+  //    (cobre o save otimista que ainda não chegou ao banco). Nav interna do
+  //    Next não dispara aqui — mas o localStorage acima já permite retomar.
+  useEffect(() => {
+    const hasProgress = !isFinished && (doneIds.size > 0 || stats.again > 0);
+    if (!hasProgress && pendingSaves === 0) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isFinished, doneIds, stats, pendingSaves]);
 
   // --- AVALIAÇÃO E LÓGICA DO ALGORITMO ---
   // OTIMISTA: avança IMEDIATAMENTE e grava no servidor em segundo plano. Antes,
@@ -214,13 +339,27 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
     // 1. Stats locais (otimista).
     setStats((prev) => ({ ...prev, [rating.toLowerCase()]: prev[rating.toLowerCase() as keyof typeof prev] + 1 }));
 
-    // 2. Grava no servidor SEM bloquear a navegação.
-    void reviewFlashcard(currentCard.id, rating).catch((e) => {
-      console.error("Falha ao salvar revisão:", e);
-      toast.error("Não consegui salvar essa avaliação — verifique a conexão.");
-    });
+    // 2. Marca como graduado (para RETOMAR sem repetir). AGAIN não gradua — o
+    //    cartão volta nesta sessão e continua "pendente".
+    if (rating !== "AGAIN") {
+      setDoneIds((prev) => {
+        const next = new Set(prev);
+        next.add(currentCard.id);
+        return next;
+      });
+    }
 
-    // 3. Reaprendizado: se errou, o cartão volta algumas posições à frente (não
+    // 3. Grava no servidor SEM bloquear a navegação. pendingSaves conta as
+    //    escritas em voo — usado no aviso de saída para não perder um save.
+    setPendingSaves((n) => n + 1);
+    void reviewFlashcard(currentCard.id, rating)
+      .catch((e) => {
+        console.error("Falha ao salvar revisão:", e);
+        toast.error("Não consegui salvar essa avaliação — verifique a conexão.");
+      })
+      .finally(() => setPendingSaves((n) => Math.max(0, n - 1)));
+
+    // 4. Reaprendizado: se errou, o cartão volta algumas posições à frente (não
     // no fim) — reforça ainda nesta sessão, mas sem reaparecer na cara.
     let nextQueue = queue;
     if (rating === "AGAIN") {
@@ -229,7 +368,7 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
       setQueue(nextQueue);
     }
 
-    // 4. Avança ou encerra. Usa o tamanho da fila JÁ atualizada — senão errar a
+    // 5. Avança ou encerra. Usa o tamanho da fila JÁ atualizada — senão errar a
     // última carta encerraria a sessão sem reaprendê-la.
     if (currentIndex + 1 >= nextQueue.length) {
       setIsFinished(true);
