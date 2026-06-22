@@ -432,6 +432,9 @@ model Flashcard {
   term       String @db.LongText
   definition String @db.LongText
   imageUrl   String? @db.LongText
+  // Dica opcional: revelada na FRENTE durante o estudo (puxa a memória sem
+  // entregar a resposta). Curta por natureza.
+  hint       String? @db.LongText
 
   box        Int   @default(1)
   easeFactor Float @default(2.5)

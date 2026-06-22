@@ -238,6 +238,7 @@ CREATE TABLE `Flashcard` (
     `term` LONGTEXT NOT NULL,
     `definition` LONGTEXT NOT NULL,
     `imageUrl` LONGTEXT NULL,
+    `hint` LONGTEXT NULL,
     `box` INTEGER NOT NULL DEFAULT 1,
     `easeFactor` DOUBLE NOT NULL DEFAULT 2.5,
     `interval` INTEGER NOT NULL DEFAULT 0,

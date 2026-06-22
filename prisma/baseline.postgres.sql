@@ -209,6 +209,7 @@ CREATE TABLE "Flashcard" (
     "term" TEXT NOT NULL,
     "definition" TEXT NOT NULL,
     "imageUrl" TEXT,
+    "hint" TEXT,
     "box" INTEGER NOT NULL DEFAULT 1,
     "easeFactor" DOUBLE PRECISION NOT NULL DEFAULT 2.5,
     "interval" INTEGER NOT NULL DEFAULT 0,

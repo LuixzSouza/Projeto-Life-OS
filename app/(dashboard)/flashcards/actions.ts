@@ -27,6 +27,14 @@ const CardSchema = z.object({
 // criação falha em silêncio.
 const MAX_IMAGE_CHARS = 4_500_000;
 
+/** Dica do cartão: texto curto opcional (revelado na frente durante o estudo). */
+const MAX_HINT_CHARS = 500;
+function readHintField(formData: FormData): string | null {
+  const raw = String(formData.get("hint") ?? "").trim();
+  if (!raw) return null;
+  return raw.slice(0, MAX_HINT_CHARS);
+}
+
 /** Normaliza o campo de imagem do formulário: data URL base64 válida ou null. */
 function readImageField(formData: FormData): { value: string | null; error?: string } {
   const raw = String(formData.get("image") ?? "").trim();
@@ -139,6 +147,7 @@ export async function createCard(deckId: string, formData: FormData) {
         term: parsed.data.term,
         definition: parsed.data.definition,
         imageUrl: image.value,
+        hint: readHintField(formData),
         box: 1, // Começa na caixa 1 (Novos cartões)
         interval: 0,
         easeFactor: 2.5, // Padrão SM-2
@@ -195,6 +204,7 @@ export async function updateCard(deckId: string, formData: FormData) {
         term: parsed.data.term,
         definition: parsed.data.definition,
         imageUrl: image.value,
+        hint: readHintField(formData),
       },
     });
     if (res.count === 0) return { success: false, message: "Cartão não encontrado." };

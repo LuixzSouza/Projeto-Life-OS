@@ -432,6 +432,9 @@ model Flashcard {
   term       String
   definition String
   imageUrl   String?
+  // Dica opcional: revelada na FRENTE durante o estudo (puxa a memória sem
+  // entregar a resposta). Curta por natureza.
+  hint       String?
 
   box        Int   @default(1)
   easeFactor Float @default(2.5)

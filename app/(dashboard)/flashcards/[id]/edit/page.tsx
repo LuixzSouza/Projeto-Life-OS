@@ -175,6 +175,21 @@ export default async function DeckEditPage({ params }: DeckEditPageProps) {
                                 </p>
                             </div>
 
+                            <div className="space-y-2">
+                                <Label className="text-xs font-bold uppercase text-muted-foreground tracking-wider ml-1">
+                                    Dica (opcional)
+                                </Label>
+                                <Input
+                                    name="hint"
+                                    placeholder="Ex: começa com 'u' e guarda valor entre renders"
+                                    maxLength={500}
+                                    className="bg-background focus:ring-primary/20 border-border/60"
+                                />
+                                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                                    Aparece na frente sob demanda (botão <strong>Dica</strong>) — ajuda sem entregar a resposta.
+                                </p>
+                            </div>
+
                             <CardImageField />
 
                             <Button type="submit" className="w-full font-semibold shadow-sm" variant="secondary">

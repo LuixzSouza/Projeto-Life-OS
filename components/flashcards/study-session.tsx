@@ -14,6 +14,7 @@ import {
   CornerDownLeft,
   Shuffle,
   ArrowLeftRight,
+  Lightbulb,
 } from "lucide-react";
 import Link from "next/link";
 import { Flashcard, FlashcardDeck } from "@prisma/client";
@@ -92,6 +93,8 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
   const [isFlipped, setIsFlipped] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [isSaving, setIsSaving] = useState(false); // Previne duplo clique
+  // Dica revelada sob demanda na frente (zera a cada novo cartão / inversão).
+  const [hintShown, setHintShown] = useState(false);
 
   // Modo Escrita: resposta digitada do cartão atual + foco automático no input.
   const [typedAnswer, setTypedAnswer] = useState("");
@@ -212,6 +215,7 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
     } else {
       setIsFlipped(false);
       setTypedAnswer(""); // limpa a resposta digitada para o próximo cartão
+      setHintShown(false); // esconde a dica para o próximo cartão
       setTimeout(() => setCurrentIndex((prev) => prev + 1), 150); // Timeout leve para animação 3D
     }
 
@@ -240,6 +244,7 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
     setReverse((r) => !r);
     setIsFlipped(false);
     setTypedAnswer("");
+    setHintShown(false);
   };
 
   /* -------------------------------------------------------------------------- */
@@ -407,6 +412,31 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
                             </div>
                         )}
                     </div>
+
+                    {/* DICA: revelada sob demanda na frente — puxa a memória sem
+                        entregar a resposta. stopPropagation p/ não virar o cartão. */}
+                    {currentCard?.hint && !isFlipped && (
+                        <div className="mx-auto mt-6 flex w-full max-w-xl justify-center" onClick={(e) => e.stopPropagation()}>
+                            {hintShown ? (
+                                <div className="flex w-full items-start gap-2.5 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-left animate-in fade-in slide-in-from-bottom-2">
+                                    <Lightbulb className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                                    <p className="whitespace-pre-wrap text-sm font-medium leading-relaxed text-amber-700 dark:text-amber-300">
+                                        {currentCard.hint}
+                                    </p>
+                                </div>
+                            ) : (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setHintShown(true)}
+                                    className="h-10 gap-2 rounded-full border-amber-500/30 text-amber-600 hover:bg-amber-500/10 hover:text-amber-700"
+                                >
+                                    <Lightbulb className="h-4 w-4" /> Dica
+                                </Button>
+                            )}
+                        </div>
+                    )}
+
                     {!written && !isFlipped && (
                         <div className="absolute bottom-8 sm:bottom-12 left-0 right-0 flex justify-center animate-pulse">
                             <span className="text-xs font-bold text-muted-foreground/80 flex items-center gap-2 bg-muted/80 px-5 py-2.5 rounded-full border border-border/50 backdrop-blur-sm shadow-sm">

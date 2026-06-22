@@ -52,6 +52,7 @@ export function FlashcardItem({ card, index, total, deckId }: FlashcardItemProps
   // Estados locais para o formulário de edição
   const [term, setTerm] = useState(card.term);
   const [definition, setDefinition] = useState(card.definition);
+  const [hint, setHint] = useState<string>(card.hint ?? "");
   const [imageUrl, setImageUrl] = useState<string | null>(card.imageUrl);
 
   async function handleSave() {
@@ -60,6 +61,7 @@ export function FlashcardItem({ card, index, total, deckId }: FlashcardItemProps
     formData.append("cardId", card.id);
     formData.append("term", term);
     formData.append("definition", definition);
+    formData.append("hint", hint);
     formData.append("image", imageUrl ?? "");
 
     const result = await updateCard(deckId, formData);
@@ -179,6 +181,20 @@ export function FlashcardItem({ card, index, total, deckId }: FlashcardItemProps
                 onChange={(e) => setDefinition(e.target.value)}
                 className="min-h-[160px] resize-none leading-relaxed text-base bg-muted/20 border-border/60 focus-visible:ring-primary/30 p-4"
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Dica (opcional)</Label>
+              <Input
+                value={hint}
+                onChange={(e) => setHint(e.target.value)}
+                placeholder="Uma pista que ajuda a lembrar — aparece na frente sob demanda"
+                maxLength={500}
+                className="text-base h-12 bg-muted/20 border-border/60 focus-visible:ring-primary/30"
+              />
+              <p className="text-[11px] leading-relaxed text-muted-foreground">
+                Mostrada na frente do cartão quando você tocar em <strong>Dica</strong> — sem revelar a resposta.
+              </p>
             </div>
 
             <div className="space-y-2">
