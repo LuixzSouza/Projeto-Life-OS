@@ -44,6 +44,17 @@ export function formatDateTime(value: Date | string | number): string {
   return `${formatDate(d)} ${formatTime(d)}`;
 }
 
+// Dia LOCAL de hoje como "YYYY-MM-DD" para preencher <input type="date">. Usar isto
+// em vez de `new Date().toISOString().slice(0,10)`, que devolve o dia em UTC e, à
+// noite em fusos negativos (Brasil), já mostra "amanhã".
+export function localTodayInput(): string {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 // Número com separador de milhar pt-BR fixo (ex: 1.234) — locale explícito
 // garante o mesmo resultado no SSR e no cliente.
 export function formatNumber(value: number): string {

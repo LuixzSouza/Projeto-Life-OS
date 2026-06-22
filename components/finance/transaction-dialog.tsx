@@ -29,7 +29,7 @@ import {
   deleteTransaction,
 } from "@/app/(dashboard)/finance/actions";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import { cn, localTodayInput } from "@/lib/utils";
 import {
   Select,
   SelectContent,
@@ -275,7 +275,7 @@ export function TransactionDialog({
                     defaultValue={
                       transaction?.date
                         ? new Date(transaction.date).toISOString().split("T")[0]
-                        : new Date().toISOString().split("T")[0]
+                        : localTodayInput()
                     }
                   />
                 </div>

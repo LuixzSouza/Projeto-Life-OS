@@ -174,7 +174,10 @@ function parseCsv(text: string): ParsedRun[] {
     if (iType >= 0 && !/(run|corrida|jog)/.test(typeVal)) continue;
 
     const rawDate = iDate >= 0 ? cols[iDate] : "";
-    const parsedDate = rawDate ? new Date(rawDate) : new Date();
+    // Data pura "YYYY-MM-DD" recebe T12:00:00 (evita o "dia anterior" em fusos
+    // negativos); datas com hora (ex.: export do Strava) são usadas como vêm.
+    const dateInput = /^\d{4}-\d{2}-\d{2}$/.test(rawDate.trim()) ? `${rawDate.trim()}T12:00:00` : rawDate;
+    const parsedDate = rawDate ? new Date(dateInput) : new Date();
     const dateIso = Number.isNaN(parsedDate.getTime()) ? new Date().toISOString() : parsedDate.toISOString();
 
     // Distância: assume km; se vier claramente em metros (>200), converte.

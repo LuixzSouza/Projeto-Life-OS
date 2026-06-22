@@ -23,7 +23,10 @@ export async function createTransaction(formData: FormData) {
   const accountId = formData.get("accountId") as string;
   const category = formData.get("category") as string;
   const dateStr = formData.get("date") as string;
-  const date = dateStr ? new Date(dateStr) : new Date();
+  // T12:00:00Z: regra de ouro de <input type="date"> (bug do "dia anterior"). É a
+  // convenção do app (transactions-view normaliza por isso); sem ela, formatDate
+  // mostra o dia errado em fusos negativos (Brasil).
+  const date = dateStr ? new Date(`${dateStr}T12:00:00Z`) : new Date();
 
   if (!accountId || isNaN(amount)) throw new Error("Dados inválidos");
 
@@ -76,7 +79,8 @@ export async function updateTransaction(formData: FormData) {
   const newType = formData.get("type") as string;
   const newCategory = formData.get("category") as string;
   const dateStr = formData.get("date") as string;
-  const newDate = dateStr ? new Date(dateStr) : new Date();
+  // T12:00:00Z: mesma convenção do create (evita o bug do "dia anterior").
+  const newDate = dateStr ? new Date(`${dateStr}T12:00:00Z`) : new Date();
 
   const userId = await requireUserId();
 
