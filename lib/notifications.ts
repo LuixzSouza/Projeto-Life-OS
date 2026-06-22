@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { Prisma } from "@prisma/client";
 import { getCurrentUserId } from "./auth";
 import { deriveAnchor, asFrequency, occurrencesInRange, periodsBetween } from "./recurrence";
 import { runDueAutomations } from "./ai-automations";
@@ -450,28 +451,44 @@ export async function syncRecurringChargeInvoices(userId: string): Promise<numbe
   const charges = await prisma.recurringCharge.findMany({
     where: { userId, active: true, clientId: { not: null }, billingId: { not: null } },
   });
-  let created = 0;
+  if (charges.length === 0) return 0;
+
+  // Antes: 1 findFirst por (cobrança × ocorrência) + 1 create — N+1 num caminho
+  // QUENTE (roda ao abrir Negócios/Finanças). Agora: UMA leitura de todas as
+  // faturas do mês desses contratos → dedupe em memória → UM createMany.
+  // Chave por DIA-LOCAL do vencimento (mesma semântica do range local original).
+  const dayKey = (billingId: string, d: Date) =>
+    `${billingId}:${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+
+  const billingIds = charges.map((c) => c.billingId).filter((x): x is string => !!x);
+  const existingInvoices = await prisma.invoice.findMany({
+    where: { userId, billingId: { in: billingIds }, dueDate: { gte: monthStart, lte: monthEnd } },
+    select: { billingId: true, dueDate: true },
+  });
+  const seen = new Set(
+    existingInvoices
+      .filter((i): i is { billingId: string; dueDate: Date } => !!i.billingId)
+      .map((i) => dayKey(i.billingId, i.dueDate)),
+  );
+
+  const toCreate: Prisma.InvoiceCreateManyInput[] = [];
   for (const c of charges) {
     if (!c.billingId) continue;
     const freq = asFrequency(c.frequency);
     const anchor = deriveAnchor(c);
     const occs = occurrencesInRange({ anchor, frequency: freq, endDate: c.endDate, rangeStart: monthStart, rangeEnd: monthEnd });
     for (const occ of occs) {
-      const dayStart = new Date(occ.getFullYear(), occ.getMonth(), occ.getDate(), 0, 0, 0);
-      const dayEnd = new Date(occ.getFullYear(), occ.getMonth(), occ.getDate(), 23, 59, 59, 999);
-      const exists = await prisma.invoice.findFirst({
-        where: { userId, billingId: c.billingId, dueDate: { gte: dayStart, lte: dayEnd } },
-        select: { id: true },
-      });
-      if (exists) continue;
+      const key = dayKey(c.billingId, occ);
+      if (seen.has(key)) continue;
+      seen.add(key); // evita duplicar se a mesma chave reaparecer nesta passada
       const title = c.installments
         ? `${c.title} — Parcela ${(c.paidInstallments ?? 0) + 1 + periodsBetween(anchor, occ, freq)}/${c.installments}`
         : `${c.title} — ${occ.toISOString().slice(0, 10)}`;
-      await prisma.invoice.create({
-        data: { billingId: c.billingId, title, value: Number(c.amount), dueDate: occ, status: "PENDING", userId },
-      });
-      created++;
+      toCreate.push({ billingId: c.billingId, title, value: Number(c.amount), dueDate: occ, status: "PENDING", userId });
     }
   }
-  return created;
+
+  if (toCreate.length === 0) return 0;
+  await prisma.invoice.createMany({ data: toCreate });
+  return toCreate.length;
 }
