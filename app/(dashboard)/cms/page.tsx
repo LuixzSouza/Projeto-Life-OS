@@ -1,14 +1,10 @@
 import { prisma } from "@/lib/prisma";
-import { createSite } from "./actions";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Globe, Plus, Server, LayoutTemplate, ArrowRight, FolderTree, Braces } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Server, LayoutTemplate, ArrowRight, FolderTree, Braces } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { SiteActionsMenu } from "@/components/cms/site-actions-menu";
+import { NewSiteDialog } from "@/components/cms/new-site-dialog";
 import { getCurrentUserId } from "@/lib/auth";
 import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
 
@@ -33,57 +29,7 @@ export default async function CMSPage() {
           </span>
         }
         description="Gerencie containers, endpoints JSON e variáveis de ambiente."
-        actions={
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button className="h-10 px-4 gap-2 font-medium rounded-lg shadow-sm">
-                <Plus className="h-4 w-4" /> Novo Container
-              </Button>
-            </DialogTrigger>
-
-            <DialogContent className="sm:max-w-md rounded-2xl p-0 overflow-hidden border-border/40 shadow-xl">
-              <DialogHeader className="p-6 pb-4 border-b border-border/40 bg-muted/10">
-                <DialogTitle className="text-xl">Inicializar Instância</DialogTitle>
-                <DialogDescription>
-                  Crie um novo container para armazenar suas rotas JSON.
-                </DialogDescription>
-              </DialogHeader>
-
-              <form action={createSite} className="p-6 space-y-5">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold text-muted-foreground">Nome do Projeto</Label>
-                    <Input
-                        name="name"
-                        placeholder="Ex: Website Institucional"
-                        required
-                        className="h-10 rounded-lg bg-muted/20 border-border/50"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
-                        Domínio Alvo <span className="text-[10px] font-normal opacity-60">(Opcional)</span>
-                    </Label>
-                    <div className="relative">
-                        <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            name="url"
-                            placeholder="https://meusite.com.br"
-                            className="h-10 pl-9 rounded-lg bg-muted/20 border-border/50 font-mono text-sm"
-                        />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-2">
-                    <Button type="submit" className="w-full h-10 rounded-lg font-medium shadow-sm">
-                    Criar Container
-                    </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-        }
+        actions={<NewSiteDialog />}
       />
 
       {/* GRID DE PROJETOS */}
@@ -95,14 +41,15 @@ export default async function CMSPage() {
               <div className="h-16 w-16 rounded-full bg-muted/20 flex items-center justify-center mb-4">
                   <Braces className="h-8 w-8 text-muted-foreground/50" />
               </div>
-              <h3 className="text-lg font-semibold text-foreground">Nenhum Endpoint Ativo</h3>
-              <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                Inicie um novo container no botão acima para começar a distribuir dados via API Rest.
+              <h3 className="text-lg font-semibold text-foreground">Nenhum container ativo</h3>
+              <p className="text-sm text-muted-foreground mt-1 mb-5 max-w-sm">
+                Crie um container para começar a distribuir dados via API REST.
               </p>
+              <NewSiteDialog />
             </div>
           ) : (
             sites.map((site) => (
-              <Card key={site.id} className="group flex flex-col bg-card border-border/40 rounded-xl shadow-sm hover:border-border/80 transition-all overflow-hidden">
+              <Card key={site.id} className="group flex flex-col bg-card border-border/40 rounded-2xl shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md overflow-hidden">
                 
                 <CardHeader className="p-5 pb-3">
                   <div className="flex justify-between items-start mb-3">
