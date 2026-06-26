@@ -31,6 +31,11 @@ export interface SharedCredential {
   notes?: string | null;
   /** Quem enviou (só para exibir "enviado por" — não é autenticado). */
   from?: string | null;
+  /** Expiração (epoch ms). Vai DENTRO do texto cifrado, então não pode ser
+   *  adulterada sem quebrar o GCM. Não há servidor para impor isso, mas o
+   *  navegador de quem abre recusa o link vencido — um link reencaminhado/achado
+   *  tempos depois deixa de revelar a senha. `null`/ausente = não expira. */
+  expiresAt?: number | null;
 }
 
 /** Cifra a credencial e devolve um token "chave.iv.ciphertext" (base64url) para o

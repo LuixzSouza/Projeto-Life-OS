@@ -8,25 +8,10 @@ import { toast } from "sonner";
 import { revealPassword } from "@/app/(dashboard)/access/actions";
 import { calculateStrength } from "./access-helpers";
 import { cn } from "@/lib/utils";
+import { copyToClipboard, scheduleClipboardClear } from "@/lib/clipboard";
 
 /** Senha revelada volta a se esconder sozinha depois disso. */
 const AUTO_HIDE_MS = 30_000;
-/** Senha copiada sai do clipboard depois disso (padrão de gerenciadores de senha). */
-const CLIPBOARD_TTL_MS = 35_000;
-
-// Limpa o clipboard após o TTL — só se ele ainda contiver a senha copiada
-// (não atropela algo que o usuário copiou depois). Sem permissão de leitura,
-// não dá para conferir: aí não mexe (melhor que apagar conteúdo alheio).
-function scheduleClipboardClear(secret: string): void {
-  setTimeout(async () => {
-    try {
-      const current = await navigator.clipboard.readText();
-      if (current === secret) await navigator.clipboard.writeText("");
-    } catch {
-      // Leitura negada/aba sem foco: não arrisca sobrescrever o clipboard.
-    }
-  }, CLIPBOARD_TTL_MS);
-}
 
 // Campos de identificação + chave de acesso, com lógica de revelar/copiar autocontida.
 export function CredentialFields({ item }: { item: AccessItem }) {
@@ -78,7 +63,7 @@ export function CredentialFields({ item }: { item: AccessItem }) {
       setCopying(true);
       const pwd = await ensurePassword();
       if (!pwd) return toast.info("Senha vazia");
-      await navigator.clipboard.writeText(pwd);
+      if (!(await copyToClipboard(pwd))) { toast.error("Falha ao copiar a senha."); return; }
       scheduleClipboardClear(pwd);
       setCopiedPass(true);
       setTimeout(() => setCopiedPass(false), 2000);
@@ -90,10 +75,10 @@ export function CredentialFields({ item }: { item: AccessItem }) {
     }
   };
 
-  const handleCopy = (text: string | null, type: 'USER' | 'PASS') => {
+  const handleCopy = async (text: string | null, type: 'USER' | 'PASS') => {
     if (!text) return toast.info("Campo vazio");
 
-    navigator.clipboard.writeText(text);
+    if (!(await copyToClipboard(text))) { toast.error("Falha ao copiar."); return; }
     if (type === 'USER') {
       setCopiedUser(true);
       setTimeout(() => setCopiedUser(false), 2000);

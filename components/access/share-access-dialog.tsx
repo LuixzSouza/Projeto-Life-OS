@@ -1,18 +1,34 @@
 "use client";
 
 import { useState } from "react";
-import { Share2, ShieldCheck, Copy, Check, Loader2, Link2, MessageCircle, AlertTriangle, FileText } from "lucide-react";
+import { Share2, ShieldCheck, Copy, Check, Loader2, Link2, MessageCircle, AlertTriangle, FileText, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogBody, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { revealPassword } from "@/app/(dashboard)/access/actions";
+import { revealPassword, getShareSenderName } from "@/app/(dashboard)/access/actions";
 import { encryptCredential } from "@/lib/share-crypto";
+import { copyToClipboard } from "@/lib/clipboard";
 import { cn } from "@/lib/utils";
 import type { AccessData } from "./access-form";
 
 // Compartilhar uma credencial com um amigo. Gera um LINK SEGURO cujo segredo fica no
 // fragmento da URL (#...) — decifrado só no navegador de quem abrir, nunca no servidor.
 // Também oferece "copiar como texto" para o envio rápido (com aviso de texto puro).
+
+// Validade do link: vira um `expiresAt` cifrado no payload (ver share-crypto).
+type ExpiryOption = "24h" | "7d" | "30d" | "never";
+const EXPIRY_MS: Record<ExpiryOption, number> = {
+  "24h": 24 * 60 * 60 * 1000,
+  "7d": 7 * 24 * 60 * 60 * 1000,
+  "30d": 30 * 24 * 60 * 60 * 1000,
+  never: 0,
+};
+const EXPIRY_LABELS: Record<ExpiryOption, string> = {
+  "24h": "24 horas",
+  "7d": "7 dias",
+  "30d": "30 dias",
+  never: "Nunca",
+};
 export function ShareAccessDialog({
   open,
   onOpenChange,
@@ -25,6 +41,8 @@ export function ShareAccessDialog({
   const [link, setLink] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Validade do link (escolhida ANTES de gerar — vai cifrada no payload). Padrão: 7 dias.
+  const [expiry, setExpiry] = useState<ExpiryOption>("7d");
 
   const reset = () => { setLink(null); setCopied(false); setGenerating(false); };
   const handleOpenChange = (v: boolean) => { if (!v) reset(); onOpenChange(v); };
@@ -33,13 +51,16 @@ export function ShareAccessDialog({
     if (!item.id) return;
     setGenerating(true);
     try {
-      const password = await revealPassword(item.id);
+      const [password, from] = await Promise.all([revealPassword(item.id), getShareSenderName()]);
+      const ms = EXPIRY_MS[expiry];
       const token = await encryptCredential({
         title: item.title,
         username: item.username,
         password,
         url: item.url,
         notes: item.notes,
+        from: from || null,
+        expiresAt: ms ? Date.now() + ms : null,
       });
       setLink(`${window.location.origin}/cofre-compartilhado#${token}`);
     } catch {
@@ -51,7 +72,10 @@ export function ShareAccessDialog({
 
   const copyLink = async () => {
     if (!link) return;
-    await navigator.clipboard.writeText(link);
+    if (!(await copyToClipboard(link))) {
+      toast.error("Não foi possível copiar. Selecione o link e copie à mão.");
+      return;
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
     toast.success("Link copiado!");
@@ -81,7 +105,10 @@ export function ShareAccessDialog({
         item.username ? `Usuário: ${item.username}` : null,
         `Senha: ${password}`,
       ].filter(Boolean);
-      await navigator.clipboard.writeText(lines.join("\n"));
+      if (!(await copyToClipboard(lines.join("\n")))) {
+        toast.error("Não foi possível copiar.");
+        return;
+      }
       toast.success("Copiado em texto. Cuidado: vai sem criptografia.", { duration: 3000 });
     } catch {
       toast.error("Falha ao copiar.");
@@ -106,16 +133,46 @@ export function ShareAccessDialog({
             <p>
               O link carrega a senha <strong>cifrada no próprio endereço</strong> — o segredo
               nunca passa pelo servidor. Mas <strong>quem tiver o link consegue ver</strong>:
-              envie só para a pessoa certa, por um canal de confiança. (Nesta versão o link
-              não expira.)
+              envie só para a pessoa certa, por um canal de confiança.
             </p>
           </div>
 
           {!link ? (
-            <Button onClick={generateLink} disabled={generating} className="h-12 w-full gap-2 text-sm font-bold">
-              {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-              {generating ? "Gerando link seguro…" : "Gerar link seguro"}
-            </Button>
+            <div className="space-y-3">
+              {/* Validade do link (escolha antes de gerar). */}
+              <div className="space-y-1.5">
+                <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <Clock className="h-3.5 w-3.5" /> Validade do link
+                </span>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {(Object.keys(EXPIRY_LABELS) as ExpiryOption[]).map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      onClick={() => setExpiry(opt)}
+                      className={cn(
+                        "rounded-lg border py-2 text-xs font-semibold transition-colors",
+                        expiry === opt
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border/50 text-muted-foreground hover:border-primary/30 hover:text-foreground",
+                      )}
+                    >
+                      {EXPIRY_LABELS[opt]}
+                    </button>
+                  ))}
+                </div>
+                {expiry === "never" && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                    Sem validade: o link revela a senha para sempre. Prefira um prazo curto.
+                  </p>
+                )}
+              </div>
+
+              <Button onClick={generateLink} disabled={generating} className="h-12 w-full gap-2 text-sm font-bold">
+                {generating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                {generating ? "Gerando link seguro…" : "Gerar link seguro"}
+              </Button>
+            </div>
           ) : (
             <div className="space-y-3">
               {/* Link gerado */}
@@ -126,6 +183,13 @@ export function ShareAccessDialog({
                   {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
                 </Button>
               </div>
+
+              <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <Clock className="h-3 w-3 shrink-0" />
+                {expiry === "never"
+                  ? "Este link não expira."
+                  : `Expira em ${EXPIRY_LABELS[expiry]} — depois disso deixa de abrir.`}
+              </p>
 
               {/* Ações de envio */}
               <div className="grid grid-cols-2 gap-2">

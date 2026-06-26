@@ -264,6 +264,17 @@ export async function deleteAccess(id: string) {
 }
 
 // --- REVELAR SENHA ---
+/**
+ * Primeiro nome de quem está logado — só para preencher o "enviado por" nos links
+ * de credencial compartilhada (rótulo informativo, não autenticado). Vazio se não
+ * houver nome cadastrado.
+ */
+export async function getShareSenderName(): Promise<string> {
+    const userId = await requireUserId();
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+    return user?.name?.trim().split(/\s+/)[0] ?? "";
+}
+
 export async function revealPassword(id: string) {
     const userId = await requireUserId();
     const item = await prisma.accessItem.findFirst({
@@ -273,9 +284,19 @@ export async function revealPassword(id: string) {
 
     if (!item?.password) throw new Error("Senha não encontrada.");
 
+    // Decifrar é o que importa: se falhar, LANÇA. Antes devolvia a string
+    // "Erro de Descriptografia", que vazava para a tela — e pior, podia ser
+    // embutida num link compartilhado como se fosse a senha real.
+    let plain: string;
     try {
-        const plain = decrypt(item.password);
-        // Trilha de auditoria: cada decifração fica na Linha do Tempo (sem a senha).
+        plain = decrypt(item.password);
+    } catch {
+        throw new Error("Não foi possível decifrar a senha (cofre corrompido ou chave trocada).");
+    }
+
+    // Trilha de auditoria é best-effort: cada decifração fica na Linha do Tempo
+    // (sem a senha), mas uma falha de log nunca pode derrubar a revelação.
+    try {
         await logActivity({
             action: "REVEAL",
             module: "access",
@@ -283,8 +304,7 @@ export async function revealPassword(id: string) {
             entityId: id,
             summary: `Acessou a senha de "${item.title}"`,
         });
-        return plain;
-    } catch {
-        return "Erro de Descriptografia";
-    }
+    } catch { /* log não é crítico */ }
+
+    return plain;
 }
