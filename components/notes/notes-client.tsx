@@ -37,10 +37,13 @@ export function NotesClient({
   initialNotes,
   initialNotebooks,
   projects,
+  initialSubjectId = "all",
 }: {
   initialNotes: NoteData[];
   initialNotebooks: NotebookData[];
   projects: NoteProject[];
+  /** Pré-seleciona o filtro de Matéria (deep-link /notes?subject=ID vindo de Estudos). */
+  initialSubjectId?: string;
 }) {
   const router = useRouter();
   const [notes, setNotes] = useState<NoteData[]>(initialNotes);
@@ -48,6 +51,7 @@ export function NotesClient({
   const [search, setSearch] = useState("");
   const [active, setActive] = useState<ActiveFilter>("all");
   const [projectFilter, setProjectFilter] = useState("all");
+  const [subjectFilter, setSubjectFilter] = useState(initialSubjectId);
   const [deleting, setDeleting] = useState<NoteData | null>(null);
   const [notebookEdit, setNotebookEdit] = useState<NotebookData | "new" | null>(null);
   const [dragNoteId, setDragNoteId] = useState<string | null>(null);
@@ -57,6 +61,15 @@ export function NotesClient({
   const [, startTransition] = useTransition();
 
   const inboxId = useMemo(() => notebooks.find((n) => n.isInbox)?.id ?? null, [notebooks]);
+
+  // Matérias presentes nas notas (para o filtro "por matéria" — ponte com Estudos).
+  const subjectOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const n of notes) {
+      if (n.subjectId && n.subjectTitle) map.set(n.subjectId, n.subjectTitle);
+    }
+    return Array.from(map, ([id, title]) => ({ id, title })).sort((a, b) => a.title.localeCompare(b.title));
+  }, [notes]);
 
   // Itens para o menu "@" da captura rápida (notas existentes + projetos).
   const mentionables = useMemo<Mentionables>(() => ({
@@ -80,6 +93,7 @@ export function NotesClient({
         if (!belongs) return false;
       }
       if (projectFilter !== "all" && n.projectId !== projectFilter) return false;
+      if (subjectFilter !== "all" && n.subjectId !== subjectFilter) return false;
       if (!q) return true;
       return (
         n.title.toLowerCase().includes(q) ||
@@ -90,7 +104,7 @@ export function NotesClient({
         (n.projectTitle?.toLowerCase().includes(q) ?? false)
       );
     });
-  }, [notes, search, active, projectFilter, inboxId]);
+  }, [notes, search, active, projectFilter, subjectFilter, inboxId]);
 
   const open = (id: string) => router.push(`/notes/${id}`);
 
@@ -188,7 +202,21 @@ export function NotesClient({
             className="pl-9"
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {subjectOptions.length > 0 && (
+            <Select value={subjectFilter} onValueChange={setSubjectFilter}>
+              <SelectTrigger className="h-9 w-[160px] gap-1.5">
+                <GraduationCap className="h-3.5 w-3.5 text-muted-foreground" />
+                <SelectValue placeholder="Matéria" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as matérias</SelectItem>
+                {subjectOptions.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.title}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <Select value={projectFilter} onValueChange={setProjectFilter}>
             <SelectTrigger className="h-9 w-[160px] gap-1.5">
               <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
@@ -279,7 +307,7 @@ export function NotesClient({
                 onClick={() => open(note.id)}
               >
                 <div className="mb-2 flex items-start justify-between gap-2">
-                  <h3 className="line-clamp-1 font-semibold text-foreground">{note.title}</h3>
+                  <h3 className="min-w-0 break-all line-clamp-1 font-semibold text-foreground" title={note.title}>{note.title}</h3>
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); handleToggleFav(note); }}

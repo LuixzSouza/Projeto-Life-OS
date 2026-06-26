@@ -6,6 +6,8 @@ export interface RichSubject extends StudySubject {
   lastStudied?: Date | string | null;
   /** Cartões vencidos nos baralhos ligados a esta matéria (revisão por matéria). */
   dueFlashcards?: number;
+  /** Notas vinculadas a esta matéria (ponte Estudos -> Notas). */
+  noteCount?: number;
 }
 
 export interface SubjectListProps {

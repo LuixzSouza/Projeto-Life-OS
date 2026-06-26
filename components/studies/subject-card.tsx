@@ -10,7 +10,7 @@ import React, { useMemo } from "react";
 import Link from "next/link";
 import { StudySubject } from "@prisma/client";
 import {
-  MoreVertical, Edit, Trash2, BookOpen, Folder, CheckCircle2, Play, Zap,
+  MoreVertical, Edit, Trash2, BookOpen, Folder, CheckCircle2, Play, Zap, FileText,
 } from "lucide-react";
 
 import {
@@ -36,6 +36,8 @@ export interface RichSubject extends StudySubject {
   lastStudied?: Date | string | null;
   /** Cartões vencidos nos baralhos desta matéria (revisão por matéria). */
   dueFlashcards?: number;
+  /** Notas vinculadas a esta matéria (ponte Estudos -> Notas). */
+  noteCount?: number;
 }
 
 interface SubjectCardProps {
@@ -169,6 +171,7 @@ export function SubjectCard({
   }, [subject]);
 
   const due = subject.dueFlashcards ?? 0;
+  const notes = subject.noteCount ?? 0;
 
   const handleCardClick: React.MouseEventHandler = (e) => {
     const t = e.target as HTMLElement;
@@ -253,6 +256,7 @@ export function SubjectCard({
             </span>
           </div>
 
+          {notes > 0 && <NotesPill subjectId={subject.id} count={notes} />}
           {due > 0 && <ReviewPill subjectId={subject.id} due={due} />}
 
           <Button
@@ -298,6 +302,7 @@ export function SubjectCard({
           </ProgressRing>
 
           <div className="flex items-center gap-1">
+            {notes > 0 && <NotesPill subjectId={subject.id} count={notes} />}
             {due > 0 && <ReviewPill subjectId={subject.id} due={due} />}
             <Button
               size="sm"
@@ -357,6 +362,20 @@ export function SubjectCard({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+/** Atalho de notas por matéria: leva às notas filtradas (/notes?subject=). */
+function NotesPill({ subjectId, count }: { subjectId: string; count: number }) {
+  return (
+    <Link
+      href={`/notes?subject=${subjectId}`}
+      onClick={(e) => e.stopPropagation()}
+      title={`Ver ${count} ${count === 1 ? "nota desta matéria" : "notas desta matéria"}`}
+      className="flex h-8 shrink-0 items-center gap-1 rounded-lg border border-border/60 bg-muted/40 px-2.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+    >
+      <FileText className="h-3 w-3" /> {count}
+    </Link>
   );
 }
 

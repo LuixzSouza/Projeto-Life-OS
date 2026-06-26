@@ -43,6 +43,7 @@ export interface SubjectWithStats extends StudySubject {
   sessionCount: number;
   lastStudied: Date | null;
   dueFlashcards: number;
+  noteCount: number;
 }
 
 // Payload de sessão com subject incluído
@@ -72,6 +73,8 @@ export default async function StudiesPage() {
   let totalFlashcards = 0;
   // Vencidos por matéria (revisão por matéria nos cards de matéria).
   const dueBySubject = new Map<string, number>();
+  // Notas por matéria (ponte Estudos -> Notas direto no card da matéria).
+  const notesBySubject = new Map<string, number>();
 
   // Heatmap de constância: minutos por dia (reusa o histórico do ELO).
   const heatmapData: Record<string, number> = {};
@@ -98,7 +101,7 @@ export default async function StudiesPage() {
     // "Agora" para a fila de revisão (cartões vencidos = nextReview nula ou no passado).
     const reviewNow = new Date();
 
-    const [subjectsData, recentSessionsData, statsData, aggregatedTimeData, lastStudiedData, activitySessions, eloSessions, dueFlashcardsCount, totalFlashcardsCount, decksWithDueData] =
+    const [subjectsData, recentSessionsData, statsData, aggregatedTimeData, lastStudiedData, activitySessions, eloSessions, dueFlashcardsCount, totalFlashcardsCount, decksWithDueData, notesBySubjectData] =
       await Promise.all([
         prisma.studySubject.findMany({
           where: { userId },
@@ -174,6 +177,14 @@ export default async function StudiesPage() {
             },
           },
         }),
+
+        // Notas vivas POR matéria: _count é barato e não traz DateTime (seguro no
+        // adapter libSQL). Vira o contador de notas no card de cada matéria.
+        prisma.studyNote.groupBy({
+          by: ["subjectId"],
+          where: { userId, deletedAt: null, subjectId: { not: null } },
+          _count: { id: true },
+        }),
       ]);
 
     dueFlashcards = dueFlashcardsCount ?? 0;
@@ -183,6 +194,12 @@ export default async function StudiesPage() {
     for (const d of decksWithDueData ?? []) {
       if (!d.studySubjectId) continue;
       dueBySubject.set(d.studySubjectId, (dueBySubject.get(d.studySubjectId) ?? 0) + d.cards.length);
+    }
+
+    // Mapa matéria → nº de notas vinculadas.
+    for (const g of notesBySubjectData ?? []) {
+      if (!g.subjectId) continue;
+      notesBySubject.set(g.subjectId, g._count?.id ?? 0);
     }
 
     // Mapa subjectId → última data estudada (substitui o _max do groupBy).
@@ -229,6 +246,7 @@ export default async function StudiesPage() {
         sessionCount: st?.count ?? 0,
         lastStudied: st?.last ?? null,
         dueFlashcards: dueBySubject.get(s.id) ?? 0,
+        noteCount: notesBySubject.get(s.id) ?? 0,
       };
     });
 

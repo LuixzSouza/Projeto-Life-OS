@@ -119,6 +119,21 @@ export async function getSubjectDetails(subjectId: string) {
         due: d.cards.filter((c) => !c.nextReview || new Date(c.nextReview).getTime() <= now).length,
     }));
 
+    // Notas vinculadas a esta matéria (estudo passivo: ler/revisar o conteúdo).
+    // Fecha o ciclo Nota -> Matéria, deixando o módulo Estudos achar as anotações.
+    const notesRaw = await prisma.studyNote.findMany({
+        where: { userId, subjectId, deletedAt: null },
+        orderBy: [{ isFavorite: "desc" }, { updatedAt: "desc" }],
+        take: 12,
+        select: { id: true, title: true, isFavorite: true, updatedAt: true },
+    });
+    const notes = notesRaw.map((n) => ({
+        id: n.id,
+        title: n.title,
+        isFavorite: n.isFavorite,
+        updatedAt: n.updatedAt.toISOString(),
+    }));
+
     return {
         success: true,
         data: {
@@ -131,6 +146,7 @@ export async function getSubjectDetails(subjectId: string) {
             subTopics: subject.children,
             parentTopic: subject.parent,
             decks,
+            notes,
         }
     };
   } catch (error) {

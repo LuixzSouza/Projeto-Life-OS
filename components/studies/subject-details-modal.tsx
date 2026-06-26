@@ -3,6 +3,8 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 
 import { getSubjectDetails, deleteSession } from "@/app/(dashboard)/studies/actions";
+import { createBlankNote } from "@/app/(dashboard)/notes/actions";
+import { useRouter } from "next/navigation";
 
 import {
   Dialog, DialogContent, DialogHeader, DialogBody,
@@ -20,6 +22,7 @@ import Link from "next/link";
 import {
   Clock, Calendar, Gauge, Target, Trash2, AlertTriangle, Loader2,
   Layers, BarChart3, History, GraduationCap, CheckCircle2, BookOpen, Zap,
+  FileText, Plus, Star,
 } from "lucide-react";
 
 import { toast } from "sonner";
@@ -48,6 +51,7 @@ type SessionDetail = {
 type SubTopic = { id: string; title: string; icon?: string | null; color?: string | null };
 type ParentTopic = { id: string; title: string };
 type DeckLite = { id: string; title: string; total: number; due: number };
+type NoteLite = { id: string; title: string; isFavorite: boolean; updatedAt: string };
 
 type SubjectDetails = {
   subjectTitle: string;
@@ -59,6 +63,7 @@ type SubjectDetails = {
   subTopics?: SubTopic[];
   parentTopic?: ParentTopic | null;
   decks?: DeckLite[];
+  notes?: NoteLite[];
 };
 
 interface SubjectDetailsModalProps {
@@ -196,6 +201,8 @@ export function SubjectDetailsModal({ subjectId, open, onClose }: SubjectDetails
   const [isLoading, setIsLoading] = useState(false);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
   const [refreshCounter, setRefreshCounter] = useState(0);
+  const [isCreatingNote, setIsCreatingNote] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     if (!open) {
@@ -243,6 +250,24 @@ export function SubjectDetailsModal({ subjectId, open, onClose }: SubjectDetails
       setIsDeletingId(null);
     }
   }, []);
+
+  // "Nova nota nesta matéria": cria uma nota já vinculada e abre o editor.
+  const handleNewNote = useCallback(async () => {
+    if (!subjectId || isCreatingNote) return;
+    setIsCreatingNote(true);
+    try {
+      const res = await createBlankNote({ subjectId });
+      if (res.success && res.id) {
+        router.push(`/notes/${res.id}`);
+      } else {
+        toast.error(res.message || "Falha ao criar a nota.");
+        setIsCreatingNote(false);
+      }
+    } catch {
+      toast.error("Erro de conexão.");
+      setIsCreatingNote(false);
+    }
+  }, [subjectId, isCreatingNote, router]);
 
   const totalDuration = details?.totalDuration ?? 0;
   const goalMinutes = details?.goalMinutes && details.goalMinutes > 0 ? details.goalMinutes : 1;
@@ -370,6 +395,44 @@ export function SubjectDetailsModal({ subjectId, open, onClose }: SubjectDetails
                   </div>
                 </div>
               )}
+
+              {/* NOTAS DA MATÉRIA (estudo passivo: ler/revisar o conteúdo) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                    <FileText className="h-3.5 w-3.5" /> Notas{details?.notes?.length ? ` (${details.notes.length})` : ""}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleNewNote}
+                    disabled={isCreatingNote || !subjectId}
+                    className="inline-flex shrink-0 items-center gap-1 text-[11px] font-semibold text-primary transition-colors hover:underline disabled:opacity-50"
+                  >
+                    {isCreatingNote ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                    Nova nota
+                  </button>
+                </div>
+
+                {details?.notes && details.notes.length > 0 ? (
+                  <div className="flex flex-col gap-1.5">
+                    {details.notes.map((n) => (
+                      <Link
+                        key={n.id}
+                        href={`/notes/${n.id}`}
+                        className="group flex items-center gap-2 rounded-lg border border-border/50 bg-card px-3 py-2 text-sm transition-colors hover:border-primary/30 hover:bg-muted/30"
+                      >
+                        <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <span className="min-w-0 truncate font-medium text-foreground">{n.title || "Sem título"}</span>
+                        {n.isFavorite && <Star className="ml-auto h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400" />}
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="rounded-lg border border-dashed border-border/50 bg-muted/10 px-3 py-3 text-center text-xs text-muted-foreground">
+                    Nenhuma nota nesta matéria ainda — toque em <strong className="text-foreground">Nova nota</strong> para começar.
+                  </p>
+                )}
+              </div>
 
               {/* HISTÓRICO */}
               <div className="space-y-3">

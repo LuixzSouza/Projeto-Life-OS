@@ -43,6 +43,21 @@ export function SubjectGrid({ subjects }: SubjectListProps) {
     return () => clearTimeout(t);
   }, [searchTerm]);
 
+  // Deep-link /studies?subject=ID: abre direto a matéria (vindo de uma Nota,
+  // do Dashboard, etc.). Lê do window p/ não exigir <Suspense> do useSearchParams,
+  // e limpa a URL para um refresh não reabrir a modal.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const id = new URLSearchParams(window.location.search).get("subject");
+    if (!id || !subjects?.some((s) => s.id === id)) return;
+    // Sincroniza uma fonte externa (a URL) com o estado uma única vez na montagem
+    // — não há fase de render onde isso possa ser feito (window só existe aqui).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSelectedSubjectId(id);
+    setIsDetailsModalOpen(true);
+    window.history.replaceState(null, "", window.location.pathname);
+  }, [subjects]);
+
   /* ------------------------------- ACTIONS -------------------------------- */
   const handleEdit = useCallback((id: string) => {
       const subject = subjects.find((s) => s.id === id) ?? null;

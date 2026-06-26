@@ -9,8 +9,13 @@ import { AskAiButton } from "@/components/ai/ask-ai-button";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Notas | Life OS" };
 
-export default async function NotesPage() {
-  const [notes, notebooks, projects] = await Promise.all([
+export default async function NotesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ subject?: string }>;
+}) {
+  const [{ subject }, notes, notebooks, projects] = await Promise.all([
+    searchParams,
     getNotes(),
     getNotebooks(),
     getNoteProjects(),
@@ -30,7 +35,12 @@ export default async function NotesPage() {
         }
       />
       <PageContainer>
-        <NotesClient initialNotes={notes} initialNotebooks={notebooks} projects={projects} />
+        <NotesClient
+          initialNotes={notes}
+          initialNotebooks={notebooks}
+          projects={projects}
+          initialSubjectId={subject ?? "all"}
+        />
       </PageContainer>
     </PageShell>
   );

@@ -203,7 +203,7 @@ export async function getNoteProjects(): Promise<NoteProject[]> {
  * navega direto para a edição em tela cheia (/notes/[id]).
  */
 export async function createBlankNote(
-  opts?: { notebookId?: string; projectId?: string },
+  opts?: { notebookId?: string; projectId?: string; subjectId?: string },
 ): Promise<{ success: boolean; id?: string; message: string }> {
   try {
     const userId = await requireUserId();
@@ -219,8 +219,14 @@ export async function createBlankNote(
       const owned = await prisma.project.findFirst({ where: { id: opts.projectId, userId, deletedAt: null }, select: { id: true } });
       projectId = owned ? owned.id : null;
     }
+    // Matéria opcional: permite "Nova nota nesta matéria" direto do módulo Estudos.
+    let subjectId: string | null = null;
+    if (opts?.subjectId) {
+      const owned = await prisma.studySubject.findFirst({ where: { id: opts.subjectId, userId }, select: { id: true } });
+      subjectId = owned ? owned.id : null;
+    }
     const created = await prisma.studyNote.create({
-      data: { userId, title: "Nova nota", content: "", notebookId, projectId },
+      data: { userId, title: "Nova nota", content: "", notebookId, projectId, subjectId },
     });
     revalidatePath("/notes");
     return { success: true, id: created.id, message: "Nota criada." };
@@ -520,11 +526,35 @@ export async function updateNote(formData: FormData): Promise<{ success: boolean
 
 /** Soft-delete: a anotação vai para a Lixeira. Restaurar/excluir: ver /trash. */
 export async function deleteNote(id: string): Promise<{ success: boolean; message: string }> {
+  // Sessão expirada é a causa nº 1 de "Falha ao excluir" depois de ficar tempo
+  // numa nota aberta — distinguir isso evita o erro genérico e confuso.
+  let userId: string;
   try {
-    const userId = await requireUserId();
-    const note = await prisma.studyNote.findFirst({ where: { id, userId, deletedAt: null }, select: { title: true } });
-    await prisma.studyNote.updateMany({ where: { id, userId }, data: { deletedAt: new Date() } });
+    userId = await requireUserId();
+  } catch {
+    return { success: false, message: "Sua sessão expirou. Recarregue a página e faça login novamente." };
+  }
 
+  try {
+    // Título é só para o log de atividade — nunca pode derrubar a exclusão.
+    const note = await prisma.studyNote
+      .findFirst({ where: { id, userId }, select: { title: true } })
+      .catch(() => null);
+
+    // A EXCLUSÃO em si é o que decide sucesso/erro.
+    const res = await prisma.studyNote.updateMany({
+      where: { id, userId },
+      data: { deletedAt: new Date() },
+    });
+
+    // Nada atualizado: a nota já não existe (ou não é sua). Idempotente: trata
+    // como removida em vez de erro — o usuário queria que ela sumisse.
+    if (res.count === 0) {
+      revalidatePath("/notes");
+      return { success: true, message: "Anotação removida." };
+    }
+
+    // Auditoria é best-effort: já não lança, e mesmo assim isolamos o resultado.
     await logActivity({
       action: "DELETE",
       module: "studies",
@@ -537,7 +567,10 @@ export async function deleteNote(id: string): Promise<{ success: boolean; messag
     return { success: true, message: "Anotação movida para a lixeira." };
   } catch (error) {
     console.error("Erro ao excluir anotação:", error);
-    return { success: false, message: "Falha ao excluir a anotação." };
+    // Mostra o motivo real (ex.: banco fora do ar, lock, schema) em vez do erro
+    // genérico — assim dá para agir em vez de só "Falha ao excluir".
+    const detail = error instanceof Error ? error.message : String(error);
+    return { success: false, message: `Não foi possível excluir: ${detail.slice(0, 140)}` };
   }
 }
 
