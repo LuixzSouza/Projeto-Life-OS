@@ -16,10 +16,13 @@ const DeckSchema = z.object({
   subjectId: z.string().optional(), 
 });
 
+// O termo (frente) é opcional: um cartão pode ter SÓ imagem na frente (ex.:
+// identificar uma figura). A regra "texto OU imagem" é validada na action, pois
+// depende do campo de imagem. O verso (resposta) continua obrigatório.
 const CardSchema = z.object({
   deckId: z.string().uuid(),
-  term: z.string().min(1, "O termo é obrigatório."),
-  definition: z.string().min(1, "A definição é obrigatória."),
+  term: z.string(),
+  definition: z.string().min(1, "A resposta (verso) é obrigatória."),
 });
 
 // Limite de imagem em base64 (~4.5MB) — folga abaixo do bodySizeLimit de 5MB do
@@ -48,8 +51,8 @@ function readImageField(formData: FormData): { value: string | null; error?: str
 
 const UpdateCardSchema = z.object({
   cardId: z.string().uuid(),
-  term: z.string().min(1, "O termo é obrigatório."),
-  definition: z.string().min(1, "A definição é obrigatória."),
+  term: z.string(),
+  definition: z.string().min(1, "A resposta (verso) é obrigatória."),
 });
 
 /* -------------------------------------------------------------------------- */
@@ -134,6 +137,12 @@ export async function createCard(deckId: string, formData: FormData) {
     const image = readImageField(formData);
     if (image.error) return { success: false, message: image.error };
 
+    // A frente pode ser só imagem, mas não pode ficar totalmente vazia: precisa
+    // de texto OU imagem (senão não há o que perguntar).
+    if (!parsed.data.term && !image.value) {
+      return { success: false, message: "A frente precisa de um texto ou de uma imagem." };
+    }
+
     // Só permite adicionar cartão a um baralho do próprio usuário.
     const deck = await prisma.flashcardDeck.findFirst({
       where: { id: parsed.data.deckId, userId },
@@ -196,6 +205,11 @@ export async function updateCard(deckId: string, formData: FormData) {
 
     const image = readImageField(formData);
     if (image.error) return { success: false, message: image.error };
+
+    // Mesma regra da criação: a frente precisa de texto OU imagem.
+    if (!parsed.data.term && !image.value) {
+      return { success: false, message: "A frente precisa de um texto ou de uma imagem." };
+    }
 
     const userId = await requireUserId();
     const res = await prisma.flashcard.updateMany({

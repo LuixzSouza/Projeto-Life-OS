@@ -563,7 +563,11 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
                             <img
                                 src={front.image}
                                 alt="Imagem do cartão"
-                                className="mx-auto mt-5 max-h-[40vh] w-auto rounded-xl border border-border/50 object-contain shadow-sm"
+                                className={cn(
+                                    "mx-auto w-auto rounded-xl border border-border/50 object-contain shadow-sm",
+                                    // Frente só-imagem: vira o destaque, ocupa mais espaço. Com texto, fica menor.
+                                    front.text ? "mt-5 max-h-[40vh]" : "mt-2 max-h-[62vh]",
+                                )}
                             />
                         )}
                         {front?.video && <VideoEmbed embed={front.video} />}

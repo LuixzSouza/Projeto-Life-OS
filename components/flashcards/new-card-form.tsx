@@ -49,6 +49,9 @@ export function NewCardForm({ deckId }: { deckId: string }) {
   const formRef = useRef<HTMLFormElement>(null);
   const termRef = useRef<HTMLInputElement>(null);
   const [justAdded, setJustAdded] = useState(false);
+  // O ImagePaster guarda a imagem em estado interno — form.reset() não a limpa.
+  // Trocar a key remonta o campo zerado (e recolhe) após adicionar o cartão.
+  const [imageFieldKey, setImageFieldKey] = useState(0);
 
   async function handleAdd(formData: FormData) {
     const result = await createCard(deckId, formData);
@@ -58,6 +61,7 @@ export function NewCardForm({ deckId }: { deckId: string }) {
     }
     toast.success("Cartão adicionado à pilha!");
     formRef.current?.reset();
+    setImageFieldKey((k) => k + 1); // zera a imagem da frente para o próximo cartão
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 1600);
     // Foco de volta no termo: adicionar vários cartões em sequência sem o mouse.
@@ -68,15 +72,18 @@ export function NewCardForm({ deckId }: { deckId: string }) {
     <form ref={formRef} action={handleAdd} className="space-y-5">
       <div className="space-y-2">
         <Label className="ml-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          Frente (Pergunta)
+          Frente (Pergunta ou imagem)
         </Label>
         <Input
           ref={termRef}
           name="term"
           placeholder="Ex: O que é useState?"
-          required
           className="border-border/60 bg-background font-medium focus:ring-primary/20"
         />
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          Pode deixar em branco e usar <strong>só uma imagem</strong> abaixo (ex.: identificar uma figura).
+        </p>
+        <CardImageField key={imageFieldKey} />
       </div>
 
       <div className="space-y-2">
@@ -108,8 +115,6 @@ export function NewCardForm({ deckId }: { deckId: string }) {
           Aparece na frente sob demanda (botão <strong>Dica</strong>) — ajuda sem entregar a resposta.
         </p>
       </div>
-
-      <CardImageField />
 
       <SubmitButton justAdded={justAdded} />
     </form>

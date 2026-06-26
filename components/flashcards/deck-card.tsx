@@ -36,7 +36,10 @@ export function DeckCard({ deck, onStudy, onDelete, onConnections }: DeckCardPro
   return (
     <Card className="group flex flex-col overflow-hidden rounded-2xl border border-border/40 bg-card shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md">
       <CardHeader className="pb-3 pt-5">
-        <div className="flex items-start justify-between gap-2">
+        {/* min-w-0: o CardHeader é um grid e este é um grid item — sem isto, o
+            título com truncate (white-space: nowrap) estoura a largura e empurra
+            o menu de 3 pontinhos para fora do card (clipado pelo overflow-hidden). */}
+        <div className="flex min-w-0 items-start justify-between gap-2">
           <div className="flex min-w-0 items-center gap-3">
             <div
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border/50 text-lg"
@@ -62,7 +65,7 @@ export function DeckCard({ deck, onStudy, onDelete, onConnections }: DeckCardPro
             </div>
           </div>
 
-          <div className="opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
+          <div className="shrink-0 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" aria-label="Mais ações" className="-mr-2 h-8 w-8 text-muted-foreground hover:text-foreground">

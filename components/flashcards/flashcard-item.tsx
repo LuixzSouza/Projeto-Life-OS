@@ -11,7 +11,9 @@ import {
   Loader2,
   Save,
   AlertTriangle,
+  Maximize2,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +25,7 @@ import {
   DialogHeader,
   DialogBody,
   DialogFooter,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -48,6 +51,8 @@ export function FlashcardItem({ card, index, total, deckId }: FlashcardItemProps
   
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  // Lightbox: ver a imagem da frente em tamanho grande (útil p/ cartões só-imagem).
+  const [isZoomOpen, setIsZoomOpen] = useState(false);
 
   // Estados locais para o formulário de edição
   const [term, setTerm] = useState(card.term);
@@ -108,16 +113,33 @@ export function FlashcardItem({ card, index, total, deckId }: FlashcardItemProps
               <span className="w-2 h-2 rounded-full bg-primary/40 group-hover:bg-primary shadow-[0_0_8px_rgba(var(--primary),0.5)] transition-all" />
               Pergunta
             </p>
-            <p className="font-semibold text-foreground text-base md:text-lg leading-relaxed whitespace-pre-wrap">
-              {card.term}
-            </p>
+            {card.term && (
+              <p className="font-semibold text-foreground text-base md:text-lg leading-relaxed whitespace-pre-wrap">
+                {card.term}
+              </p>
+            )}
             {card.imageUrl && (
-              // eslint-disable-next-line @next/next/no-img-element -- base64 local (images.unoptimized), next/image não otimiza
-              <img
-                src={card.imageUrl}
-                alt="Imagem do cartão"
-                className="mt-1 max-h-40 w-auto rounded-lg border border-border/50 object-contain"
-              />
+              <button
+                type="button"
+                onClick={() => setIsZoomOpen(true)}
+                title="Clique para ampliar"
+                aria-label="Ampliar imagem do cartão"
+                className="group/img relative mt-1 block w-full overflow-hidden rounded-xl border border-border/50 bg-muted/20 transition-colors hover:border-primary/40"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- base64 local (images.unoptimized), next/image não otimiza */}
+                <img
+                  src={card.imageUrl}
+                  alt="Imagem do cartão"
+                  className={cn(
+                    "mx-auto w-auto max-w-full object-contain transition-transform duration-300 group-hover/img:scale-[1.02]",
+                    // Só-imagem (sem texto na frente) vira o destaque → maior.
+                    card.term ? "max-h-56" : "max-h-80",
+                  )}
+                />
+                <span className="pointer-events-none absolute bottom-2 right-2 flex items-center gap-1 rounded-md bg-background/85 px-2 py-1 text-[10px] font-semibold text-muted-foreground opacity-0 shadow-sm backdrop-blur transition-opacity group-hover/img:opacity-100">
+                  <Maximize2 className="h-3 w-3" /> Ampliar
+                </span>
+              </button>
             )}
           </div>
 
@@ -166,10 +188,11 @@ export function FlashcardItem({ card, index, total, deckId }: FlashcardItemProps
 
           <DialogBody className="space-y-6">
             <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Frente (Pergunta)</Label>
-              <Input 
-                value={term} 
-                onChange={(e) => setTerm(e.target.value)} 
+              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Frente (Pergunta ou imagem)</Label>
+              <Input
+                value={term}
+                onChange={(e) => setTerm(e.target.value)}
+                placeholder="Deixe em branco para usar só a imagem"
                 className="font-semibold text-base h-12 bg-muted/20 border-border/60 focus-visible:ring-primary/30"
               />
             </div>
@@ -212,6 +235,27 @@ export function FlashcardItem({ card, index, total, deckId }: FlashcardItemProps
               Salvar Alterações
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* -------------------------------------------------------- */}
+      {/* LIGHTBOX: imagem da frente em tamanho grande              */}
+      {/* -------------------------------------------------------- */}
+      <Dialog open={isZoomOpen} onOpenChange={setIsZoomOpen}>
+        <DialogContent size="xl" className="bg-background/95 p-0">
+          <DialogTitle className="sr-only">
+            Imagem do cartão #{(total - index).toString().padStart(2, "0")}
+          </DialogTitle>
+          <div className="flex max-h-[90dvh] items-center justify-center p-4 sm:p-6">
+            {card.imageUrl && (
+              // eslint-disable-next-line @next/next/no-img-element -- base64 local (images.unoptimized)
+              <img
+                src={card.imageUrl}
+                alt="Imagem do cartão ampliada"
+                className="max-h-[82dvh] w-auto max-w-full rounded-xl object-contain"
+              />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 

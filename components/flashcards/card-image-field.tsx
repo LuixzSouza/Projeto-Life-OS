@@ -26,7 +26,7 @@ export function CardImageField() {
         onClick={() => setOpen(true)}
         className="gap-2 text-muted-foreground hover:text-primary"
       >
-        <ImagePlus className="h-4 w-4" /> Adicionar imagem (opcional)
+        <ImagePlus className="h-4 w-4" /> Adicionar imagem à frente
       </Button>
     );
   }
