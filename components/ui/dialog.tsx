@@ -276,7 +276,9 @@ const DialogTitle = React.forwardRef<
     ref={ref}
     data-slot="dialog-title"
     className={cn(
-      "text-lg font-bold tracking-tight text-foreground leading-tight",
+      // break-words: títulos longos sem espaços (URLs, nomes colados) quebram em
+      // vez de estourar a largura do modal por baixo do botão de fechar.
+      "text-lg font-bold tracking-tight text-foreground leading-tight break-words",
       className
     )}
     {...props}

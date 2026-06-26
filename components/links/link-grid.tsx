@@ -369,7 +369,7 @@ export function LinkGrid({ links }: { links: SavedLink[] }) {
                 {/* Content Area */}
                 <div className="p-4 flex flex-col flex-1 gap-2">
                 <div className="flex justify-between items-start gap-2">
-                    <h3 className="font-semibold text-foreground line-clamp-1" title={link.title}>
+                    <h3 className="min-w-0 font-semibold text-foreground line-clamp-1 break-all" title={link.title}>
                     {link.title}
                     </h3>
                 </div>
