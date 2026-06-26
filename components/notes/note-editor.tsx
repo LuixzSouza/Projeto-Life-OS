@@ -6,7 +6,7 @@ import remarkGfm from "remark-gfm";
 import {
   Bold, Italic, Strikethrough, Heading2, List, Quote, Code, Link2, Eye, Pencil,
   Heading1, Heading3, ListOrdered, CheckSquare, Table, Minus, Image as ImageIcon,
-  FileText, Briefcase, ListTodo,
+  FileText, Briefcase, ListTodo, ListTree, Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -211,6 +211,26 @@ export function NoteEditor({
 
   const wordCount = value.trim() ? value.trim().split(/\s+/).length : 0;
   const imageCount = useMemo(() => countEmbeddedImages(value), [value]);
+  // Tempo de leitura (~200 ppm) — toque de editor profissional.
+  const readingMin = wordCount > 0 ? Math.max(1, Math.ceil(wordCount / 200)) : 0;
+
+  // ESTRUTURA (Obsidian-like): índice dos títulos (#, ##, ###) com clique p/ pular.
+  // Ignora títulos dentro de blocos de código. `index` é o offset do início da linha.
+  const [showOutline, setShowOutline] = useState(false);
+  const outline = useMemo(() => {
+    const items: { level: number; text: string; index: number }[] = [];
+    let inFence = false;
+    let idx = 0;
+    for (const line of value.split("\n")) {
+      if (/^\s*```/.test(line)) inFence = !inFence;
+      else if (!inFence) {
+        const m = line.match(/^(#{1,3})\s+(.+?)\s*$/);
+        if (m) items.push({ level: m[1].length, text: m[2], index: idx });
+      }
+      idx += line.length + 1; // +1 do "\n"
+    }
+    return items;
+  }, [value]);
 
   // Comandos filtrados pelo texto digitado após a "/".
   const slashList = useMemo(() => {
@@ -262,6 +282,33 @@ export function NoteEditor({
     onChange(next);
   }, [value, onChange]);
 
+
+  /** Leva o cursor a um título e rola a janela até ele (clique no outline). */
+  const jumpToHeading = useCallback((index: number) => {
+    setShowOutline(false);
+    setMode("edit");
+    requestAnimationFrame(() => {
+      const ta = taRef.current;
+      if (!ta) return;
+      ta.focus();
+      const lineEnd = value.indexOf("\n", index);
+      const caret = lineEnd === -1 ? value.length : lineEnd;
+      ta.setSelectionRange(caret, caret);
+      const coords = getCaretCoordinates(ta, index);
+      const rect = ta.getBoundingClientRect();
+      window.scrollTo({ top: window.scrollY + rect.top + coords.top - 120, behavior: "smooth" });
+    });
+  }, [value]);
+
+  // Auto-crescimento: a área de escrita acompanha o conteúdo (feel de documento,
+  // sem rolagem interna). Piso confortável de ~55vh para a página em branco.
+  useLayoutEffect(() => {
+    const ta = taRef.current;
+    if (!ta || mode !== "edit") return;
+    ta.style.height = "auto";
+    const floor = Math.round((typeof window !== "undefined" ? window.innerHeight : 800) * 0.55);
+    ta.style.height = `${Math.max(ta.scrollHeight, floor)}px`;
+  }, [value, mode]);
 
   /** Reavalia se há seleção e (re)posiciona a barra flutuante. */
   const syncBar = useCallback(() => {
@@ -437,10 +484,28 @@ export function NoteEditor({
     const file = Array.from(ev.clipboardData.items)
       .find((it) => it.kind === "file" && it.type.startsWith("image/"))
       ?.getAsFile();
-    if (!file) return; // deixa o paste de texto normal seguir
-    ev.preventDefault();
-    void embedImageFile(file);
-  }, [embedImageFile]);
+    if (file) {
+      ev.preventDefault();
+      void embedImageFile(file);
+      return;
+    }
+
+    // Link inteligente (estilo Notion): colar uma URL sobre um texto selecionado
+    // transforma a seleção em [texto](url), em vez de substituí-la pela URL crua.
+    const ta = taRef.current;
+    const pasted = ev.clipboardData.getData("text/plain").trim();
+    if (ta && pasted && /^https?:\/\/\S+$/.test(pasted) && ta.selectionStart !== ta.selectionEnd) {
+      ev.preventDefault();
+      const s = ta.selectionStart;
+      const e = ta.selectionEnd;
+      const sel = value.slice(s, e);
+      const insert = `[${sel}](${pasted})`;
+      const next = value.slice(0, s) + insert + value.slice(e);
+      pendingSel.current = { start: s + insert.length, end: s + insert.length };
+      commit(next);
+    }
+    // Senão: deixa o paste de texto normal seguir.
+  }, [embedImageFile, value, commit]);
 
   const handleDrop = useCallback((ev: React.DragEvent<HTMLTextAreaElement>) => {
     const file = Array.from(ev.dataTransfer.files).find((f) => f.type.startsWith("image/"));
@@ -490,6 +555,49 @@ export function NoteEditor({
       if (ev.key === "Escape") { ev.preventDefault(); setMention(null); return; }
     }
 
+    // Tab / Shift+Tab: indenta/desindenta a(s) linha(s) da seleção (listas, outlines).
+    if (ev.key === "Tab") {
+      ev.preventDefault();
+      const ta = ev.currentTarget;
+      const s = ta.selectionStart;
+      const e = ta.selectionEnd;
+      const lineStart = value.lastIndexOf("\n", s - 1) + 1;
+      const lineEndIdx = value.indexOf("\n", e);
+      const lineEnd = lineEndIdx === -1 ? value.length : lineEndIdx;
+      const block = value.slice(lineStart, lineEnd);
+      const lines = block.split("\n");
+      const INDENT = "  ";
+      let deltaStart: number;
+      let deltaEnd: number;
+      let newBlock: string;
+      if (ev.shiftKey) {
+        let firstRemoved = 0;
+        let totalRemoved = 0;
+        newBlock = lines
+          .map((ln, i) => {
+            const m = ln.match(/^( {1,2}|\t)/);
+            if (!m) return ln;
+            if (i === 0) firstRemoved = m[0].length;
+            totalRemoved += m[0].length;
+            return ln.slice(m[0].length);
+          })
+          .join("\n");
+        deltaStart = -firstRemoved;
+        deltaEnd = -totalRemoved;
+      } else {
+        newBlock = lines.map((ln) => INDENT + ln).join("\n");
+        deltaStart = INDENT.length;
+        deltaEnd = INDENT.length * lines.length;
+      }
+      const next = value.slice(0, lineStart) + newBlock + value.slice(lineEnd);
+      pendingSel.current = {
+        start: Math.max(lineStart, s + deltaStart),
+        end: Math.max(lineStart, e + deltaEnd),
+      };
+      commit(next);
+      return;
+    }
+
     if (ev.metaKey || ev.ctrlKey) {
       const k = ev.key.toLowerCase();
       if (k === "z") { ev.preventDefault(); if (ev.shiftKey) redo(); else undo(); return; }
@@ -535,8 +643,57 @@ export function NoteEditor({
 
   return (
     <div className="relative">
-      {/* Cabeçalho do editor: alterna Editar / Visualizar / Imagens */}
-      <div className="mb-1.5 flex items-center justify-end">
+      {/* Cabeçalho do editor: Estrutura (outline) · Editar / Visualizar / Imagens */}
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        {/* ESTRUTURA: índice dos títulos da nota (some quando não há títulos). */}
+        <div className="relative">
+          {outline.length > 0 ? (
+            <button
+              type="button"
+              onClick={() => setShowOutline((v) => !v)}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-2.5 py-1 text-xs font-medium transition-colors",
+                showOutline ? "bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-muted/50",
+              )}
+              title="Estrutura da nota"
+            >
+              <ListTree className="h-3.5 w-3.5" /> Estrutura
+              <span className="opacity-60">{outline.length}</span>
+            </button>
+          ) : (
+            <span />
+          )}
+
+          {showOutline && outline.length > 0 && (
+            <>
+              {/* Backdrop p/ fechar ao clicar fora. */}
+              <button
+                type="button"
+                aria-hidden
+                tabIndex={-1}
+                className="fixed inset-0 z-40 cursor-default"
+                onClick={() => setShowOutline(false)}
+              />
+              <div className="absolute left-0 top-full z-50 mt-1 max-h-72 w-72 overflow-y-auto rounded-lg border border-border/60 bg-popover p-1 shadow-lg">
+                <p className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
+                  Estrutura
+                </p>
+                {outline.map((h, i) => (
+                  <button
+                    key={`${h.index}-${i}`}
+                    type="button"
+                    onClick={() => jumpToHeading(h.index)}
+                    className="flex w-full items-center gap-2 rounded-md py-1.5 pr-2 text-left text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+                    style={{ paddingLeft: 8 + (h.level - 1) * 14 }}
+                  >
+                    <span className={cn("truncate", h.level === 1 && "font-semibold text-foreground")}>{h.text}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
         <div className="inline-flex rounded-lg border border-border/60 p-0.5">
           {([
             { id: "edit" as const, icon: Pencil, label: "Editar" },
@@ -577,8 +734,12 @@ export function NoteEditor({
             onDrop={handleDrop}
             placeholder={placeholder}
             className={cn(
-              "flex min-h-[200px] w-full resize-y rounded-md border border-input bg-transparent px-3 py-2 text-sm leading-relaxed shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
-              dragging && "border-primary ring-1 ring-primary",
+              // Superfície de documento: cresce com o conteúdo (sem rolagem interna),
+              // tipografia confortável e visual limpo (feel Notion/Obsidian).
+              "block w-full resize-none overflow-hidden rounded-2xl border border-border/40 bg-card/40 px-5 py-5 text-[15px] leading-8 shadow-sm transition-colors sm:px-8 sm:py-7",
+              "placeholder:text-muted-foreground/50 focus-visible:border-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/10",
+              "disabled:cursor-not-allowed disabled:opacity-50",
+              dragging && "border-primary ring-2 ring-primary/20",
             )}
           />
 
@@ -674,9 +835,9 @@ export function NoteEditor({
           )}
         </div>
       ) : mode === "preview" ? (
-        <div className="min-h-[200px] rounded-md border border-input bg-transparent px-3 py-2">
+        <div className="min-h-[55vh] rounded-2xl border border-border/40 bg-card/40 px-5 py-6 shadow-sm sm:px-8 sm:py-8">
           {value.trim() ? (
-            <div className="prose prose-sm dark:prose-invert max-w-none prose-img:rounded-lg prose-img:border prose-img:border-border/40">
+            <div className="prose prose-base dark:prose-invert max-w-none prose-headings:scroll-mt-24 prose-img:rounded-lg prose-img:border prose-img:border-border/40">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 // Por padrão o react-markdown bloqueia data: e URLs "estranhas",
@@ -720,18 +881,26 @@ export function NoteEditor({
           )}
         </div>
       ) : (
-        <div className="min-h-[200px] rounded-md border border-input bg-transparent p-3">
+        <div className="min-h-[40vh] rounded-2xl border border-border/40 bg-card/40 p-4 shadow-sm sm:p-5">
           <NoteImageGallery content={value} onChange={onChange} onUploadImage={onUploadImage} />
         </div>
       )}
 
-      <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+      <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
         <span>
           <kbd className="rounded bg-muted px-1">/</kbd> blocos •{" "}
           <kbd className="rounded bg-muted px-1">@</kbd> linkar •{" "}
+          <kbd className="rounded bg-muted px-1">Tab</kbd> indentar •{" "}
           <kbd className="rounded bg-muted px-1">⌘Z</kbd> desfazer • cole/arraste imagens
         </span>
-        <span className="shrink-0 tabular-nums">{wordCount} palavras · {value.length} caracteres</span>
+        <span className="flex shrink-0 items-center gap-2 tabular-nums">
+          {readingMin > 0 && (
+            <span className="inline-flex items-center gap-1">
+              <Clock className="h-3 w-3" /> {readingMin} min
+            </span>
+          )}
+          <span>{wordCount} palavras · {value.length} caracteres</span>
+        </span>
       </div>
     </div>
   );

@@ -242,13 +242,13 @@ export function NoteFullEditor({
             <ArrowLeft className="h-4 w-4" />
           </Link>
 
-          <Input
-            suppressHydrationWarning
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Título da nota"
-            className="h-9 flex-1 border-none bg-transparent px-1 text-base font-semibold shadow-none focus-visible:ring-0"
-          />
+          {/* Contexto estático: o título editável grande vive no corpo (estilo Notion). */}
+          <span
+            className="flex-1 truncate px-1 text-sm font-semibold text-muted-foreground"
+            title={title || "Sem título"}
+          >
+            {title || "Sem título"}
+          </span>
 
           {/* Indicador de status do autosave */}
           <span className="hidden shrink-0 items-center gap-1 text-xs text-muted-foreground sm:inline-flex">
@@ -351,6 +351,16 @@ export function NoteFullEditor({
       </header>
 
       <main className="mx-auto max-w-4xl space-y-6 px-4 py-6 md:px-8">
+        {/* Título grande do documento (editável, estilo Notion/Obsidian). */}
+        <input
+          suppressHydrationWarning
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Sem título"
+          aria-label="Título da nota"
+          className="w-full border-none bg-transparent px-1 text-3xl font-bold leading-tight tracking-tight text-foreground outline-none placeholder:text-muted-foreground/40 sm:text-4xl"
+        />
+
         {/* Editor */}
         <NoteEditor
           value={content}
@@ -417,7 +427,18 @@ export function NoteFullEditor({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Matéria</label>
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Matéria</label>
+              {subjectId !== "none" && (
+                <Link
+                  href={`/studies?subject=${subjectId}`}
+                  className="inline-flex shrink-0 items-center gap-0.5 text-[10px] font-semibold text-primary hover:underline"
+                  title="Abrir esta matéria no módulo Estudos"
+                >
+                  Abrir em Estudos <ExternalLink className="h-3 w-3" />
+                </Link>
+              )}
+            </div>
             <Select value={subjectId} onValueChange={setSubjectId}>
               <SelectTrigger><SelectValue placeholder="Nenhuma" /></SelectTrigger>
               <SelectContent>
