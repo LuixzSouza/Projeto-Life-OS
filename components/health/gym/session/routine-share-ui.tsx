@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { buildShareLink, decodeRoutines } from "./routine-share";
 import { decodePlans, type SharedPlan } from "./plan-share";
+import { copyToClipboard } from "@/lib/clipboard";
 import { playClick } from "./sfx";
 import type { Routine } from "./session-types";
 
@@ -24,10 +25,9 @@ export function RoutineShareButton({ routine, className }: { routine: Routine; c
     } catch {
       /* usuário cancelou ou share indisponível — cai pro clipboard */
     }
-    try {
-      await navigator.clipboard.writeText(url);
+    if (await copyToClipboard(url)) {
       toast.success("Link da rotina copiado — cole no WhatsApp pro seu amigo!");
-    } catch {
+    } else {
       toast.error("Não consegui copiar o link.");
     }
   };

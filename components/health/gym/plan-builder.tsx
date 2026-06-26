@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { copyToClipboard } from "@/lib/clipboard";
 import { decodePlans, buildPlanShareLink, type SharedPlan } from "./session/plan-share";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -136,10 +137,9 @@ export function PlanBuilder() {
     } catch {
       /* cancelado ou indisponível — cai pro clipboard */
     }
-    try {
-      await navigator.clipboard.writeText(url);
+    if (await copyToClipboard(url)) {
       toast.success(`Backup de ${n} ficha${n > 1 ? "s" : ""} copiado! Guarde o link em local seguro.`);
-    } catch {
+    } else {
       toast.error("Não consegui copiar o backup.");
     }
   };
@@ -155,10 +155,9 @@ export function PlanBuilder() {
     } catch {
       /* cancelado ou indisponível — cai pro clipboard */
     }
-    try {
-      await navigator.clipboard.writeText(url);
+    if (await copyToClipboard(url)) {
       toast.success("Link da ficha copiado — cole no WhatsApp pro seu parceiro de treino!");
-    } catch {
+    } else {
       toast.error("Não consegui copiar o link.");
     }
   };

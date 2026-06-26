@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { Cake, ArrowLeft, Share2, Sparkles, Heart, Check, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { copyToClipboard } from "@/lib/clipboard";
 import { CelebrationEditor } from "./celebration-editor";
 import type { CelebrationData, CelebrationSource } from "@/app/(dashboard)/social/celebration-actions";
 
@@ -187,12 +188,11 @@ export function CelebrationStage({
     } catch {
       /* usuário cancelou o share nativo — cai pro copiar */
     }
-    try {
-      await navigator.clipboard.writeText(data.shareUrl);
+    if (await copyToClipboard(data.shareUrl)) {
       setCopied(true);
       toast.success("Link copiado! Mande para a pessoa. 🎁");
       setTimeout(() => setCopied(false), 2500);
-    } catch {
+    } else {
       toast.error("Não consegui copiar o link.");
     }
   };
