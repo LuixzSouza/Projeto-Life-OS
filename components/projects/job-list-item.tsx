@@ -10,7 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import {
     DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Briefcase, ExternalLink, DollarSign, Calendar, Pencil, CalendarClock, MapPin, Sparkles, Link2, Folder, Flag, Mail, AlertTriangle, ChevronDown, Target } from "lucide-react";
+import { Briefcase, ExternalLink, DollarSign, Calendar, Pencil, CalendarClock, MapPin, Sparkles, Link2, Folder, Flag, Mail, AlertTriangle, ChevronDown, Target, PanelRightOpen, FileText } from "lucide-react";
 import { deleteJob, updateJobStatus } from "@/app/(dashboard)/projects/actions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -59,9 +59,13 @@ interface JobItemProps {
     mode: 'list' | 'grid';
     onAiClick?: (job: JobWithProject) => void;
     onLinkClick?: (job: JobWithProject) => void;
+    /** Abre o modal "qual currículo você enviou?" ao mover para APPLIED. */
+    onApplyClick?: (job: JobWithProject) => void;
+    /** Abre o detalhamento da vaga (com a aba Currículo Enviado). */
+    onDetailsClick?: (job: JobWithProject) => void;
 }
 
-export function JobListItem({ job, mode, onAiClick, onLinkClick }: JobItemProps) {
+export function JobListItem({ job, mode, onAiClick, onLinkClick, onApplyClick, onDetailsClick }: JobItemProps) {
     const [isEditOpen, setIsEditOpen] = useState(false);
     const statusInfo = STATUS_MAP[job.status] || STATUS_MAP.APPLIED;
     const StatusIcon = statusInfo.icon;
@@ -79,6 +83,12 @@ export function JobListItem({ job, mode, onAiClick, onLinkClick }: JobItemProps)
 
     const changeStatus = async (status: string) => {
         if (status === job.status) return;
+        // "Candidatei-me" (APPLIED) abre o modal de escolha do currículo enviado
+        // (congela o snapshot). Sem o handler, cai no fluxo direto (compat).
+        if (status === "APPLIED" && onApplyClick) {
+            onApplyClick(job);
+            return;
+        }
         const res = await updateJobStatus(job.id, status);
         if (res.success) {
             toast.success(`Movido para "${STATUS_MAP[status]?.label ?? status}".`);
@@ -127,6 +137,16 @@ export function JobListItem({ job, mode, onAiClick, onLinkClick }: JobItemProps)
             {stale != null && (
                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md text-amber-600 bg-amber-500/10" title={`Sem movimento há ${stale} dias`}><AlertTriangle className="h-3 w-3" /> {stale}d parado</span>
             )}
+            {job.snapshotMeta && (
+                <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onDetailsClick?.(job); }}
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md text-primary bg-primary/10 hover:bg-primary/20 transition-colors max-w-[180px]"
+                    title={`Currículo enviado: ${job.snapshotMeta.resumeName}`}
+                >
+                    <FileText className="h-3 w-3 shrink-0" /> <span className="truncate">{job.snapshotMeta.resumeName}</span>
+                </button>
+            )}
         </>
     );
 
@@ -153,6 +173,11 @@ export function JobListItem({ job, mode, onAiClick, onLinkClick }: JobItemProps)
     // Botões de ação compartilhados (ghost icons).
     const renderActions = (revealOnHover = true) => (
         <div className={cn("flex items-center gap-1", revealOnHover && "opacity-0 group-hover:opacity-100 transition-opacity")}>
+            {onDetailsClick && (
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10" onClick={(e) => { e.stopPropagation(); onDetailsClick(job); }} title="Detalhes da vaga">
+                    <PanelRightOpen className="h-4 w-4" />
+                </Button>
+            )}
             {onAiClick && (
                 <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-violet-600 hover:bg-violet-500/10" onClick={(e) => { e.stopPropagation(); onAiClick(job); }} title="Assistente de IA">
                     <Sparkles className="h-4 w-4" />

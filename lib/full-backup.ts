@@ -289,6 +289,8 @@ const BACKUP_ENTRIES: BackupEntry[] = [
   std("meetings", "Meeting", "tasks", prisma.meeting, {
     fks: [{ field: "projectId", target: "projects" }],
   }),
+  // Antes de jobApplications: na Fase 3 a vaga ganha FK para o currículo enviado.
+  std("resumes", "Resume", "tasks", prisma.resume),
   std("jobApplications", "JobApplication", "tasks", prisma.jobApplication, {
     fks: [{ field: "projectId", target: "projects" }],
   }),

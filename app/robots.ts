@@ -1,8 +1,9 @@
 import type { MetadataRoute } from "next";
+import { siteConfig } from "@/config/site.config";
 
-// Domínio de produção (mesmo fallback do app/layout.tsx). Sobrescreva com
+// Domínio de produção (fonte única em config/site.config.ts). Sobrescreva com
 // NEXT_PUBLIC_SITE_URL nas env vars do deploy.
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://life-os.vercel.app";
+const SITE_URL = siteConfig.urls.site;
 
 // robots.txt gerado pelo Next. Filosofia privacy-first: só a landing e as
 // páginas institucionais do rodapé são rastreáveis. Tudo que é dado de usuário,

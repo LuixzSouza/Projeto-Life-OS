@@ -1,12 +1,13 @@
 import type { MetadataRoute } from "next";
+import { siteConfig } from "@/config/site.config";
 
-// PWA: torna o Life OS instalável no celular ("Adicionar à tela inicial") —
+// PWA: torna o app instalável no celular ("Adicionar à tela inicial") —
 // abre em janela própria, com ícone e cor de tema, direto no dashboard.
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Life OS — Second Brain",
-    short_name: "Life OS",
-    description: "Seu sistema operacional pessoal: finanças, projetos, estudos, treino e mais.",
+    name: `${siteConfig.brand.name} — ${siteConfig.brand.tagline}`,
+    short_name: siteConfig.brand.shortName,
+    description: siteConfig.brand.description,
     start_url: "/dashboard",
     display: "standalone",
     background_color: "#09090b",

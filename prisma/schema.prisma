@@ -47,6 +47,7 @@ model User {
   stats            UserStats?
   settings         Settings?
   portfolio        Portfolio?
+  resumes          Resume[]
   bodyMeasurements BodyMeasurement[]
   clients          Client[]
   mediaItems       MediaItem[]
@@ -802,6 +803,18 @@ model JobApplication {
   coverLetter String? // última carta de apresentação gerada
   matchScore  Int? // % de compatibilidade da última análise (ordenação por fit)
 
+  // --- Rastreabilidade do currículo enviado (Fase 3 do Career OS) ---
+  // resumeId: vínculo VIVO com a versão de currículo (pode ser editada depois).
+  //   Sem FK de propósito: no modo réplica/Turso o ensureSchema só faz ADD COLUMN
+  //   (SQLite não adiciona FK a tabela existente). A deleteResume nulifica os
+  //   links órfãos na mão — o snapshot abaixo é quem garante a imutabilidade.
+  // resumeSnapshot: JSON CONGELADO no momento do envio (envelope ResumeSnapshot:
+  //   nome/locale/template + PortfolioData). Nunca muda, mesmo que a versão viva
+  //   seja editada ou excluída — é o "o que a empresa recebeu".
+  resumeId       String?
+  resumeSnapshot String?
+  snapshotAt     DateTime?
+
   type String @default("JOB")
 
   appliedDate DateTime @default(now())
@@ -848,6 +861,27 @@ model Portfolio {
 
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Currículos versionados: N por usuário (Base + variações por vaga/idioma).
+// `data` usa o MESMO shape PortfolioData de types/portfolio.ts (JSON string).
+// O Portfolio acima vira legado: na 1ª visita ele é copiado para o Resume Base.
+model Resume {
+  id       String  @id @default(uuid())
+  name     String // "Currículo Base", "Front-end · Nubank", "English · Remote"
+  locale   String  @default("pt-BR") // pt-BR | en-US
+  template String  @default("MODERN") // MODERN (2 colunas) | ATS (1 coluna)
+  isBase   Boolean @default(false) // exatamente 1 por usuário (garantido nas actions)
+  parentId String? // id do currículo de origem (linhagem de clones; sem FK de propósito)
+  data     String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // Posição da carteira de investimentos do usuário (ações, FIIs, ETFs, cripto).

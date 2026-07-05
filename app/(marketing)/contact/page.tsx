@@ -3,13 +3,14 @@ import Link from "next/link";
 import { Mail, Github, Bug, MessageCircle, ArrowUpRight } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { DocHeader } from "@/components/marketing/doc";
+import { siteConfig, mailtoHref } from "@/config/site.config";
 
 export const metadata: Metadata = {
   title: "Contato",
-  description: "Fale com o time do Life OS — e-mail, GitHub e issues.",
+  description: `Fale com o time do ${siteConfig.brand.name} — e-mail, GitHub e issues.`,
 };
 
-const REPO = "https://github.com/LuixzSouza/Projeto-Life-OS";
+const REPO = siteConfig.urls.repo;
 
 interface Channel {
   icon: LucideIcon;
@@ -25,8 +26,8 @@ const CHANNELS: Channel[] = [
     icon: Mail,
     title: "E-mail",
     description: "Para dúvidas, parcerias ou suporte direto.",
-    cta: "luiz.antoniodesouza004@gmail.com",
-    href: "mailto:luiz.antoniodesouza004@gmail.com",
+    cta: siteConfig.contact.email,
+    href: mailtoHref(),
   },
   {
     icon: Bug,

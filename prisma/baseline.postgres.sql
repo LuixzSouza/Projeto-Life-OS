@@ -428,6 +428,9 @@ CREATE TABLE "JobApplication" (
     "priority" TEXT,
     "coverLetter" TEXT,
     "matchScore" INTEGER,
+    "resumeId" TEXT,
+    "resumeSnapshot" TEXT,
+    "snapshotAt" TIMESTAMP(3),
     "type" TEXT NOT NULL DEFAULT 'JOB',
     "appliedDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -1925,3 +1928,25 @@ ALTER TABLE "Attachment" ADD CONSTRAINT "Attachment_userId_fkey" FOREIGN KEY ("u
 -- AddForeignKey
 ALTER TABLE "EntityLink" ADD CONSTRAINT "EntityLink_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
+
+-- CreateTable
+CREATE TABLE "Resume" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "locale" TEXT NOT NULL DEFAULT 'pt-BR',
+    "template" TEXT NOT NULL DEFAULT 'MODERN',
+    "isBase" BOOLEAN NOT NULL DEFAULT false,
+    "parentId" TEXT,
+    "data" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "userId" TEXT NOT NULL,
+
+    CONSTRAINT "Resume_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE INDEX "Resume_userId_idx" ON "Resume"("userId");
+
+-- AddForeignKey
+ALTER TABLE "Resume" ADD CONSTRAINT "Resume_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

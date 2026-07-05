@@ -52,6 +52,7 @@ model User {
   stats            UserStats?
   settings         Settings?
   portfolio        Portfolio?
+  resumes          Resume[]
   bodyMeasurements BodyMeasurement[]
   clients          Client[]
   mediaItems       MediaItem[]
@@ -807,6 +808,12 @@ model JobApplication {
   coverLetter String? @db.LongText // última carta de apresentação gerada
   matchScore  Int? // % de compatibilidade da última análise (ordenação por fit)
 
+  // --- Rastreabilidade do currículo enviado (Fase 3 do Career OS) ---
+  // Ver comentário no schema.prisma canônico. LongText para caber o JSON congelado.
+  resumeId       String?    @db.LongText
+  resumeSnapshot String?    @db.LongText
+  snapshotAt     DateTime?
+
   type String @default("JOB")
 
   appliedDate DateTime @default(now())
@@ -853,6 +860,27 @@ model Portfolio {
 
   userId String @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Currículos versionados: N por usuário (Base + variações por vaga/idioma).
+// `data` usa o MESMO shape PortfolioData de types/portfolio.ts (JSON string).
+// O Portfolio acima vira legado: na 1ª visita ele é copiado para o Resume Base.
+model Resume {
+  id       String  @id @default(uuid())
+  name     String // "Currículo Base", "Front-end · Nubank", "English · Remote"
+  locale   String  @default("pt-BR") // pt-BR | en-US
+  template String  @default("MODERN") // MODERN (2 colunas) | ATS (1 coluna)
+  isBase   Boolean @default(false) // exatamente 1 por usuário (garantido nas actions)
+  parentId String? // id do currículo de origem (linhagem de clones; sem FK de propósito)
+  data     String  @db.LongText
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // Posição da carteira de investimentos do usuário (ações, FIIs, ETFs, cripto).

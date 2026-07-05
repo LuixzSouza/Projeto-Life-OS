@@ -491,6 +491,9 @@ CREATE TABLE `JobApplication` (
     `priority` LONGTEXT NULL,
     `coverLetter` LONGTEXT NULL,
     `matchScore` INTEGER NULL,
+    `resumeId` LONGTEXT NULL,
+    `resumeSnapshot` LONGTEXT NULL,
+    `snapshotAt` DATETIME(3) NULL,
     `type` VARCHAR(191) NOT NULL DEFAULT 'JOB',
     `appliedDate` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
@@ -1621,3 +1624,23 @@ ALTER TABLE `Attachment` ADD CONSTRAINT `Attachment_userId_fkey` FOREIGN KEY (`u
 -- AddForeignKey
 ALTER TABLE `EntityLink` ADD CONSTRAINT `EntityLink_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
+
+-- CreateTable
+CREATE TABLE `Resume` (
+    `id` VARCHAR(191) NOT NULL,
+    `name` VARCHAR(191) NOT NULL,
+    `locale` VARCHAR(191) NOT NULL DEFAULT 'pt-BR',
+    `template` VARCHAR(191) NOT NULL DEFAULT 'MODERN',
+    `isBase` BOOLEAN NOT NULL DEFAULT false,
+    `parentId` VARCHAR(191) NULL,
+    `data` LONGTEXT NOT NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+    `userId` VARCHAR(191) NOT NULL,
+
+    INDEX `Resume_userId_idx`(`userId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- AddForeignKey
+ALTER TABLE `Resume` ADD CONSTRAINT `Resume_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;

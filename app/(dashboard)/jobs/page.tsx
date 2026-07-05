@@ -6,7 +6,8 @@ import { Metadata } from "next";
 import { JobTracker } from "@/components/projects/job-tracker";
 import { Briefcase } from "lucide-react";
 import { getCurrentUserId } from "@/lib/auth";
-import { getPortfolio } from "@/app/(dashboard)/projects/actions";
+import { listResumes } from "./resume-actions";
+import { parseSnapshotMeta } from "@/types/resume-snapshot";
 import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
 import { AskAiButton } from "@/components/ai/ask-ai-button";
 
@@ -17,7 +18,7 @@ export const metadata: Metadata = {
 export default async function JobsPage() {
   const userId = await getCurrentUserId();
 
-  const [jobs, portfolio, projects] = await Promise.all([
+  const [jobs, resumes, projects] = await Promise.all([
     prisma.jobApplication.findMany({
       where: { userId },
       orderBy: { appliedDate: "desc" },
@@ -26,13 +27,21 @@ export default async function JobsPage() {
         events: { orderBy: { createdAt: "asc" }, select: { status: true, createdAt: true } },
       },
     }),
-    getPortfolio(),
+    listResumes(),
     prisma.project.findMany({
       where: { userId, deletedAt: null },
       orderBy: { updatedAt: "desc" },
       select: { id: true, title: true, slug: true },
     }),
   ]);
+
+  // O snapshot (JSON de currículo, ~10-30 KB por vaga) NÃO vai ao client na lista:
+  // trafega só o metadado leve. O PDF exato busca o snapshot completo sob demanda.
+  const jobsClient = jobs.map((j) => ({
+    ...j,
+    resumeSnapshot: null,
+    snapshotMeta: parseSnapshotMeta(j.resumeSnapshot),
+  }));
 
   return (
     <PageShell>
@@ -44,7 +53,7 @@ export default async function JobsPage() {
       />
 
       <PageContainer>
-        <JobTracker jobs={jobs} portfolio={portfolio} projects={projects} />
+        <JobTracker jobs={jobsClient} resumes={resumes} projects={projects} />
       </PageContainer>
     </PageShell>
   );

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/settings/mode-toggle";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
+import { siteConfig } from "@/config/site.config";
 
 interface NavbarProps {
   authState: {
@@ -35,6 +36,7 @@ export default function LandingNavbar({ authState }: NavbarProps) {
       { label: "Privacidade", href: "#privacy" },
       { label: "Rotina", href: "#routine" },
       { label: "Configuração", href: "#config" },
+      { label: "Planos", href: "#pricing" },
       { label: "Dúvidas", href: "#faq" },
     ],
     []
@@ -102,13 +104,13 @@ export default function LandingNavbar({ authState }: NavbarProps) {
       >
         <div className="mx-auto flex h-full max-w-7xl items-center justify-between px-6">
           {/* -------- Logo -------- */}
-          <Link href="/" className="group relative z-50 flex items-center gap-3" aria-label="Life OS Home">
-            <Image src="/logo.webp" width={40} height={40} alt="Life OS" className="transition-transform duration-300 group-hover:scale-105" />
+          <Link href="/" className="group relative z-50 flex items-center gap-3" aria-label={`${siteConfig.brand.name} Home`}>
+            <Image src={siteConfig.brand.logo} width={40} height={40} alt={siteConfig.brand.name} className="transition-transform duration-300 group-hover:scale-105" />
             <div className="flex flex-col">
-              <span className="text-base font-bold leading-none tracking-tight text-foreground">Life OS</span>
+              <span className="text-base font-bold leading-none tracking-tight text-foreground">{siteConfig.brand.name}</span>
               <div className="mt-1 flex items-center gap-1.5">
                 <span className="size-1.5 animate-pulse rounded-full bg-primary" />
-                <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">v1.0 Stable</span>
+                <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">{siteConfig.brand.versionLabel}</span>
               </div>
             </div>
           </Link>

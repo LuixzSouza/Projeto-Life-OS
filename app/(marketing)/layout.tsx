@@ -6,6 +6,7 @@ import Image from "next/image";
 import { ArrowLeft } from "lucide-react";
 import { ModeToggle } from "@/components/settings/mode-toggle";
 import LandingFooter from "@/components/landing/landing-footer";
+import { siteConfig } from "@/config/site.config";
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -15,9 +16,9 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
 
       <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-4xl items-center justify-between px-6">
-          <Link href="/" className="group flex items-center gap-3" aria-label="Life OS — início">
-            <Image src="/logo.webp" width={32} height={32} alt="Life OS" className="transition-transform group-hover:scale-105" />
-            <span className="font-bold tracking-tight text-foreground">Life OS</span>
+          <Link href="/" className="group flex items-center gap-3" aria-label={`${siteConfig.brand.name} — início`}>
+            <Image src={siteConfig.brand.logo} width={32} height={32} alt={siteConfig.brand.name} className="transition-transform group-hover:scale-105" />
+            <span className="font-bold tracking-tight text-foreground">{siteConfig.brand.name}</span>
           </Link>
           <div className="flex items-center gap-2">
             <Link

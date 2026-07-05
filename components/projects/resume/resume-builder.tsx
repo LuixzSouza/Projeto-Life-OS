@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useMemo, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -9,12 +10,13 @@ import {
     DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-    LayoutTemplate, Printer, Save, User, Briefcase, Layers, Code,
+    LayoutTemplate, Save, User, Briefcase, Layers, Code,
     GraduationCap, MessageSquare, ShieldCheck, Loader2, CheckCircle2,
-    Award, Languages, FileDown, Download, Upload, ChevronDown, Database, Lightbulb, Circle
+    Award, Languages, FileDown, Download, Upload, ChevronDown, Database, Lightbulb, Circle, ArrowLeft,
+    Eye, EyeOff, FileText
 } from "lucide-react";
 import { PortfolioData, INITIAL_PORTFOLIO } from "@/types/portfolio";
-import { savePortfolio } from "@/app/(dashboard)/projects/actions";
+import { saveResumeData } from "@/app/(dashboard)/jobs/resume-actions";
 import { resumeHealth } from "@/lib/resume-health";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -27,8 +29,20 @@ import { EducationForm } from "./education-form";
 import { TestimonialsForm } from "./testimonials-form";
 import { CertificationsForm } from "./certifications-form";
 import { LanguagesForm } from "./languages-form";
-import { ResumePreview } from "./resume-preview";
+import { useResumeExport } from "./use-resume-export";
 import { LUIZ_PORTFOLIO } from "./seed-data";
+
+// Prévia em PDF real: só carrega no client (react-pdf usa APIs do navegador) e
+// fora do bundle inicial (só quando o preview é exibido).
+const ResumePdfViewer = dynamic(() => import("./resume-pdf-viewer"), {
+    ssr: false,
+    loading: () => (
+        <div className="flex h-full w-full flex-col items-center justify-center gap-3 rounded-xl border border-border/40 bg-muted/20">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Carregando prévia…</p>
+        </div>
+    ),
+});
 
 // Helper tático para os ícones do Accordion
 const StatusIcon = ({ active, icon: Icon }: { active: boolean, icon: React.ElementType }) => (
@@ -42,29 +56,30 @@ const StatusIcon = ({ active, icon: Icon }: { active: boolean, icon: React.Eleme
     </div>
 );
 
-export function ResumeBuilder({ initialData }: { initialData: PortfolioData }) {
+interface ResumeBuilderProps {
+    initialData: PortfolioData;
+    /** Versão de currículo sendo editada (model Resume). */
+    resumeId: string;
+    resumeName?: string;
+    /** Idioma da versão (pt-BR | en-US) — define chrome e tamanho do PDF. */
+    locale?: string;
+    /** Template do PDF (ATS por padrão). */
+    template?: string;
+    /** Quando presente, mostra o botão de voltar ao gerenciador de versões. */
+    onBack?: () => void;
+}
+
+export function ResumeBuilder({ initialData, resumeId, resumeName, locale, template, onBack }: ResumeBuilderProps) {
+    const { exporting, exportPdf } = useResumeExport();
     // 1. INICIALIZAÇÃO A PARTIR DO BANCO (SQLite via Server Action)
     const [data, setData] = useState<PortfolioData>(initialData);
     const [isSaving, setIsSaving] = useState(false);
     const [autoSave, setAutoSave] = useState<"idle" | "saving" | "saved">("idle");
-    const printRef = useRef<HTMLDivElement>(null);
     const fileRef = useRef<HTMLInputElement>(null);
     const firstRender = useRef(true);
 
-    // A folha A4 tem largura fixa (210mm ≈ 794px). Em telas menores que isso o
-    // preview escala para caber (zoom), em vez de estourar com scroll lateral.
-    const previewWrapRef = useRef<HTMLDivElement>(null);
-    const [previewScale, setPreviewScale] = useState(1);
-    useEffect(() => {
-        const el = previewWrapRef.current;
-        if (!el) return;
-        const A4_WIDTH_PX = 794;
-        const ro = new ResizeObserver(() => {
-            setPreviewScale(Math.min(1, el.clientWidth / A4_WIDTH_PX));
-        });
-        ro.observe(el);
-        return () => ro.disconnect();
-    }, []);
+    // Toggle da prévia: escondê-la dá tela cheia ao formulário (foco no preenchimento).
+    const [showPreview, setShowPreview] = useState(true);
 
     // 2. MIGRAÇÃO SUAVE: se houver currículo legado no localStorage e o banco
     //    estiver vazio, importa uma única vez e limpa a chave antiga.
@@ -87,7 +102,8 @@ export function ResumeBuilder({ initialData }: { initialData: PortfolioData }) {
     const handleSave = async () => {
         setIsSaving(true);
         try {
-            await savePortfolio(data);
+            const res = await saveResumeData(resumeId, data);
+            if (!res.success) throw new Error(res.error);
             setAutoSave("saved");
             toast.success("Currículo salvo no banco de dados!");
         } catch {
@@ -104,14 +120,14 @@ export function ResumeBuilder({ initialData }: { initialData: PortfolioData }) {
         setAutoSave("saving");
         const t = setTimeout(async () => {
             try {
-                await savePortfolio(data);
-                setAutoSave("saved");
+                const res = await saveResumeData(resumeId, data);
+                setAutoSave(res.success ? "saved" : "idle");
             } catch {
                 setAutoSave("idle");
             }
         }, 1200);
         return () => clearTimeout(t);
-    }, [data]);
+    }, [data, resumeId]);
 
     // 3c. EXPORT / IMPORT JSON (backup e portabilidade — local-first).
     const exportJson = () => {
@@ -142,80 +158,10 @@ export function ResumeBuilder({ initialData }: { initialData: PortfolioData }) {
         }
     };
 
-    // 4. EXPORTAÇÃO PROFISSIONAL DE PDF
-    const handlePrint = () => {
-        toast.info("Renderizando PDF em alta qualidade...");
-        
-        const previewNode = document.getElementById("resume-preview-container");
-        if (!previewNode) return;
-
-        const iframe = document.createElement("iframe");
-        iframe.style.display = "none";
-        document.body.appendChild(iframe);
-
-        const iframeDoc = iframe.contentWindow?.document;
-        if (!iframeDoc) return;
-
-        const styleNodes = document.querySelectorAll("style, link[rel='stylesheet']");
-        const stylesHtml = Array.from(styleNodes).map(node => node.outerHTML).join("");
-
-        iframeDoc.open();
-        iframeDoc.write(`
-            <!DOCTYPE html>
-            <html>
-                <head>
-                    <title>Curriculo_${data.hero.name ? data.hero.name.replace(/\s+/g, '_') : 'Export'}</title>
-                    ${stylesHtml}
-                    <style>
-                        /* Margens aplicadas por PÁGINA (toda página ganha respiro, não só a 1ª). */
-                        @page { size: A4 portrait; margin: 14mm; }
-                        * {
-                            -webkit-print-color-adjust: exact !important;
-                            print-color-adjust: exact !important;
-                            box-sizing: border-box;
-                        }
-                        html, body { margin: 0 !important; padding: 0 !important; background: #fff !important; }
-                        #resume-preview-container {
-                            width: auto !important;
-                            min-height: 0 !important;
-                            box-shadow: none !important;
-                            border: none !important;
-                            border-radius: 0 !important;
-                            margin: 0 !important;
-                        }
-                        /* O @page cuida das margens — zera o padding interno da folha. */
-                        #resume-preview-container .resume-page { padding: 0 !important; height: auto !important; }
-                        /* Coluna única no papel: o grid de 2 colunas não pagina entre páginas. */
-                        #resume-preview-container .resume-body { display: block !important; }
-                        #resume-preview-container .resume-sidebar { width: 100% !important; margin-top: 1.5rem !important; }
-                        /* Regras de quebra: itens inteiros nunca partem; títulos não ficam órfãos no rodapé. */
-                        #resume-preview-container .break-inside-avoid,
-                        #resume-preview-container li,
-                        #resume-preview-container .resume-entry { break-inside: avoid; page-break-inside: avoid; }
-                        #resume-preview-container h1,
-                        #resume-preview-container h2,
-                        #resume-preview-container h3 { break-after: avoid-page; }
-                        #resume-preview-container section { margin-bottom: 1.25rem; }
-                        /* Com margem de página a largura cai abaixo do breakpoint md;
-                           reforço o cabeçalho em linha (nome à esquerda, contato à direita). */
-                        #resume-preview-container header { flex-direction: row !important; align-items: flex-end !important; }
-                        #resume-preview-container header > div:first-child { width: 65% !important; }
-                        #resume-preview-container header > div:last-child { width: 35% !important; align-items: flex-end !important; }
-                    </style>
-                </head>
-                <body>
-                    ${previewNode.outerHTML}
-                </body>
-            </html>
-        `);
-        iframeDoc.close();
-
-        setTimeout(() => {
-            iframe.contentWindow?.focus();
-            iframe.contentWindow?.print();
-            setTimeout(() => { document.body.removeChild(iframe); }, 1000);
-        }, 500);
-    };
+    // 4. EXPORTAÇÃO PROFISSIONAL DE PDF (react-pdf — motor determinístico, ATS-friendly).
+    //    Byte-a-byte igual à prévia na tela (mesmo componente ResumePdf).
+    const handleExportPdf = () =>
+        exportPdf({ data, name: resumeName, locale, template });
 
     const checklist = useMemo(() => ({
         hero: !!data.hero.name && !!data.hero.headline && !!data.hero.email,
@@ -240,49 +186,82 @@ export function ResumeBuilder({ initialData }: { initialData: PortfolioData }) {
         <div className="flex flex-col lg:flex-row gap-6 lg:h-[calc(100vh-140px)] w-full">
 
             {/* --- LEFT: EDITOR PANEL --- */}
-            <div className="no-print w-full lg:w-[500px] xl:w-[550px] flex flex-col gap-4 overflow-hidden shrink-0 lg:h-full">
+            <div className={cn(
+                "flex flex-col gap-4 overflow-hidden lg:h-full",
+                showPreview
+                    ? "w-full lg:w-[500px] xl:w-[550px] shrink-0"
+                    : "w-full max-w-4xl mx-auto" // prévia oculta: coluna única, centralizada e confortável
+            )}>
                 <Card className="flex-1 flex flex-col overflow-hidden border-border/40 bg-card/60 backdrop-blur-2xl h-full shadow-2xl rounded-[2rem]">
                     
                     {/* Header do Painel */}
                     <div className="px-4 py-4 sm:px-8 sm:py-6 border-b border-border/40 bg-background/50 flex flex-col gap-5 shrink-0 z-10">
                         <div className="flex justify-between items-center">
-                            <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-inner">
+                            <div className="flex items-center gap-3 min-w-0">
+                                {onBack && (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={onBack}
+                                        aria-label="Voltar aos currículos"
+                                        className="h-9 w-9 rounded-xl shrink-0 text-muted-foreground hover:text-foreground"
+                                    >
+                                        <ArrowLeft className="h-4 w-4" />
+                                    </Button>
+                                )}
+                                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-inner shrink-0">
                                     <LayoutTemplate className="h-5 w-5" />
                                 </div>
-                                <div>
+                                <div className="min-w-0">
                                     <h3 className="font-black uppercase tracking-widest text-primary text-[11px]">
                                         Builder Engine
                                     </h3>
-                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mt-0.5">
-                                        Gerador de Portfólio
+                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mt-0.5 truncate">
+                                        {resumeName || "Gerador de Portfólio"}
                                     </p>
                                 </div>
                             </div>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        className="h-9 rounded-xl font-black uppercase tracking-widest text-[9px] gap-1.5 border-border/60 hover:bg-primary/5 hover:text-primary"
-                                    >
-                                        <Database className="h-3.5 w-3.5" /> Dados <ChevronDown className="h-3 w-3 opacity-60" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="rounded-xl">
-                                    <DropdownMenuLabel className="text-[10px] uppercase tracking-widest">Backup & importação</DropdownMenuLabel>
-                                    <DropdownMenuItem onClick={exportJson} className="gap-2 text-xs cursor-pointer">
-                                        <Download className="h-3.5 w-3.5" /> Exportar JSON (backup)
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => fileRef.current?.click()} className="gap-2 text-xs cursor-pointer">
-                                        <Upload className="h-3.5 w-3.5" /> Importar JSON
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={() => { setData(LUIZ_PORTFOLIO); toast.success("Dados do PDF importados! Revise — o autosave grava sozinho."); }} className="gap-2 text-xs cursor-pointer">
-                                        <FileDown className="h-3.5 w-3.5" /> Preencher com dados do PDF
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                            <div className="flex items-center gap-2 shrink-0">
+                                {/* Toggle da prévia em PDF — foca no formulário quando oculto. */}
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setShowPreview((v) => !v)}
+                                    aria-pressed={showPreview}
+                                    title={showPreview ? "Ocultar prévia (tela cheia p/ o formulário)" : "Mostrar prévia em PDF"}
+                                    className={cn(
+                                        "h-9 rounded-xl font-black uppercase tracking-widest text-[9px] gap-1.5 border-border/60",
+                                        showPreview ? "bg-primary/5 text-primary" : "hover:bg-primary/5 hover:text-primary"
+                                    )}
+                                >
+                                    {showPreview ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                                    <span className="hidden sm:inline">Prévia</span>
+                                </Button>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-9 rounded-xl font-black uppercase tracking-widest text-[9px] gap-1.5 border-border/60 hover:bg-primary/5 hover:text-primary"
+                                        >
+                                            <Database className="h-3.5 w-3.5" /> Dados <ChevronDown className="h-3 w-3 opacity-60" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="rounded-xl">
+                                        <DropdownMenuLabel className="text-[10px] uppercase tracking-widest">Backup & importação</DropdownMenuLabel>
+                                        <DropdownMenuItem onClick={exportJson} className="gap-2 text-xs cursor-pointer">
+                                            <Download className="h-3.5 w-3.5" /> Exportar JSON (backup)
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => fileRef.current?.click()} className="gap-2 text-xs cursor-pointer">
+                                            <Upload className="h-3.5 w-3.5" /> Importar JSON
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onClick={() => { setData(LUIZ_PORTFOLIO); toast.success("Dados do PDF importados! Revise — o autosave grava sozinho."); }} className="gap-2 text-xs cursor-pointer">
+                                            <FileDown className="h-3.5 w-3.5" /> Preencher com dados do PDF
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
                             <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={importJson} />
                         </div>
 
@@ -501,37 +480,38 @@ export function ResumeBuilder({ initialData }: { initialData: PortfolioData }) {
                             )}
                         </Button>
                         <Button
+                            disabled={exporting}
                             className="flex-1 gap-2 rounded-xl h-12 sm:h-14 bg-foreground text-background hover:bg-foreground/90 font-black uppercase tracking-widest text-[11px] shadow-xl transition-all"
-                            onClick={handlePrint}
+                            onClick={handleExportPdf}
+                            title="Gera um PDF ATS-friendly (uma coluna, texto linear)"
                         >
-                            <Printer className="h-4 w-4" /> Exportar PDF
+                            {exporting ? (
+                                <><Loader2 className="h-4 w-4 animate-spin" /> Gerando PDF…</>
+                            ) : (
+                                <><FileDown className="h-4 w-4" /> Exportar PDF</>
+                            )}
                         </Button>
                     </div>
                 </Card>
             </div>
 
-            {/* --- RIGHT: PREVIEW PANEL --- */}
-            <div className="no-print-bg flex-1 bg-zinc-100/50 dark:bg-zinc-950/50 p-3 sm:p-4 lg:p-8 rounded-[2rem] border border-border/40 shadow-inner flex justify-center lg:h-full lg:overflow-hidden relative">
-                <div ref={previewWrapRef} className="w-full lg:h-full lg:overflow-y-auto scrollbar-hide flex justify-center pb-6 lg:pb-20">
-                    {/* O zoom fica num wrapper (não no container impresso) para o
-                        PDF não herdar a escala reduzida do preview mobile. */}
-                    <div style={previewScale < 1 ? { zoom: previewScale } : undefined}>
-                        {/* ESTE É O CONTAINER QUE SERÁ IMPRESSO */}
-                        <div
-                            id="resume-preview-container"
-                            ref={printRef}
-                            className="w-[210mm] min-h-[297mm] h-fit bg-white text-zinc-900 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.15)] rounded-sm transition-all"
-                        >
-                            <ResumePreview data={data} onChange={setData} />
-                        </div>
+            {/* --- RIGHT: PREVIEW PANEL (PDF REAL — WYSIWYG) --- */}
+            {showPreview && (
+                <div className="flex-1 min-w-0 bg-zinc-100/50 dark:bg-zinc-950/50 p-3 sm:p-4 lg:p-6 rounded-[2rem] border border-border/40 shadow-inner flex flex-col lg:h-full relative">
+                    <div className="flex items-center justify-between px-1 pb-3 shrink-0">
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/70 flex items-center gap-1.5">
+                            <FileText className="h-3 w-3 text-primary" /> Prévia fiel (PDF real)
+                        </span>
+                        <span className="text-[10px] font-semibold text-muted-foreground/60 hidden sm:flex items-center gap-1.5">
+                            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> igual ao arquivo baixado
+                        </span>
+                    </div>
+                    {/* Altura mínima no mobile (sem lg:h-full) para o iframe do PDF ter espaço. */}
+                    <div className="flex-1 min-h-[70vh] lg:min-h-0">
+                        <ResumePdfViewer data={data} locale={locale} template={template} />
                     </div>
                 </div>
-
-                <div className="no-print absolute bottom-8 right-12 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 bg-background/95 backdrop-blur-md px-5 py-2.5 rounded-xl border border-border/40 shadow-2xl pointer-events-none hidden lg:flex items-center gap-2.5">
-                    <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
-                    Preview Dinâmico (A4)
-                </div>
-            </div>
+            )}
         </div>
     );
 }

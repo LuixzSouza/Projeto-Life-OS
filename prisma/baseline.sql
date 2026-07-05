@@ -428,6 +428,9 @@ CREATE TABLE "JobApplication" (
     "priority" TEXT,
     "coverLetter" TEXT,
     "matchScore" INTEGER,
+    "resumeId" TEXT,
+    "resumeSnapshot" TEXT,
+    "snapshotAt" DATETIME,
     "type" TEXT NOT NULL DEFAULT 'JOB',
     "appliedDate" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
@@ -1579,3 +1582,21 @@ CREATE INDEX "EntityLink_userId_idx" ON "EntityLink"("userId");
 -- CreateIndex
 CREATE UNIQUE INDEX "EntityLink_fromType_fromId_toType_toId_kind_key" ON "EntityLink"("fromType", "fromId", "toType", "toId", "kind");
 
+
+-- CreateTable
+CREATE TABLE "Resume" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "locale" TEXT NOT NULL DEFAULT 'pt-BR',
+    "template" TEXT NOT NULL DEFAULT 'MODERN',
+    "isBase" BOOLEAN NOT NULL DEFAULT false,
+    "parentId" TEXT,
+    "data" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    "userId" TEXT NOT NULL,
+    CONSTRAINT "Resume_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateIndex
+CREATE INDEX "Resume_userId_idx" ON "Resume"("userId");

@@ -5,6 +5,7 @@ import { Plus, Minus, MessageCircle, Mail, Package, ImageIcon } from "lucide-rea
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
+import { siteConfig, mailtoHref } from "@/config/site.config";
 
 // --- 1. DADOS (com as imagens reais) ---
 
@@ -15,7 +16,7 @@ interface FAQItem {
   visual: ReactNode;
 }
 
-const REPO_URL = "https://github.com/LuixzSouza/Projeto-Life-OS";
+const REPO_URL = siteConfig.urls.repo;
 
 const FAQS: FAQItem[] = [
   {
@@ -180,20 +181,24 @@ export default function FAQSectionWithImages() {
 
             {/* Contato rápido */}
             <div className="flex flex-wrap gap-4 pt-6">
-              <a
-                href="mailto:luiz.antoniodesouza004@gmail.com"
-                className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
-              >
-                <Mail className="size-3.5" /> Reportar Bug
-              </a>
-              <a
-                href={REPO_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
-              >
-                <Package className="size-3.5" /> Acessar GitHub
-              </a>
+              {siteConfig.contact.email && (
+                <a
+                  href={mailtoHref("Contato pelo site")}
+                  className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
+                >
+                  <Mail className="size-3.5" /> Falar com a gente
+                </a>
+              )}
+              {REPO_URL && (
+                <a
+                  href={REPO_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground transition-colors hover:text-primary"
+                >
+                  <Package className="size-3.5" /> Acessar GitHub
+                </a>
+              )}
             </div>
           </div>
 

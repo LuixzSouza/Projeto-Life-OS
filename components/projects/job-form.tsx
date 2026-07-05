@@ -9,22 +9,42 @@ import { Textarea } from "@/components/ui/textarea";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Briefcase, DollarSign, Clock, Users, Globe, FileText, MapPin, Flag, CalendarClock, UserCheck, Mail, Wand2, Loader2, History } from "lucide-react";
-import { createJob, updateJob, scrapeJob } from "@/app/(dashboard)/projects/actions";
+import { createJob, updateJob, scrapeJob, parseJobText } from "@/app/(dashboard)/projects/actions";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { STATUS_MAP } from "./job-tracker-status";
+import { NotesMarkdownField } from "./notes-markdown-field";
 import type { JobEventLite } from "./job-types";
 
 const LABEL_CLS = "text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5";
 const INPUT_CLS = "h-11 bg-muted/40 border-border/40 rounded-xl focus-visible:bg-background focus-visible:ring-1 focus-visible:ring-primary/20";
 const SELECT_CLS = "h-11 bg-muted/40 border-border/40 rounded-xl";
 
+// Remove parâmetros de rastreio da URL (LinkedIn/UTM) antes de salvar — o
+// identificador da vaga vive no PATH, então tirar a query é seguro e deixa o link limpo.
+const TRACKING_PARAM = /^(utm_|eBP|refId|trackingId|alternateChannel|referralCode|savedSearchId|origin|eBP|midToken|trk|li_fat_id)$/i;
+function cleanJobUrl(url: string): string {
+    try {
+        const u = new URL(url);
+        for (const key of [...u.searchParams.keys()]) {
+            if (TRACKING_PARAM.test(key) || key.startsWith("utm_")) u.searchParams.delete(key);
+        }
+        return u.toString();
+    } catch {
+        return url;
+    }
+}
+
+const isUrl = (s: string) => /^https?:\/\/\S+$/i.test(s.trim());
+
 export function JobForm({ defaultValues, type, mode = 'create', events, onSubmit }: { defaultValues?: JobApplication, type: string, mode?: 'create' | 'edit', events?: JobEventLite[], onSubmit?: () => void }) {
     const formRef = useRef<HTMLFormElement>(null);
-    const [importUrl, setImportUrl] = useState("");
+    const [importText, setImportText] = useState("");
     const [importing, setImporting] = useState(false);
+    // Notas em Markdown: controlado (o preenchimento automático atualiza via estado).
+    const [notes, setNotes] = useState(defaultValues?.requirements || "");
 
     // Preenche um campo (input/textarea uncontrolled) via DOM — o submit lê do DOM.
     const setField = (name: string, value?: string) => {
@@ -33,27 +53,49 @@ export function JobForm({ defaultValues, type, mode = 'create', events, onSubmit
         if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) el.value = value;
     };
 
-    const runImport = async () => {
-        const url = importUrl.trim();
-        if (!url) return;
+    // Uma caixa, dois caminhos: se for um link → tenta scraping; se for texto colado
+    // (sites que bloqueiam, como LinkedIn/Gupy/SPAs) → interpreta o texto. Sempre
+    // pré-preenche para revisão, nunca salva direto.
+    const runImport = async (raw?: string) => {
+        const value = (raw ?? importText).trim();
+        if (!value || importing) return;
         setImporting(true);
         try {
-            const res = await scrapeJob(url);
+            const asUrl = isUrl(value);
+            const res = asUrl ? await scrapeJob(value) : await parseJobText(value);
             if (res.success) {
                 setField("company", res.data.company);
                 setField("role", res.data.role);
                 setField("location", res.data.location);
                 setField("salary", res.data.salary);
-                setField("requirements", res.data.requirements);
-                setField("jobUrl", url);
-                toast.success("Dados importados do link! Revise antes de salvar. ✨");
+                if (res.data.requirements) setNotes(res.data.requirements); // campo controlado
+                if (asUrl) setField("jobUrl", cleanJobUrl(value));
+                setImportText(""); // caixa limpa: os dados já foram para os campos abaixo
+                const filled = [res.data.company, res.data.role].filter(Boolean).length;
+                toast.success(
+                    filled > 0
+                        ? "Vaga preenchida! Revise os campos antes de salvar. ✨"
+                        : "Texto lançado nas notas — complete empresa e cargo."
+                );
             } else {
                 toast.error(res.error);
             }
         } catch {
-            toast.error("Falha ao importar o link.");
+            toast.error("Falha ao interpretar. Cole o texto da vaga e tente de novo.");
         } finally {
             setImporting(false);
+        }
+    };
+
+    // Preenchimento sem fricção: assim que colar um link (ou um texto de tamanho
+    // razoável), dispara o import sozinho — sem precisar clicar em "Preencher".
+    const handleImportPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+        const pasted = e.clipboardData.getData("text").trim();
+        if (!pasted) return;
+        if (isUrl(pasted) || pasted.length > 40) {
+            e.preventDefault();
+            setImportText(pasted);
+            void runImport(pasted);
         }
     };
 
@@ -67,20 +109,29 @@ export function JobForm({ defaultValues, type, mode = 'create', events, onSubmit
             <input type="hidden" name="id" value={defaultValues?.id} />
             <input type="hidden" name="type" value={type} />
 
-            {/* Auto-import por URL (best-effort: JSON-LD/meta tags) — só ao criar */}
+            {/* Preenchimento automático: link (scraping) OU texto colado (fallback
+                p/ sites que bloqueiam) — só ao criar. Sempre pré-preenche p/ revisão. */}
             {mode === 'create' && (
-                <div className="flex items-center gap-2 rounded-xl border border-dashed border-primary/30 bg-primary/[0.03] p-2">
-                    <Globe className="h-4 w-4 text-primary shrink-0 ml-1" />
-                    <Input
-                        value={importUrl}
-                        onChange={(e) => setImportUrl(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); runImport(); } }}
-                        placeholder="Cole o link da vaga para preencher automaticamente…"
-                        className="h-9 border-none bg-transparent shadow-none focus-visible:ring-0 text-sm"
+                <div className="space-y-2 rounded-xl border border-dashed border-primary/30 bg-primary/[0.03] p-3">
+                    <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-semibold text-primary uppercase tracking-wider flex items-center gap-1.5">
+                            <Wand2 className="h-3.5 w-3.5" /> Preencher automaticamente
+                        </span>
+                        <Button type="button" size="sm" onClick={() => runImport()} disabled={importing || !importText.trim()} className="h-8 shrink-0 gap-1.5 rounded-lg">
+                            {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />} {importing ? "Lendo…" : "Preencher"}
+                        </Button>
+                    </div>
+                    <Textarea
+                        value={importText}
+                        onChange={(e) => setImportText(e.target.value)}
+                        onPaste={handleImportPaste}
+                        onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); runImport(); } }}
+                        placeholder="Cole o LINK da vaga (LinkedIn, Gupy…) ou o TEXTO da descrição — preenche sozinho ao colar…"
+                        className="min-h-[64px] bg-background/60 border-border/40 rounded-lg p-2.5 text-sm focus-visible:ring-1 focus-visible:ring-primary/20 resize-y"
                     />
-                    <Button type="button" size="sm" onClick={runImport} disabled={importing || !importUrl.trim()} className="shrink-0 gap-1.5 rounded-lg">
-                        {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />} Importar
-                    </Button>
+                    <p className="text-[10px] text-muted-foreground leading-snug">
+                        Cole e pronto — <b>preenche automaticamente</b>. Se o site bloquear a leitura do link, cole o texto da vaga.
+                    </p>
                 </div>
             )}
 
@@ -164,11 +215,11 @@ export function JobForm({ defaultValues, type, mode = 'create', events, onSubmit
 
             <div className="space-y-1.5">
                 <Label className={LABEL_CLS}><FileText className="h-3.5 w-3.5" /> Notas e observações</Label>
-                <Textarea
+                <NotesMarkdownField
                     name="requirements"
-                    defaultValue={defaultValues?.requirements || ""}
-                    placeholder="Requisitos, pontos fortes, dúvidas... (usado também pela IA)"
-                    className="min-h-[110px] bg-muted/40 border-border/40 rounded-xl p-3.5 focus-visible:bg-background focus-visible:ring-1 focus-visible:ring-primary/20"
+                    value={notes}
+                    onChange={setNotes}
+                    placeholder={"Requisitos, pontos fortes, dúvidas...\n\nUse Markdown: ## Título, - item, - [ ] tarefa, **negrito**"}
                 />
             </div>
 

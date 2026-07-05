@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Github, Lock, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CtaButton } from "./cta-button";
+import { siteConfig } from "@/config/site.config";
 
 interface FinalCTAProps {
   authState: {
@@ -56,19 +57,21 @@ export default function FinalCTASection({ authState }: FinalCTAProps) {
 
             <div className="flex flex-col items-center justify-center gap-4 pt-2 sm:flex-row">
               <CtaButton href={targetUrl}>{ctaLabel}</CtaButton>
-              <a
-                href="https://github.com/LuixzSouza/Projeto-Life-OS"
-                target="_blank"
-                rel="noreferrer"
-                className="w-full sm:w-auto"
-              >
-                <Button
-                  variant="ghost"
-                  className="h-14 w-full rounded-full border border-border px-8 text-muted-foreground transition-all hover:border-primary/40 hover:text-foreground sm:w-auto"
+              {siteConfig.features.showGithubLinks && siteConfig.urls.repo && (
+                <a
+                  href={siteConfig.urls.repo}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="w-full sm:w-auto"
                 >
-                  <Github className="mr-2 h-5 w-5" /> Ver no GitHub
-                </Button>
-              </a>
+                  <Button
+                    variant="ghost"
+                    className="h-14 w-full rounded-full border border-border px-8 text-muted-foreground transition-all hover:border-primary/40 hover:text-foreground sm:w-auto"
+                  >
+                    <Github className="mr-2 h-5 w-5" /> Ver no GitHub
+                  </Button>
+                </a>
+              )}
             </div>
 
             <p className="flex items-center justify-center gap-1.5 pt-2 text-xs text-muted-foreground">

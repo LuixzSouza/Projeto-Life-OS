@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { PortfolioData } from "@/types/portfolio";
+import { ResumeRecord } from "@/app/(dashboard)/jobs/resume-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogBody } from "@/components/ui/dialog";
@@ -11,12 +11,14 @@ import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { ResumeBuilder } from "./resume/resume-builder";
+import { ResumeManager } from "./resume/resume-manager";
 import { JobListItem } from "./job-list-item";
 import { JobForm } from "./job-form";
 import { StatsCard } from "./job-stats-card";
 import { JobAiDialog } from "./job-ai-dialog";
 import { JobProjectDialog } from "./job-project-dialog";
+import { JobApplyDialog } from "./job-apply-dialog";
+import { JobDetailDialog } from "./job-detail-dialog";
 import { STATUS_MAP, getThemeClasses } from "./job-tracker-status";
 import { JobWithProject, ProjectOption } from "./job-types";
 
@@ -43,17 +45,19 @@ const BOARD_COLUMNS = ["APPLIED", "SCREENING", "TEST", "INTERVIEW", "OFFER", "AC
 
 interface JobTrackerProps {
     jobs: JobWithProject[];
-    portfolio: PortfolioData;
+    resumes: ResumeRecord[];
     projects: ProjectOption[];
 }
 
-export function JobTracker({ jobs, portfolio, projects }: JobTrackerProps) {
+export function JobTracker({ jobs, resumes, projects }: JobTrackerProps) {
     const [viewMode, setViewMode] = useState<ViewMode>('list');
     const [search, setSearch] = useState("");
     const [sortBy, setSortBy] = useState<SortMode>('recent');
     const [onlyFollowUp, setOnlyFollowUp] = useState(false);
     const [aiJob, setAiJob] = useState<JobWithProject | null>(null);
     const [projectJob, setProjectJob] = useState<JobWithProject | null>(null);
+    const [applyJob, setApplyJob] = useState<JobWithProject | null>(null);
+    const [detailJob, setDetailJob] = useState<JobWithProject | null>(null);
 
     const renderContent = (type: string) => {
         const typed = jobs.filter(j => (j.type || 'JOB') === type);
@@ -192,10 +196,10 @@ export function JobTracker({ jobs, portfolio, projects }: JobTrackerProps) {
                         </p>
                     </div>
                 ) : viewMode === 'board' ? (
-                    <KanbanBoard jobs={filtered} onAiClick={setAiJob} onLinkClick={setProjectJob} />
+                    <KanbanBoard jobs={filtered} onAiClick={setAiJob} onLinkClick={setProjectJob} onApplyClick={setApplyJob} onDetailsClick={setDetailJob} />
                 ) : (
                     <div className={cn(viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch" : "space-y-3")}>
-                        {filtered.map(job => <JobListItem key={job.id} job={job} mode={viewMode} onAiClick={setAiJob} onLinkClick={setProjectJob} />)}
+                        {filtered.map(job => <JobListItem key={job.id} job={job} mode={viewMode} onAiClick={setAiJob} onLinkClick={setProjectJob} onApplyClick={setApplyJob} onDetailsClick={setDetailJob} />)}
                     </div>
                 )}
             </div>
@@ -214,7 +218,7 @@ export function JobTracker({ jobs, portfolio, projects }: JobTrackerProps) {
                             Freelas & Projetos
                         </TabsTrigger>
                         <TabsTrigger value="resume" className="rounded-lg text-xs font-semibold data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all gap-1.5 flex-1 h-full">
-                            <FileText className="h-3.5 w-3.5" /> Currículo
+                            <FileText className="h-3.5 w-3.5" /> Currículos
                         </TabsTrigger>
                     </TabsList>
                 </div>
@@ -222,15 +226,15 @@ export function JobTracker({ jobs, portfolio, projects }: JobTrackerProps) {
                 <TabsContent value="jobs" className="mt-0 focus-visible:ring-0 outline-none">{renderContent('JOB')}</TabsContent>
                 <TabsContent value="freela" className="mt-0 focus-visible:ring-0 outline-none">{renderContent('FREELANCE')}</TabsContent>
                 <TabsContent value="resume" className="mt-0 focus-visible:ring-0 outline-none">
-                    <div className="bg-white dark:bg-zinc-950 border border-border/40 rounded-[2rem] shadow-sm overflow-hidden p-2">
-                        <ResumeBuilder initialData={portfolio} />
-                    </div>
+                    <ResumeManager resumes={resumes} />
                 </TabsContent>
             </Tabs>
 
             {/* Modais globais (fora do .map) */}
             <JobAiDialog job={aiJob} onOpenChange={(open) => { if (!open) setAiJob(null); }} />
             <JobProjectDialog job={projectJob} projects={projects} onOpenChange={(open) => { if (!open) setProjectJob(null); }} />
+            <JobApplyDialog job={applyJob} resumes={resumes} onOpenChange={(open) => { if (!open) setApplyJob(null); }} />
+            <JobDetailDialog job={detailJob} resumes={resumes} onOpenChange={(open) => { if (!open) setDetailJob(null); }} />
         </>
     );
 }
@@ -254,7 +258,7 @@ function FunnelStep({ label, value, pct, tone }: { label: string; value: number;
 
 // --- KANBAN BOARD ---
 
-function KanbanBoard({ jobs, onAiClick, onLinkClick }: { jobs: JobWithProject[]; onAiClick: (job: JobWithProject) => void; onLinkClick: (job: JobWithProject) => void }) {
+function KanbanBoard({ jobs, onAiClick, onLinkClick, onApplyClick, onDetailsClick }: { jobs: JobWithProject[]; onAiClick: (job: JobWithProject) => void; onLinkClick: (job: JobWithProject) => void; onApplyClick: (job: JobWithProject) => void; onDetailsClick: (job: JobWithProject) => void }) {
     const grouped = useMemo(() => {
         const map: Record<string, JobWithProject[]> = {};
         for (const col of BOARD_COLUMNS) map[col] = [];
@@ -284,7 +288,7 @@ function KanbanBoard({ jobs, onAiClick, onLinkClick }: { jobs: JobWithProject[];
                             {items.length === 0 ? (
                                 <p className="text-xs font-medium text-muted-foreground/40 text-center py-8">Vazio</p>
                             ) : (
-                                items.map(job => <JobListItem key={job.id} job={job} mode="grid" onAiClick={onAiClick} onLinkClick={onLinkClick} />)
+                                items.map(job => <JobListItem key={job.id} job={job} mode="grid" onAiClick={onAiClick} onLinkClick={onLinkClick} onApplyClick={onApplyClick} onDetailsClick={onDetailsClick} />)
                             )}
                         </div>
                     </div>

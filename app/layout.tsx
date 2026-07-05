@@ -8,6 +8,7 @@ import { isSystemInstalled } from "@/lib/db-config";
 import { ConsoleWelcome } from "@/components/console-welcome";
 import { getCurrentUserId } from "@/lib/auth";
 import { THEME_PRESETS } from "@/components/settings/appearance/theme-presets";
+import { siteConfig } from "@/config/site.config";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -19,39 +20,36 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// Domínio de produção (sobrescreva com NEXT_PUBLIC_SITE_URL nas env vars).
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://life-os.vercel.app";
-const MARKETING_TITLE = "Life OS — Seu segundo cérebro, 100% local";
-const MARKETING_DESC =
-  "Centralize finanças, projetos, estudos, saúde e mais num único arquivo SQLite que é seu. Privacidade total, sem assinatura e sem nuvem obrigatória.";
+// Metadados derivam da fonte única de configuração da marca (config/site.config.ts).
+// Domínio de produção: sobrescreva com NEXT_PUBLIC_SITE_URL nas env vars.
+const SITE_URL = siteConfig.urls.site;
+const MARKETING_TITLE = siteConfig.seo.title;
+const MARKETING_DESC = siteConfig.seo.description;
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   // Aba curta nas páginas internas; cada rota pode definir seu próprio título.
-  title: { default: "Life OS", template: "%s · Life OS" },
+  title: { default: siteConfig.brand.name, template: `%s · ${siteConfig.brand.name}` },
   description: MARKETING_DESC,
-  applicationName: "Life OS",
-  keywords: [
-    "second brain", "segundo cérebro", "produtividade", "finanças pessoais",
-    "privacidade", "local-first", "SQLite", "self-hosted", "Life OS",
-  ],
-  authors: [{ name: "Luiz Souza" }],
+  applicationName: siteConfig.brand.name,
+  keywords: siteConfig.seo.keywords,
+  authors: [{ name: siteConfig.footer.author }],
   openGraph: {
     type: "website",
-    locale: "pt_BR",
+    locale: siteConfig.seo.locale,
     url: SITE_URL,
-    siteName: "Life OS",
+    siteName: siteConfig.brand.name,
     title: MARKETING_TITLE,
     description: MARKETING_DESC,
-    images: [{ url: "/logo.webp", width: 512, height: 512, alt: "Life OS" }],
+    images: [{ url: siteConfig.seo.ogImage, width: 512, height: 512, alt: siteConfig.brand.name }],
   },
   twitter: {
     card: "summary_large_image",
     title: MARKETING_TITLE,
     description: MARKETING_DESC,
-    images: ["/logo.webp"],
+    images: [siteConfig.seo.ogImage],
   },
-  icons: { icon: "/logo.webp" },
+  icons: { icon: siteConfig.brand.logo },
 };
 
 // Paleta de accents para quem ainda NÃO configurou (visitante na landing,

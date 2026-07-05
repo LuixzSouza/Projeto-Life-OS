@@ -7,6 +7,9 @@ import { renderToFile } from "@react-pdf/renderer";
 import QRCode from "qrcode";
 import { BillingDocument } from "../components/pdf/billing-document";
 import { MeetingDocument } from "../components/pdf/meeting-document";
+import { ResumePdf } from "../components/pdf/resume-pdf";
+import { LUIZ_PORTFOLIO } from "../components/projects/resume/seed-data";
+import type { PortfolioData } from "../types/portfolio";
 import { buildPixPayload } from "../lib/pix-payload";
 
 mkdirSync("logs", { recursive: true });
@@ -57,10 +60,40 @@ const meeting = (
   />
 );
 
+// Currículo real (dados do seed) — verifica o template ATS no caso feliz.
+const resume = <ResumePdf data={LUIZ_PORTFOLIO} locale="pt-BR" />;
+
+// Teste de estresse fixo (roadmap §2): muitas experiências, bullets de ~500
+// caracteres, título sem espaço e URL gigante — nada pode estourar ou cortar.
+const HUGE_BULLET =
+  "Liderei a reformulação completa da arquitetura de front-end migrando um monolito legado para uma stack moderna baseada em Next.js e React Server Components, reduzindo o tempo de carregamento inicial em 62%, eliminando 140 mil linhas de código morto, padronizando o design system em 38 componentes acessíveis e mentorando quatro pessoas desenvolvedoras juniores ao longo do processo de migração incremental sem downtime.";
+const stress: PortfolioData = {
+  ...LUIZ_PORTFOLIO,
+  hero: {
+    ...LUIZ_PORTFOLIO.hero,
+    name: "SupercalifragilisticexpialidocioseAntidisestablishmentarianismo",
+    website: "https://www.exemplo-com-um-dominio-absurdamente-longo-para-testar-quebra.com.br/caminho/muito/profundo?query=parametro-gigante",
+  },
+  experience: Array.from({ length: 12 }, (_, i) => ({
+    id: `stress-${i}`,
+    company: `Empresa Número ${i + 1} com Nome Institucional Bastante Extenso Ltda`,
+    role: "Pessoa Desenvolvedora Front-End Sênior e Arquiteta de Interfaces",
+    startDate: "jan 2020",
+    endDate: i === 0 ? "atual" : "dez 2021",
+    location: "São Paulo, SP · remoto",
+    summary: HUGE_BULLET.slice(0, 200),
+    achievements: [HUGE_BULLET, HUGE_BULLET.slice(0, 180)],
+    stack: ["React", "Next.js", "TypeScript", "Tailwind", "Node.js"],
+  })),
+};
+const resumeStress = <ResumePdf data={stress} locale="pt-BR" />;
+
 async function main() {
   await renderToFile(await billing(), "logs/pdf-smoke-billing.pdf");
   await renderToFile(meeting, "logs/pdf-smoke-meeting.pdf");
-  console.log("ok: logs/pdf-smoke-billing.pdf e logs/pdf-smoke-meeting.pdf");
+  await renderToFile(resume, "logs/pdf-smoke-resume.pdf");
+  await renderToFile(resumeStress, "logs/pdf-smoke-resume-stress.pdf");
+  console.log("ok: logs/pdf-smoke-*.pdf (billing, meeting, resume, resume-stress)");
 }
 
 void main();

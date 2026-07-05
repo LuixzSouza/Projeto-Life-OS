@@ -7,13 +7,17 @@ import { PortfolioData, INITIAL_PORTFOLIO } from "@/types/portfolio";
 
 // =========================================================
 // PORTFÓLIO / CURRÍCULO (Builder Engine)
-// Persistência no SQLite (1 portfólio por usuário) substituindo o localStorage.
+// LEGADO: o editor agora vive em Resume (currículos versionados — ver
+// app/(dashboard)/jobs/resume-actions.ts). getPortfolio segue como fonte
+// de leitura p/ IA e afins: prefere o Resume Base e cai no Portfolio antigo.
 // =========================================================
 
 export async function getPortfolio(): Promise<PortfolioData> {
   const userId = await requireUserId();
 
-  const record = await prisma.portfolio.findUnique({ where: { userId } });
+  const record =
+    (await prisma.resume.findFirst({ where: { userId, isBase: true } })) ??
+    (await prisma.portfolio.findUnique({ where: { userId } }));
   if (!record) return INITIAL_PORTFOLIO;
 
   try {

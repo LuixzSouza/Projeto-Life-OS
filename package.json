@@ -17,6 +17,7 @@
     "lint": "eslint",
     "postinstall": "prisma generate && prisma generate --schema prisma/schema.postgres.prisma && prisma generate --schema prisma/schema.mysql.prisma",
     "db:migrate": "npx prisma migrate dev",
+    "db:ensure": "npx tsx scripts/db-ensure.ts",
     "db:derive": "node scripts/derive-schemas.mjs",
     "db:generate:all": "prisma generate && prisma generate --schema prisma/schema.postgres.prisma && prisma generate --schema prisma/schema.mysql.prisma",
     "db:baseline": "prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > prisma/baseline.sql",

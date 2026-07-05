@@ -4,9 +4,10 @@ import { Github, Mail, ArrowRight, Heart, BookText } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { siteConfig, copyrightRange } from "@/config/site.config";
 
-const REPO = "https://github.com/LuixzSouza/Projeto-Life-OS";
-const PROFILE = "https://github.com/LuixzSouza";
+const REPO = siteConfig.urls.repo;
+const PROFILE = siteConfig.urls.profile;
 
 type LinkKind = "anchor" | "page" | "external";
 interface FooterLink {
@@ -73,16 +74,15 @@ export default function LandingFooter() {
           {/* Marca + newsletter */}
           <div className="space-y-6 md:col-span-5">
             <Link href="/" className="flex items-center gap-3">
-              <Image src="/logo.webp" width={36} height={36} alt="Life OS" />
-              <span className="text-xl font-bold tracking-tight text-foreground">Life OS</span>
+              <Image src={siteConfig.brand.logo} width={36} height={36} alt={siteConfig.brand.name} />
+              <span className="text-xl font-bold tracking-tight text-foreground">{siteConfig.brand.name}</span>
             </Link>
 
             <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
-              O sistema operacional para a sua vida — tarefas, saúde, finanças e conhecimento num
-              único arquivo SQLite, <strong className="text-foreground">local e seu</strong>. Sem
-              nuvem obrigatória, sem assinatura.
+              {siteConfig.brand.description}
             </p>
 
+            {siteConfig.features.showNewsletter && (
             <div className="flex flex-col gap-2">
               <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 Acompanhe o projeto
@@ -102,6 +102,7 @@ export default function LandingFooter() {
                 </button>
               </form>
             </div>
+            )}
           </div>
 
           {/* Colunas de links */}
@@ -135,11 +136,11 @@ export default function LandingFooter() {
 
         {/* Barra inferior */}
         <div className="flex flex-col items-center justify-between gap-4 border-t border-border/60 pt-8 md:flex-row">
-          <p className="text-xs text-muted-foreground">© 2026 Life OS · Open source sob licença MIT.</p>
+          <p className="text-xs text-muted-foreground">© {copyrightRange()} {siteConfig.footer.copyrightHolder} · {siteConfig.footer.note}</p>
 
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             Feito com <Heart className="size-3 fill-primary text-primary" /> por{" "}
-            <span className="font-bold text-foreground">Luiz Antônio</span>
+            <span className="font-bold text-foreground">{siteConfig.footer.author}</span>
           </div>
 
           <div className="flex items-center gap-4">

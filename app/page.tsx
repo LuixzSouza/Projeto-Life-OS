@@ -11,6 +11,7 @@ import TimelineSection from "@/components/landing/timeline-section";
 import MobileSection from "@/components/landing/mobile-section";
 import FAQSection from "@/components/landing/faq-section";
 import StatsSection from "@/components/landing/stats-section";
+import PricingSection from "@/components/landing/pricing-section";
 import FinalCTASection from "@/components/landing/final-cta-section";
 import { Reveal } from "@/components/landing/reveal";
 
@@ -53,6 +54,7 @@ export default async function LandingPage() {
                 <Reveal><TechnicalSection /></Reveal>
                 <Reveal><TimelineSection/></Reveal>
                 <Reveal><MobileSection/></Reveal>
+                <Reveal><PricingSection /></Reveal>
                 <Reveal><FAQSection/></Reveal>
                 <Reveal><FinalCTASection authState={authState} /></Reveal>
             </main>
