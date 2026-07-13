@@ -210,7 +210,7 @@ export function RecurringCard({ total, items, accounts = [] }: { total: number, 
     const moneyShort = useFormatCurrency();
     const [payTarget, setPayTarget] = useState<RecurringItemData | null>(null);
     return (
-        <div className="bg-card rounded-[1.5rem] border border-border/60 shadow-sm flex flex-col h-[500px] overflow-hidden transition-all hover:shadow-md">
+        <div className="bg-card rounded-2xl border border-border/60 shadow-sm flex flex-col h-[500px] overflow-hidden transition-all hover:shadow-md">
             
             {/* Header do Card */}
             <div className="p-6 border-b border-border/40 flex justify-between items-start bg-gradient-to-br from-muted/30 to-background relative overflow-hidden">

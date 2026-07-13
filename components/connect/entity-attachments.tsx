@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { ConnectSectionHeader } from "./connect-section-header";
+import { externalHref } from "@/lib/url";
 import {
   getEntityAttachments,
   addEntityAttachment,
@@ -88,7 +89,7 @@ export function EntityAttachments({ entityType, entityId }: { entityType: string
   };
 
   const addLink = () => {
-    const url = linkUrl.trim();
+    const url = externalHref(linkUrl);
     if (!url) return;
     startTransition(async () => {
       try {
@@ -164,8 +165,9 @@ export function EntityAttachments({ entityType, entityId }: { entityType: string
       )}
 
       {items.length === 0 ? (
-        <p className="flex items-center gap-1.5 py-2 text-xs text-muted-foreground">
-          <Paperclip className="h-3.5 w-3.5" /> Nenhum anexo ainda.
+        <p className="flex items-start gap-1.5 py-2 text-xs text-muted-foreground">
+          <Paperclip className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>Nenhum anexo ainda. Use os botões acima — ex.: o PDF do contrato, um print ou um link de referência.</span>
         </p>
       ) : (
         <ul className="space-y-1.5">
@@ -189,7 +191,7 @@ export function EntityAttachments({ entityType, entityId }: { entityType: string
                   </p>
                 </div>
                 {a.url && (
-                  <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" title="Abrir">
+                  <a href={externalHref(a.url) ?? a.url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary" title="Abrir">
                     <ExternalLink className="h-4 w-4" />
                   </a>
                 )}

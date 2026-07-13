@@ -60,7 +60,7 @@ export function WishlistGrid({ items, accounts, totalBalance }: WishlistGridProp
     return (
         <div className="space-y-6">
             {/* RESUMO: a lista de desejos comparada com o dinheiro que existe */}
-            <div className="rounded-[1.5rem] border border-border/40 bg-card shadow-sm p-5 sm:p-6">
+            <div className="rounded-2xl border border-border/40 bg-card shadow-sm p-5 sm:p-6">
                 <div className="flex flex-col lg:flex-row lg:items-center gap-6">
                     <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-4">
                         <SummaryTile icon={<Target className="h-4 w-4 text-primary" />} label="Desejos" value={String(active.length)} />

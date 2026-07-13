@@ -41,7 +41,7 @@ export function IncomeDynamicsCard({
   const formatMoney = useFormatCurrency();
 
   return (
-    <Card className="lg:col-span-2 rounded-[2rem] border-border/40 shadow-lg relative overflow-hidden bg-card">
+    <Card className="lg:col-span-2 rounded-2xl border-border/40 shadow-sm hover:shadow-md transition-all relative overflow-hidden bg-card">
       <div className="absolute top-0 right-0 w-80 h-80 bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
 
       <CardHeader className="pb-4 pt-8 px-8">
@@ -53,7 +53,7 @@ export function IncomeDynamicsCard({
       <CardContent className="px-8 pb-8 space-y-8 relative z-10">
 
         {/* Bloco Editável do Salário */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-6 rounded-3xl border border-border/60 bg-muted/10 hover:bg-muted/30 hover:border-primary/30 transition-all group/salary gap-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-6 rounded-2xl border border-border/60 bg-muted/10 hover:bg-muted/30 hover:border-primary/30 transition-all group/salary gap-4 shadow-sm">
           <div>
             <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-1.5 mb-1">
               <Wallet className="h-3.5 w-3.5" /> Receita Bruta / Salário
@@ -62,7 +62,9 @@ export function IncomeDynamicsCard({
           </div>
           {isEditing ? (
             <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 bg-background p-1.5 rounded-2xl shadow-inner border border-border/50">
-              <Input autoFocus value={tempSalary} onChange={e => setTempSalary(e.target.value)} className="w-36 h-10 text-right font-mono text-lg font-bold border-none focus-visible:ring-0 bg-transparent" />
+              {/* Smart View ligado: mascara o valor mesmo no modo edição (mostra
+                  pontinhos, mas segue editável) — não vaza o número ao editar. */}
+              <Input autoFocus type={smartView ? "password" : "text"} inputMode="decimal" value={tempSalary} onChange={e => setTempSalary(e.target.value)} className="w-36 h-10 text-right font-mono text-lg font-bold border-none focus-visible:ring-0 bg-transparent" />
               <Button size="icon" aria-label="Salvar salário" className="h-10 w-10 rounded-xl shadow-md" onClick={onSaveSalary} disabled={isPending}>
                 {isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />}
               </Button>
@@ -90,7 +92,7 @@ export function IncomeDynamicsCard({
         </div>
 
         {/* Resultado Final (Caixa Forte) */}
-        <div className={cn("flex flex-col sm:flex-row sm:justify-between sm:items-center p-8 rounded-[2rem] border-2 transition-all mt-6 relative overflow-hidden shadow-sm",
+        <div className={cn("flex flex-col sm:flex-row sm:justify-between sm:items-center p-8 rounded-2xl border-2 transition-all mt-6 relative overflow-hidden shadow-sm",
           metrics.residual < 0 ? "border-rose-500/30 bg-rose-500/5" : "border-primary/20 bg-primary/5"
         )}>
           <div className="absolute right-0 top-0 opacity-5 pointer-events-none translate-x-1/4 -translate-y-1/4">

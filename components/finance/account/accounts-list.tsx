@@ -88,7 +88,7 @@ export function AccountsList({ accounts }: { accounts: AccountItem[] }) {
     const total = accounts.reduce((acc, a) => acc + a.balance, 0);
     const connectedCount = accounts.filter((a) => a.isConnected).length;
 
-    if (!isMounted) return <div className="flex gap-5 overflow-hidden pb-6"><div className="w-[320px] h-[200px] bg-muted rounded-3xl animate-pulse" /></div>;
+    if (!isMounted) return <div className="flex gap-5 overflow-hidden pb-6"><div className="w-[320px] h-[200px] bg-muted rounded-2xl animate-pulse" /></div>;
 
     return (
         <div className="w-full space-y-5">
@@ -111,7 +111,7 @@ export function AccountsList({ accounts }: { accounts: AccountItem[] }) {
                 {/* Botão Nova Conta */}
                 <div
                     onClick={handleCreate}
-                    className="min-w-[320px] h-[200px] rounded-3xl border-2 border-dashed border-border bg-muted/20 hover:bg-muted/40 flex flex-col items-center justify-center cursor-pointer transition-all group snap-center active:scale-95 duration-200"
+                    className="min-w-[320px] h-[200px] rounded-2xl border-2 border-dashed border-border bg-muted/20 hover:bg-muted/40 flex flex-col items-center justify-center cursor-pointer transition-all group snap-center active:scale-95 duration-200"
                 >
                     <div className="h-14 w-14 rounded-full bg-background shadow-sm border border-border flex items-center justify-center group-hover:scale-110 transition-transform group-hover:border-primary/50">
                         <Plus className="h-6 w-6 text-muted-foreground group-hover:text-primary transition-colors" />
@@ -149,7 +149,7 @@ export function AccountsList({ accounts }: { accounts: AccountItem[] }) {
 
             {/* Confirmação de exclusão */}
             <AlertDialog open={!!deleteTarget} onOpenChange={(o) => { if (!o && !isDeleting) setDeleteTarget(null); }}>
-                <AlertDialogContent className="rounded-[2rem] border-destructive/20">
+                <AlertDialogContent className="rounded-2xl border-destructive/20">
                     <AlertDialogHeader>
                         <div className="flex items-center gap-3 text-destructive mb-1">
                             <div className="p-3 rounded-2xl bg-destructive/10"><AlertCircle className="h-6 w-6" /></div>
@@ -208,7 +208,7 @@ function BankCard({ account, onEdit, onDelete, onConnections }: { account: Accou
 
     return (
         <div
-            className="relative min-w-[320px] h-[200px] rounded-3xl shadow-xl overflow-hidden text-white transition-all duration-300 hover:shadow-2xl hover:-translate-y-1 group select-none"
+            className="relative min-w-[320px] h-[200px] rounded-2xl shadow-md overflow-hidden text-white transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 group select-none"
             style={{
                 background: `linear-gradient(135deg, ${account.color || '#18181b'} 0%, #000000 100%)`
             }}

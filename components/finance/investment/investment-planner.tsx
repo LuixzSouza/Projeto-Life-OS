@@ -80,7 +80,7 @@ export function InvestmentPlanner({ rate }: PlannerProps) {
 
             {/* --- COLUNA ESQUERDA: CONFIGURAÇÃO E GRÁFICO (8/12) --- */}
             <div className="xl:col-span-8 space-y-6 flex flex-col">
-                <Card className="border-border/40 shadow-sm bg-card rounded-[2rem] overflow-hidden flex-1 flex flex-col">
+                <Card className="border-border/40 shadow-sm bg-card rounded-2xl overflow-hidden flex-1 flex flex-col">
                     <CardHeader className="border-b border-border/40 pb-5 bg-muted/10 shrink-0">
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-5">
                             <div className="space-y-1.5">

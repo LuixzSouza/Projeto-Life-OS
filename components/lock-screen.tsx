@@ -161,7 +161,25 @@ export function LockScreen({ onUnlock }: LockScreenProps) {
         setLoading(true);
         setIsError(false);
 
-        const res = await verifyMasterPassword(password);
+        let res: { success: boolean; unauthenticated?: boolean };
+        try {
+            res = await verifyMasterPassword(password);
+        } catch {
+            // Falha de rede/servidor inesperada: não trava o cadeado, só avisa.
+            toast.error("Não foi possível verificar agora. Tente novamente.");
+            setLoading(false);
+            return;
+        }
+
+        // Sessão expirou enquanto a tela estava bloqueada: reautenticar do zero.
+        // Limpa o lock persistido para não voltar a travar após o novo login.
+        if (res.unauthenticated) {
+            localStorage.removeItem("life-os-locked");
+            toast.error("Sua sessão expirou. Entre novamente.");
+            setLoading(false);
+            window.location.href = "/login";
+            return;
+        }
 
         if (res.success) {
             toast.dismiss();

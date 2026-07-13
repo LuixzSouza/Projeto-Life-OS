@@ -26,3 +26,18 @@ export const ENTITY_LABEL: Record<string, string> = {
 };
 
 export const FALLBACK_ICON = Link2;
+
+/** Cor (hex) por `entityType` — usada no mapa de conexões e nas legendas. */
+export const ENTITY_COLOR: Record<string, string> = {
+  task: "#6366f1", note: "#0ea5e9", transaction: "#10b981", account: "#059669",
+  project: "#8b5cf6", event: "#f59e0b", friend: "#ec4899", client: "#7c3aed",
+  invoice: "#14b8a6", media: "#f43f5e", link: "#3b82f6", flashcardDeck: "#06b6d4",
+  studySubject: "#2563eb", goal: "#f97316", wardrobeItem: "#d946ef", workout: "#ef4444",
+  meal: "#84cc16",
+};
+
+const FALLBACK_COLOR = "#64748b";
+
+export function entityColor(type: string): string {
+  return ENTITY_COLOR[type] ?? FALLBACK_COLOR;
+}

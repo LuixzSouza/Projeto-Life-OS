@@ -31,7 +31,7 @@ export function HealthDiagnosticCard({ metrics, smartView, isClient }: HealthDia
       ];
 
   return (
-    <Card className={cn("rounded-[2rem] border-border/40 shadow-lg flex flex-col transition-all duration-500 border-t-[10px] bg-card", metrics.health.border)}>
+    <Card className={cn("rounded-2xl border-border/40 shadow-sm hover:shadow-md flex flex-col transition-all duration-500 border-t-4 bg-card", metrics.health.border)}>
       <CardHeader className="pt-8 px-8 pb-4">
         <CardTitle className="flex items-center justify-between text-xl font-extrabold">
           <div className="flex items-center gap-3">
@@ -76,7 +76,7 @@ export function HealthDiagnosticCard({ metrics, smartView, isClient }: HealthDia
         </div>
 
         {/* Plano de Ação */}
-        <div className="bg-muted/20 p-6 rounded-3xl border border-border/50 shadow-sm mt-auto">
+        <div className="bg-muted/20 p-6 rounded-2xl border border-border/50 shadow-sm mt-auto">
           <h4 className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2 mb-4 text-foreground/80">
             <Zap className="h-4 w-4 text-primary fill-primary/20" /> O que fazer agora?
           </h4>

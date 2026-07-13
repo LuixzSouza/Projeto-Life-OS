@@ -75,7 +75,7 @@ export const MetricCard: FC<{ title: string; value: number; icon: ReactNode; tre
   };
 
   return (
-    <Card className={cn("relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 rounded-3xl group border", variants[variant])}>
+    <Card className={cn("relative overflow-hidden rounded-2xl border shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md group", variants[variant])}>
       <CardContent className="p-6 flex flex-col justify-between h-full min-h-[160px]">
         <div className="flex justify-between items-start mb-4">
           <div className="p-3.5 rounded-2xl bg-background/80 backdrop-blur-md shadow-sm border border-border/50 group-hover:scale-110 transition-transform duration-300">

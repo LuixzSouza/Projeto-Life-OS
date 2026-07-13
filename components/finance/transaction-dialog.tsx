@@ -40,7 +40,6 @@ import {
 
 import type { TransactionDialogProps } from "./transaction-dialog-types";
 import { useAmountInput } from "./use-amount-input";
-import { DeleteTransactionAlert } from "./delete-transaction-alert";
 import { EntityConnections } from "@/components/connect/entity-connections";
 
 export function TransactionDialog({
@@ -114,7 +113,6 @@ export function TransactionDialog({
   const hasAccounts = accounts.length > 0;
 
   return (
-    <>
       <Dialog open={open} onOpenChange={setOpen}>
         {!isControlled && <DialogTrigger asChild>
           {trigger ? (
@@ -290,62 +288,67 @@ export function TransactionDialog({
 
               </DialogBody>
 
-              <DialogFooter className="!flex-row justify-between items-center">
-                {transaction ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="text-rose-600 hover:bg-rose-500/10 rounded-xl font-bold px-4"
-                    onClick={() => setIsDeleteDialogOpen(true)}
-                    disabled={isLoading}
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" /> Excluir
-                  </Button>
-                ) : (
-                  <div />
-                )}
+              {/* Confirmação de exclusão INLINE (sem 2º modal — modais Radix
+                  sobrepostos travam os cliques). Um modal só = sempre clicável. */}
+              {isDeleteDialogOpen ? (
+                <DialogFooter className="!flex-row justify-between items-center gap-3">
+                  <p className="text-sm font-bold text-rose-600 leading-tight">Excluir esta transação?</p>
+                  <div className="flex gap-2 shrink-0">
+                    <Button type="button" variant="ghost" className="rounded-xl font-bold" onClick={() => setIsDeleteDialogOpen(false)} disabled={isLoading}>Não</Button>
+                    <Button type="button" onClick={handleDelete} disabled={isLoading} className="bg-destructive text-white hover:bg-destructive/90 rounded-xl font-bold px-6 min-w-[120px]">
+                      {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Sim, remover"}
+                    </Button>
+                  </div>
+                </DialogFooter>
+              ) : (
+                <DialogFooter className="!flex-row justify-between items-center">
+                  {transaction ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="text-rose-600 hover:bg-rose-500/10 rounded-xl font-bold px-4"
+                      onClick={() => setIsDeleteDialogOpen(true)}
+                      disabled={isLoading}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" /> Excluir
+                    </Button>
+                  ) : (
+                    <div />
+                  )}
 
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="rounded-xl font-bold"
-                    onClick={() => setOpen(false)}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={isLoading}
-                    className={cn(
-                      "rounded-xl font-bold text-white shadow-lg min-w-[120px]",
-                      type === "EXPENSE"
-                        ? "bg-rose-600 hover:bg-rose-500 shadow-rose-500/20"
-                        : "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20"
-                    )}
-                  >
-                    {isLoading ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : transaction ? (
-                      "Salvar"
-                    ) : (
-                      "Registrar"
-                    )}
-                  </Button>
-                </div>
-              </DialogFooter>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="rounded-xl font-bold"
+                      onClick={() => setOpen(false)}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={isLoading}
+                      className={cn(
+                        "rounded-xl font-bold text-white shadow-lg min-w-[120px]",
+                        type === "EXPENSE"
+                          ? "bg-rose-600 hover:bg-rose-500 shadow-rose-500/20"
+                          : "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20"
+                      )}
+                    >
+                      {isLoading ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : transaction ? (
+                        "Salvar"
+                      ) : (
+                        "Registrar"
+                      )}
+                    </Button>
+                  </div>
+                </DialogFooter>
+              )}
             </form>
           )}
         </DialogContent>
       </Dialog>
-
-      {/* Modal Seguro de Exclusão */}
-      <DeleteTransactionAlert
-        open={isDeleteDialogOpen}
-        onOpenChange={setIsDeleteDialogOpen}
-        isLoading={isLoading}
-        onConfirm={handleDelete}
-      />
-    </>
   );
 }

@@ -6,12 +6,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Trash2, MessageSquareQuote } from "lucide-react";
 import { PortfolioData } from "@/types/portfolio";
+import { ReorderControls, moveItem } from "./reorder-controls";
 
 export function TestimonialsForm({ data, onChange }: { data: PortfolioData, onChange: (d: PortfolioData) => void }) {
-    
+
     const add = () => onChange({ ...data, testimonials: [...data.testimonials, { id: crypto.randomUUID(), authorName: "", authorRole: "", company: "", text: "" }] });
     const remove = (id: string) => onChange({ ...data, testimonials: data.testimonials.filter(t => t.id !== id) });
     const update = (id: string, field: string, val: string) => onChange({ ...data, testimonials: data.testimonials.map(t => t.id === id ? { ...t, [field]: val } : t) });
+    const move = (index: number, dir: -1 | 1) => onChange({ ...data, testimonials: moveItem(data.testimonials, index, dir) });
 
     return (
         <div className="space-y-6">
@@ -26,9 +28,9 @@ export function TestimonialsForm({ data, onChange }: { data: PortfolioData, onCh
                 </Button>
             </div>
 
-            <div className="grid grid-cols-1 gap-6">
-                {data.testimonials.map((test) => (
-                    <div key={test.id} className="relative group bg-card border border-border/40 p-6 rounded-[2rem] shadow-lg hover:border-primary/30 transition-all">
+            <div className="grid grid-cols-1 gap-8">
+                {data.testimonials.map((test, index) => (
+                    <div key={test.id} className="relative group bg-card border border-border/40 p-6 rounded-[2rem] shadow-sm hover:border-primary/30 transition-all">
                         <Button
                             size="icon"
                             variant="destructive"
@@ -38,7 +40,12 @@ export function TestimonialsForm({ data, onChange }: { data: PortfolioData, onCh
                         >
                             <Trash2 className="h-4 w-4" />
                         </Button>
-                        
+
+                        <div className="flex items-center gap-3 mb-4">
+                            <span className="bg-primary/10 text-primary text-[9px] uppercase tracking-widest font-black px-3 py-1 rounded-lg border border-primary/20">#{index + 1}</span>
+                            <ReorderControls index={index} count={data.testimonials.length} onMove={(dir) => move(index, dir)} orientation="horizontal" />
+                        </div>
+
                         <div className="space-y-4">
                             <div className="space-y-2">
                                 <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Conteúdo do Depoimento</Label>

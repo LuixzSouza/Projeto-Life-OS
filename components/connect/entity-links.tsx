@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { GitBranch, Search, X, Loader2, ExternalLink, SlidersHorizontal } from "lucide-react";
+import { GitBranch, Search, X, Loader2, ExternalLink, SlidersHorizontal, Sparkles, Plus } from "lucide-react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -13,7 +13,9 @@ import {
   searchLinkableEntities,
   linkEntityAction,
   unlinkEntityAction,
+  suggestEntityLinks,
   type LinkedEntity,
+  type SuggestedLink,
 } from "@/app/(dashboard)/connect/actions";
 
 const KIND_LABEL: Record<string, string> = {
@@ -54,6 +56,8 @@ export function EntityLinks({ entityType, entityId }: { entityType: string; enti
   const [searching, setSearching] = useState(false);
   const [kind, setKind] = useState("RELATED");
   const [showKind, setShowKind] = useState(false); // tipo do vínculo é avançado/opcional
+  const [suggestions, setSuggestions] = useState<SuggestedLink[] | null>(null); // null = ainda não pediu
+  const [suggesting, setSuggesting] = useState(false);
   const [pending, startTransition] = useTransition();
   const seq = useRef(0);
 
@@ -112,6 +116,31 @@ export function EntityLinks({ entityType, entityId }: { entityType: string; enti
         toast.error("Não consegui remover a relação.");
       }
     });
+  };
+
+  // Sugestões automáticas (heurística + IA) — sob demanda para não custar em toda abertura.
+  const loadSuggestions = () => {
+    setSuggesting(true);
+    suggestEntityLinks(entityType, entityId)
+      .then((s) => setSuggestions(s.filter((x) => !links.some((l) => l.entityType === x.entityType && l.entityId === x.entityId))))
+      .catch(() => toast.error("Não consegui sugerir agora."))
+      .finally(() => setSuggesting(false));
+  };
+
+  const acceptSuggestion = (s: SuggestedLink) => {
+    startTransition(async () => {
+      try {
+        setLinks(await linkEntityAction(entityType, entityId, s.entityType, s.entityId, "RELATED"));
+        setSuggestions((prev) => prev?.filter((x) => !(x.entityType === s.entityType && x.entityId === s.entityId)) ?? null);
+        toast.success("Conexão criada.");
+      } catch {
+        toast.error("Não consegui criar a conexão.");
+      }
+    });
+  };
+
+  const dismissSuggestion = (s: SuggestedLink) => {
+    setSuggestions((prev) => prev?.filter((x) => !(x.entityType === s.entityType && x.entityId === s.entityId)) ?? null);
   };
 
   if (loading) {
@@ -212,10 +241,82 @@ export function EntityLinks({ entityType, entityId }: { entityType: string; enti
         )}
       </div>
 
+      {/* Sugestões automáticas: o sistema propõe ligações prováveis pra você confirmar */}
+      <div className="space-y-2">
+        {suggestions === null ? (
+          <button
+            type="button"
+            onClick={loadSuggestions}
+            disabled={suggesting}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-primary transition-colors hover:text-primary/80 disabled:opacity-60"
+          >
+            {suggesting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            {suggesting ? "Procurando conexões…" : "Sugerir conexões automaticamente"}
+          </button>
+        ) : suggestions.length === 0 ? (
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">Nenhuma sugestão por ora — adicione tags ou mais conteúdo pra melhorar.</p>
+            <button type="button" onClick={loadSuggestions} disabled={suggesting} className="text-[11px] text-muted-foreground hover:text-foreground">
+              Tentar de novo
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-1.5 rounded-lg border border-primary/20 bg-primary/[0.03] p-2">
+            <div className="flex items-center justify-between px-0.5">
+              <p className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-primary">
+                <Sparkles className="h-3 w-3" /> Sugestões
+              </p>
+              <button
+                type="button"
+                onClick={loadSuggestions}
+                disabled={suggesting}
+                className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-60"
+              >
+                {suggesting && <Loader2 className="h-3 w-3 animate-spin" />} Atualizar
+              </button>
+            </div>
+            {suggestions.map((s) => {
+              const Icon = ENTITY_ICON[s.entityType] ?? FALLBACK_ICON;
+              return (
+                <div key={`${s.entityType}:${s.entityId}`} className="flex items-center gap-2 rounded-md bg-card px-2 py-1.5">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                    <Icon className="h-3.5 w-3.5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{s.title}</p>
+                    <p className="truncate text-[11px] text-muted-foreground">
+                      <span className="text-muted-foreground/60">{ENTITY_LABEL[s.entityType] ?? s.entityType}</span>
+                      {" · "}{s.reason}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => acceptSuggestion(s)}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/20 disabled:opacity-60"
+                  >
+                    <Plus className="h-3 w-3" /> Conectar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => dismissSuggestion(s)}
+                    className="shrink-0 text-muted-foreground/60 transition-colors hover:text-foreground"
+                    title="Dispensar sugestão"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Conexões existentes */}
       {links.length === 0 ? (
-        <p className="flex items-center gap-1.5 py-1 text-xs text-muted-foreground">
-          <GitBranch className="h-3.5 w-3.5" /> Nenhuma conexão ainda — busque um item acima pra ligar.
+        <p className="flex items-start gap-1.5 py-1 text-xs text-muted-foreground">
+          <GitBranch className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>Nenhuma conexão ainda. Busque acima para ligar — ex.: ao projeto, à nota da reunião ou ao gasto relacionado.</span>
         </p>
       ) : (
         <ul className="space-y-1.5">

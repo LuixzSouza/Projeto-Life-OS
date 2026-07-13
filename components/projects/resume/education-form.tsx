@@ -5,11 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Trash2, GraduationCap } from "lucide-react";
 import { PortfolioData } from "@/types/portfolio";
+import { ReorderControls, moveItem } from "./reorder-controls";
 
 export function EducationForm({ data, onChange }: { data: PortfolioData; onChange: (d: PortfolioData) => void }) {
   const add = () => onChange({ ...data, education: [...data.education, { id: crypto.randomUUID(), institution: "", degree: "", dates: "" }] });
   const remove = (id: string) => onChange({ ...data, education: data.education.filter(e => e.id !== id) });
   const update = (id: string, field: string, val: string) => onChange({ ...data, education: data.education.map(e => e.id === id ? { ...e, [field]: val } : e) });
+  const move = (index: number, dir: -1 | 1) => onChange({ ...data, education: moveItem(data.education, index, dir) });
 
   return (
     <div className="space-y-6">
@@ -24,13 +26,18 @@ export function EducationForm({ data, onChange }: { data: PortfolioData; onChang
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
-        {data.education.map((edu) => (
-          <div key={edu.id} className="relative group bg-card border border-border/40 p-6 rounded-[2rem] shadow-lg hover:border-primary/30 transition-all">
+      <div className="grid grid-cols-1 gap-8">
+        {data.education.map((edu, index) => (
+          <div key={edu.id} className="relative group bg-card border border-border/40 p-6 rounded-[2rem] shadow-sm hover:border-primary/30 transition-all">
             <Button size="icon" variant="destructive" aria-label="Remover formação" className="absolute -top-3 -right-3 h-8 w-8 rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shadow-lg" onClick={() => remove(edu.id)}>
               <Trash2 className="h-4 w-4" />
             </Button>
-            
+
+            <div className="flex items-center gap-3 mb-4">
+              <span className="bg-primary/10 text-primary text-[9px] uppercase tracking-widest font-black px-3 py-1 rounded-lg border border-primary/20">#{index + 1}</span>
+              <ReorderControls index={index} count={data.education.length} onMove={(dir) => move(index, dir)} orientation="horizontal" />
+            </div>
+
             <div className="space-y-4">
               <div className="space-y-2">
                   <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Instituição de Ensino</Label>

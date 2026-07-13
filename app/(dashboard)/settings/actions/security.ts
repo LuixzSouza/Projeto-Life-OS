@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { requireUserId, hashPassword, verifyPassword, logout, login } from "@/lib/auth";
+import { requireUserId, getCurrentUserId, hashPassword, verifyPassword, logout, login } from "@/lib/auth";
 import { validatePasswordStrength } from "@/lib/password-policy";
 import { setRegistrationOpen } from "@/lib/db-config";
 import { wipeUserData } from "@/lib/full-backup";
@@ -263,10 +263,16 @@ export async function updateSecurityPreferences(formData: FormData) {
     return { success: true };
 }
 
-export async function verifyMasterPassword(password: string) {
-    const userId = await requireUserId();
+export async function verifyMasterPassword(
+    password: string
+): Promise<{ success: boolean; unauthenticated?: boolean }> {
+    // Verificação (não mutação): se a sessão expirou, falha suavemente em vez de
+    // lançar — assim a tela de bloqueio pode redirecionar ao login sem virar 500.
+    const userId = await getCurrentUserId();
+    if (!userId) return { success: false, unauthenticated: true };
+
     const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) return { success: false };
+    if (!user) return { success: false, unauthenticated: true };
 
     const isValid = await verifyPassword(password, user.password);
 

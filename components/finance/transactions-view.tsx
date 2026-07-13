@@ -155,7 +155,7 @@ export function TransactionsView({
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
                     {/* Resumo Dinâmico */}
-                    <div className="lg:col-span-1 rounded-[1.5rem] border border-border/40 bg-card p-6 shadow-sm flex flex-col justify-center">
+                    <div className="lg:col-span-1 rounded-2xl border border-border/40 bg-card p-6 shadow-sm flex flex-col justify-center">
                         <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-4 flex items-center gap-2">
                             <Filter className="h-3.5 w-3.5" /> {PERIOD_LABELS[filters.period] ?? "Período"}
                         </p>
@@ -188,7 +188,7 @@ export function TransactionsView({
                     </div>
 
                     {/* Gráfico de Barras (últimos 6 meses do filtro) */}
-                    <div className="lg:col-span-2 rounded-[1.5rem] border border-border/40 bg-card p-6 shadow-sm flex flex-col">
+                    <div className="lg:col-span-2 rounded-2xl border border-border/40 bg-card p-6 shadow-sm flex flex-col">
                         <div className="flex justify-between items-start mb-6">
                             <div>
                                 <h3 className="text-sm font-extrabold flex items-center gap-2">
@@ -249,7 +249,7 @@ export function TransactionsView({
                 </div>
 
                 {/* BARRA DE FILTROS E BUSCA */}
-                <div className="rounded-[1.5rem] border border-border/40 bg-card p-4 shadow-sm space-y-3">
+                <div className="rounded-2xl border border-border/40 bg-card p-4 shadow-sm space-y-3">
                     <div className="relative">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
                         <Input
@@ -403,7 +403,7 @@ export function TransactionsView({
                             </div>
                         </section>
                     )) : (
-                        <div className="rounded-[1.5rem] border border-dashed border-border/60 bg-muted/10 py-20">
+                        <div className="rounded-2xl border border-dashed border-border/60 bg-muted/10 py-20">
                             <EmptyState
                                 icon={Receipt}
                                 title="Nenhuma transação encontrada"

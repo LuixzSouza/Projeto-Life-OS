@@ -108,9 +108,23 @@ export function SecurityProvider({
         return () => window.removeEventListener("life-os:lock", handler);
     }, [lockSystem]);
 
+    // Higiene do cadeado em páginas públicas/entrada: se um lock obsoleto ficou
+    // no localStorage (ex.: sessão expirou), ele NÃO pode cobrir /login, /setup
+    // etc. — senão o usuário fica preso sem alcançar o formulário. Limpa o estado.
+    useEffect(() => {
+        if (isExempt()) {
+            localStorage.removeItem("life-os-locked");
+            // Sincroniza o estado com a rota isenta (não é cascata: só dispara na
+            // transição para uma página pública e para de disparar assim que
+            // isLocked vira false). setState aqui é intencional e seguro.
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            if (isLocked) setIsLocked(false);
+        }
+    }, [isExempt, isLocked]);
+
     return (
         <>
-            {isLocked && (
+            {isLocked && !isExempt() && (
                 <LockScreen
                     onUnlock={() => {
                         setIsLocked(false);

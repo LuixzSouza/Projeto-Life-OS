@@ -15,11 +15,16 @@ import { toast } from "sonner";
 import { savePageContent, deletePage } from "@/app/(dashboard)/cms/actions";
 import { formatTime } from "@/lib/utils";
 
-// 🟢 IMPORTS DO CODEMIRROR
-import CodeMirror from '@uiw/react-codemirror';
-import { json as jsonLang } from '@codemirror/lang-json';
-import { javascript } from '@codemirror/lang-javascript';
-import { vscodeDark } from '@uiw/codemirror-theme-vscode';
+// CodeMirror (~500KB) carregado SOB DEMANDA: só baixa quando o editor abre.
+import dynamic from "next/dynamic";
+const JsonCodeEditor = dynamic(() => import("./json-code-editor"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full w-full items-center justify-center bg-[#1e1e1e] text-xs text-zinc-500">
+      Carregando editor…
+    </div>
+  ),
+});
 
 export function CodeEditor({ page }: { page: SitePage }) {
     const [code, setCode] = useState(page.content);
@@ -143,21 +148,7 @@ export function CodeEditor({ page }: { page: SitePage }) {
             {/* ÁREA DO CODEMIRROR */}
             <div className="flex-1 overflow-hidden relative bg-[#1e1e1e]">
                 <ScrollArea className="h-full w-full">
-                    <CodeMirror
-                        value={code}
-                        height="100%"
-                        theme={vscodeDark}
-                        extensions={[jsonLang(), javascript({ jsx: true })]}
-                        onChange={onChange}
-                        className="text-[13px] md:text-[14px] leading-relaxed custom-codemirror"
-                        basicSetup={{
-                            lineNumbers: true,
-                            foldGutter: true,
-                            highlightActiveLine: true,
-                            bracketMatching: true,
-                            autocompletion: true,
-                        }}
-                    />
+                    <JsonCodeEditor value={code} onChange={onChange} />
                 </ScrollArea>
             </div>
 

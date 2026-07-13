@@ -2,12 +2,11 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogBody, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Plus, HandCoins, Trash2, AlertCircle, DollarSign } from "lucide-react";
+import { Loader2, Plus, HandCoins, Trash2, DollarSign } from "lucide-react";
 import Link from "next/link";
 import { createRecurringCharge, updateRecurringCharge, deleteRecurringCharge } from "@/app/(dashboard)/finance/actions";
 import { toast } from "sonner";
@@ -146,7 +145,6 @@ export function RecurringChargeDialog({ trigger, item, clients }: RecurringCharg
     };
 
     return (
-        <>
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogTrigger asChild>
                     {trigger ? trigger : (
@@ -295,43 +293,36 @@ export function RecurringChargeDialog({ trigger, item, clients }: RecurringCharg
                             </div>
                         </DialogBody>
 
-                        <DialogFooter className="!flex-row justify-between items-center">
-                            {item ? (
-                                <Button type="button" variant="ghost" className="text-rose-600 hover:bg-rose-500/10 rounded-xl font-bold px-4" onClick={() => setIsDeleteDialogOpen(true)} disabled={isLoading}>
-                                    <Trash2 className="h-4 w-4 mr-2" /> Excluir
-                                </Button>
-                            ) : <div />}
+                        {/* Confirmação de exclusão INLINE (sem 2º modal — modais Radix
+                            sobrepostos travam os cliques). Um modal só = sempre clicável. */}
+                        {isDeleteDialogOpen ? (
+                            <DialogFooter className="!flex-row justify-between items-center gap-3">
+                                <p className="text-sm font-bold text-rose-600 leading-tight">Remover esta cobrança?</p>
+                                <div className="flex gap-2 shrink-0">
+                                    <Button type="button" variant="ghost" className="rounded-xl font-bold" onClick={() => setIsDeleteDialogOpen(false)} disabled={isLoading}>Não</Button>
+                                    <Button type="button" onClick={handleDelete} disabled={isLoading} className="bg-destructive text-white hover:bg-destructive/90 rounded-xl font-bold px-6 min-w-[120px]">
+                                        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Sim, remover"}
+                                    </Button>
+                                </div>
+                            </DialogFooter>
+                        ) : (
+                            <DialogFooter className="!flex-row justify-between items-center">
+                                {item ? (
+                                    <Button type="button" variant="ghost" className="text-rose-600 hover:bg-rose-500/10 rounded-xl font-bold px-4" onClick={() => setIsDeleteDialogOpen(true)} disabled={isLoading}>
+                                        <Trash2 className="h-4 w-4 mr-2" /> Excluir
+                                    </Button>
+                                ) : <div />}
 
-                            <div className="flex gap-2">
-                                <Button type="button" variant="ghost" className="rounded-xl font-bold" onClick={() => setOpen(false)}>Cancelar</Button>
-                                <Button type="submit" disabled={isLoading} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/20 min-w-[120px]">
-                                    {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (item ? "Salvar" : "Criar")}
-                                </Button>
-                            </div>
-                        </DialogFooter>
+                                <div className="flex gap-2">
+                                    <Button type="button" variant="ghost" className="rounded-xl font-bold" onClick={() => setOpen(false)}>Cancelar</Button>
+                                    <Button type="submit" disabled={isLoading} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-lg shadow-emerald-500/20 min-w-[120px]">
+                                        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : (item ? "Salvar" : "Criar")}
+                                    </Button>
+                                </div>
+                            </DialogFooter>
+                        )}
                     </form>
                 </DialogContent>
             </Dialog>
-
-            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-                <AlertDialogContent className="rounded-[2rem] border-destructive/20 shadow-2xl">
-                    <AlertDialogHeader>
-                        <div className="flex items-center gap-3 text-destructive mb-2">
-                            <div className="p-3 rounded-2xl bg-destructive/10"><AlertCircle className="h-6 w-6" /></div>
-                            <AlertDialogTitle className="text-xl font-bold">Remover Cobrança?</AlertDialogTitle>
-                        </div>
-                        <AlertDialogDescription className="text-base text-muted-foreground">
-                            Você deixará de ser lembrado desta cobrança mensal.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter className="mt-6">
-                        <AlertDialogCancel className="rounded-xl h-12 font-bold">Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDelete} className="bg-destructive text-white hover:bg-destructive/90 rounded-xl h-12 font-bold px-8 shadow-lg shadow-destructive/20">
-                            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sim, Remover"}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-        </>
     );
 }

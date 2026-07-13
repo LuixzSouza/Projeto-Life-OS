@@ -1,14 +1,28 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Link2, Loader2, ShieldCheck, X, FileUp, Settings2, Sparkles } from "lucide-react";
 import { syncBankAccount, createConnectTokenAction, linkAccountToPluggyAction } from "@/app/(dashboard)/finance/actions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { PluggyConnect } from "react-pluggy-connect";
 import { Dialog, DialogContent, DialogTitle, DialogHeader, DialogDescription, DialogBody } from "@/components/ui/dialog";
+
+// O widget da Pluggy (~1MB) só é usado DENTRO do diálogo, quando há connectToken.
+// Carregado sob demanda para não pesar no bundle inicial do dashboard de finanças.
+const PluggyConnect = dynamic(
+  () => import("react-pluggy-connect").then((m) => m.PluggyConnect),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full w-full items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    ),
+  },
+);
 
 /* -------------------------------------------------------------------------- */
 /* TYPES E INTERFACES                                                         */
@@ -159,7 +173,7 @@ export function BankConnector({ onOpenImport }: { onOpenImport?: () => void }) {
 
             {/* Modal Nativo do Shadcn UI cuidando do scroll lock e blur de forma correta */}
             <Dialog open={isDialogOpen} onOpenChange={(open) => { if(!open) handleCloseConnection(); }}>
-                <DialogContent showCloseButton={false} className="sm:max-w-[450px] h-[85vh] sm:h-[750px] max-h-[900px] rounded-[2rem]">
+                <DialogContent showCloseButton={false} className="sm:max-w-[450px] h-[85vh] sm:h-[750px] max-h-[900px] rounded-2xl">
 
                     {/* Cabeçalho Customizado */}
                     <div className="flex justify-between items-center p-4 bg-muted/10 border-b border-border/40 shrink-0">

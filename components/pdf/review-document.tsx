@@ -10,6 +10,7 @@ import {
 import { formatCurrency } from "@/lib/utils";
 import { fmtMinutes, fmtKg, type MonthStats } from "@/components/review/review-types";
 import type { TrendPoint } from "@/components/review/finance-trend-chart";
+import type { Highlight, HighlightKind } from "@/lib/review-highlights";
 
 const s = StyleSheet.create({
   section: { marginBottom: 20 },
@@ -46,7 +47,20 @@ const s = StyleSheet.create({
   tRowLast: { borderBottomWidth: 0 },
   tMonth: { width: 70, fontSize: 9, fontWeight: 500, color: pdfTheme.ink },
   tCell: { flex: 1, textAlign: "right", fontSize: 8.5, fontFamily: "Geist Mono", color: pdfTheme.body },
+
+  // Destaques (faixa narrativa no topo)
+  hlRow: { flexDirection: "row", alignItems: "flex-start", paddingVertical: 5 },
+  hlBar: { width: 3, borderRadius: 2, marginRight: 9, alignSelf: "stretch" },
+  hlTitle: { fontSize: 9.5, fontWeight: 600, color: pdfTheme.ink },
+  hlDetail: { fontSize: 8, color: pdfTheme.muted, marginTop: 1 },
 });
+
+// Cor da barrinha do destaque conforme a natureza (conquista/alerta/informativo).
+const HL_ACCENT: Record<HighlightKind, string> = {
+  win: pdfTheme.success,
+  attention: pdfTheme.danger,
+  info: pdfTheme.muted,
+};
 
 export interface ReviewDocumentProps {
   periodLabel: string;
@@ -56,10 +70,11 @@ export interface ReviewDocumentProps {
   stats: MonthStats;
   prev: MonthStats;
   trend: TrendPoint[];
+  highlights: Highlight[];
 }
 
 export function ReviewDocument({
-  periodLabel, prevLabel, generatedAt, currency, stats, prev, trend,
+  periodLabel, prevLabel, generatedAt, currency, stats, prev, trend, highlights,
 }: ReviewDocumentProps) {
   const money = (v: number) => formatCurrency(v, { currency });
   const balance = stats.income - stats.expense;
@@ -78,6 +93,22 @@ export function ReviewDocument({
     >
       <BrandedPage docTitle="Retrospectiva" headerMeta={generatedAt}>
         <PageTitle title={`Retrospectiva — ${periodLabel}`} subtitle={`Resumo consolidado · comparações contra ${prevLabel}`} />
+
+        {/* Destaques do período */}
+        {highlights.length > 0 && (
+          <View style={s.section}>
+            <SectionTitle>Destaques do período</SectionTitle>
+            {highlights.map((h) => (
+              <View key={h.id} style={s.hlRow} wrap={false}>
+                <View style={[s.hlBar, { backgroundColor: HL_ACCENT[h.kind] }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={s.hlTitle}>{h.title}</Text>
+                  <Text style={s.hlDetail}>{h.detail}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* Finanças */}
         <SectionTitle>Finanças</SectionTitle>

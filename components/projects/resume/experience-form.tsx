@@ -3,9 +3,12 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Plus, Trash2, Building2 } from "lucide-react";
 import { PortfolioData } from "@/types/portfolio";
+import { SmartTextarea } from "./smart-textarea";
+import { BrainDumpBox } from "./brain-dump-box";
+import { ReorderControls, moveItem } from "./reorder-controls";
+import { parseExperienceFromText } from "@/app/(dashboard)/jobs/resume-ai-actions";
 
 interface ExperienceFormProps {
   data: PortfolioData;
@@ -20,6 +23,8 @@ export function ExperienceForm({ data, onChange }: ExperienceFormProps) {
 
   const removeExperience = (id: string) => onChange({ ...data, experience: data.experience.filter((exp) => exp.id !== id) });
 
+  const moveExperience = (index: number, dir: -1 | 1) => onChange({ ...data, experience: moveItem(data.experience, index, dir) });
+
   const updateExperience = (id: string, field: string, value: string | string[]) => {
     onChange({
       ...data,
@@ -32,9 +37,21 @@ export function ExperienceForm({ data, onChange }: ExperienceFormProps) {
     updateExperience(id, "stack", stackArray);
   };
 
+  // Controlado: mantém linhas conforme digitadas (preserva o Enter para novo item),
+  // descartando só vazios no meio — a última linha vazia fica para o cursor respirar.
   const handleAchievementsChange = (id: string, value: string) => {
-    const achievementsArray = value.split("\n").map((s) => s.trim()).filter(Boolean);
+    const lines = value.split("\n");
+    const achievementsArray = lines.filter((l, i) => l.trim() !== "" || i === lines.length - 1);
     updateExperience(id, "achievements", achievementsArray);
+  };
+
+  // Brain dump: IA estrutura texto livre em experiências e adiciona ao formulário.
+  const handleBrainDump = async (text: string): Promise<{ ok: true; count: number } | { ok: false; error: string }> => {
+    const res = await parseExperienceFromText(text);
+    if (!res.success) return { ok: false, error: res.error };
+    const created = res.items.map((it) => ({ id: crypto.randomUUID(), ...it }));
+    onChange({ ...data, experience: [...data.experience, ...created] });
+    return { ok: true, count: created.length };
   };
 
   return (
@@ -51,9 +68,16 @@ export function ExperienceForm({ data, onChange }: ExperienceFormProps) {
         </Button>
       </div>
 
-      <div className="space-y-6">
+      <BrainDumpBox
+        title="Adicionar experiência com IA"
+        description="Cole ou escreva bagunçado — a IA organiza nos campos certos."
+        placeholder="Ex.: Trabalhei na Tech Solutions de 2022 até hoje como dev pleno, mexi com React e Node, refiz o checkout e a conversão subiu 20%, também liderei 2 juniores..."
+        onParse={handleBrainDump}
+      />
+
+      <div className="space-y-8">
         {data.experience.map((exp, index) => (
-          <div key={exp.id} className="relative group border border-border/40 bg-card rounded-[2rem] p-8 shadow-xl">
+          <div key={exp.id} className="relative group border border-border/40 bg-card rounded-[2rem] p-6 sm:p-7 shadow-sm">
             <Button
               size="icon" variant="destructive"
               aria-label="Remover experiência"
@@ -63,10 +87,16 @@ export function ExperienceForm({ data, onChange }: ExperienceFormProps) {
               <Trash2 className="h-4 w-4" />
             </Button>
 
-            <div className="mb-6">
+            <div className="mb-6 flex items-center gap-3">
               <span className="bg-primary/10 text-primary text-[9px] uppercase tracking-widest font-black px-3 py-1 rounded-lg border border-primary/20">
                 POSIÇÃO #{index + 1}
               </span>
+              <ReorderControls
+                index={index}
+                count={data.experience.length}
+                onMove={(dir) => moveExperience(index, dir)}
+                orientation="horizontal"
+              />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -101,20 +131,30 @@ export function ExperienceForm({ data, onChange }: ExperienceFormProps) {
               
               <div className="col-span-1 md:col-span-2 space-y-2 pt-2">
                 <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Resumo da Responsabilidade</Label>
-                <Textarea 
-                  value={exp.summary} onChange={(e) => updateExperience(exp.id, "summary", e.target.value)} 
-                  placeholder="Fui responsável por liderar a migração..." className="min-h-[80px] bg-muted/30 border-border/50 rounded-xl resize-none leading-relaxed"
+                <SmartTextarea
+                  label={`Resumo — ${exp.role || "experiência"}`}
+                  value={exp.summary}
+                  onChange={(v) => updateExperience(exp.id, "summary", v)}
+                  placeholder="Fui responsável por liderar a migração..."
+                  polishKind="experience-summary"
+                  polishContext={[exp.role, exp.company, exp.stack.join(", ")].filter(Boolean).join(" · ")}
+                  recommendedRange={[40, 300]}
                 />
               </div>
 
               <div className="col-span-1 md:col-span-2 space-y-2 bg-primary/5 p-4 rounded-[1.5rem] border border-primary/10">
                 <Label className="text-[10px] font-black uppercase tracking-widest text-primary flex justify-between">
                   <span>Conquistas e Métricas</span>
-                  <span className="text-muted-foreground/50 lowercase font-medium tracking-normal text-xs">Pressione ENTER para separar itens</span>
+                  <span className="text-muted-foreground/50 lowercase font-medium tracking-normal text-xs">Uma por linha · ✨ para a IA melhorar</span>
                 </Label>
-                <Textarea 
-                  defaultValue={exp.achievements.join("\n")} onBlur={(e) => handleAchievementsChange(exp.id, e.target.value)} 
-                  placeholder="Aumentei a conversão em 20% após reescrever o checkout..." className="min-h-[100px] bg-background border-border/40 rounded-xl text-sm resize-none"
+                <SmartTextarea
+                  label={`Conquistas — ${exp.role || "experiência"}`}
+                  value={exp.achievements.join("\n")}
+                  onChange={(v) => handleAchievementsChange(exp.id, v)}
+                  placeholder="Aumentei a conversão em 20% após reescrever o checkout..."
+                  polishKind="experience-achievements"
+                  polishContext={[exp.role, exp.company, exp.stack.join(", ")].filter(Boolean).join(" · ")}
+                  className="bg-background border-border/40 text-sm"
                 />
               </div>
             </div>

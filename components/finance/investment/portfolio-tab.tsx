@@ -54,7 +54,7 @@ export function PortfolioTab({ positions, totals }: PortfolioTabProps) {
   if (positions.length === 0) {
     return (
       <>
-        <div className="flex flex-col items-center justify-center py-20 rounded-[2rem] border-2 border-dashed border-border/50 bg-muted/10 text-center">
+        <div className="flex flex-col items-center justify-center py-20 rounded-2xl border-2 border-dashed border-border/50 bg-muted/10 text-center">
           <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4 text-primary">
             <Wallet className="h-8 w-8" />
           </div>
@@ -131,7 +131,7 @@ export function PortfolioTab({ positions, totals }: PortfolioTabProps) {
       </div>
 
       {/* ALOCAÇÃO */}
-      <Card className="rounded-[2rem] border-border/40 shadow-sm">
+      <Card className="rounded-2xl border-border/40 shadow-sm">
         <CardContent className="p-6">
           <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-4 flex items-center gap-2">
             <PieIcon className="h-3.5 w-3.5" /> Alocação da carteira
@@ -141,7 +141,7 @@ export function PortfolioTab({ positions, totals }: PortfolioTabProps) {
       </Card>
 
       {/* TABELA DE POSIÇÕES */}
-      <Card className="rounded-[2rem] border-border/40 shadow-sm overflow-hidden">
+      <Card className="rounded-2xl border-border/40 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -213,7 +213,7 @@ export function PortfolioTab({ positions, totals }: PortfolioTabProps) {
       <HoldingDialog open={dialogOpen} onOpenChange={setDialogOpen} holding={editing} />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => { if (!o && !isDeleting) setDeleteTarget(null); }}>
-        <AlertDialogContent className="rounded-[2rem] border-destructive/20">
+        <AlertDialogContent className="rounded-2xl border-destructive/20">
           <AlertDialogHeader>
             <div className="flex items-center gap-3 text-destructive mb-1">
               <div className="p-3 rounded-2xl bg-destructive/10"><AlertCircle className="h-6 w-6" /></div>

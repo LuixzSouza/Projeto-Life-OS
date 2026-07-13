@@ -129,19 +129,19 @@ export function JobListItem({ job, mode, onAiClick, onLinkClick, onApplyClick, o
     const metaChips = (
         <>
             {priority && (
-                <span className={cn("inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md", priority.cls)}><Flag className="h-3 w-3" /> {priority.label}</span>
+                <span className={cn("inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md", priority.cls)}><Flag className="h-3 w-3" /> {priority.label}</span>
             )}
             {job.matchScore != null && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md text-violet-600 bg-violet-500/10"><Target className="h-3 w-3" /> Match {job.matchScore}%</span>
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md text-violet-600 bg-violet-500/10"><Target className="h-3 w-3" /> Match {job.matchScore}%</span>
             )}
             {stale != null && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md text-amber-600 bg-amber-500/10" title={`Sem movimento há ${stale} dias`}><AlertTriangle className="h-3 w-3" /> {stale}d parado</span>
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md text-amber-600 bg-amber-500/10" title={`Sem movimento há ${stale} dias`}><AlertTriangle className="h-3 w-3" /> {stale}d parado</span>
             )}
             {job.snapshotMeta && (
                 <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); onDetailsClick?.(job); }}
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md text-primary bg-primary/10 hover:bg-primary/20 transition-colors max-w-[180px]"
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md text-primary bg-primary/10 hover:bg-primary/20 transition-colors max-w-[180px]"
                     title={`Currículo enviado: ${job.snapshotMeta.resumeName}`}
                 >
                     <FileText className="h-3 w-3 shrink-0" /> <span className="truncate">{job.snapshotMeta.resumeName}</span>
@@ -163,7 +163,7 @@ export function JobListItem({ job, mode, onAiClick, onLinkClick, onApplyClick, o
         <Link
             href={`/projects/${job.project.slug}`}
             onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-md hover:bg-primary/20 transition-colors max-w-[160px] truncate"
+            className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-md hover:bg-primary/20 transition-colors max-w-[160px] truncate"
             title={`Abrir projeto: ${job.project.title}`}
         >
             <Folder className="h-3 w-3 shrink-0" /> <span className="truncate">{job.project.title}</span>
@@ -229,26 +229,26 @@ export function JobListItem({ job, mode, onAiClick, onLinkClick, onApplyClick, o
     // ============ GRID MODE ============
     if (mode === 'grid') {
         return (
-            <Card className="group relative flex flex-col justify-between rounded-2xl border border-border/40 bg-card p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:border-primary/30 h-full">
-                <CardContent className="p-0 space-y-4">
+            <Card className="group relative flex flex-col justify-between rounded-2xl border border-border/40 bg-card p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md hover:border-primary/30 h-full">
+                <CardContent className="p-0 space-y-5">
                     <div className="flex items-start justify-between gap-3">
-                        <div className="h-11 w-11 rounded-xl bg-background border border-border/40 flex items-center justify-center shadow-sm overflow-hidden p-2 shrink-0">
+                        <div className="h-12 w-12 rounded-xl bg-background border border-border/40 flex items-center justify-center shadow-sm overflow-hidden p-2 shrink-0">
                             {logoNode}
                         </div>
                         {statusDropdownNode}
                     </div>
 
-                    <div className="space-y-1 min-w-0">
+                    <div className="space-y-1.5 min-w-0">
                         <h4 className="font-bold text-base text-foreground tracking-tight truncate group-hover:text-primary transition-colors">{job.company}</h4>
                         <p className="text-sm text-muted-foreground truncate">{job.role}</p>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-1.5">
+                    <div className="flex flex-wrap items-center gap-2">
                         {job.salary && (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-md"><DollarSign className="h-3 w-3" /> {job.salary}</span>
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 bg-emerald-500/10 px-2.5 py-1 rounded-md"><DollarSign className="h-3 w-3" /> {job.salary}</span>
                         )}
                         {followUp && (
-                            <span className={cn("inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md", followUp.cls)}><CalendarClock className="h-3 w-3" /> {followUp.label}</span>
+                            <span className={cn("inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md", followUp.cls)}><CalendarClock className="h-3 w-3" /> {followUp.label}</span>
                         )}
                         {projectLinkNode}
                         {metaChips}
@@ -263,7 +263,7 @@ export function JobListItem({ job, mode, onAiClick, onLinkClick, onApplyClick, o
                     </div>
                 </CardContent>
 
-                <div className="mt-4 pt-3 flex items-center justify-end border-t border-border/40">
+                <div className="mt-5 pt-4 flex items-center justify-end border-t border-border/40">
                     {renderActions(false)}
                 </div>
 
@@ -274,22 +274,22 @@ export function JobListItem({ job, mode, onAiClick, onLinkClick, onApplyClick, o
 
     // ============ LIST MODE ============
     return (
-        <div className="group flex flex-col sm:flex-row sm:items-center gap-4 p-4 bg-card border border-border/40 rounded-2xl hover:shadow-md hover:border-primary/30 transition-all">
+        <div className="group flex flex-col sm:flex-row sm:items-center gap-5 p-5 bg-card border border-border/40 rounded-2xl hover:shadow-md hover:border-primary/30 transition-all">
             <div className="flex items-center gap-4 flex-1 min-w-0">
-                <div className="h-11 w-11 rounded-xl bg-background flex items-center justify-center border border-border/40 shrink-0 shadow-sm overflow-hidden p-2">
+                <div className="h-12 w-12 rounded-xl bg-background flex items-center justify-center border border-border/40 shrink-0 shadow-sm overflow-hidden p-2">
                     {logoNode}
                 </div>
-                <div className="min-w-0 space-y-1">
+                <div className="min-w-0 space-y-1.5">
                     <div className="flex items-center gap-2 flex-wrap">
                         <h4 className="font-bold text-base text-foreground tracking-tight truncate group-hover:text-primary transition-colors">{job.company}</h4>
                         {statusDropdownNode}
                     </div>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
                         <span className="font-medium truncate max-w-[220px]">{job.role}</span>
                         <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{new Date(job.appliedDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</span>
                         {job.location && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{job.location}</span>}
                         {job.salary && <span className="flex items-center gap-1 font-semibold text-emerald-600"><DollarSign className="h-3 w-3" />{job.salary}</span>}
-                        {followUp && <span className={cn("inline-flex items-center gap-1 font-semibold px-1.5 py-0.5 rounded-md", followUp.cls)}><CalendarClock className="h-3 w-3" />{followUp.label}</span>}
+                        {followUp && <span className={cn("inline-flex items-center gap-1 font-semibold px-2 py-1 rounded-md", followUp.cls)}><CalendarClock className="h-3 w-3" />{followUp.label}</span>}
                         {projectLinkNode}
                         {metaChips}
                     </div>

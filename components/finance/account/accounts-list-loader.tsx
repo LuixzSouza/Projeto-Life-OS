@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import type { ComponentProps } from "react";
 
 // Carrega o componente apenas no navegador (Cliente), ignorando o Servidor
 const AccountsList = dynamic(
@@ -11,7 +12,6 @@ const AccountsList = dynamic(
   }
 );
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function AccountsListLoader(props: any) {
+export function AccountsListLoader(props: ComponentProps<typeof AccountsList>) {
   return <AccountsList {...props} />;
 }

@@ -29,6 +29,15 @@ export async function generateRemindersAction(): Promise<NotificationInbox> {
   return getNotificationInbox();
 }
 
+/**
+ * Tick leve do badge ao vivo: gera só os lembretes determinísticos (sem a cauda
+ * de IA/backup) e devolve a caixa atualizada. Chamado em intervalo pelo sino.
+ */
+export async function tickInboxAction(): Promise<NotificationInbox> {
+  await generateReminders({ heavy: false });
+  return getNotificationInbox();
+}
+
 export async function deleteNotificationAction(id: string): Promise<NotificationInbox> {
   await deleteNotification(id);
   return getNotificationInbox();

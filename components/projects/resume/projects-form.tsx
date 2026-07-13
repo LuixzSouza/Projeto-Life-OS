@@ -3,9 +3,12 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Plus, Trash2, Link as LinkIcon, Github, LayoutTemplate, Target, Zap } from "lucide-react";
 import { PortfolioData } from "@/types/portfolio";
+import { SmartTextarea } from "./smart-textarea";
+import { BrainDumpBox } from "./brain-dump-box";
+import { ReorderControls, moveItem } from "./reorder-controls";
+import { parseProjectsFromText } from "@/app/(dashboard)/jobs/resume-ai-actions";
 
 interface ProjectsFormProps {
   data: PortfolioData;
@@ -23,11 +26,22 @@ export function ProjectsForm({ data, onChange }: ProjectsFormProps) {
 
   const removeProject = (id: string) => onChange({ ...data, projects: data.projects.filter((p) => p.id !== id) });
 
+  const moveProject = (index: number, dir: -1 | 1) => onChange({ ...data, projects: moveItem(data.projects, index, dir) });
+
   const updateProject = (id: string, field: string, value: string) => {
     onChange({
       ...data,
       projects: data.projects.map((p) => p.id === id ? { ...p, [field]: value } : p),
     });
+  };
+
+  // Brain dump: IA estrutura texto livre em projetos e adiciona ao formulário.
+  const handleBrainDump = async (text: string): Promise<{ ok: true; count: number } | { ok: false; error: string }> => {
+    const res = await parseProjectsFromText(text);
+    if (!res.success) return { ok: false, error: res.error };
+    const created = res.items.map((it) => ({ id: crypto.randomUUID(), ...it }));
+    onChange({ ...data, projects: [...data.projects, ...created] });
+    return { ok: true, count: created.length };
   };
 
   return (
@@ -57,8 +71,15 @@ export function ProjectsForm({ data, onChange }: ProjectsFormProps) {
         </Button>
       </div>
 
+      <BrainDumpBox
+        title="Adicionar projeto com IA"
+        description="Descreva o projeto livremente — a IA separa desafio, impacto e stack."
+        placeholder="Ex.: Fiz o site luixzsouza.com.br, um portfólio com design system próprio em Next.js e Tailwind, pra centralizar minha marca e cases. github.com/LuixzSouza..."
+        onParse={handleBrainDump}
+      />
+
       {/* GRID DE PROJETOS */}
-      <div className="grid grid-cols-1 xl:grid-cols-1 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-1 gap-8">
         {data.projects.map((proj, index) => (
           <div 
             key={proj.id} 
@@ -66,9 +87,17 @@ export function ProjectsForm({ data, onChange }: ProjectsFormProps) {
           >
             {/* Cabeçalho do Card */}
             <div className="flex justify-between items-center mb-5 border-b border-border/40 pb-3">
-              <span className="bg-primary/10 text-primary text-[9px] uppercase tracking-widest font-black px-3 py-1.5 rounded-lg border border-primary/20">
-                PROJETO #{index + 1}
-              </span>
+              <div className="flex items-center gap-3">
+                <span className="bg-primary/10 text-primary text-[9px] uppercase tracking-widest font-black px-3 py-1.5 rounded-lg border border-primary/20">
+                  PROJETO #{index + 1}
+                </span>
+                <ReorderControls
+                  index={index}
+                  count={data.projects.length}
+                  onMove={(dir) => moveProject(index, dir)}
+                  orientation="horizontal"
+                />
+              </div>
               <Button
                 size="icon"
                 variant="ghost"
@@ -126,22 +155,30 @@ export function ProjectsForm({ data, onChange }: ProjectsFormProps) {
                       <Label className="text-[10px] font-black uppercase tracking-widest text-foreground flex items-center gap-1.5">
                         <Target className="h-3 w-3 text-primary" /> Desafio (Problema)
                       </Label>
-                      <Textarea 
-                          value={proj.problem} 
-                          onChange={(e) => updateProject(proj.id, "problem", e.target.value)} 
+                      <SmartTextarea
+                          label={`Desafio — ${proj.title || "projeto"}`}
+                          value={proj.problem}
+                          onChange={(v) => updateProject(proj.id, "problem", v)}
                           placeholder="O cliente tinha um processo manual que tomava 5 horas..."
-                          className="bg-background min-h-[70px] text-sm rounded-xl resize-none border-border/40 shadow-inner focus-visible:ring-primary/20"
+                          polishKind="project-problem"
+                          polishContext={[proj.title, proj.role, proj.stack.join(", ")].filter(Boolean).join(" · ")}
+                          minHeight={70}
+                          className="bg-background text-sm shadow-inner"
                       />
                   </div>
                   <div className="space-y-2">
                       <Label className="text-[10px] font-black uppercase tracking-widest text-emerald-600 dark:text-emerald-500 flex items-center gap-1.5">
                         <Zap className="h-3 w-3" /> Resultados (Impacto)
                       </Label>
-                      <Textarea 
-                          value={proj.impact} 
-                          onChange={(e) => updateProject(proj.id, "impact", e.target.value)} 
+                      <SmartTextarea
+                          label={`Impacto — ${proj.title || "projeto"}`}
+                          value={proj.impact}
+                          onChange={(v) => updateProject(proj.id, "impact", v)}
                           placeholder="Automação reduziu o tempo para 10 minutos (redução de 96%)..."
-                          className="bg-background min-h-[70px] text-sm rounded-xl resize-none border-emerald-500/20 shadow-inner focus-visible:ring-emerald-500/20"
+                          polishKind="project-impact"
+                          polishContext={[proj.title, proj.role, proj.stack.join(", ")].filter(Boolean).join(" · ")}
+                          minHeight={70}
+                          className="bg-background text-sm border-emerald-500/20 shadow-inner"
                       />
                   </div>
               </div>

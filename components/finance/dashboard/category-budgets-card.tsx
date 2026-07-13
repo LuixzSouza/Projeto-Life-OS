@@ -80,7 +80,7 @@ export function CategoryBudgetsCard({ items, options }: CategoryBudgetsCardProps
   };
 
   return (
-    <div className="rounded-[2rem] border border-border/40 bg-card p-6 shadow-sm space-y-5">
+    <div className="rounded-2xl border border-border/40 bg-card p-6 shadow-sm space-y-5">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <span className="rounded-lg bg-primary/10 p-1.5">

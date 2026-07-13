@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import {
   Bell, Check, CheckCheck, RefreshCw, Calendar, Cake, Receipt, ListTodo, Layers,
   Inbox, BadgeCheck, HandCoins, CalendarClock, X, Trash2, Gauge, Handshake,
@@ -9,7 +10,6 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import {
   refreshInboxAction,
@@ -18,8 +18,12 @@ import {
   deleteNotificationAction,
   clearReadAction,
   generateRemindersAction,
+  tickInboxAction,
 } from "@/app/(dashboard)/notifications/actions";
 import type { ClientNotification, NotificationInbox } from "@/lib/notifications";
+
+// Intervalo do polling do badge ao vivo (mesma ordem do BlockReminders).
+const LIVE_POLL_MS = 90_000;
 
 const ICONS: Record<string, React.ElementType> = {
   INVOICE_DUE: Receipt,
@@ -58,6 +62,28 @@ function dueChip(iso: string | null): { text: string; tone: string } | null {
   if (d === 1) return { text: "amanhã", tone: "bg-primary/10 text-primary" };
   if (d <= 14) return { text: `em ${d}d`, tone: "bg-muted text-muted-foreground" };
   return null;
+}
+
+// Agrupa as notificações por faixa de data (Hoje / Ontem / Últimos 7 dias /
+// Anteriores) para uma caixa longa ficar escaneável. Ordena por createdAt desc;
+// o destaque de "não lida" fica no estilo da linha, não na posição.
+function groupByDay(items: ClientNotification[]): { label: string; items: ClientNotification[] }[] {
+  const startToday = new Date();
+  startToday.setHours(0, 0, 0, 0);
+  const startYesterday = startToday.getTime() - 864e5;
+  const start7 = startToday.getTime() - 6 * 864e5;
+  const buckets = [
+    { label: "Hoje", min: startToday.getTime(), items: [] as ClientNotification[] },
+    { label: "Ontem", min: startYesterday, items: [] as ClientNotification[] },
+    { label: "Últimos 7 dias", min: start7, items: [] as ClientNotification[] },
+    { label: "Anteriores", min: -Infinity, items: [] as ClientNotification[] },
+  ];
+  const sorted = [...items].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  for (const n of sorted) {
+    const t = new Date(n.createdAt).getTime();
+    (buckets.find((bk) => t >= bk.min) ?? buckets[buckets.length - 1]).items.push(n);
+  }
+  return buckets.filter((bk) => bk.items.length > 0).map(({ label, items }) => ({ label, items }));
 }
 
 // Detecção de mobile (sm-) para trocar Popover ↔ bottom sheet.
@@ -103,6 +129,49 @@ export function NotificationBell({
     // antes era preciso clicar no refresh para os lembretes aparecerem.
     if (o) run(generateRemindersAction);
   };
+
+  // Badge ao vivo: enquanto a aba está visível, gera os lembretes leves e
+  // recarrega a caixa em intervalo, para o contador refletir novidades sem o
+  // usuário precisar reabrir o sino. Um toast discreto anuncia o que chegou
+  // (só com o painel fechado — aberto, a lista já mostra). Refs (sincronizados
+  // via efeito, nunca no corpo do render) evitam closures obsoletas e
+  // re-registrar o intervalo a cada render.
+  const openRef = useRef(open);
+  const unreadRef = useRef(inbox.unreadCount);
+  useEffect(() => { openRef.current = open; }, [open]);
+  useEffect(() => { unreadRef.current = inbox.unreadCount; }, [inbox.unreadCount]);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const poll = async () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      try {
+        const fresh = await tickInboxAction();
+        const prev = unreadRef.current;
+        setInbox(fresh);
+        if (fresh.unreadCount > prev && !openRef.current) {
+          const delta = fresh.unreadCount - prev;
+          toast("🔔 Nova notificação", {
+            description: delta > 1 ? `${delta} novidades na sua caixa.` : "Você tem uma novidade na caixa.",
+          });
+        }
+      } catch {
+        /* silencioso — mantém o estado atual */
+      }
+    };
+
+    const start = () => { if (!timer) timer = setInterval(() => void poll(), LIVE_POLL_MS); };
+    const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
+    const onVisibility = () => {
+      if (typeof document !== "undefined" && document.hidden) stop();
+      else { void poll(); start(); } // ao voltar à aba: checa já e retoma
+    };
+
+    start();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => { stop(); document.removeEventListener("visibilitychange", onVisibility); };
+  }, []);
 
   const unread = inbox.unreadCount;
   const readCount = inbox.items.filter((n) => n.readAt).length;
@@ -168,8 +237,13 @@ export function NotificationBell({
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-      <PopoverContent align="start" side="right" sideOffset={12} className="flex w-96 flex-col p-0">
-        <div className="flex items-center justify-between border-b border-border/60 px-3 py-2.5">
+      <PopoverContent
+        align="start"
+        side="right"
+        sideOffset={12}
+        className="flex max-h-[min(32rem,calc(100dvh-4rem))] w-96 flex-col overflow-hidden p-0"
+      >
+        <div className="flex shrink-0 items-center justify-between border-b border-border/60 px-3 py-2.5">
           <span className="text-sm font-semibold">Notificações</span>
         </div>
         {panel}
@@ -201,7 +275,7 @@ function InboxPanel({
   return (
     <>
       {/* Abas + ações */}
-      <div className="flex items-center justify-between gap-2 border-b border-border/40 px-3 py-2">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border/40 px-3 py-2">
         <div className="flex rounded-lg border border-border/40 bg-muted/40 p-0.5">
           <TabButton active={tab === "unread"} onClick={() => setTab("unread")}>
             Não lidas{unread > 0 ? ` (${unread})` : ""}
@@ -237,7 +311,15 @@ function InboxPanel({
         </div>
       </div>
 
-      <ScrollArea className={cn(isMobile ? "flex-1" : "max-h-96")}>
+      <div
+        className={cn(
+          // Scroll NATIVO — não depende de altura percentual (o ScrollArea do
+          // Radix não rolava dentro do popover). max-h fixo no desktop garante
+          // que sempre haja overflow rolável; flex-1 no sheet mobile.
+          "overflow-y-auto overscroll-contain",
+          isMobile ? "min-h-0 flex-1" : "max-h-96"
+        )}
+      >
         {visible.length === 0 ? (
           <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
             <Inbox className="h-8 w-8 text-muted-foreground/40" />
@@ -251,19 +333,26 @@ function InboxPanel({
             </p>
           </div>
         ) : (
-          <ul className="divide-y divide-border/40">
-            {visible.map((n) => (
-              <NotificationRow
-                key={n.id}
-                n={n}
-                onRead={() => onRead(n.id)}
-                onDelete={() => onDelete(n.id)}
-                onNavigate={onNavigate}
-              />
-            ))}
-          </ul>
+          groupByDay(visible).map((group) => (
+            <section key={group.label}>
+              <h4 className="sticky top-0 z-10 border-b border-border/30 bg-background/95 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground/60 backdrop-blur">
+                {group.label}
+              </h4>
+              <ul className="divide-y divide-border/40">
+                {group.items.map((n) => (
+                  <NotificationRow
+                    key={n.id}
+                    n={n}
+                    onRead={() => onRead(n.id)}
+                    onDelete={() => onDelete(n.id)}
+                    onNavigate={onNavigate}
+                  />
+                ))}
+              </ul>
+            </section>
+          ))
         )}
-      </ScrollArea>
+      </div>
     </>
   );
 }

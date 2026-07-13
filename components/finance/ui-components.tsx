@@ -82,7 +82,7 @@ export const MetricCard: FC<MetricCardProps> = ({
   };
 
   return (
-    <Card className={cn("relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 group", variants[variant])}>
+    <Card className={cn("relative overflow-hidden transition-all duration-300 shadow-sm hover:shadow-md hover:-translate-y-0.5 group", variants[variant])}>
       <CardContent className="p-6 flex flex-col justify-between h-full min-h-[140px]">
         
         {/* Header do Card */}

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import {
   Tag as TagIcon, Paperclip, Plus, Trash2, ExternalLink, Loader2,
   FileText, Image as ImageIcon, Link2, GitBranch, ArrowRight, X,
+  List, Network,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -11,7 +12,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { externalHref } from "@/lib/url";
 import { ENTITY_ICON, ENTITY_LABEL, FALLBACK_ICON } from "./entity-meta";
+import { ConnectExplainer } from "./connect-explainer";
+import { ConnectGraph } from "./connect-graph";
 import {
   getTaggedEntities, createTagAction, updateTagAction, deleteTagAction, removeAttachmentAction,
   removeLinkCenter,
@@ -48,7 +52,9 @@ export function ConnectCenter({
   initialLinks: LinkRow[];
 }) {
   return (
-    <Tabs defaultValue="tags" className="space-y-6">
+    <div className="space-y-6">
+      <ConnectExplainer />
+      <Tabs defaultValue="tags" className="space-y-6">
       <TabsList>
         <TabsTrigger value="tags" className="gap-2">
           <TagIcon className="h-4 w-4" /> Tags
@@ -65,20 +71,21 @@ export function ConnectCenter({
       </TabsList>
 
       <TabsContent value="tags" className="space-y-4">
-        <TabHint>Suas etiquetas e tudo que cada uma conecta entre os módulos. Clique numa tag para ver os itens.</TabHint>
+        <TabHint>Suas etiquetas e tudo que cada uma reúne entre os módulos. Clique numa tag para ver, no mesmo lugar, as tarefas, notas e gastos marcados com ela.</TabHint>
         <TagsTab initialTags={initialTags} />
       </TabsContent>
 
       <TabsContent value="attachments" className="space-y-4">
-        <TabHint>Todos os arquivos e links anexados a qualquer item, reunidos num lugar só.</TabHint>
+        <TabHint>Todos os arquivos e links que você anexou a qualquer item (contratos, prints, páginas), reunidos aqui — clique para abrir ou ir ao item de origem.</TabHint>
         <AttachmentsTab initial={initialAttachments} />
       </TabsContent>
 
       <TabsContent value="links" className="space-y-4">
-        <TabHint>O grafo de conexões entre os módulos: o que aponta para o quê.</TabHint>
+        <TabHint>O mapa das ligações entre seus itens: o que se conecta a quê (a tarefa que nasceu de uma nota, o gasto ligado a um projeto…).</TabHint>
         <LinksTab initial={initialLinks} />
       </TabsContent>
-    </Tabs>
+      </Tabs>
+    </div>
   );
 }
 
@@ -344,7 +351,7 @@ function AttachmentsTab({ initial }: { initial: AttachmentRow[] }) {
             </div>
             <div className="flex items-center justify-between border-t border-border/40 px-3 py-1.5">
               {a.url ? (
-                <a href={a.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                <a href={externalHref(a.url) ?? a.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
                   Abrir <ExternalLink className="h-3 w-3" />
                 </a>
               ) : (
@@ -389,6 +396,7 @@ function LinkEndpoint({ entity }: { entity: LinkRow["from"] }) {
 
 function LinksTab({ initial }: { initial: LinkRow[] }) {
   const [links, setLinks] = useState<LinkRow[]>(initial);
+  const [view, setView] = useState<"list" | "graph">("list");
   const [pending, startTransition] = useTransition();
 
   const remove = (id: string) => {
@@ -415,6 +423,43 @@ function LinksTab({ initial }: { initial: LinkRow[] }) {
   }
 
   return (
+    <div className="space-y-4">
+      {/* Alterna entre a lista e o mapa visual da MESMA rede de conexões. */}
+      <div className="flex items-center gap-1 rounded-lg border border-border/50 bg-card p-0.5 w-fit">
+        <ViewToggle active={view === "list"} onClick={() => setView("list")} icon={List} label="Lista" />
+        <ViewToggle active={view === "graph"} onClick={() => setView("graph")} icon={Network} label="Mapa" />
+      </div>
+
+      {view === "graph" ? (
+        <ConnectGraph links={links} />
+      ) : (
+        <LinkList links={links} pending={pending} onRemove={remove} />
+      )}
+    </div>
+  );
+}
+
+function ViewToggle({ active, onClick, icon: Icon, label }: {
+  active: boolean; onClick: () => void; icon: typeof List; label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+        active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground",
+      )}
+    >
+      <Icon className="h-3.5 w-3.5" /> {label}
+    </button>
+  );
+}
+
+function LinkList({ links, pending, onRemove }: {
+  links: LinkRow[]; pending: boolean; onRemove: (id: string) => void;
+}) {
+  return (
     <ul className="divide-y divide-border/40 overflow-hidden rounded-xl border border-border/50">
       {links.map((l) => (
         <li key={l.id} className="flex items-center gap-3 bg-card px-4 py-3">
@@ -427,7 +472,7 @@ function LinksTab({ initial }: { initial: LinkRow[] }) {
           </div>
           <button
             disabled={pending}
-            onClick={() => remove(l.id)}
+            onClick={() => onRemove(l.id)}
             className="shrink-0 text-muted-foreground transition-colors hover:text-destructive"
             title="Remover relação"
           >

@@ -83,7 +83,7 @@ function ProfileCard({ active, onClick, icon: Icon, theme, title, subtitle, desc
             className={cn(
                 "relative group flex flex-col items-start text-left p-6 rounded-2xl border-2 transition-all duration-300 outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 active:scale-[0.98]",
                 active 
-                    ? `bg-background shadow-lg ${t.activeBorder}` 
+                    ? `bg-background shadow-md ${t.activeBorder}` 
                     : "bg-card border-transparent shadow-sm hover:border-border hover:shadow-md"
             )}
         >

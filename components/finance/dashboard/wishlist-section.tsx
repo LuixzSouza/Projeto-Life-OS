@@ -51,7 +51,7 @@ export function WishlistSection({ wishlist, accounts, totalBalance }: WishlistSe
           <WishlistGridLoader items={wishlist} accounts={accountOptions} totalBalance={totalBalance} />
         </div>
       ) : (
-        <div className="rounded-[2rem] border border-dashed border-border/60 bg-muted/10 mt-6 transition-colors hover:bg-muted/20">
+        <div className="rounded-2xl border border-dashed border-border/60 bg-muted/10 mt-6 transition-colors hover:bg-muted/20">
           <EmptyState
             icon={ShoppingBag}
             title="Sua lista está vazia"

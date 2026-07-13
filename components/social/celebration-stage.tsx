@@ -7,11 +7,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { Cake, ArrowLeft, Share2, Sparkles, Heart, Check, Pencil } from "lucide-react";
+import { Cake, ArrowLeft, Share2, Sparkles, Heart, Check, Pencil, ImageDown, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
+import { renderCelebrationCard, cardFileName } from "@/lib/celebration-card";
 import { CelebrationEditor } from "./celebration-editor";
 import type { CelebrationData, CelebrationSource } from "@/app/(dashboard)/social/celebration-actions";
 
@@ -105,18 +106,16 @@ function FloatingEmojis({ emojis }: { emojis: string[] }) {
 }
 
 // ---------------------------------------------------------------------------
-// Foto: única (hero) ou várias (carrossel com crossfade)
+// Fotos: uma grande (hero, com anel girando) ou várias juntas, lado a lado.
 // ---------------------------------------------------------------------------
-function PhotoHero({ photos, name, glow }: { photos: string[]; name: string; glow: string }) {
-  const [idx, setIdx] = useState(0);
-  const initials = (name || "?").trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+const MAX_CLUSTER = 4;
 
-  useEffect(() => {
-    if (photos.length < 2) return;
-    const t = setInterval(() => setIdx((i) => (i + 1) % photos.length), 3500);
-    return () => clearInterval(t);
-  }, [photos.length]);
+function initialsOf(name: string): string {
+  return (name || "?").trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+}
 
+/** Foto única grande — com o anel de brilho girando. */
+function SinglePhoto({ src, name, glow }: { src: string | null; name: string; glow: string }) {
   return (
     <motion.div
       initial={{ scale: 0.6, opacity: 0, y: 20 }}
@@ -127,23 +126,13 @@ function PhotoHero({ photos, name, glow }: { photos: string[]; name: string; glo
         glow,
       )}
     >
-      {photos.length === 0 ? (
-        <div className="flex h-full w-full items-center justify-center bg-white/40 text-4xl font-black text-foreground/70 backdrop-blur dark:bg-white/5">
-          {initials}
-        </div>
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt={name} className="h-full w-full object-cover" />
       ) : (
-        <AnimatePresence mode="wait">
-          <motion.img
-            key={idx}
-            src={photos[idx]}
-            alt={name}
-            className="h-full w-full object-cover"
-            initial={{ opacity: 0, scale: 1.08 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.7 }}
-          />
-        </AnimatePresence>
+        <div className="flex h-full w-full items-center justify-center bg-white/40 text-4xl font-black text-foreground/70 backdrop-blur dark:bg-white/5">
+          {initialsOf(name)}
+        </div>
       )}
       {/* anel girando de brilho */}
       <motion.span
@@ -154,6 +143,42 @@ function PhotoHero({ photos, name, glow }: { photos: string[]; name: string; glo
       />
     </motion.div>
   );
+}
+
+/** Várias fotos juntas: círculos sobrepostos, entrando em cascata. */
+function PhotoCluster({ photos, name, glow }: { photos: string[]; name: string; glow: string }) {
+  const shown = photos.slice(0, MAX_CLUSTER);
+  // Círculos menores conforme aumenta a quantidade, para caber no mobile.
+  const size = shown.length >= 4 ? "h-24 w-24 sm:h-28 sm:w-28"
+    : shown.length === 3 ? "h-28 w-28 sm:h-32 sm:w-32"
+    : "h-32 w-32 sm:h-40 sm:w-40";
+  return (
+    <div className="flex items-center justify-center">
+      {shown.map((src, i) => (
+        <motion.div
+          key={`${i}-${src.slice(0, 24)}`}
+          initial={{ scale: 0.5, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 130, damping: 14, delay: 0.15 + i * 0.09 }}
+          className={cn(
+            "relative overflow-hidden rounded-full ring-4 ring-white/80 dark:ring-white/10",
+            size,
+            glow,
+            i > 0 && "-ml-5 sm:-ml-7", // sobreposição
+          )}
+          style={{ zIndex: shown.length - i }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={src} alt={name} className="h-full w-full object-cover" />
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
+function PhotoHero({ photos, name, glow }: { photos: string[]; name: string; glow: string }) {
+  if (photos.length >= 2) return <PhotoCluster photos={photos} name={name} glow={glow} />;
+  return <SinglePhoto src={photos[0] ?? null} name={name} glow={glow} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -172,6 +197,59 @@ export function CelebrationStage({
   const [source, setSource] = useState<CelebrationSource>(data.source);
   const [copied, setCopied] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [imgBusy, setImgBusy] = useState(false);
+
+  // Gera o cartão como IMAGEM e compartilha o arquivo (celular) ou baixa o PNG.
+  // Ideal quando o link público não está acessível (ex.: rodando local).
+  const saveImage = async () => {
+    if (imgBusy) return;
+    setImgBusy(true);
+    const toastId = toast.loading("Gerando imagem…");
+    try {
+      const blob = await renderCelebrationCard({
+        displayName: data.displayName,
+        fullName: data.fullName,
+        greeting: theme.greeting,
+        age: data.age,
+        isToday: data.isToday,
+        paragraphs,
+        photos,
+        confetti: theme.confetti,
+      });
+      const file = new File([blob], cardFileName(data.displayName), { type: "image/png" });
+
+      // Compartilhamento nativo de arquivo (melhor no celular: manda direto).
+      if (typeof navigator !== "undefined" && navigator.share && navigator.canShare?.({ files: [file] })) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: `Feliz aniversário, ${data.displayName}!`,
+            text: `Uma homenagem para ${data.displayName} 🎉`,
+          });
+          toast.dismiss(toastId);
+          return;
+        } catch (err) {
+          // Cancelou o compartilhamento → não baixa nada.
+          if (err instanceof Error && err.name === "AbortError") { toast.dismiss(toastId); return; }
+          // Qualquer outra falha → cai para o download abaixo.
+        }
+      }
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = file.name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      toast.success("Imagem salva! Agora é só enviar. 🎁", { id: toastId });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não consegui gerar a imagem.", { id: toastId });
+    } finally {
+      setImgBusy(false);
+    }
+  };
 
   const share = async () => {
     if (!data.shareUrl) return;
@@ -298,14 +376,23 @@ export function CelebrationStage({
             transition={{ delay: 0.7 + paragraphs.length * 0.25 + 0.2 }}
             className="mt-12 flex flex-wrap items-center justify-center gap-3"
           >
+            <button
+              type="button"
+              onClick={saveImage}
+              disabled={imgBusy}
+              className="inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-bold text-background shadow-lg transition-transform hover:scale-105 active:scale-95 disabled:opacity-60 disabled:hover:scale-100"
+            >
+              {imgBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageDown className="h-4 w-4" />}
+              {imgBusy ? "Gerando…" : "Gerar imagem para enviar"}
+            </button>
             {data.shareUrl && (
               <button
                 type="button"
                 onClick={share}
-                className="inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-bold text-background shadow-lg transition-transform hover:scale-105 active:scale-95"
+                className="inline-flex items-center gap-2 rounded-full bg-white/60 px-4 py-2.5 text-sm font-semibold text-foreground/80 backdrop-blur transition-colors hover:bg-white/80 dark:bg-white/10 dark:hover:bg-white/20"
               >
                 {copied ? <Check className="h-4 w-4" /> : <Share2 className="h-4 w-4" />}
-                {copied ? "Link copiado!" : "Compartilhar com a pessoa"}
+                {copied ? "Link copiado!" : "Copiar link"}
               </button>
             )}
             <button
@@ -315,6 +402,26 @@ export function CelebrationStage({
             >
               <Pencil className="h-4 w-4" />
               Personalizar texto e fotos
+            </button>
+          </motion.div>
+        )}
+
+        {/* Convidado também pode salvar a imagem para guardar/repostar */}
+        {variant === "guest" && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.7 + paragraphs.length * 0.25 + 0.2 }}
+            className="mt-12"
+          >
+            <button
+              type="button"
+              onClick={saveImage}
+              disabled={imgBusy}
+              className="inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-bold text-background shadow-lg transition-transform hover:scale-105 active:scale-95 disabled:opacity-60 disabled:hover:scale-100"
+            >
+              {imgBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageDown className="h-4 w-4" />}
+              {imgBusy ? "Gerando…" : "Salvar como imagem"}
             </button>
           </motion.div>
         )}

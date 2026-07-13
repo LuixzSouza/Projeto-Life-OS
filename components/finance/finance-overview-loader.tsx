@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import type { ComponentProps } from "react";
 
 // Importa o componente original dinamicamente, DESATIVANDO o SSR
 const FinanceOverview = dynamic(
@@ -11,7 +12,6 @@ const FinanceOverview = dynamic(
   }
 );
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function FinanceOverviewLoader(props: any) {
+export function FinanceOverviewLoader(props: ComponentProps<typeof FinanceOverview>) {
   return <FinanceOverview {...props} />;
 }

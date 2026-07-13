@@ -77,7 +77,7 @@ export function FixedIncomeCalculator({ cdi, ipca, preset }: FixedIncomeCalculat
   return (
     <div className="grid gap-6 lg:grid-cols-2">
       {/* ENTRADAS */}
-      <div className="space-y-5 rounded-[2rem] border border-border/40 bg-card p-6 shadow-sm">
+      <div className="space-y-5 rounded-2xl border border-border/40 bg-card p-6 shadow-sm">
         <h4 className="flex items-center gap-2 text-sm font-extrabold text-foreground">
           <Calculator className="h-4 w-4 text-primary" /> Simulador real
         </h4>
@@ -122,7 +122,7 @@ export function FixedIncomeCalculator({ cdi, ipca, preset }: FixedIncomeCalculat
       </div>
 
       {/* RESULTADO */}
-      <div className="space-y-4 rounded-[2rem] border border-primary/20 bg-primary/[0.03] p-6 shadow-sm">
+      <div className="space-y-4 rounded-2xl border border-primary/20 bg-primary/[0.03] p-6 shadow-sm">
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Valor líquido em {months} meses</span>
           <span className="rounded-full bg-primary/10 px-2.5 py-1 text-[10px] font-black text-primary">{result.annualRate.toFixed(2)}% a.a.</span>

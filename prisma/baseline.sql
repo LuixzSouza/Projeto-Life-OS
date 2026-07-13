@@ -461,6 +461,21 @@ CREATE TABLE "Portfolio" (
 );
 
 -- CreateTable
+CREATE TABLE "Resume" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "locale" TEXT NOT NULL DEFAULT 'pt-BR',
+    "template" TEXT NOT NULL DEFAULT 'MODERN',
+    "isBase" BOOLEAN NOT NULL DEFAULT false,
+    "parentId" TEXT,
+    "data" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    "userId" TEXT NOT NULL,
+    CONSTRAINT "Resume_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
 CREATE TABLE "InvestmentHolding" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "ticker" TEXT NOT NULL,
@@ -777,6 +792,13 @@ CREATE TABLE "Settings" (
     "foodApiEnabled" BOOLEAN NOT NULL DEFAULT true,
     "sleepGoalHours" REAL,
     "calorieGoalOverride" INTEGER,
+    "notifyEmailEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "notifyEmail" TEXT,
+    "notifySmtpHost" TEXT DEFAULT 'smtp.gmail.com',
+    "notifySmtpPort" INTEGER DEFAULT 465,
+    "notifySmtpUser" TEXT,
+    "notifySmtpPass" TEXT,
+    "notifyMinPriority" TEXT NOT NULL DEFAULT 'HIGH',
     "storagePath" TEXT DEFAULT 'D:/LifeOS_Data',
     "updatedAt" DATETIME NOT NULL,
     "onboardingCompleted" BOOLEAN NOT NULL DEFAULT false,
@@ -1078,6 +1100,7 @@ CREATE TABLE "Notification" (
     "priority" TEXT NOT NULL DEFAULT 'NORMAL',
     "dueAt" DATETIME,
     "readAt" DATETIME,
+    "emailedAt" DATETIME,
     "userId" TEXT NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "Notification_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
@@ -1331,6 +1354,9 @@ CREATE INDEX "JobEvent_userId_idx" ON "JobEvent"("userId");
 CREATE UNIQUE INDEX "Portfolio_userId_key" ON "Portfolio"("userId");
 
 -- CreateIndex
+CREATE INDEX "Resume_userId_idx" ON "Resume"("userId");
+
+-- CreateIndex
 CREATE INDEX "InvestmentHolding_userId_idx" ON "InvestmentHolding"("userId");
 
 -- CreateIndex
@@ -1582,21 +1608,3 @@ CREATE INDEX "EntityLink_userId_idx" ON "EntityLink"("userId");
 -- CreateIndex
 CREATE UNIQUE INDEX "EntityLink_fromType_fromId_toType_toId_kind_key" ON "EntityLink"("fromType", "fromId", "toType", "toId", "kind");
 
-
--- CreateTable
-CREATE TABLE "Resume" (
-    "id" TEXT NOT NULL PRIMARY KEY,
-    "name" TEXT NOT NULL,
-    "locale" TEXT NOT NULL DEFAULT 'pt-BR',
-    "template" TEXT NOT NULL DEFAULT 'MODERN',
-    "isBase" BOOLEAN NOT NULL DEFAULT false,
-    "parentId" TEXT,
-    "data" TEXT NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    "userId" TEXT NOT NULL,
-    CONSTRAINT "Resume_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
-);
-
--- CreateIndex
-CREATE INDEX "Resume_userId_idx" ON "Resume"("userId");

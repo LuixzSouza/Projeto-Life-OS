@@ -46,6 +46,7 @@ import { SessionsCard } from "@/components/settings/sessions-card"; // ✅ Desco
 import { DbOverviewCard, type DbOverview } from "@/components/settings/db-overview-card"; // ✅ Card "Seu banco"
 import { MigrateDbCard } from "@/components/settings/migrate-db-card"; // ✅ Mudar de banco (Fase 3)
 import { SpaceOptimizerCard } from "@/components/settings/space-optimizer-card"; // ✅ Otimizar espaço (plano grátis)
+import { NotificationsCard } from "@/components/settings/notifications-card"; // ✅ Receber avisos por e-mail (celular)
 
 const SETTINGS_TABS = ["profile", "intelligence", "integrations", "system", "security"] as const;
 type SettingsTab = (typeof SETTINGS_TABS)[number];
@@ -386,11 +387,38 @@ export default async function SettingsPage({
                         initialWorkEnd={settings?.workEnd}
                         initialReminderLead={settings?.reminderLeadMinutes}
                         userName={user?.name}
-                        userEmail={user?.email} 
-                        userAvatar={user?.avatarUrl} 
-                        userBio={user?.bio} 
-                        userCover={user?.coverUrl} 
+                        userEmail={user?.email}
+                        userAvatar={user?.avatarUrl}
+                        userBio={user?.bio}
+                        userCover={user?.coverUrl}
                     />
+
+                    {/* Notificações por e-mail (receber no celular) */}
+                    <div className="grid gap-6 md:grid-cols-12 pt-6 border-t border-border">
+                        <div className="md:col-span-4">
+                            <h3 className="text-lg font-medium text-foreground">Notificações</h3>
+                            <p className="text-sm text-muted-foreground">
+                                Receba os avisos importantes por e-mail, direto no seu celular.
+                            </p>
+                        </div>
+                        <div className="md:col-span-8">
+                            <Card className="border-border shadow-sm bg-card">
+                                <CardContent className="p-6">
+                                    <NotificationsCard
+                                        initial={{
+                                            enabled: settings?.notifyEmailEnabled ?? false,
+                                            email: settings?.notifyEmail ?? "",
+                                            smtpHost: settings?.notifySmtpHost ?? "smtp.gmail.com",
+                                            smtpPort: settings?.notifySmtpPort ?? 465,
+                                            smtpUser: settings?.notifySmtpUser ?? "",
+                                            hasPassword: !!rawSettings?.notifySmtpPass,
+                                            minPriority: (settings?.notifyMinPriority as "LOW" | "NORMAL" | "HIGH") ?? "HIGH",
+                                        }}
+                                    />
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </div>
                 </TabsContent>
 
                 {/* === ABA 3: INTELIGÊNCIA ARTIFICIAL === */}

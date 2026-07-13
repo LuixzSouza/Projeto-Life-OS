@@ -61,7 +61,7 @@ export function MonthlySummary({ totalBalance, monthIncome, monthExpense, monthl
       </div>
 
       {/* Gráfico de Fluxo de Caixa (AreaChart) */}
-      <div className="rounded-[2rem] border border-border/40 bg-card shadow-sm p-6 md:p-8">
+      <div className="rounded-2xl border border-border/40 bg-card shadow-sm p-6 md:p-8">
         <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
           <h3 className="text-lg font-extrabold text-foreground flex items-center gap-3">
             <div className="p-2 bg-primary/10 rounded-xl"><TrendingUp className="h-5 w-5 text-primary" /></div>

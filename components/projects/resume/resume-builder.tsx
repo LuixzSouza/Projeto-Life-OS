@@ -13,13 +13,20 @@ import {
     LayoutTemplate, Save, User, Briefcase, Layers, Code,
     GraduationCap, MessageSquare, ShieldCheck, Loader2, CheckCircle2,
     Award, Languages, FileDown, Download, Upload, ChevronDown, Database, Lightbulb, Circle, ArrowLeft,
-    Eye, EyeOff, FileText
+    Eye, EyeOff
 } from "lucide-react";
 import { PortfolioData, INITIAL_PORTFOLIO } from "@/types/portfolio";
 import { saveResumeData } from "@/app/(dashboard)/jobs/resume-actions";
+import { reviewResume } from "@/app/(dashboard)/jobs/resume-ai-actions";
 import { resumeHealth } from "@/lib/resume-health";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { Sparkles } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogBody } from "@/components/ui/dialog";
+import { FieldFocusProvider } from "./field-focus";
+import { SectionOrderControl } from "./section-order-control";
 
 import { HeroForm } from "./hero-form";
 import { ExperienceForm } from "./experience-form";
@@ -80,6 +87,27 @@ export function ResumeBuilder({ initialData, resumeId, resumeName, locale, templ
 
     // Toggle da prévia: escondê-la dá tela cheia ao formulário (foco no preenchimento).
     const [showPreview, setShowPreview] = useState(true);
+
+    // Revisão do CV pela IA (coach): modal com markdown de pontos fortes/melhorias.
+    const [reviewOpen, setReviewOpen] = useState(false);
+    const [reviewLoading, setReviewLoading] = useState(false);
+    const [reviewText, setReviewText] = useState("");
+
+    const handleReview = async () => {
+        setReviewOpen(true);
+        setReviewLoading(true);
+        setReviewText("");
+        try {
+            const res = await reviewResume(data);
+            if (res.success) setReviewText(res.content);
+            else { setReviewText(""); toast.error(res.error); setReviewOpen(false); }
+        } catch {
+            toast.error("Falha ao consultar a IA.");
+            setReviewOpen(false);
+        } finally {
+            setReviewLoading(false);
+        }
+    };
 
     // 2. MIGRAÇÃO SUAVE: se houver currículo legado no localStorage e o banco
     //    estiver vazio, importa uma única vez e limpa a chave antiga.
@@ -181,8 +209,9 @@ export function ResumeBuilder({ initialData, resumeId, resumeName, locale, templ
     const pendingTips = useMemo(() => resumeHealth(data).filter((t) => !t.done), [data]);
 
     return (
-        // Altura travada só no desktop (painéis lado a lado com scroll interno).
-        // No mobile o conteúdo flui na página — altura fixa esmagava os painéis.
+        <FieldFocusProvider>
+        {/* Altura travada só no desktop (painéis lado a lado com scroll interno).
+            No mobile o conteúdo flui na página — altura fixa esmagava os painéis. */}
         <div className="flex flex-col lg:flex-row gap-6 lg:h-[calc(100vh-140px)] w-full">
 
             {/* --- LEFT: EDITOR PANEL --- */}
@@ -222,6 +251,20 @@ export function ResumeBuilder({ initialData, resumeId, resumeName, locale, templ
                                 </div>
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
+                                {/* Revisão do CV pela IA (coach). */}
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleReview}
+                                    disabled={reviewLoading}
+                                    title="A IA revisa seu currículo e sugere melhorias"
+                                    className="h-9 rounded-xl font-black uppercase tracking-widest text-[9px] gap-1.5 border-violet-500/30 bg-violet-500/5 text-violet-600 hover:bg-violet-500/10"
+                                >
+                                    {reviewLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                                    <span className="hidden sm:inline">Revisar IA</span>
+                                </Button>
+                                {/* Ordem e visibilidade das seções do PDF. */}
+                                <SectionOrderControl data={data} onChange={setData} />
                                 {/* Toggle da prévia em PDF — foca no formulário quando oculto. */}
                                 <Button
                                     variant="outline"
@@ -300,15 +343,15 @@ export function ResumeBuilder({ initialData, resumeId, resumeName, locale, templ
                     
                     {/* Accordion de Seções (Área de Scroll) */}
                     <ScrollArea className="flex-1 bg-muted/5 h-full custom-scrollbar relative">
-                        <div className="px-3 py-4 pb-24 sm:px-6 sm:py-6 sm:pb-32">
-                            <Accordion type="single" collapsible defaultValue="hero" className="w-full space-y-4">
+                        <div className="px-4 py-5 pb-24 sm:px-7 sm:py-7 sm:pb-32">
+                            <Accordion type="single" collapsible defaultValue="hero" className="w-full space-y-5">
                                 
                                 {/* Item 1: Identidade */}
                                 <AccordionItem 
                                     value="hero" 
                                     className="border border-border/40 rounded-[1.5rem] bg-card shadow-sm data-[state=open]:shadow-lg data-[state=open]:border-primary/30 data-[state=open]:bg-primary/[0.02] transition-all duration-300 overflow-hidden"
                                 >
-                                    <AccordionTrigger className="hover:no-underline py-5 px-5 hover:bg-muted/30 transition-colors">
+                                    <AccordionTrigger className="hover:no-underline py-6 px-5 sm:px-6 hover:bg-muted/30 transition-colors">
                                         <div className="flex items-center gap-4">
                                             <StatusIcon active={checklist.hero} icon={User} />
                                             <div className="text-left">
@@ -317,7 +360,7 @@ export function ResumeBuilder({ initialData, resumeId, resumeName, locale, templ
                                             </div>
                                         </div>
                                     </AccordionTrigger>
-                                    <AccordionContent className="px-5 pb-6 pt-2 border-t border-border/20">
+                                    <AccordionContent className="px-5 sm:px-6 pb-7 pt-4 border-t border-border/20">
                                         <HeroForm data={data} onChange={setData} />
                                     </AccordionContent>
                                 </AccordionItem>
@@ -327,7 +370,7 @@ export function ResumeBuilder({ initialData, resumeId, resumeName, locale, templ
                                     value="experience" 
                                     className="border border-border/40 rounded-[1.5rem] bg-card shadow-sm data-[state=open]:shadow-lg data-[state=open]:border-primary/30 data-[state=open]:bg-primary/[0.02] transition-all duration-300 overflow-hidden"
                                 >
-                                    <AccordionTrigger className="hover:no-underline py-5 px-5 hover:bg-muted/30 transition-colors">
+                                    <AccordionTrigger className="hover:no-underline py-6 px-5 sm:px-6 hover:bg-muted/30 transition-colors">
                                         <div className="flex items-center gap-4">
                                             <StatusIcon active={checklist.experience} icon={Briefcase} />
                                             <div className="text-left">
@@ -336,7 +379,7 @@ export function ResumeBuilder({ initialData, resumeId, resumeName, locale, templ
                                             </div>
                                         </div>
                                     </AccordionTrigger>
-                                    <AccordionContent className="px-5 pb-6 pt-2 border-t border-border/20">
+                                    <AccordionContent className="px-5 sm:px-6 pb-7 pt-4 border-t border-border/20">
                                         <ExperienceForm data={data} onChange={setData} />
                                     </AccordionContent>
                                 </AccordionItem>
@@ -346,7 +389,7 @@ export function ResumeBuilder({ initialData, resumeId, resumeName, locale, templ
                                     value="projects" 
                                     className="border border-border/40 rounded-[1.5rem] bg-card shadow-sm data-[state=open]:shadow-lg data-[state=open]:border-primary/30 data-[state=open]:bg-primary/[0.02] transition-all duration-300 overflow-hidden"
                                 >
-                                    <AccordionTrigger className="hover:no-underline py-5 px-5 hover:bg-muted/30 transition-colors">
+                                    <AccordionTrigger className="hover:no-underline py-6 px-5 sm:px-6 hover:bg-muted/30 transition-colors">
                                         <div className="flex items-center gap-4">
                                             <StatusIcon active={checklist.projects} icon={Layers} />
                                             <div className="text-left">
@@ -355,7 +398,7 @@ export function ResumeBuilder({ initialData, resumeId, resumeName, locale, templ
                                             </div>
                                         </div>
                                     </AccordionTrigger>
-                                    <AccordionContent className="px-5 pb-6 pt-2 border-t border-border/20">
+                                    <AccordionContent className="px-5 sm:px-6 pb-7 pt-4 border-t border-border/20">
                                         <ProjectsForm data={data} onChange={setData} />
                                     </AccordionContent>
                                 </AccordionItem>
@@ -365,7 +408,7 @@ export function ResumeBuilder({ initialData, resumeId, resumeName, locale, templ
                                     value="education" 
                                     className="border border-border/40 rounded-[1.5rem] bg-card shadow-sm data-[state=open]:shadow-lg data-[state=open]:border-primary/30 data-[state=open]:bg-primary/[0.02] transition-all duration-300 overflow-hidden"
                                 >
-                                    <AccordionTrigger className="hover:no-underline py-5 px-5 hover:bg-muted/30 transition-colors">
+                                    <AccordionTrigger className="hover:no-underline py-6 px-5 sm:px-6 hover:bg-muted/30 transition-colors">
                                         <div className="flex items-center gap-4">
                                             <StatusIcon active={checklist.education} icon={GraduationCap} />
                                             <div className="text-left">
@@ -374,7 +417,7 @@ export function ResumeBuilder({ initialData, resumeId, resumeName, locale, templ
                                             </div>
                                         </div>
                                     </AccordionTrigger>
-                                    <AccordionContent className="px-5 pb-6 pt-2 border-t border-border/20">
+                                    <AccordionContent className="px-5 sm:px-6 pb-7 pt-4 border-t border-border/20">
                                         <EducationForm data={data} onChange={setData} />
                                     </AccordionContent>
                                 </AccordionItem>
@@ -384,7 +427,7 @@ export function ResumeBuilder({ initialData, resumeId, resumeName, locale, templ
                                     value="skills" 
                                     className="border border-border/40 rounded-[1.5rem] bg-card shadow-sm data-[state=open]:shadow-lg data-[state=open]:border-primary/30 data-[state=open]:bg-primary/[0.02] transition-all duration-300 overflow-hidden"
                                 >
-                                    <AccordionTrigger className="hover:no-underline py-5 px-5 hover:bg-muted/30 transition-colors">
+                                    <AccordionTrigger className="hover:no-underline py-6 px-5 sm:px-6 hover:bg-muted/30 transition-colors">
                                         <div className="flex items-center gap-4">
                                             <StatusIcon active={checklist.skills} icon={Code} />
                                             <div className="text-left">
@@ -393,7 +436,7 @@ export function ResumeBuilder({ initialData, resumeId, resumeName, locale, templ
                                             </div>
                                         </div>
                                     </AccordionTrigger>
-                                    <AccordionContent className="px-5 pb-6 pt-2 border-t border-border/20">
+                                    <AccordionContent className="px-5 sm:px-6 pb-7 pt-4 border-t border-border/20">
                                         <SkillsForm data={data} onChange={setData} />
                                     </AccordionContent>
                                 </AccordionItem>
@@ -403,7 +446,7 @@ export function ResumeBuilder({ initialData, resumeId, resumeName, locale, templ
                                     value="testimonials" 
                                     className="border border-border/40 rounded-[1.5rem] bg-card shadow-sm data-[state=open]:shadow-lg data-[state=open]:border-primary/30 data-[state=open]:bg-primary/[0.02] transition-all duration-300 overflow-hidden"
                                 >
-                                    <AccordionTrigger className="hover:no-underline py-5 px-5 hover:bg-muted/30 transition-colors">
+                                    <AccordionTrigger className="hover:no-underline py-6 px-5 sm:px-6 hover:bg-muted/30 transition-colors">
                                         <div className="flex items-center gap-4">
                                             <StatusIcon active={checklist.testimonials} icon={MessageSquare} />
                                             <div className="text-left">
@@ -412,7 +455,7 @@ export function ResumeBuilder({ initialData, resumeId, resumeName, locale, templ
                                             </div>
                                         </div>
                                     </AccordionTrigger>
-                                    <AccordionContent className="px-5 pb-6 pt-2 border-t border-border/20">
+                                    <AccordionContent className="px-5 sm:px-6 pb-7 pt-4 border-t border-border/20">
                                         <TestimonialsForm data={data} onChange={setData} />
                                     </AccordionContent>
                                 </AccordionItem>
@@ -422,7 +465,7 @@ export function ResumeBuilder({ initialData, resumeId, resumeName, locale, templ
                                     value="certifications"
                                     className="border border-border/40 rounded-[1.5rem] bg-card shadow-sm data-[state=open]:shadow-lg data-[state=open]:border-primary/30 data-[state=open]:bg-primary/[0.02] transition-all duration-300 overflow-hidden"
                                 >
-                                    <AccordionTrigger className="hover:no-underline py-5 px-5 hover:bg-muted/30 transition-colors">
+                                    <AccordionTrigger className="hover:no-underline py-6 px-5 sm:px-6 hover:bg-muted/30 transition-colors">
                                         <div className="flex items-center gap-4">
                                             <StatusIcon active={checklist.certifications} icon={Award} />
                                             <div className="text-left">
@@ -431,7 +474,7 @@ export function ResumeBuilder({ initialData, resumeId, resumeName, locale, templ
                                             </div>
                                         </div>
                                     </AccordionTrigger>
-                                    <AccordionContent className="px-5 pb-6 pt-2 border-t border-border/20">
+                                    <AccordionContent className="px-5 sm:px-6 pb-7 pt-4 border-t border-border/20">
                                         <CertificationsForm data={data} onChange={setData} />
                                     </AccordionContent>
                                 </AccordionItem>
@@ -441,7 +484,7 @@ export function ResumeBuilder({ initialData, resumeId, resumeName, locale, templ
                                     value="languages"
                                     className="border border-border/40 rounded-[1.5rem] bg-card shadow-sm data-[state=open]:shadow-lg data-[state=open]:border-primary/30 data-[state=open]:bg-primary/[0.02] transition-all duration-300 overflow-hidden"
                                 >
-                                    <AccordionTrigger className="hover:no-underline py-5 px-5 hover:bg-muted/30 transition-colors">
+                                    <AccordionTrigger className="hover:no-underline py-6 px-5 sm:px-6 hover:bg-muted/30 transition-colors">
                                         <div className="flex items-center gap-4">
                                             <StatusIcon active={checklist.languages} icon={Languages} />
                                             <div className="text-left">
@@ -450,7 +493,7 @@ export function ResumeBuilder({ initialData, resumeId, resumeName, locale, templ
                                             </div>
                                         </div>
                                     </AccordionTrigger>
-                                    <AccordionContent className="px-5 pb-6 pt-2 border-t border-border/20">
+                                    <AccordionContent className="px-5 sm:px-6 pb-7 pt-4 border-t border-border/20">
                                         <LanguagesForm data={data} onChange={setData} />
                                     </AccordionContent>
                                 </AccordionItem>
@@ -497,21 +540,39 @@ export function ResumeBuilder({ initialData, resumeId, resumeName, locale, templ
 
             {/* --- RIGHT: PREVIEW PANEL (PDF REAL — WYSIWYG) --- */}
             {showPreview && (
-                <div className="flex-1 min-w-0 bg-zinc-100/50 dark:bg-zinc-950/50 p-3 sm:p-4 lg:p-6 rounded-[2rem] border border-border/40 shadow-inner flex flex-col lg:h-full relative">
-                    <div className="flex items-center justify-between px-1 pb-3 shrink-0">
-                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/70 flex items-center gap-1.5">
-                            <FileText className="h-3 w-3 text-primary" /> Prévia fiel (PDF real)
-                        </span>
-                        <span className="text-[10px] font-semibold text-muted-foreground/60 hidden sm:flex items-center gap-1.5">
-                            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> igual ao arquivo baixado
-                        </span>
-                    </div>
-                    {/* Altura mínima no mobile (sem lg:h-full) para o iframe do PDF ter espaço. */}
+                <div className="flex-1 min-w-0 bg-zinc-100/50 dark:bg-zinc-950/50 p-3 sm:p-4 lg:p-5 rounded-[2rem] border border-border/40 shadow-inner flex flex-col lg:h-full relative">
+                    {/* A barra de ferramentas e o rótulo agora vivem dentro do viewer.
+                        Altura mínima no mobile (sem lg:h-full) p/ o iframe ter espaço. */}
                     <div className="flex-1 min-h-[70vh] lg:min-h-0">
-                        <ResumePdfViewer data={data} locale={locale} template={template} />
+                        <ResumePdfViewer data={data} locale={locale} template={template} name={resumeName} />
                     </div>
                 </div>
             )}
         </div>
+
+        {/* Revisão do CV pela IA — coach com pontos fortes e melhorias. */}
+        <Dialog open={reviewOpen} onOpenChange={setReviewOpen}>
+            <DialogContent size="lg">
+                <DialogHeader
+                    icon={<Sparkles />}
+                    iconClassName="bg-violet-500/10 text-violet-500 border-violet-500/20"
+                    title="Revisão do currículo pela IA"
+                    description="Sugestões acionáveis — nada é aplicado automaticamente."
+                />
+                <DialogBody>
+                    {reviewLoading ? (
+                        <div className="flex flex-col items-center justify-center gap-3 py-16 text-muted-foreground">
+                            <Loader2 className="h-7 w-7 animate-spin text-violet-500" />
+                            <span className="text-xs font-black uppercase tracking-widest">Analisando seu currículo…</span>
+                        </div>
+                    ) : (
+                        <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed [&_h2]:text-base [&_h2]:font-black [&_h3]:mt-4 [&_h3]:font-bold [&_ul]:my-2 [&_li]:my-0.5">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{reviewText}</ReactMarkdown>
+                        </div>
+                    )}
+                </DialogBody>
+            </DialogContent>
+        </Dialog>
+        </FieldFocusProvider>
     );
 }

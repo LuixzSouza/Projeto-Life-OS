@@ -67,8 +67,8 @@ export function ProductComparator({ cdi }: ComparatorProps) {
                         <Dialog key={product.id}>
                             <DialogTrigger asChild>
                                 <div className={cn(
-                                    "group relative bg-card border rounded-[2rem] p-6 sm:p-8 flex flex-col justify-between cursor-pointer transition-all duration-300 outline-none",
-                                    "hover:shadow-xl hover:-translate-y-1 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary",
+                                    "group relative bg-card border rounded-2xl p-6 sm:p-8 flex flex-col justify-between cursor-pointer transition-all duration-300 outline-none",
+                                    "hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-primary",
                                     isBest 
                                         ? "border-primary/50 shadow-[0_0_30px_-10px_rgba(var(--primary),0.2)] bg-primary/[0.02]" 
                                         : "border-border/60 hover:border-primary/30"

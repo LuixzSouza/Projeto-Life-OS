@@ -23,13 +23,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-    FileText, Plus, Copy, Pencil, Trash2, MoreVertical, BadgeCheck, Loader2, FileDown,
+    FileText, Plus, Copy, Pencil, Trash2, MoreVertical, BadgeCheck, Loader2, FileDown, Languages,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
     ResumeRecord, cloneResume, renameResume, deleteResume,
 } from "@/app/(dashboard)/jobs/resume-actions";
+import { createTranslatedResume } from "@/app/(dashboard)/jobs/resume-ai-actions";
 import { ResumeBuilder } from "./resume-builder";
 import { useResumeExport } from "./use-resume-export";
 
@@ -54,6 +55,27 @@ export function ResumeManager({ resumes }: { resumes: ResumeRecord[] }) {
     const [nameInput, setNameInput] = useState("");
     const [localeInput, setLocaleInput] = useState("pt-BR");
     const [busy, setBusy] = useState(false);
+    const [translatingId, setTranslatingId] = useState<string | null>(null);
+
+    // Gera uma NOVA versão com o conteúdo traduzido pela IA (original intacto).
+    const handleTranslate = async (r: ResumeRecord, targetLocale: string) => {
+        if (translatingId) return;
+        setTranslatingId(r.id);
+        const tid = toast.loading("Traduzindo currículo com IA — pode levar alguns segundos…");
+        try {
+            const res = await createTranslatedResume(r.id, targetLocale);
+            if (res.success) {
+                toast.success("Nova versão traduzida criada! Revise antes de exportar.", { id: tid });
+                router.refresh();
+            } else {
+                toast.error(res.error, { id: tid });
+            }
+        } catch {
+            toast.error("Falha ao traduzir. Tente de novo.", { id: tid });
+        } finally {
+            setTranslatingId(null);
+        }
+    };
 
     const base = resumes.find((r) => r.isBase) ?? resumes[0];
 
@@ -117,7 +139,7 @@ export function ResumeManager({ resumes }: { resumes: ResumeRecord[] }) {
     };
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-300">
+        <div className="space-y-8 animate-in fade-in duration-300">
             {/* Cabeçalho da seção */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
@@ -141,7 +163,7 @@ export function ResumeManager({ resumes }: { resumes: ResumeRecord[] }) {
             </div>
 
             {/* Grid de versões */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 items-stretch">
                 {resumes.map((r) => {
                     const locale = LOCALE_INFO[r.locale] ?? { flag: "🌐", label: r.locale };
                     const parent = r.parentId ? resumes.find((p) => p.id === r.parentId) : null;
@@ -149,7 +171,7 @@ export function ResumeManager({ resumes }: { resumes: ResumeRecord[] }) {
                         <Card
                             key={r.id}
                             className={cn(
-                                "p-5 flex flex-col gap-4 bg-card border-border/40 shadow-sm hover:shadow-md hover:border-primary/30 transition-all rounded-2xl",
+                                "p-6 flex flex-col gap-5 bg-card border-border/40 shadow-sm hover:shadow-md hover:border-primary/30 transition-all rounded-2xl",
                                 r.isBase && "border-primary/30 bg-primary/[0.02]"
                             )}
                         >
@@ -192,6 +214,16 @@ export function ResumeManager({ resumes }: { resumes: ResumeRecord[] }) {
                                         </DropdownMenuItem>
                                         <DropdownMenuItem
                                             className="gap-2 text-xs cursor-pointer"
+                                            disabled={translatingId === r.id}
+                                            onClick={() => handleTranslate(r, r.locale === "en-US" ? "pt-BR" : "en-US")}
+                                        >
+                                            {translatingId === r.id
+                                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                : <Languages className="h-3.5 w-3.5" />}
+                                            {r.locale === "en-US" ? "Versão em português (IA)" : "Versão em inglês (IA)"}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                            className="gap-2 text-xs cursor-pointer"
                                             disabled={exporting}
                                             onClick={() => exportPdf({ data: r.data, name: r.name, locale: r.locale, template: r.template })}
                                         >
@@ -215,7 +247,7 @@ export function ResumeManager({ resumes }: { resumes: ResumeRecord[] }) {
                                 </DropdownMenu>
                             </div>
 
-                            <div className="flex flex-wrap items-center gap-1.5">
+                            <div className="flex flex-wrap items-center gap-2">
                                 {r.isBase && (
                                     <Badge className="bg-primary/10 text-primary border-none gap-1 text-[10px]">
                                         <BadgeCheck className="h-3 w-3" /> Base

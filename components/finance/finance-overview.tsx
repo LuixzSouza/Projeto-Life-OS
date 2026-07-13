@@ -10,7 +10,8 @@ import { toast } from "sonner";
 import { useFormatCurrency } from "@/components/providers/currency-provider";
 import { useSmartView } from "@/components/finance/smart-view-context";
 
-import { generateFinanceReport } from "./report-generator";
+// report-generator carrega o ExcelJS (~1MB). Importado sob demanda (só ao
+// exportar) para não pesar no bundle inicial da página de finanças.
 import { FinanceOverviewProps } from "@/types/finance";
 
 import { MetricCard, getHealthStatus, useIsClient, TOOLTIPS, type FinanceMetrics } from "./overview/overview-shared";
@@ -50,32 +51,34 @@ export function FinanceOverview({
     });
   };
 
-  const handleReport = () => {
+  const handleReport = async () => {
+    toast.success("Gerando relatório...", { description: "Preparando seu arquivo Excel." });
+    const { generateFinanceReport } = await import("./report-generator");
     generateFinanceReport({ totalBalance, netSalary, grossSalary, totalRecurring, totalPaidDebts, totalPendingDebts, metrics, transactions, recurringExpenses, wishlistTotal, wishlistSaved });
-    toast.success("Download iniciado!", { description: "Seu relatório Excel está sendo gerado." });
   };
 
-  if (!isClient) return <div className="h-[400px] w-full bg-muted/10 animate-pulse rounded-[2rem] border border-border/40" />;
+  if (!isClient) return <div className="h-[400px] w-full bg-muted/10 animate-pulse rounded-2xl border border-border/40" />;
 
   return (
     <div className="space-y-10 animate-in fade-in duration-700">
 
-      {/* HEADER DE CONTROLES */}
+      {/* HEADER DE CONTROLES — alinhado ao design system (chip suave, sombras
+          sutis) em vez do bloco sólido/sombra pesada de antes. */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-foreground rounded-2xl shadow-lg">
-            <Wallet className="h-5 w-5 text-background" />
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Wallet className="h-5 w-5" />
           </div>
-          <div>
-            <h2 className="text-2xl font-extrabold text-foreground tracking-tight">Visão Global</h2>
-            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mt-0.5">Painel de Controle</p>
+          <div className="min-w-0">
+            <h2 className="text-2xl font-bold text-foreground tracking-tight">Visão Global</h2>
+            <p className="text-sm text-muted-foreground">Seu painel de controle financeiro</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={handleReport} className="rounded-xl h-11 font-bold gap-2 hover:bg-primary/5 hover:text-primary transition-colors shadow-sm">
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={handleReport} className="rounded-xl h-11 font-semibold gap-2 hover:bg-primary/5 hover:text-primary transition-colors shadow-sm">
             <FileSpreadsheet className="h-4 w-4" /> Relatório
           </Button>
-          <Button variant={smartView ? "secondary" : "default"} onClick={toggleSmartView} className="rounded-xl h-11 font-bold gap-2 transition-all active:scale-95 shadow-lg shadow-primary/20">
+          <Button variant={smartView ? "secondary" : "default"} onClick={toggleSmartView} className="rounded-xl h-11 font-semibold gap-2 transition-all active:scale-95 shadow-sm">
             {smartView ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />} Smart View
           </Button>
         </div>

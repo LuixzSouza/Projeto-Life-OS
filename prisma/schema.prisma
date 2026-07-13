@@ -1348,6 +1348,17 @@ model Settings {
   sleepGoalHours      Float? // meta de sono em horas/noite (ex.: 8). null = padrão do sistema
   calorieGoalOverride Int?   // override manual da meta calórica diária. null = usar sugestão do perfil (TDEE)
 
+  // Entrega de notificações por e-mail (opt-in): recebe os avisos importantes no
+  // celular via SMTP do próprio usuário (ex.: Gmail + senha de app). A senha é
+  // cifrada at-rest (ver SETTINGS_SECRET_FIELDS). Tudo desligado por padrão.
+  notifyEmailEnabled Boolean @default(false)
+  notifyEmail        String? // destino (para onde chega o aviso — normalmente o próprio Gmail)
+  notifySmtpHost     String? @default("smtp.gmail.com")
+  notifySmtpPort     Int?    @default(465)
+  notifySmtpUser     String? // conta remetente (geralmente o mesmo Gmail)
+  notifySmtpPass     String? // senha de app (cifrada)
+  notifyMinPriority  String  @default("HIGH") // só despacha >= este nível: LOW | NORMAL | HIGH
+
   // Localização de dados (Cuidado com caminhos absolutos como D:/ se for rodar em Linux/Docker)
   storagePath String? @default("D:/LifeOS_Data")
 
@@ -1777,6 +1788,10 @@ model Notification {
   priority String    @default("NORMAL") // LOW | NORMAL | HIGH
   dueAt    DateTime?
   readAt   DateTime?
+
+  // Entrega por canal externo (e-mail): carimbo de quando esta notificação já foi
+  // despachada, para nunca reenviar. null = ainda não considerada/enviada.
+  emailedAt DateTime?
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)

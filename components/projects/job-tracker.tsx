@@ -102,9 +102,9 @@ export function JobTracker({ jobs, resumes, projects }: JobTrackerProps) {
         const rate = (n: number) => (applied > 0 ? Math.round((n / applied) * 100) : 0);
 
         return (
-            <div className="space-y-6 animate-in fade-in duration-300">
+            <div className="space-y-8 animate-in fade-in duration-300">
                 {/* KPIs */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
                     <StatsCard label="Em andamento" value={activeCount} icon={Rocket} theme="blue" hint="processos abertos" />
                     <StatsCard label="Entrevistas" value={interviewCount} icon={Target} theme="yellow" hint="fase de entrevista" />
                     <StatsCard label="Conquistas" value={offerCount} icon={Trophy} theme="emerald" hint="propostas e contratos" />
@@ -117,7 +117,7 @@ export function JobTracker({ jobs, resumes, projects }: JobTrackerProps) {
 
                 {/* Funil de conversão */}
                 {applied > 0 && (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 rounded-2xl border border-border/40 bg-muted/10 p-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-5 rounded-2xl border border-border/40 bg-muted/10 p-6">
                         <FunnelStep label="Candidaturas" value={applied} pct={100} tone="text-blue-600" />
                         <FunnelStep label="Responderam" value={responded} pct={rate(responded)} tone="text-purple-600" />
                         <FunnelStep label="Entrevistas" value={interviewed} pct={rate(interviewed)} tone="text-amber-600" />
@@ -198,7 +198,7 @@ export function JobTracker({ jobs, resumes, projects }: JobTrackerProps) {
                 ) : viewMode === 'board' ? (
                     <KanbanBoard jobs={filtered} onAiClick={setAiJob} onLinkClick={setProjectJob} onApplyClick={setApplyJob} onDetailsClick={setDetailJob} />
                 ) : (
-                    <div className={cn(viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch" : "space-y-3")}>
+                    <div className={cn(viewMode === 'grid' ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch" : "space-y-4")}>
                         {filtered.map(job => <JobListItem key={job.id} job={job} mode={viewMode} onAiClick={setAiJob} onLinkClick={setProjectJob} onApplyClick={setApplyJob} onDetailsClick={setDetailJob} />)}
                     </div>
                 )}
@@ -243,12 +243,12 @@ export function JobTracker({ jobs, resumes, projects }: JobTrackerProps) {
 
 function FunnelStep({ label, value, pct, tone }: { label: string; value: number; pct: number; tone: string }) {
     return (
-        <div className="space-y-1.5">
+        <div className="space-y-2">
             <div className="flex items-baseline justify-between gap-2">
                 <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider truncate">{label}</span>
                 <span className={cn("text-[11px] font-bold", tone)}>{pct}%</span>
             </div>
-            <p className="text-xl font-black tracking-tight">{value}</p>
+            <p className="text-2xl font-black tracking-tight">{value}</p>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
                 <div className={cn("h-full rounded-full", tone.replace("text-", "bg-"))} style={{ width: `${pct}%` }} />
             </div>
@@ -270,21 +270,21 @@ function KanbanBoard({ jobs, onAiClick, onLinkClick, onApplyClick, onDetailsClic
     }, [jobs]);
 
     return (
-        <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+        <div className="flex gap-5 overflow-x-auto pb-4 scrollbar-hide">
             {BOARD_COLUMNS.map(col => {
                 const info = STATUS_MAP[col];
                 const items = grouped[col];
                 const accent = getThemeClasses(info.theme).split(" ")[0];
                 return (
-                    <div key={col} className="w-[300px] shrink-0 flex flex-col">
-                        <div className="flex items-center justify-between mb-3 px-1">
+                    <div key={col} className="w-[320px] shrink-0 flex flex-col">
+                        <div className="flex items-center justify-between mb-4 px-1">
                             <span className={cn("text-xs font-semibold flex items-center gap-1.5", accent)}>
                                 <span className={cn("h-2 w-2 rounded-full", accent.replace("text", "bg"))} />
                                 {info.label}
                             </span>
                             <span className="text-[11px] font-semibold text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full">{items.length}</span>
                         </div>
-                        <div className="flex-1 space-y-3 bg-muted/20 rounded-2xl p-3 min-h-[180px] border border-border/40">
+                        <div className="flex-1 space-y-4 bg-muted/20 rounded-2xl p-4 min-h-[200px] border border-border/40">
                             {items.length === 0 ? (
                                 <p className="text-xs font-medium text-muted-foreground/40 text-center py-8">Vazio</p>
                             ) : (

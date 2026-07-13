@@ -40,7 +40,7 @@ export const MetricCard: FC<MetricCardProps> = ({
   const formatMoney = useFormatCurrency();
 
   return (
-    <Card className={cn("relative overflow-hidden transition-all duration-300 hover:shadow-lg group", variants[variant])}>
+    <Card className={cn("relative overflow-hidden transition-all duration-300 shadow-sm hover:shadow-md group", variants[variant])}>
       <CardContent className="p-6">
         <div className="flex justify-between items-start mb-4">
           <div className="p-2.5 rounded-xl bg-background border shadow-sm group-hover:scale-110 transition-transform duration-300">

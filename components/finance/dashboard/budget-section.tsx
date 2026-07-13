@@ -112,7 +112,7 @@ export function BudgetSection({ budget, monthlyFlow, wishlist, totalBalance }: B
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* BALDES */}
-        <div className="rounded-[2rem] border border-border/40 bg-card p-6 shadow-sm space-y-5">
+        <div className="rounded-2xl border border-border/40 bg-card p-6 shadow-sm space-y-5">
           {budget.buckets.map((bucket) => {
             const meta = BUCKET_META[bucket.key];
             const Icon = meta.icon;
@@ -176,7 +176,7 @@ export function BudgetSection({ budget, monthlyFlow, wishlist, totalBalance }: B
         </div>
 
         {/* PREDITIVO */}
-        <div className="rounded-[2rem] border border-border/40 bg-card p-6 shadow-sm space-y-5">
+        <div className="rounded-2xl border border-border/40 bg-card p-6 shadow-sm space-y-5">
           <div className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-primary" />
             <h4 className="text-sm font-black uppercase tracking-widest text-foreground">No ritmo atual</h4>

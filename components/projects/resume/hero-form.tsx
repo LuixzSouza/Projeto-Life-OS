@@ -2,11 +2,23 @@
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { PortfolioData } from "@/types/portfolio";
-import { User, Mail, Phone, Briefcase, MapPin, Globe, Upload, X } from "lucide-react";
+import { User, Mail, Phone, Briefcase, MapPin, Globe, Upload, X, Palette, Check } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { SmartTextarea } from "./smart-textarea";
+
+// Presets profissionais de cor de destaque do PDF (o 1º é o padrão indigo).
+const ACCENT_PRESETS = [
+  { hex: "#4F46E5", name: "Índigo" },
+  { hex: "#0F172A", name: "Grafite" },
+  { hex: "#0D9488", name: "Teal" },
+  { hex: "#2563EB", name: "Azul" },
+  { hex: "#7C3AED", name: "Violeta" },
+  { hex: "#B91C1C", name: "Vinho" },
+  { hex: "#B45309", name: "Âmbar" },
+];
 
 export function HeroForm({ data, onChange }: { data: PortfolioData; onChange: (d: PortfolioData) => void }) {
   const update = (field: string, value: string) => {
@@ -15,6 +27,12 @@ export function HeroForm({ data, onChange }: { data: PortfolioData; onChange: (d
       hero: { ...data.hero, [field]: value }
     });
   };
+
+  const accent = data.meta?.accentColor || ACCENT_PRESETS[0].hex;
+  const setAccent = (hex: string) => onChange({ ...data, meta: { ...data.meta, accentColor: hex } });
+
+  const showPhoto = !!data.meta?.showPhoto;
+  const toggleShowPhoto = () => onChange({ ...data, meta: { ...data.meta, showPhoto: !showPhoto } });
 
   // Upload local em Base64 (mantém o app portátil, sem buckets externos).
   const handlePhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -67,6 +85,22 @@ export function HeroForm({ data, onChange }: { data: PortfolioData; onChange: (d
               </Button>
             )}
           </div>
+          {data.hero.photoUrl && (
+            <button
+              type="button"
+              onClick={toggleShowPhoto}
+              aria-pressed={showPhoto}
+              className="mt-1 flex items-center gap-2 text-[10px] font-bold text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <span className={cn(
+                "flex h-4 w-4 items-center justify-center rounded-[5px] border transition-colors",
+                showPhoto ? "bg-primary border-primary text-primary-foreground" : "border-border/60"
+              )}>
+                {showPhoto && <Check className="h-3 w-3" />}
+              </span>
+              Mostrar foto no PDF
+            </button>
+          )}
         </div>
       </div>
 
@@ -140,15 +174,63 @@ export function HeroForm({ data, onChange }: { data: PortfolioData; onChange: (d
       </div>
 
       <div className="space-y-3 pt-2">
-        <Label className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/60">
-          Resumo Estratégico (2 linhas)
+        <Label className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/60 flex justify-between">
+          <span>Resumo Estratégico</span>
+          <span className="text-muted-foreground/40 lowercase font-medium tracking-normal text-xs">✨ para a IA melhorar</span>
         </Label>
-        <Textarea 
-          value={data.about.short} 
-          onChange={e => onChange({ ...data, about: { ...data.about, short: e.target.value } })} 
-          className="min-h-[100px] resize-none bg-muted/30 border-border/50 rounded-xl shadow-inner focus-visible:ring-primary/20 leading-relaxed"
+        <SmartTextarea
+          label="Resumo Estratégico"
+          value={data.about.short}
+          onChange={(v) => onChange({ ...data, about: { ...data.about, short: v } })}
           placeholder="Resumo de impacto para o cabeçalho..."
+          polishKind="about-short"
+          polishContext={[data.hero.headline, data.hero.name].filter(Boolean).join(" · ")}
+          recommendedRange={[120, 450]}
+          minHeight={100}
+          className="bg-muted/30 shadow-inner"
         />
+      </div>
+
+      {/* COR DE DESTAQUE DO PDF */}
+      <div className="space-y-3 pt-2 border-t border-border/40">
+        <Label className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/60 flex items-center gap-2">
+          <Palette className="h-3 w-3" /> Cor de Destaque do Currículo
+        </Label>
+        <div className="flex flex-wrap items-center gap-2.5">
+          {ACCENT_PRESETS.map((c) => (
+            <button
+              key={c.hex}
+              type="button"
+              onClick={() => setAccent(c.hex)}
+              title={c.name}
+              aria-label={`Cor ${c.name}`}
+              aria-pressed={accent.toLowerCase() === c.hex.toLowerCase()}
+              className={cn(
+                "h-8 w-8 rounded-full flex items-center justify-center transition-all hover:scale-110 shadow-sm ring-offset-2 ring-offset-background",
+                accent.toLowerCase() === c.hex.toLowerCase() && "ring-2 ring-foreground/40"
+              )}
+              style={{ backgroundColor: c.hex }}
+            >
+              {accent.toLowerCase() === c.hex.toLowerCase() && <Check className="h-4 w-4 text-white" />}
+            </button>
+          ))}
+          {/* Cor personalizada (input nativo). */}
+          <label
+            title="Cor personalizada"
+            className="h-8 w-8 rounded-full flex items-center justify-center border-2 border-dashed border-border/60 cursor-pointer hover:border-primary/50 transition-colors relative overflow-hidden"
+            style={ACCENT_PRESETS.some((c) => c.hex.toLowerCase() === accent.toLowerCase()) ? undefined : { backgroundColor: accent, borderStyle: "solid" }}
+          >
+            <Palette className="h-3.5 w-3.5 text-muted-foreground" />
+            <input
+              type="color"
+              value={accent}
+              onChange={(e) => setAccent(e.target.value)}
+              className="absolute inset-0 opacity-0 cursor-pointer"
+              aria-label="Escolher cor personalizada"
+            />
+          </label>
+        </div>
+        <p className="text-[10px] text-muted-foreground/60">Aplica no nome, títulos de seção e marcadores do PDF.</p>
       </div>
     </div>
   );

@@ -106,7 +106,7 @@ export function EntityTags({ entityType, entityId }: { entityType: string; entit
       <div className="flex flex-wrap items-center gap-1.5">
         {tags.length === 0 && (
           <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-            <TagIcon className="h-3.5 w-3.5" /> Nenhuma tag ainda — digite abaixo e Enter.
+            <TagIcon className="h-3.5 w-3.5" /> Nenhuma tag ainda — digite e Enter (ex.: urgente, viagem, cliente-x).
           </span>
         )}
         {tags.map((t) => (

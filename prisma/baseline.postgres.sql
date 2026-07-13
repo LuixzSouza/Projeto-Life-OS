@@ -462,6 +462,22 @@ CREATE TABLE "Portfolio" (
 );
 
 -- CreateTable
+CREATE TABLE "Resume" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "locale" TEXT NOT NULL DEFAULT 'pt-BR',
+    "template" TEXT NOT NULL DEFAULT 'MODERN',
+    "isBase" BOOLEAN NOT NULL DEFAULT false,
+    "parentId" TEXT,
+    "data" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "userId" TEXT NOT NULL,
+
+    CONSTRAINT "Resume_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "InvestmentHolding" (
     "id" TEXT NOT NULL,
     "ticker" TEXT NOT NULL,
@@ -792,6 +808,13 @@ CREATE TABLE "Settings" (
     "foodApiEnabled" BOOLEAN NOT NULL DEFAULT true,
     "sleepGoalHours" DOUBLE PRECISION,
     "calorieGoalOverride" INTEGER,
+    "notifyEmailEnabled" BOOLEAN NOT NULL DEFAULT false,
+    "notifyEmail" TEXT,
+    "notifySmtpHost" TEXT DEFAULT 'smtp.gmail.com',
+    "notifySmtpPort" INTEGER DEFAULT 465,
+    "notifySmtpUser" TEXT,
+    "notifySmtpPass" TEXT,
+    "notifyMinPriority" TEXT NOT NULL DEFAULT 'HIGH',
     "storagePath" TEXT DEFAULT 'D:/LifeOS_Data',
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "onboardingCompleted" BOOLEAN NOT NULL DEFAULT false,
@@ -1105,6 +1128,7 @@ CREATE TABLE "Notification" (
     "priority" TEXT NOT NULL DEFAULT 'NORMAL',
     "dueAt" TIMESTAMP(3),
     "readAt" TIMESTAMP(3),
+    "emailedAt" TIMESTAMP(3),
     "userId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -1360,6 +1384,9 @@ CREATE INDEX "JobEvent_userId_idx" ON "JobEvent"("userId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Portfolio_userId_key" ON "Portfolio"("userId");
+
+-- CreateIndex
+CREATE INDEX "Resume_userId_idx" ON "Resume"("userId");
 
 -- CreateIndex
 CREATE INDEX "InvestmentHolding_userId_idx" ON "InvestmentHolding"("userId");
@@ -1773,6 +1800,9 @@ ALTER TABLE "JobEvent" ADD CONSTRAINT "JobEvent_userId_fkey" FOREIGN KEY ("userI
 ALTER TABLE "Portfolio" ADD CONSTRAINT "Portfolio_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "Resume" ADD CONSTRAINT "Resume_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "InvestmentHolding" ADD CONSTRAINT "InvestmentHolding_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -1928,25 +1958,3 @@ ALTER TABLE "Attachment" ADD CONSTRAINT "Attachment_userId_fkey" FOREIGN KEY ("u
 -- AddForeignKey
 ALTER TABLE "EntityLink" ADD CONSTRAINT "EntityLink_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
-
--- CreateTable
-CREATE TABLE "Resume" (
-    "id" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
-    "locale" TEXT NOT NULL DEFAULT 'pt-BR',
-    "template" TEXT NOT NULL DEFAULT 'MODERN',
-    "isBase" BOOLEAN NOT NULL DEFAULT false,
-    "parentId" TEXT,
-    "data" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    "userId" TEXT NOT NULL,
-
-    CONSTRAINT "Resume_pkey" PRIMARY KEY ("id")
-);
-
--- CreateIndex
-CREATE INDEX "Resume_userId_idx" ON "Resume"("userId");
-
--- AddForeignKey
-ALTER TABLE "Resume" ADD CONSTRAINT "Resume_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

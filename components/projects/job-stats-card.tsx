@@ -20,14 +20,14 @@ const THEMES: Record<StatsCardProps["theme"], string> = {
 export function StatsCard({ label, value, icon: Icon, theme, hint }: StatsCardProps) {
     return (
         <Card className="bg-card border-border/40 shadow-sm hover:shadow-md hover:border-border/80 transition-all">
-            <CardContent className="p-5 flex items-start justify-between gap-4">
-                <div className="space-y-1 min-w-0">
+            <CardContent className="p-6 flex items-start justify-between gap-4">
+                <div className="space-y-1.5 min-w-0">
                     <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</p>
-                    <h3 className="text-2xl font-bold tracking-tight text-foreground">{value}</h3>
+                    <h3 className="text-3xl font-bold tracking-tight text-foreground">{value}</h3>
                     {hint && <p className="text-xs text-muted-foreground truncate">{hint}</p>}
                 </div>
-                <div className={cn("p-2.5 rounded-xl shrink-0", THEMES[theme])}>
-                    <Icon className="h-4 w-4" />
+                <div className={cn("p-3 rounded-xl shrink-0", THEMES[theme])}>
+                    <Icon className="h-5 w-5" />
                 </div>
             </CardContent>
         </Card>

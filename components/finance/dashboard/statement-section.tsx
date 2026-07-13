@@ -35,11 +35,11 @@ export function StatementSection({ transactions, recurring, totalRecurring, acco
           </div>
 
           {transactions.length > 0 ? (
-            <div className="h-[500px] rounded-[2rem] border border-border/40 bg-card shadow-sm overflow-hidden flex flex-col">
+            <div className="h-[500px] rounded-2xl border border-border/40 bg-card shadow-sm overflow-hidden flex flex-col">
               <TransactionList transactions={transactions} accounts={accounts} />
             </div>
           ) : (
-            <div className="h-[500px] rounded-[2rem] border border-dashed border-border/60 bg-muted/10 flex flex-col transition-colors hover:bg-muted/20">
+            <div className="h-[500px] rounded-2xl border border-dashed border-border/60 bg-muted/10 flex flex-col transition-colors hover:bg-muted/20">
               <EmptyState
                 icon={Receipt}
                 title="Sem movimentações"
@@ -67,7 +67,7 @@ export function StatementSection({ transactions, recurring, totalRecurring, acco
           {recurring.length > 0 ? (
             <RecurringCard total={totalRecurring} items={recurring} accounts={accounts} />
           ) : (
-            <div className="h-[500px] rounded-[2rem] border border-dashed border-border/60 bg-muted/10 flex flex-col transition-colors hover:bg-muted/20">
+            <div className="h-[500px] rounded-2xl border border-dashed border-border/60 bg-muted/10 flex flex-col transition-colors hover:bg-muted/20">
               <EmptyState
                 icon={AlertCircle}
                 title="Sem custos fixos"

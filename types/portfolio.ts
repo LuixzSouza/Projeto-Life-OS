@@ -7,6 +7,16 @@ export interface PortfolioData {
     title: string;
     lastUpdated: string;
     completionScore: number;
+    /** Cor de destaque do PDF (hex #RRGGBB). Ausente = accent padrão (indigo). */
+    accentColor?: string;
+    /** Ordem das seções do PDF (chaves de RESUME_SECTIONS). Ausente = padrão. */
+    sectionOrder?: string[];
+    /** Seções ocultas no PDF (chaves). */
+    hiddenSections?: string[];
+    /** Mostrar a foto do hero no cabeçalho do PDF (opt-in; ATS costuma dispensar). */
+    showPhoto?: boolean;
+    /** Template do PDF: "ats" (coluna única) | "modern" (barra lateral). */
+    template?: string;
   };
   hero: {
     name: string;

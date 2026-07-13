@@ -93,7 +93,7 @@ function CashFlowChartContent({ data, className }: { data: CashFlowPoint[]; clas
     return (
       <div
         className={cn(
-          "h-[300px] w-full flex flex-col items-center justify-center bg-muted/5 rounded-[2rem] border-2 border-dashed border-border/40",
+          "h-[300px] w-full flex flex-col items-center justify-center bg-muted/5 rounded-2xl border-2 border-dashed border-border/40",
           className
         )}
       >
@@ -171,7 +171,7 @@ function CashFlowChartContent({ data, className }: { data: CashFlowPoint[]; clas
 const CashFlowChartDynamic = dynamic(() => Promise.resolve(CashFlowChartContent), {
   ssr: false,
   loading: () => (
-    <div className="h-[300px] w-full bg-muted/5 animate-pulse rounded-[2rem] border border-border/40 flex items-center justify-center">
+    <div className="h-[300px] w-full bg-muted/5 animate-pulse rounded-2xl border border-border/40 flex items-center justify-center">
       <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/30">
         Carregando fluxo de caixa...
       </span>

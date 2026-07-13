@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, X, Languages } from "lucide-react";
 import { PortfolioData } from "@/types/portfolio";
+import { ReorderControls, moveItem } from "./reorder-controls";
 
 const LEVELS = ["Nativo", "Fluente", "Avançado", "Intermediário", "Básico"];
 
@@ -12,6 +13,7 @@ export function LanguagesForm({ data, onChange }: { data: PortfolioData; onChang
   const add = () => onChange({ ...data, languages: [...data.languages, { id: crypto.randomUUID(), name: "", level: "Intermediário" }] });
   const remove = (id: string) => onChange({ ...data, languages: data.languages.filter(l => l.id !== id) });
   const update = (id: string, field: string, val: string) => onChange({ ...data, languages: data.languages.map(l => l.id === id ? { ...l, [field]: val } : l) });
+  const move = (index: number, dir: -1 | 1) => onChange({ ...data, languages: moveItem(data.languages, index, dir) });
 
   return (
     <div className="space-y-6">
@@ -25,7 +27,7 @@ export function LanguagesForm({ data, onChange }: { data: PortfolioData; onChang
       </div>
 
       <div className="grid grid-cols-1 gap-3">
-        {data.languages.map((lang) => (
+        {data.languages.map((lang, index) => (
           <div key={lang.id} className="flex gap-2 items-center group">
             <Input
               value={lang.name}
@@ -41,6 +43,7 @@ export function LanguagesForm({ data, onChange }: { data: PortfolioData; onChang
                 {LEVELS.map(l => <SelectItem key={l} value={l} className="text-xs font-bold">{l}</SelectItem>)}
               </SelectContent>
             </Select>
+            <ReorderControls index={index} count={data.languages.length} onMove={(dir) => move(index, dir)} orientation="horizontal" className="shrink-0" />
             <Button
               size="icon"
               variant="ghost"

@@ -22,6 +22,7 @@ export const SETTINGS_SECRET_FIELDS = [
   "pluggyClientId",
   "pluggySecret",
   "brapiToken",
+  "notifySmtpPass",
 ] as const;
 
 // Cifra um valor para gravação. `null`/vazio passam direto como `null`

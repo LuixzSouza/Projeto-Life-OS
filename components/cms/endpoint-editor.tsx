@@ -10,10 +10,16 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Save, Check, Terminal, Loader2 } from "lucide-react";
 
-import CodeMirror from '@uiw/react-codemirror';
-import { json as jsonLang } from '@codemirror/lang-json';
-import { javascript } from '@codemirror/lang-javascript';
-import { vscodeDark } from '@uiw/codemirror-theme-vscode';
+// CodeMirror (~500KB) carregado SOB DEMANDA: só baixa quando o editor abre.
+import dynamic from "next/dynamic";
+const JsonCodeEditor = dynamic(() => import("./json-code-editor"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full w-full items-center justify-center bg-[#1e1e1e] text-xs text-zinc-500">
+      Carregando editor…
+    </div>
+  ),
+});
 
 // Editor de endpoint usado dentro do SiteManager (container CMS).
 export function EndpointEditor({ page }: { page: SitePage }) {
@@ -88,21 +94,7 @@ export function EndpointEditor({ page }: { page: SitePage }) {
       {/* ÁREA DO CODEMIRROR */}
       <div className="flex-1 overflow-hidden relative bg-[#1e1e1e]">
         <ScrollArea className="h-full w-full">
-          <CodeMirror
-            value={code}
-            height="100%"
-            theme={vscodeDark}
-            extensions={[jsonLang(), javascript({ jsx: true })]}
-            onChange={onChange}
-            className="text-[13px] md:text-[14px] leading-relaxed custom-codemirror"
-            basicSetup={{
-              lineNumbers: true,
-              foldGutter: true,
-              highlightActiveLine: true,
-              bracketMatching: true,
-              autocompletion: true,
-            }}
-          />
+          <JsonCodeEditor value={code} onChange={onChange} />
         </ScrollArea>
       </div>
 

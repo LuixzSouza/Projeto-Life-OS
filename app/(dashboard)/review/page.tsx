@@ -21,6 +21,8 @@ import { ErrorState } from "@/components/ui/error-state";
 import { FinanceTrendChart, type TrendPoint } from "@/components/review/finance-trend-chart";
 import { ActivityHeatmap } from "@/components/review/activity-heatmap";
 import { ExportReviewPdfButton } from "@/components/review/export-review-pdf-button";
+import { MonthHighlights } from "@/components/review/month-highlights";
+import { computeHighlights } from "@/lib/review-highlights";
 import { fmtMinutes, fmtKg, type CategoryTotal, type MonthStats } from "@/components/review/review-types";
 
 export const dynamic = "force-dynamic";
@@ -299,6 +301,9 @@ export default async function ReviewPage({
     stats.txCount === 0 && stats.workouts === 0 && stats.studySessions === 0 &&
     stats.focusSessions === 0 && stats.tasksDone === 0 && stats.mealsCount === 0;
 
+  // Destaques do período: conquistas/alertas derivados dos números (sem IA).
+  const highlights = computeHighlights(stats, prev, { money, cmp });
+
   return (
     <PageShell>
       <PageHeader
@@ -315,6 +320,7 @@ export default async function ReviewPage({
               stats={stats}
               prev={prev}
               trend={trend}
+              highlights={highlights}
             />
             <AskAiButton
               q={`Analise minha retrospectiva de ${periodLabel}: finanças (receita ${money(stats.income)}, despesa ${money(stats.expense)}), ${stats.workouts} treinos, ${fmtMinutes(stats.studyMinutes)} de estudo, ${stats.tasksDone} tarefas concluídas. O que foi bem, o que derrapou e quais 3 intenções sugere para o próximo ${isYearMode ? "ano" : "mês"}?`}
@@ -383,6 +389,9 @@ export default async function ReviewPage({
               <p className="text-xs text-muted-foreground">Navegue para outro mês ou comece a registrar — tudo aparece aqui.</p>
             </div>
           )}
+
+          {/* Destaques do período — a "capa" narrativa da retrospectiva */}
+          {!isEmpty && <MonthHighlights highlights={highlights} />}
 
           {/* Finanças — saldo em destaque */}
           <Card className="overflow-hidden rounded-2xl border-border/40 bg-card shadow-sm">

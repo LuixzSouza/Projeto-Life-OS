@@ -169,7 +169,7 @@ export function WishlistForm({ item, onClose }: { item?: WishlistData, onClose: 
             <div className="flex flex-col md:flex-row gap-6 md:gap-8">
                 {/* COLUNA 1: PREVIEW DA IMAGEM */}
                 <div className="w-full md:w-[240px] flex flex-col gap-4 shrink-0 mx-auto">
-                    <div className="aspect-square w-full md:max-w-[240px] max-w-[200px] mx-auto rounded-[2rem] border border-border/50 bg-muted/10 flex items-center justify-center overflow-hidden relative group transition-all hover:bg-muted/20 shadow-sm">
+                    <div className="aspect-square w-full md:max-w-[240px] max-w-[200px] mx-auto rounded-2xl border border-border/50 bg-muted/10 flex items-center justify-center overflow-hidden relative group transition-all hover:bg-muted/20 shadow-sm">
                         {previewUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img src={previewUrl} alt="Preview" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" onError={() => setPreviewUrl("")} />

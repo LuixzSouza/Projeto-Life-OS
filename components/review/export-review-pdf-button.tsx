@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import type { MonthStats } from "@/components/review/review-types";
 import type { TrendPoint } from "@/components/review/finance-trend-chart";
+import type { Highlight } from "@/lib/review-highlights";
 
 interface ExportReviewPdfButtonProps {
   periodLabel: string;
@@ -18,6 +19,7 @@ interface ExportReviewPdfButtonProps {
   stats: MonthStats;
   prev: MonthStats;
   trend: TrendPoint[];
+  highlights: Highlight[];
 }
 
 export function ExportReviewPdfButton(props: ExportReviewPdfButtonProps) {
@@ -44,6 +46,7 @@ export function ExportReviewPdfButton(props: ExportReviewPdfButtonProps) {
           stats={props.stats}
           prev={props.prev}
           trend={props.trend}
+          highlights={props.highlights}
         />
       ).toBlob();
 

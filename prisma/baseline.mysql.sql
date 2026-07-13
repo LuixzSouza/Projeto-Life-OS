@@ -530,6 +530,23 @@ CREATE TABLE `Portfolio` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
+CREATE TABLE `Resume` (
+    `id` VARCHAR(191) NOT NULL,
+    `name` VARCHAR(191) NOT NULL,
+    `locale` VARCHAR(191) NOT NULL DEFAULT 'pt-BR',
+    `template` VARCHAR(191) NOT NULL DEFAULT 'MODERN',
+    `isBase` BOOLEAN NOT NULL DEFAULT false,
+    `parentId` VARCHAR(191) NULL,
+    `data` LONGTEXT NOT NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+    `userId` VARCHAR(191) NOT NULL,
+
+    INDEX `Resume_userId_idx`(`userId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
 CREATE TABLE `InvestmentHolding` (
     `id` VARCHAR(191) NOT NULL,
     `ticker` LONGTEXT NOT NULL,
@@ -895,6 +912,13 @@ CREATE TABLE `Settings` (
     `foodApiEnabled` BOOLEAN NOT NULL DEFAULT true,
     `sleepGoalHours` DOUBLE NULL,
     `calorieGoalOverride` INTEGER NULL,
+    `notifyEmailEnabled` BOOLEAN NOT NULL DEFAULT false,
+    `notifyEmail` VARCHAR(191) NULL,
+    `notifySmtpHost` VARCHAR(191) NULL DEFAULT 'smtp.gmail.com',
+    `notifySmtpPort` INTEGER NULL DEFAULT 465,
+    `notifySmtpUser` VARCHAR(191) NULL,
+    `notifySmtpPass` VARCHAR(191) NULL,
+    `notifyMinPriority` VARCHAR(191) NOT NULL DEFAULT 'HIGH',
     `storagePath` VARCHAR(191) NULL DEFAULT 'D:/LifeOS_Data',
     `updatedAt` DATETIME(3) NOT NULL,
     `onboardingCompleted` BOOLEAN NOT NULL DEFAULT false,
@@ -1247,6 +1271,7 @@ CREATE TABLE `Notification` (
     `priority` VARCHAR(191) NOT NULL DEFAULT 'NORMAL',
     `dueAt` DATETIME(3) NULL,
     `readAt` DATETIME(3) NULL,
+    `emailedAt` DATETIME(3) NULL,
     `userId` VARCHAR(191) NOT NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
@@ -1469,6 +1494,9 @@ ALTER TABLE `JobEvent` ADD CONSTRAINT `JobEvent_userId_fkey` FOREIGN KEY (`userI
 ALTER TABLE `Portfolio` ADD CONSTRAINT `Portfolio_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE `Resume` ADD CONSTRAINT `Resume_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE `InvestmentHolding` ADD CONSTRAINT `InvestmentHolding_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -1624,23 +1652,3 @@ ALTER TABLE `Attachment` ADD CONSTRAINT `Attachment_userId_fkey` FOREIGN KEY (`u
 -- AddForeignKey
 ALTER TABLE `EntityLink` ADD CONSTRAINT `EntityLink_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
-
--- CreateTable
-CREATE TABLE `Resume` (
-    `id` VARCHAR(191) NOT NULL,
-    `name` VARCHAR(191) NOT NULL,
-    `locale` VARCHAR(191) NOT NULL DEFAULT 'pt-BR',
-    `template` VARCHAR(191) NOT NULL DEFAULT 'MODERN',
-    `isBase` BOOLEAN NOT NULL DEFAULT false,
-    `parentId` VARCHAR(191) NULL,
-    `data` LONGTEXT NOT NULL,
-    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    `updatedAt` DATETIME(3) NOT NULL,
-    `userId` VARCHAR(191) NOT NULL,
-
-    INDEX `Resume_userId_idx`(`userId`),
-    PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- AddForeignKey
-ALTER TABLE `Resume` ADD CONSTRAINT `Resume_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;

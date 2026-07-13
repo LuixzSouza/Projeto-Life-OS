@@ -1,9 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+import dynamic from "next/dynamic";
 import { Check, Copy } from "lucide-react";
+
+// Realce carregado sob demanda: enquanto o chunk pesado do Prism não chega,
+// mostramos o código cru num <pre> (sem layout shift). ssr:false — highlight
+// é puramente visual e client-only.
+const CodeHighlighter = dynamic(() => import("./code-highlighter"), {
+  ssr: false,
+  loading: () => (
+    <pre className="m-0 overflow-x-auto bg-[#1e1e2e] px-4 py-3 text-[12.5px] text-zinc-200">
+      <code>Carregando…</code>
+    </pre>
+  ),
+});
 
 /** Bloco de código com realce de sintaxe (Prism) + cabeçalho com linguagem e copiar. */
 export function CodeBlock({ language, value }: { language?: string; value: string }) {
@@ -33,14 +44,7 @@ export function CodeBlock({ language, value }: { language?: string; value: strin
           {copied ? <><Check className="h-3 w-3" /> Copiado</> : <><Copy className="h-3 w-3" /> Copiar</>}
         </button>
       </div>
-      <SyntaxHighlighter
-        language={language}
-        style={oneDark}
-        customStyle={{ margin: 0, borderRadius: 0, fontSize: "12.5px", background: "#1e1e2e" }}
-        wrapLongLines
-      >
-        {value}
-      </SyntaxHighlighter>
+      <CodeHighlighter language={language} value={value} />
     </div>
   );
 }

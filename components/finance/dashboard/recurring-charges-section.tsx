@@ -35,7 +35,7 @@ export function RecurringChargesSection({ charges, totalCharges, clients }: Recu
       {charges.length > 0 ? (
         <RecurringChargesCard total={totalCharges} items={charges} clients={clients} />
       ) : (
-        <div className="rounded-[2rem] border border-dashed border-border/60 bg-muted/10 transition-colors hover:bg-muted/20">
+        <div className="rounded-2xl border border-dashed border-border/60 bg-muted/10 transition-colors hover:bg-muted/20">
           <EmptyState
             icon={HandCoins}
             title="Nenhuma cobrança recorrente"
@@ -59,7 +59,7 @@ function RecurringChargesCard({ total, items, clients }: { total: number; items:
   const formatMoney = useFormatCurrency();
 
   return (
-    <div className="bg-card rounded-[1.5rem] border border-border/40 shadow-sm overflow-hidden transition-all hover:shadow-md">
+    <div className="bg-card rounded-2xl border border-border/40 shadow-sm overflow-hidden transition-all hover:shadow-md">
       {/* Resumo */}
       <div className="p-6 border-b border-border/40 flex justify-between items-start bg-gradient-to-br from-emerald-500/5 to-background">
         <div>

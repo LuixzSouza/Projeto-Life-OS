@@ -31,7 +31,7 @@ export function ProjectionResults({
 
   return (
     <Card className={cn(
-      "relative overflow-hidden border-0 shadow-xl transition-all duration-700 rounded-[2rem] h-full",
+      "relative overflow-hidden border-0 shadow-md transition-all duration-700 rounded-2xl h-full",
       "bg-zinc-950 dark:bg-zinc-950 text-zinc-50"
     )}>
       {/* Background Pattern */}

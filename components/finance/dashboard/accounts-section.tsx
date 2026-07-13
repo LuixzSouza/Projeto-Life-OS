@@ -46,7 +46,7 @@ export function AccountsSection({ accounts }: AccountsSectionProps) {
           />
         </>
       ) : (
-        <div className="rounded-[2rem] border border-dashed border-border/60 bg-muted/10 transition-colors hover:bg-muted/20">
+        <div className="rounded-2xl border border-dashed border-border/60 bg-muted/10 transition-colors hover:bg-muted/20">
           <EmptyState
             icon={Wallet}
             title="Nenhuma conta conectada"

@@ -7,6 +7,7 @@ import { runAutoBackupIfDue } from "./auto-backup";
 import { runIntegrityCheckIfDue } from "./integrity-watch";
 import { detectAnomalies } from "./ai-insights";
 import { CONTACT_ACTION, CONTACT_MODULE, daysSinceContact, reconnectAfterDays } from "./social-contact";
+import { dispatchNotificationEmails } from "./notify-email";
 
 export type NotificationPriority = "LOW" | "NORMAL" | "HIGH";
 
@@ -139,8 +140,15 @@ export async function clearReadNotifications(): Promise<number> {
 /**
  * Deriva notificações a partir dos dados reais (faturas, eventos, aniversários,
  * tarefas atrasadas, flashcards a revisar). Idempotente via notifyOnce.
+ *
+ * `heavy` (padrão true) controla a "cauda cara": automações da IA, backup,
+ * verificação de integridade, detector de anomalias e os rituais guiados
+ * (check-in noturno, faxina mensal, retrospectiva). O polling do badge ao vivo
+ * chama com `heavy:false` para atualizar só os lembretes determinísticos e
+ * baratos a cada ciclo — sem acionar IA/backup fora de hora.
  */
-export async function generateReminders(): Promise<number> {
+export async function generateReminders(opts: { heavy?: boolean } = {}): Promise<number> {
+  const heavy = opts.heavy ?? true;
   const userId = await getCurrentUserId();
   if (!userId) return 0;
 
@@ -350,6 +358,14 @@ export async function generateReminders(): Promise<number> {
       }
     }
   }
+
+  // 8.6 Entrega por e-mail (opt-in): despacha os avisos importantes recém-criados
+  //     para o celular do usuário. Throttled/idempotente por dentro; best-effort.
+  //     Fica ANTES do gate `heavy` para também disparar no tick leve do badge.
+  try { await dispatchNotificationEmails(userId); } catch (e) { console.warn("[notify-email] dispatch falhou:", e); }
+
+  // Cauda cara (IA/manutenção): só no modo completo. O polling do badge pula.
+  if (!heavy) return created;
 
   // 9. Automações agendadas da IA ("toda sexta, resumo financeiro") — best-effort.
   try {
