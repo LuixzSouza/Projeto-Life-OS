@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   Plus, Trash2, ChevronLeft, ArrowUp, ArrowDown, Play, Loader2, Pencil,
-  Dumbbell, ClipboardList, Save, Target as TargetIcon, Share2, Download, Upload, X, ClipboardPaste,
+  Dumbbell, ClipboardList, Save, Target as TargetIcon, Share2, Download, Upload, X, ClipboardPaste, ImageDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,8 +17,11 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { listWorkoutPlans, saveWorkoutPlan, deleteWorkoutPlan } from "@/app/(dashboard)/health/actions";
+import type { ImportedPlan } from "./session/plan-import-types";
+import { PlanPhotoImport } from "./plan-photo-import";
+import { sharePlanImage } from "./session/plan-share-image";
 import { groupOfExercise } from "./exercise-db";
-import { guessEquipment, EQUIPMENT_META } from "./session/session-types";
+import { guessEquipment, EQUIPMENT_META, uid } from "./session/session-types";
 import { savePendingStart } from "./session/session-storage";
 import { divisionToStart } from "./session/plan-start";
 import {
@@ -162,6 +165,17 @@ export function PlanBuilder() {
     }
   };
 
+  // Compartilha a ficha como IMAGEM (print bonito com os exercícios).
+  const sharePlanAsImage = async (plan: WorkoutPlan) => {
+    if (totalExercises(plan) === 0) { toast.error("Adicione exercícios antes de gerar a imagem."); return; }
+    const t = toast.loading("Gerando imagem da ficha…");
+    const res = await sharePlanImage(plan);
+    toast.dismiss(t);
+    if (res === "shared") toast.success("Imagem pronta pra compartilhar! 💪");
+    else if (res === "downloaded") toast.success("Imagem da ficha baixada!");
+    else toast.error("Não consegui gerar a imagem.");
+  };
+
   // ---- Helpers de edição (imutáveis) ----
   const patchDraft = (fn: (p: WorkoutPlan) => WorkoutPlan) => setDraft((d) => (d ? fn(d) : d));
   const patchDivision = (divId: string, fn: (d: PlanDivision) => PlanDivision) =>
@@ -171,6 +185,14 @@ export function PlanBuilder() {
 
   const openEditor = (plan: WorkoutPlan) => { setDraft(plan); setActiveDiv(plan.divisions[0]?.id ?? ""); };
   const createNew = () => { const p = newPlan("Nova ficha"); setDraft(p); setActiveDiv(p.divisions[0]?.id ?? ""); };
+
+  // Ficha lida por foto (IA): abre no editor como rascunho novo (id temporário →
+  // o primeiro "Salvar" cria o registro). Usuário revisa/ajusta antes de salvar.
+  const openImported = (p: ImportedPlan) => {
+    const draftPlan: WorkoutPlan = { id: uid("plan"), name: p.name, goal: p.goal, divisions: p.divisions };
+    setDraft(draftPlan);
+    setActiveDiv(draftPlan.divisions[0]?.id ?? "");
+  };
 
   const handleSave = async () => {
     if (!draft) return;
@@ -224,9 +246,12 @@ export function PlanBuilder() {
           <button type="button" onClick={() => setDraft(null)} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
             <ChevronLeft className="h-4 w-4" /> Minhas fichas
           </button>
-          <Button onClick={handleSave} disabled={saving} className="h-9 gap-1.5 font-semibold">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar ficha
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => sharePlanAsImage(draft)} variant="outline" size="icon" className="h-9 w-9 shrink-0" title="Compartilhar como imagem"><ImageDown className="h-4 w-4" /></Button>
+            <Button onClick={handleSave} disabled={saving} className="h-9 gap-1.5 font-semibold">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar ficha
+            </Button>
+          </div>
         </div>
 
         {/* Nome + objetivo */}
@@ -317,6 +342,7 @@ export function PlanBuilder() {
           {plans && plans.length > 0 && (
             <Button onClick={exportAll} size="sm" variant="outline" className="h-9 flex-1 gap-1.5 text-xs sm:flex-none" title="Exportar todas as fichas (backup)"><Upload className="h-3.5 w-3.5" /> Exportar</Button>
           )}
+          <PlanPhotoImport onImported={openImported} />
           <Button onClick={() => setImportOpen((v) => !v)} size="sm" variant="outline" className="h-9 flex-1 gap-1.5 text-xs sm:flex-none"><Download className="h-3.5 w-3.5" /> Importar</Button>
           <Button onClick={createNew} size="sm" className="h-9 flex-1 gap-1.5 font-semibold sm:flex-none"><Plus className="h-4 w-4" /> Nova ficha</Button>
         </div>
@@ -351,8 +377,11 @@ export function PlanBuilder() {
         <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-muted/5 py-16 text-center">
           <div className="mb-3 rounded-full bg-muted/20 p-3"><Dumbbell className="h-6 w-6 text-muted-foreground/50" /></div>
           <h4 className="text-base font-semibold">Nenhuma ficha ainda</h4>
-          <p className="mt-1 max-w-xs text-xs text-muted-foreground">Crie sua primeira ficha (ex: Push/Pull/Legs) com séries, faixas de reps e RIR/RPE.</p>
-          <Button onClick={createNew} size="sm" className="mt-4 gap-1.5"><Plus className="h-4 w-4" /> Criar ficha</Button>
+          <p className="mt-1 max-w-xs text-xs text-muted-foreground">Fotografe a ficha que te passaram ou crie do zero (ex: Push/Pull/Legs) com séries, faixas de reps e RIR/RPE.</p>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            <PlanPhotoImport onImported={openImported} />
+            <Button onClick={createNew} size="sm" className="gap-1.5"><Plus className="h-4 w-4" /> Criar ficha</Button>
+          </div>
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
@@ -367,7 +396,8 @@ export function PlanBuilder() {
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => sharePlan(plan)} title="Compartilhar"><Share2 className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => sharePlanAsImage(plan)} title="Compartilhar como imagem"><ImageDown className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => sharePlan(plan)} title="Compartilhar link"><Share2 className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => openEditor(plan)} title="Editar"><Pencil className="h-4 w-4" /></Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>

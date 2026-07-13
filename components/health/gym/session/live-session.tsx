@@ -17,7 +17,7 @@ import type { WorkoutPlan } from "./plan-types";
 import { enqueueGymSession } from "./mutation-queue";
 import { addGalleryPhotos } from "./gym-gallery";
 import { handleSpotifyCallback } from "./spotify";
-import { sessionStats, toStoredExercises, elapsedSeconds, uid, type ExerciseHistoryPoint, type LastPerf, type Routine, type SaveGymSessionInput } from "./session-types";
+import { sessionStats, toStoredExercises, elapsedSeconds, uid, type ExerciseHistoryPoint, type LastPerf, type MuscleRecovery, type Routine, type SaveGymSessionInput } from "./session-types";
 
 // Acima deste tempo sem mexer, um treino em andamento é tratado como "obsoleto"
 // (abandonado) e o app pergunta se quer retomar ou descartar.
@@ -39,10 +39,12 @@ export function LiveSession({
   lastPerf,
   volumeHistory = {},
   plans: initialPlans = [],
+  recovery = [],
 }: {
   lastPerf: LastPerf[];
   volumeHistory?: Record<string, ExerciseHistoryPoint[]>;
   plans?: WorkoutPlan[];
+  recovery?: MuscleRecovery[];
 }) {
   const router = useRouter();
   const s = useActiveSession();
@@ -78,6 +80,8 @@ export function LiveSession({
     setRestSeconds: s.setRestSeconds,
     addExercise: s.addExercise,
     removeExercise: s.removeExercise,
+    moveExercise: s.moveExercise,
+    skipExercise: s.skipExercise,
     addSet: s.addSet,
     dropSet: s.dropSet,
     addWarmupSets: s.addWarmupSets,
@@ -85,7 +89,7 @@ export function LiveSession({
     updateSet: s.updateSet,
     toggleSetDone: s.toggleSetDone,
     setSetType: s.setSetType,
-  }), [s.renameExercise, s.replaceExercise, s.setExerciseEquipment, s.setExerciseNote, s.setRestSeconds, s.addExercise, s.removeExercise, s.addSet, s.dropSet, s.addWarmupSets, s.removeSet, s.updateSet, s.toggleSetDone, s.setSetType]);
+  }), [s.renameExercise, s.replaceExercise, s.setExerciseEquipment, s.setExerciseNote, s.setRestSeconds, s.addExercise, s.removeExercise, s.moveExercise, s.skipExercise, s.addSet, s.dropSet, s.addWarmupSets, s.removeSet, s.updateSet, s.toggleSetDone, s.setSetType]);
 
   // "Iniciar" a partir de uma Ficha (builder) deixa a divisão escolhida no
   // pending-start; ao abrir a sessão sem treino ativo, dispara automaticamente.
@@ -279,6 +283,7 @@ export function LiveSession({
         <SessionSetup
           routines={routines}
           plans={plans}
+          recovery={recovery}
           onStart={s.start}
           onClose={() => router.push("/health/gym")}
           onImportRoutines={handleImportRoutines}

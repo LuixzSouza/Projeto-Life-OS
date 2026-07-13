@@ -123,6 +123,31 @@ export function useActiveSession() {
     mutate((exs) => exs.filter((e) => e.id !== exId));
   }, [mutate]);
 
+  // Reordena um exercício (−1 sobe, +1 desce) — útil ao adicionar no meio do treino.
+  const moveExercise = useCallback((exId: string, dir: -1 | 1) => {
+    mutate((exs) => {
+      const i = exs.findIndex((e) => e.id === exId);
+      const j = i + dir;
+      if (i === -1 || j < 0 || j >= exs.length) return exs;
+      const copy = [...exs];
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+      return copy;
+    });
+  }, [mutate]);
+
+  // "Fazer depois": manda o exercício pro FIM da fila (máquina ocupada) — preserva
+  // as séries já feitas; você volta a ele quando liberar.
+  const skipExercise = useCallback((exId: string) => {
+    mutate((exs) => {
+      const i = exs.findIndex((e) => e.id === exId);
+      if (i === -1 || i === exs.length - 1) return exs; // não achou ou já é o último
+      const copy = [...exs];
+      const [moved] = copy.splice(i, 1);
+      copy.push({ ...moved, postponed: true }); // marca p/ o lembrete "adiados"
+      return copy;
+    });
+  }, [mutate]);
+
   const renameExercise = useCallback((exId: string, name: string) => {
     mutate((exs) => exs.map((e) => (e.id === exId ? { ...e, name } : e)));
   }, [mutate]);
@@ -220,7 +245,7 @@ export function useActiveSession() {
     start, cancel, finish, reopen, touch,
     togglePause, endWarmup, extendWarmup, setLocation,
     setTitle, setRestSeconds,
-    addExercise, removeExercise, renameExercise, replaceExercise, setExerciseEquipment, setExerciseNote,
+    addExercise, removeExercise, moveExercise, skipExercise, renameExercise, replaceExercise, setExerciseEquipment, setExerciseNote,
     addSet, dropSet, addWarmupSets, removeSet, updateSet, toggleSetDone, setSetType,
   };
 }

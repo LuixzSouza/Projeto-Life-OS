@@ -74,6 +74,9 @@ export interface LiveExercise {
   target?: LiveTarget;
   sets: LiveSet[];
   note?: string;
+  /** "Fazer depois": foi adiado pro fim (máquina ocupada). Some do lembrete quando
+   *  concluído ou quando você volta a fazê-lo. */
+  postponed?: boolean;
 }
 
 // Opções para iniciar uma sessão (compartilhado por setup, ficha e pending-start).

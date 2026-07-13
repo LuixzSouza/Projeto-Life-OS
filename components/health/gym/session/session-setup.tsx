@@ -7,9 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { MuscleBodyIcon } from "../muscle-body-icon";
-import { EXERCISES_BY_GROUP, MUSCLE_GROUPS } from "../exercise-db";
+import { EXERCISES_BY_GROUP, MUSCLE_GROUPS, MUSCLE_META, groupOfExercise } from "../exercise-db";
 import { ExerciseThumb } from "./exercise-thumb";
-import { EQUIPMENT_META, guessEquipment, type Equipment, type Routine } from "./session-types";
+import { EQUIPMENT_META, guessEquipment, type Equipment, type Routine, type MuscleRecovery } from "./session-types";
 import { smartOrder } from "./exercise-order";
 import { playClick, primeAudio } from "./sfx";
 import { RoutineShareButton, ImportRoutineButton } from "./routine-share-ui";
@@ -48,6 +48,7 @@ interface PickedExercise { name: string; group?: string; equipment: Equipment; s
 export function SessionSetup({
   routines,
   plans = [],
+  recovery = [],
   onStart,
   onClose,
   onImportRoutines,
@@ -55,6 +56,7 @@ export function SessionSetup({
 }: {
   routines: Routine[];
   plans?: WorkoutPlan[];
+  recovery?: MuscleRecovery[];
   onStart: (opts: StartOptions) => void;
   onClose: () => void;
   onImportRoutines?: (routines: Routine[]) => void;
@@ -210,6 +212,10 @@ export function SessionSetup({
   const plannedCount = routines.length + plans.reduce((acc, p) => acc + p.divisions.length, 0);
   const hasSaved = plannedCount > 0;
 
+  // Divisão recomendada pra hoje: a que treina os músculos mais RECUPERADOS
+  // (cruza com o mapa de recuperação). Some quando tudo está fadigado.
+  const recommended = useMemo(() => recommendDivision(plans, recovery), [plans, recovery]);
+
   // ---- Pergunta do aquecimento (overlay único, antes de qualquer treino) ----
   const warmupPrompt = pendingStart && (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-background/80 px-6 backdrop-blur-sm">
@@ -256,6 +262,32 @@ export function SessionSetup({
           </Button>
         </div>
 
+        {/* Recomendado hoje: um toque inicia a divisão com os músculos mais descansados */}
+        {recommended && (
+          <button
+            type="button"
+            onClick={() => startDivisionNow(recommended.plan, recommended.div)}
+            className="group relative mb-4 overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 via-card to-card p-4 text-left shadow-sm transition-all hover:border-primary/50 hover:shadow-md"
+          >
+            <span className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full bg-primary/15 blur-2xl" />
+            <div className="relative flex items-center gap-3">
+              <div className="min-w-0 flex-1">
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+                  <Sparkles className="h-3 w-3" /> Recomendado hoje
+                </span>
+                <h2 className="mt-1.5 truncate text-lg font-bold">{recommended.div.label}</h2>
+                <p className="truncate text-xs text-muted-foreground">{recommended.plan.name} · {recommended.reason}</p>
+              </div>
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-transform group-hover:scale-105">
+                <Play className="h-5 w-5" />
+              </span>
+            </div>
+            <div className="relative mt-3">
+              <ThumbRow names={recommended.div.exercises} total={recommended.div.exercises.length} />
+            </div>
+          </button>
+        )}
+
         <div className="grid gap-3">
           {/* Planejado */}
           <button
@@ -292,74 +324,49 @@ export function SessionSetup({
         </div>
 
         {/* Atalho: fichas + rotinas para iniciar com um toque + importar/compartilhar */}
-        <div className="mt-6 space-y-3">
+        <div className="mt-7 space-y-4">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              {hasSaved ? "Iniciar rápido" : "Recebeu um treino de um amigo?"}
+            <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {hasSaved ? <><Zap className="h-3.5 w-3.5 text-amber-500" /> Iniciar rápido</> : "Recebeu um treino de um amigo?"}
             </p>
             {onImportRoutines && <ImportRoutineButton onImport={onImportRoutines} onImportPlans={onImportPlans} />}
           </div>
 
-          {/* Fichas do banco: um toque na divisão (Treino A/B/C) já inicia;
-              "Treinar tudo" junta todas as divisões numa sessão só (corpo todo). */}
+          {/* Fichas do banco: cards ricos com prévia dos exercícios. Um toque na
+              divisão (Treino A/B/C) já inicia; "Treinar tudo" junta todas. */}
           {plans.map((plan) => (
-            <div key={plan.id} className="space-y-1.5">
-              <p className="flex items-center gap-1.5 text-xs font-semibold">
+            <div key={plan.id} className="space-y-2">
+              <p className="flex items-center gap-1.5 px-0.5 text-xs font-semibold text-muted-foreground">
                 <ClipboardList className="h-3.5 w-3.5 text-primary" />
                 {plan.name}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {plan.divisions.map((div) => (
-                  <button
-                    key={div.id}
-                    type="button"
-                    onClick={() => startDivisionNow(plan, div)}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-card py-1.5 pl-3 pr-3 text-xs font-medium transition-colors hover:border-primary/40 hover:bg-primary/5"
-                  >
-                    <Play className="h-3 w-3 text-primary" />
-                    {div.label}
-                    <span className="text-muted-foreground/60">{div.exercises.length} ex.</span>
-                  </button>
-                ))}
                 {plan.divisions.length > 1 && (
                   <button
                     type="button"
                     onClick={() => startPlanNow(plan)}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/5 py-1.5 pl-3 pr-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/10"
+                    className="ml-auto inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/5 px-2.5 py-1 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/10"
                   >
-                    <Layers className="h-3 w-3" />
-                    Treinar tudo
-                    <span className="text-primary/60">{plan.divisions.reduce((a, d) => a + d.exercises.length, 0)} ex.</span>
+                    <Layers className="h-3 w-3" /> Treinar tudo
                   </button>
                 )}
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {plan.divisions.map((div) => (
+                  <DivisionQuickCard key={div.id} div={div} recommended={recommended?.div.id === div.id} onStart={() => startDivisionNow(plan, div)} />
+                ))}
               </div>
             </div>
           ))}
 
           {routines.length > 0 && (
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               {plans.length > 0 && (
-                <p className="flex items-center gap-1.5 text-xs font-semibold">
+                <p className="flex items-center gap-1.5 px-0.5 text-xs font-semibold text-muted-foreground">
                   <Star className="h-3.5 w-3.5 text-amber-400" /> Rotinas deste aparelho
                 </p>
               )}
-              <div className="flex flex-wrap gap-2">
+              <div className="grid gap-2 sm:grid-cols-2">
                 {routines.map((r) => (
-                  <div
-                    key={r.id}
-                    className="inline-flex items-center rounded-full border border-border/60 bg-card pr-1 transition-colors hover:border-primary/40"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => startRoutineNow(r)}
-                      className="inline-flex items-center gap-1.5 rounded-full py-1.5 pl-3 text-xs font-medium hover:bg-primary/5"
-                    >
-                      <Star className="h-3.5 w-3.5 text-amber-400" />
-                      {r.name}
-                      <span className="text-muted-foreground/60">{r.exercises.length} ex.</span>
-                    </button>
-                    <RoutineShareButton routine={r} className="ml-0.5 flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-primary" />
-                  </div>
+                  <RoutineQuickCard key={r.id} routine={r} onStart={() => startRoutineNow(r)} />
                 ))}
               </div>
             </div>
@@ -676,6 +683,123 @@ export function SessionSetup({
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ---- Cards de "Iniciar rápido" (prévia visual do treino, um toque pra começar) ----
+
+// Grupos musculares de uma divisão: os declarados ou, na falta, deduzidos dos exercícios.
+function divisionGroups(div: PlanDivision): string[] {
+  if (div.muscleGroups.length) return div.muscleGroups;
+  return Array.from(new Set(div.exercises.map((e) => e.group ?? groupOfExercise(e.name)).filter((g): g is string => !!g)));
+}
+
+// Divisão recomendada pra hoje: a de maior recuperação MÉDIA dos seus músculos.
+// Sem registro recente de um grupo = 100% recuperado. Retorna null se tudo fadigado.
+function recommendDivision(plans: WorkoutPlan[], recovery: MuscleRecovery[]): { plan: WorkoutPlan; div: PlanDivision; reason: string } | null {
+  if (!recovery.length || !plans.length) return null;
+  const recMap = new Map(recovery.map((r) => [r.group, r]));
+  const recoveryOf = (g: string) => {
+    const r = recMap.get(g);
+    return r && r.lastTrainedAt ? r.recovery : 1;
+  };
+  let best: { plan: WorkoutPlan; div: PlanDivision; score: number; groups: string[] } | null = null;
+  for (const plan of plans) {
+    for (const div of plan.divisions) {
+      if (div.exercises.length === 0) continue;
+      const groups = divisionGroups(div);
+      if (!groups.length) continue;
+      const score = groups.reduce((a, g) => a + recoveryOf(g), 0) / groups.length;
+      if (!best || score > best.score) best = { plan, div, score, groups };
+    }
+  }
+  if (!best || best.score < 0.6) return null; // tudo cansado → não força
+  const fresh = [...best.groups]
+    .sort((a, b) => recoveryOf(b) - recoveryOf(a))
+    .slice(0, 2)
+    .map((g) => MUSCLE_META[g]?.label ?? g);
+  const reason = fresh.length ? `${fresh.join(" e ")} descansado${fresh.length > 1 ? "s" : ""}` : "pronto pra treinar";
+  return { plan: best.plan, div: best.div, reason };
+}
+function colorOf(groups: string[], fallback: string): string {
+  const g = groups[0];
+  return (g && MUSCLE_META[g]?.color) || fallback;
+}
+
+function ThumbRow({ names, total }: { names: { name: string; group?: string }[]; total: number }) {
+  const preview = names.slice(0, 5);
+  const extra = total - preview.length;
+  if (preview.length === 0) return null;
+  return (
+    <div className="flex items-center gap-1">
+      {preview.map((ex, i) => (
+        <ExerciseThumb key={`${ex.name}-${i}`} name={ex.name} group={ex.group} showPlay={false} className="h-9 w-9 rounded-md" />
+      ))}
+      {extra > 0 && (
+        <span className="flex h-9 w-9 items-center justify-center rounded-md bg-muted text-[10px] font-bold text-muted-foreground">+{extra}</span>
+      )}
+    </div>
+  );
+}
+
+function DivisionQuickCard({ div, recommended = false, onStart }: { div: PlanDivision; recommended?: boolean; onStart: () => void }) {
+  const groups = divisionGroups(div);
+  const color = colorOf(groups, "#6366f1");
+  return (
+    <button
+      type="button"
+      onClick={onStart}
+      className={cn(
+        "group flex flex-col gap-2.5 rounded-2xl border bg-card p-3 text-left shadow-sm transition-all hover:shadow-md",
+        recommended ? "border-primary/50 ring-1 ring-primary/30" : "border-border/50 hover:border-primary/40",
+      )}
+    >
+      <div className="flex items-center gap-2.5">
+        <span className="h-9 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+        <div className="min-w-0 flex-1">
+          <p className="flex items-center gap-1.5 truncate text-sm font-bold">
+            {div.label}
+            {recommended && <span className="shrink-0 rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-bold uppercase text-primary">hoje</span>}
+          </p>
+          <p className="truncate text-[11px] text-muted-foreground">
+            {groups.map((g) => MUSCLE_META[g]?.label ?? g).join(" · ") || "Treino"} · {div.exercises.length} ex.
+          </p>
+        </div>
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+          <Play className="h-4 w-4" />
+        </span>
+      </div>
+      <ThumbRow names={div.exercises} total={div.exercises.length} />
+    </button>
+  );
+}
+
+function RoutineQuickCard({ routine, onStart }: { routine: Routine; onStart: () => void }) {
+  const groups = routine.muscleGroups.length
+    ? routine.muscleGroups
+    : Array.from(new Set(routine.exercises.map((e) => e.group ?? groupOfExercise(e.name)).filter((g): g is string => !!g)));
+  const color = colorOf(groups, "#f59e0b");
+  return (
+    <div className="group relative flex flex-col gap-2.5 rounded-2xl border border-border/50 bg-card p-3 shadow-sm transition-all hover:border-primary/40 hover:shadow-md">
+      <RoutineShareButton
+        routine={routine}
+        className="absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-primary"
+      />
+      <button type="button" onClick={onStart} className="flex flex-col gap-2.5 text-left">
+        <div className="flex items-center gap-2.5 pr-8">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: `${color}20` }}>
+            <Star className="h-4 w-4" style={{ color }} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-bold">{routine.name}</p>
+            <p className="truncate text-[11px] text-muted-foreground">
+              {groups.map((g) => MUSCLE_META[g]?.label ?? g).join(" · ") || "Rotina"} · {routine.exercises.length} ex.
+            </p>
+          </div>
+        </div>
+        <ThumbRow names={routine.exercises} total={routine.exercises.length} />
+      </button>
     </div>
   );
 }

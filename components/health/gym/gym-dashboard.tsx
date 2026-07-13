@@ -16,6 +16,12 @@ import { VolumeChart } from "./volume-chart";
 import { MuscleFrequencyCard } from "./muscle-frequency-card";
 import { MuscleRecoveryCard } from "./muscle-recovery-card";
 import { PersonalRecordsCard } from "./personal-records-card";
+import { ConsistencyCard } from "./consistency-card";
+import { WeeklyVolumeCard } from "./weekly-volume-card";
+import { ExerciseProgressCard } from "./exercise-progress-card";
+import { TodaySuggestionCard } from "./today-suggestion-card";
+import { FrequencyHeatmapCard } from "./frequency-heatmap-card";
+import { MuscleBalanceCard } from "./muscle-balance-card";
 import { WorkoutCard } from "./workout-card";
 import type { GymWorkout, VolumePoint, MuscleCount } from "./gym-types";
 import { loadMultiplier, type MuscleRecovery, type Equipment } from "./session/session-types";
@@ -123,12 +129,17 @@ export function GymDashboard({ workouts, recovery = [] }: { workouts: GymWorkout
         </div>
 
         {/* --- TAB: DASHBOARD --- */}
-        <TabsContent value="dashboard" className="m-0 focus-visible:outline-none">
+        <TabsContent value="dashboard" className="m-0 space-y-6 focus-visible:outline-none">
+          <TodaySuggestionCard workouts={workouts} recovery={recovery} onPlanTab={() => setTab("planner")} />
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
             {/* Left Column: Stats (4/12) */}
             <div className="min-w-0 lg:col-span-4 space-y-6">
+              <ConsistencyCard workouts={workouts} />
               <MuscleRecoveryCard recovery={recovery} />
+              <WeeklyVolumeCard workouts={workouts} />
+              <MuscleBalanceCard workouts={workouts} />
+              <ExerciseProgressCard workouts={workouts} />
               <VolumeChart data={volumeData} />
               <PersonalRecordsCard workouts={workouts} />
               <MuscleFrequencyCard distribution={muscleDistribution} />
@@ -136,6 +147,8 @@ export function GymDashboard({ workouts, recovery = [] }: { workouts: GymWorkout
 
             {/* Right Column: Feed (8/12) */}
             <div className="min-w-0 lg:col-span-8 space-y-5">
+
+              <FrequencyHeatmapCard workouts={workouts} />
 
               {/* Filter Chips */}
               <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">

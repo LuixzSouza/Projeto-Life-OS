@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Check, Plus, Minus, Trash2, X, Timer, ChevronDown, ChevronUp, History, Flag, Trophy,
   List, Target, ChevronLeft, ChevronRight, CircleCheck, Replace, Volume2, VolumeX, AlertTriangle,
-  EyeOff, MoreVertical, Pause, Lock, Play, Droplets, MapPin, Bell, BellOff, LogOut, StickyNote, TrendingDown, Flame,
+  EyeOff, MoreVertical, Pause, Lock, Play, Droplets, MapPin, Bell, BellOff, LogOut, StickyNote, TrendingDown, TrendingUp, Flame, ArrowUp, ArrowDown, Megaphone, SkipForward,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -19,17 +19,19 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useWakeLock } from "./use-wake-lock";
-import { sessionStats, estimatedOneRepMax, elapsedSeconds, isExercisePR, isWorkingSet, EQUIPMENT_META, SET_TYPE_META, type Equipment, type SetType, type LiveSession, type LastPerf, type ExerciseHistoryPoint, type LiveTarget } from "./session-types";
+import { sessionStats, estimatedOneRepMax, elapsedSeconds, isExercisePR, isWorkingSet, guessEquipment, EQUIPMENT_META, SET_TYPE_META, type Equipment, type SetType, type LiveSession, type LastPerf, type ExerciseHistoryPoint, type LiveTarget } from "./session-types";
+import { ExercisePicker } from "./exercise-picker";
 import { RestOverlay } from "./rest-overlay";
 import { WarmupOverlay } from "./warmup-overlay";
 import { ExerciseDemoModal } from "./exercise-demo-modal";
 import { ExerciseThumb } from "./exercise-thumb";
 import { PlateHint } from "./plate-hint";
 import { buildWarmupRamp } from "./warmup-sets";
+import { overloadHint } from "../gym-analytics";
 import { MusicButton } from "./music-button";
 import { getAllMedia, persistMedia, mediaFor, setVideoFor, type MediaMap } from "./exercise-media";
 import { isNotifyEnabled, isNotifySupported, setNotifyEnabled, showSessionNotification } from "./session-notify";
-import { isSfxMuted, setSfxMuted, playSuccess, playRestEnd, playFinish, playCountdown, playWaterReminder, announceRestOver, announceWarmupOver, primeAudio, hapticTick, hapticExerciseDone, hapticRestEnd, vibrate } from "./sfx";
+import { isSfxMuted, setSfxMuted, playSuccess, playRestEnd, playFinish, playCountdown, playWaterReminder, announceRestOver, announceWarmupOver, announceExercise, announceRestRemaining, isCoachEnabled, setCoachEnabled, primeAudio, hapticTick, hapticExerciseDone, hapticRestEnd, vibrate } from "./sfx";
 
 // Preferência do modo de visão da sessão (list | focus), persistida localmente.
 const VIEW_KEY = "lifeos:gym:view-mode";
@@ -141,6 +143,8 @@ export interface SessionControls {
   setRestSeconds: (seconds: number) => void;
   addExercise: (name: string, group?: string) => void;
   removeExercise: (exId: string) => void;
+  moveExercise: (exId: string, dir: -1 | 1) => void;
+  skipExercise: (exId: string) => void;
   addSet: (exId: string) => void;
   dropSet: (exId: string, afterSetId: string) => void;
   addWarmupSets: (exId: string, sets: { weight: string; reps: string }[]) => void;
@@ -224,9 +228,16 @@ export function SessionActive({
   const [restMinimized, setRestMinimized] = useState(false);
   const restEndsRef = useRef<number | null>(null);
   const buzzed = useRef(false);
+  // Callouts de tempo já falados neste descanso (ex.: 30, 10) — sem repetir.
+  const restCalloutRef = useRef<Set<number>>(new Set());
+  // Instante em que o descanso terminou → janela curta pra NÃO reanunciar o
+  // exercício (o "Bora! Agora: X" do fim do descanso já cobre). Timestamp (não
+  // booleano) pra expirar sozinho e não suprimir uma navegação manual posterior.
+  const restEndedAtRef = useRef(0);
   const setRest = (end: number | null) => {
     restEndsRef.current = end;
     buzzed.current = false;
+    restCalloutRef.current = new Set();
     setRestEndsAt(end);
   };
 
@@ -268,6 +279,13 @@ export function SessionActive({
       if (restEndsRef.current !== null) {
         // Voz "três, dois, um" nos últimos segundos do descanso (uma vez cada).
         const remaining = Math.round((restEndsRef.current - n) / 1000);
+        // Callouts do treinador ("Faltam 30 segundos" / "…10 segundos") — 1x cada.
+        for (const mark of [30, 10]) {
+          if (remaining === mark && !restCalloutRef.current.has(mark)) {
+            restCalloutRef.current.add(mark);
+            announceRestRemaining(mark);
+          }
+        }
         if (remaining >= 1 && remaining <= 3 && countedRef.current !== remaining) {
           countedRef.current = remaining;
           playCountdown(remaining);
@@ -335,6 +353,18 @@ export function SessionActive({
     setNotifyOn(on);
     if (!on && !notifyOn) toast.error("Permissão de notificação negada pelo navegador.");
     else toast.info(on ? "Vou mostrar o treino na bandeja quando você sair do app." : "Notificações do treino desligadas.");
+  };
+
+  // --- Voz do treinador (anuncia exercício + tempo de descanso) ---
+  const [coachOn, setCoachOn] = useState(true);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setCoachOn(isCoachEnabled()); }, []);
+  const toggleCoach = () => {
+    const on = !coachOn;
+    setCoachOn(on);
+    setCoachEnabled(on);
+    if (on) primeAudio();
+    toast.info(on ? "Voz do treinador ligada — vou avisar o exercício e o descanso. 🔊" : "Voz do treinador desligada (os beeps continuam).");
   };
 
   // --- Local do treino (GPS, opcional) ---
@@ -421,6 +451,7 @@ export function SessionActive({
   const handleRestDone = () => {
     setRest(null);
     setRestMinimized(false);
+    restEndedAtRef.current = Date.now(); // o anúncio do fim do descanso já diz o próximo
     if (mode === "focus") {
       const restIdx = restExId ? exercises.findIndex((e) => e.id === restExId) : -1;
       if (restIdx !== -1 && !allDone(exercises[restIdx]) && restIdx !== focusIdx) {
@@ -478,12 +509,36 @@ export function SessionActive({
   const focusEx = exercises[idx];
   const pct = stats.totalSets > 0 ? Math.round((stats.doneSets / stats.totalSets) * 100) : 0;
 
+  // Exercícios ADIADOS ("fazer depois") ainda pendentes — lembrete pra não esquecer
+  // de voltar. Exclui o que você já está fazendo agora (Foco).
+  const postponed = useMemo(
+    () => exercises.filter((e) => e.postponed && !allDone(e) && !(mode === "focus" && e.id === focusEx?.id)),
+    [exercises, mode, focusEx],
+  );
+  // Volta pro 1º exercício adiado pendente (em Foco).
+  const goToPostponed = () => {
+    const target = exercises.find((e) => e.postponed && !allDone(e));
+    if (!target) return;
+    const i = exercises.findIndex((e) => e.id === target.id);
+    if (i === -1) return;
+    setViewMode("focus");
+    setDir(1);
+    setFocusIdx(i);
+  };
+
   // "Próximo" no Foco pula exercícios já concluídos (sem repetir o que já foi feito);
   // se só restarem concluídos à frente, anda sequencial mesmo (revisão).
   const goNext = () => {
     const next = firstIncomplete(idx + 1);
     setDir(1);
     setFocusIdx(next !== -1 ? next : Math.min(exercises.length - 1, idx + 1));
+  };
+
+  // Adiciona no Foco e SALTA pro novo exercício (entra no fim → new index = length atual).
+  const addAndFocus = (name: string, group?: string) => {
+    controls.addExercise(name, group);
+    setDir(1);
+    setFocusIdx(exercises.length);
   };
 
   // Remove o exercício em Foco e reposiciona no próximo pendente.
@@ -494,12 +549,39 @@ export function SessionActive({
     toast.info("Exercício removido do treino.");
   };
 
+  // "Fazer depois": manda o exercício em Foco pro fim (máquina ocupada) e mostra o
+  // próximo (que escorrega pra posição atual). Se já for o último, nada a fazer.
+  const skipFocused = () => {
+    if (!focusEx) return;
+    if (idx >= exercises.length - 1) { toast.info("Este já é o último exercício."); return; }
+    controls.skipExercise(focusEx.id);
+    setDir(1);
+    toast.info("Movido pro fim — volte quando a máquina liberar. ⏭️");
+  };
+
   // Toda troca de tela (Lista↔Foco, navegar exercício) volta o scroll pro topo —
   // sem isso a nova tela "começa lá embaixo" na posição da anterior.
   const rootRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     rootRef.current?.scrollIntoView({ block: "start" });
   }, [mode, idx]);
+
+  // Voz do treinador: anuncia o exercício ao CHEGAR nele (modo Foco). Pula durante
+  // o aquecimento e logo após o descanso (o "Bora! Agora: X" do fim já falou).
+  const lastAnnouncedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (mode !== "focus" || inWarmup) return;
+    const ex = exercises[idx];
+    if (!ex || !ex.name.trim()) return;
+    if (Date.now() - restEndedAtRef.current < 1600) {
+      restEndedAtRef.current = 0;
+      lastAnnouncedRef.current = ex.id;
+      return;
+    }
+    if (lastAnnouncedRef.current === ex.id) return;
+    lastAnnouncedRef.current = ex.id;
+    announceExercise(ex.name, ex.sets.length, ex.target?.minReps, ex.target?.maxReps);
+  }, [mode, idx, exercises, inWarmup]);
 
   return (
     <div ref={rootRef} className="flex min-h-dvh flex-col bg-background">
@@ -573,6 +655,10 @@ export function SessionActive({
                 <Droplets className="h-4 w-4" /> Lembrete de água
                 <span className="ml-auto text-[10px] font-semibold text-primary">{waterMinutes === 0 ? "desligado" : `${waterMinutes} min`}</span>
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={toggleCoach} className="gap-2.5 rounded-xl py-2.5">
+                <Megaphone className="h-4 w-4" /> Voz do treinador
+                <span className="ml-auto text-[10px] font-semibold text-primary">{coachOn ? "ligada" : "desligada"}</span>
+              </DropdownMenuItem>
               {isNotifySupported() && (
                 <DropdownMenuItem onClick={() => void toggleNotify()} className="gap-2.5 rounded-xl py-2.5">
                   {notifyOn ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />} Notificar fora do app
@@ -630,15 +716,29 @@ export function SessionActive({
         <div className="h-1 w-full bg-muted/40">
           <div className="h-full bg-primary transition-[width] duration-500 ease-out" style={{ width: `${pct}%` }} />
         </div>
+
+        {/* Lembrete de exercícios adiados (fazer depois) — toque pra voltar a eles */}
+        {postponed.length > 0 && (
+          <button
+            type="button"
+            onClick={goToPostponed}
+            className="flex w-full items-center justify-center gap-1.5 bg-amber-400/10 py-1.5 text-[11px] font-semibold text-amber-600 transition-colors hover:bg-amber-400/20"
+          >
+            <SkipForward className="h-3.5 w-3.5" />
+            {postponed.length} exercício{postponed.length > 1 ? "s" : ""} adiado{postponed.length > 1 ? "s" : ""} — toque para voltar
+          </button>
+        )}
       </header>
 
       {/* CONTEÚDO */}
       {mode === "list" ? (
         <main className="mx-auto w-full max-w-2xl flex-1 space-y-3 px-4 py-4 pb-28">
-          {exercises.map((ex) => (
+          {exercises.map((ex, i) => (
             <ExerciseCard
               key={ex.id}
               ex={ex}
+              index={i}
+              total={exercises.length}
               last={ex.name ? lastPerf[ex.name.toLowerCase()] : undefined}
               youtubeId={ex.name ? mediaFor(media, ex.name)?.youtubeId : undefined}
               controls={controls}
@@ -646,7 +746,7 @@ export function SessionActive({
               onOpenDemo={() => ex.name.trim() && setDemoFor(ex.name)}
             />
           ))}
-          <AddExercisePanel onAdd={controls.addExercise} groups={session.muscleGroups} />
+          <AddExercisePanel onAdd={controls.addExercise} groups={session.muscleGroups} existingNames={new Set(exercises.map((e) => e.name.toLowerCase()))} />
         </main>
       ) : focusEx ? (
         <FocusView
@@ -654,6 +754,9 @@ export function SessionActive({
           dir={dir}
           index={idx}
           total={exercises.length}
+          groups={session.muscleGroups}
+          existingNames={new Set(exercises.map((e) => e.name.toLowerCase()))}
+          onAdd={addAndFocus}
           last={focusEx.name ? lastPerf[focusEx.name.toLowerCase()] : undefined}
           youtubeId={focusEx.name ? mediaFor(media, focusEx.name)?.youtubeId : undefined}
           controls={controls}
@@ -665,6 +768,7 @@ export function SessionActive({
           onPrev={() => { setDir(-1); setFocusIdx(Math.max(0, idx - 1)); }}
           onNext={goNext}
           onRemove={removeFocused}
+          onSkip={skipFocused}
         />
       ) : null}
 
@@ -869,11 +973,9 @@ function SetRows({ ex, controls, onToggle, big = false, last }: {
   const activeIdx = ex.sets.findIndex((s) => !s.done);
   // Sobrecarga progressiva: bateu o teto de reps na última vez → sugere subir a carga.
   // Só aparece enquanto nenhuma série foi concluída (depois vira ruído).
-  const lastW = numOf(last?.weight ?? "");
-  const lastR = numOf(last?.reps ?? "");
-  const suggestKg = !bodyweight && lastW > 0 && lastR >= (target?.maxReps ?? 12) && !ex.sets.some((s) => s.done)
-    ? Math.round((lastW + 2.5) * 100) / 100
-    : null;
+  // Dupla progressão: só enquanto nenhuma série foi feita (depois vira ruído).
+  // "up" = subir carga (bateu o teto de reps); "rep" = mesma carga, +1 rep.
+  const hint = !ex.sets.some((s) => s.done) ? overloadHint(last, target, { bodyweight, perHand }) : null;
   // Drop set: alvo é a série atual ou, se tudo concluído, a última — desde que seja
   // de trabalho (não aquecimento) e tenha carga (não faz sentido em peso corporal puro).
   const dropBase = activeIdx !== -1 ? ex.sets[activeIdx] : ex.sets[ex.sets.length - 1];
@@ -900,9 +1002,13 @@ function SetRows({ ex, controls, onToggle, big = false, last }: {
           {target.intensity && <span className="text-primary/70">· {target.intensity.type} {target.intensity.value}</span>}
         </div>
       )}
-      {suggestKg !== null && (
-        <div className="mb-1.5 flex items-center gap-1.5 rounded-lg bg-emerald-500/10 px-2 py-1 text-[11px] font-semibold text-emerald-600">
-          <Trophy className="h-3 w-3" /> Você fechou {lastR} reps com {last?.weight}kg — tente {suggestKg}{perHand ? "kg/mão" : "kg"} hoje!
+      {hint && (
+        <div className={cn(
+          "mb-1.5 flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-semibold",
+          hint.kind === "up" ? "bg-emerald-500/10 text-emerald-600" : "bg-sky-500/10 text-sky-600",
+        )}>
+          {hint.kind === "up" ? <TrendingUp className="h-3 w-3 shrink-0" /> : <Target className="h-3 w-3 shrink-0" />}
+          {hint.message}
         </div>
       )}
       {plateWeight > 0 && <PlateHint total={plateWeight} />}
@@ -1022,42 +1128,32 @@ function LastAndPR({ last, pr, orm = 0 }: { last?: LastPerf; pr: boolean; orm?: 
 // Botão de trocar exercício (erro do usuário) — input inline que substitui o movimento.
 function SwapControl({ ex, controls, iconOnly = false }: { ex: Ex; controls: SessionControls; iconOnly?: boolean }) {
   const [open, setOpen] = useState(false);
-  const [value, setValue] = useState(ex.name);
-  const submit = () => {
-    const name = value.trim();
-    if (name) controls.replaceExercise(ex.id, name, ex.group, ex.equipment);
-    setOpen(false);
-  };
-  if (!open) {
-    return (
+  return (
+    <>
       <button
         type="button"
-        onClick={() => { setValue(ex.name); setOpen(true); }}
+        onClick={() => setOpen(true)}
         className={cn("text-muted-foreground hover:text-primary", iconOnly ? "" : "inline-flex items-center gap-1 text-xs font-medium")}
         aria-label="Trocar exercício"
       >
         <Replace className="h-4 w-4" /> {!iconOnly && "Trocar"}
       </button>
-    );
-  }
-  return (
-    <div className="flex items-center gap-1.5">
-      <Input
-        autoFocus
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") submit(); if (e.key === "Escape") setOpen(false); }}
-        placeholder="Trocar por…"
-        className="h-8 w-40 text-sm"
+      <ExercisePicker
+        open={open}
+        onOpenChange={setOpen}
+        groups={ex.group ? [ex.group] : []}
+        title={`Trocar "${ex.name}"`}
+        onPick={(name, group) => controls.replaceExercise(ex.id, name, group ?? ex.group, guessEquipment(name))}
       />
-      <Button size="sm" className="h-8 px-2" onClick={submit}>OK</Button>
-    </div>
+    </>
   );
 }
 
 // ---- Card de um exercício (modo Lista) ----
-function ExerciseCard({ ex, last, youtubeId, controls, onToggle, onOpenDemo }: {
+function ExerciseCard({ ex, index, total, last, youtubeId, controls, onToggle, onOpenDemo }: {
   ex: Ex;
+  index: number;
+  total: number;
   last?: LastPerf;
   youtubeId?: string;
   controls: SessionControls;
@@ -1098,7 +1194,30 @@ function ExerciseCard({ ex, last, youtubeId, controls, onToggle, onOpenDemo }: {
         <div className="space-y-2.5 border-t border-border/40 p-2">
           <div className="flex items-center justify-between gap-2 px-1">
             <EquipmentPicker value={ex.equipment} onChange={(eq) => controls.setExerciseEquipment(ex.id, eq)} />
-            {ex.name && <SwapControl ex={ex} controls={controls} />}
+            <div className="flex shrink-0 items-center gap-2">
+              {total > 1 && (
+                <div className="flex items-center rounded-lg border border-border/50">
+                  <button type="button" onClick={() => controls.moveExercise(ex.id, -1)} disabled={index === 0} className="px-1.5 py-1 text-muted-foreground/70 hover:text-foreground disabled:opacity-30" aria-label="Mover para cima" title="Subir">
+                    <ArrowUp className="h-3.5 w-3.5" />
+                  </button>
+                  <button type="button" onClick={() => controls.moveExercise(ex.id, 1)} disabled={index === total - 1} className="border-l border-border/50 px-1.5 py-1 text-muted-foreground/70 hover:text-foreground disabled:opacity-30" aria-label="Mover para baixo" title="Descer">
+                    <ArrowDown className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
+              {index < total - 1 && (
+                <button
+                  type="button"
+                  onClick={() => { controls.skipExercise(ex.id); toast.info("Movido pro fim — volte quando liberar. ⏭️"); }}
+                  className="text-muted-foreground/70 hover:text-primary"
+                  title="Fazer depois (mandar pro fim)"
+                  aria-label="Fazer depois"
+                >
+                  <SkipForward className="h-4 w-4" />
+                </button>
+              )}
+              {ex.name && <SwapControl ex={ex} controls={controls} />}
+            </div>
           </div>
           <SetRows ex={ex} controls={controls} onToggle={onToggle} last={last} />
           <div className="px-1 pt-0.5">
@@ -1118,11 +1237,14 @@ const focusVariants = {
 };
 
 // ---- Modo Foco: um exercício por vez ----
-function FocusView({ ex, dir, index, total, doneFlags, last, youtubeId, controls, onToggle, onOpenDemo, hasPrev, hasNext, onPrev, onNext, onRemove }: {
+function FocusView({ ex, dir, index, total, groups, existingNames, onAdd, doneFlags, last, youtubeId, controls, onToggle, onOpenDemo, hasPrev, hasNext, onPrev, onNext, onRemove, onSkip }: {
   ex: Ex;
   dir: number;
   index: number;
   total: number;
+  groups: string[];
+  existingNames: Set<string>;
+  onAdd: (name: string, group?: string) => void;
   doneFlags: boolean[];
   last?: LastPerf;
   youtubeId?: string;
@@ -1134,6 +1256,7 @@ function FocusView({ ex, dir, index, total, doneFlags, last, youtubeId, controls
   onPrev: () => void;
   onNext: () => void;
   onRemove: () => void;
+  onSkip: () => void;
 }) {
   const done = allDone(ex);
   const pr = isPR(ex, last);
@@ -1233,6 +1356,17 @@ function FocusView({ ex, dir, index, total, doneFlags, last, youtubeId, controls
         </div>
       )}
 
+      {/* Fazer depois (máquina ocupada) — manda pro fim e mostra o próximo */}
+      {ex.name && hasNext && (
+        <button
+          type="button"
+          onClick={onSkip}
+          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border/50 py-2 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+        >
+          <SkipForward className="h-3.5 w-3.5" /> Fazer depois (máquina ocupada)
+        </button>
+      )}
+
       {/* Navegação */}
       <div className="mt-4 flex items-center gap-3">
         <Button variant="outline" onClick={onPrev} disabled={!hasPrev} className="h-12 flex-1 gap-1.5">
@@ -1252,32 +1386,36 @@ function FocusView({ ex, dir, index, total, doneFlags, last, youtubeId, controls
           </div>
         )}
       </div>
+
+      {/* Adicionar exercício também no Foco (antes só existia na Lista) — salta pro novo */}
+      <div className="mt-3">
+        <AddExercisePanel groups={groups} existingNames={existingNames} onAdd={onAdd} />
+      </div>
     </motion.main>
     </AnimatePresence>
   );
 }
 
 // ---- Painel de adicionar exercício (modo Lista) ----
-function AddExercisePanel({ groups, onAdd }: { groups: string[]; onAdd: (name: string, group?: string) => void }) {
-  const [value, setValue] = useState("");
-  const submit = () => {
-    const name = value.trim();
-    if (!name) return;
-    onAdd(name);
-    setValue("");
-  };
+function AddExercisePanel({ groups, existingNames, onAdd }: { groups: string[]; existingNames: Set<string>; onAdd: (name: string, group?: string) => void }) {
+  const [open, setOpen] = useState(false);
   return (
-    <div className="flex items-center gap-2 rounded-2xl border border-dashed border-border/50 bg-card/50 p-2">
-      <Input
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); submit(); } }}
-        placeholder={groups.length ? `Adicionar exercício (${groups.join(", ")})…` : "Adicionar exercício…"}
-        className="h-10 border-none bg-transparent shadow-none focus-visible:ring-0"
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border/60 bg-card/50 py-3 text-sm font-semibold text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/5 hover:text-primary"
+      >
+        <Plus className="h-4 w-4" /> Adicionar exercício
+      </button>
+      <ExercisePicker
+        open={open}
+        onOpenChange={setOpen}
+        groups={groups}
+        existingNames={existingNames}
+        multiple
+        onPick={(name, group) => onAdd(name, group)}
       />
-      <Button type="button" size="sm" onClick={submit} disabled={!value.trim()} className="shrink-0 gap-1.5">
-        <Plus className="h-4 w-4" /> Incluir
-      </Button>
-    </div>
+    </>
   );
 }

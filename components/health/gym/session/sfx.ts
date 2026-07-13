@@ -144,6 +144,55 @@ export function announceRestOver(nextName?: string): void {
   }, 1100);
 }
 
+// ---- Treinador por VOZ (opt-out) — anuncia o exercício atual e o tempo de descanso.
+// Preferência própria (separada do mudo geral): quem quer só os beeps desliga aqui. ----
+
+const COACH_KEY = "lifeos:gym:coach-voice";
+
+/** Voz do treinador ligada? (padrão: sim). */
+export function isCoachEnabled(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    return window.localStorage.getItem(COACH_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+export function setCoachEnabled(on: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(COACH_KEY, on ? "1" : "0");
+  } catch {
+    /* ignora */
+  }
+}
+
+/** Fala só quando NÃO está mudo E a voz do treinador está ligada. */
+function speakCoach(text: string, rate = 1.02): void {
+  if (isSfxMuted() || !isCoachEnabled()) return;
+  speak(text, rate);
+}
+
+/** Anuncia o exercício atual + a meta. Ex.: "Agora: Supino reto. 4 séries de 8 a 12 repetições." */
+export function announceExercise(name: string, sets: number, minReps?: number, maxReps?: number): void {
+  const clean = name.trim();
+  if (!clean) return;
+  let text = `Agora: ${clean}.`;
+  if (sets > 0) {
+    const reps = minReps && maxReps
+      ? minReps === maxReps ? `${minReps} repetições` : `${minReps} a ${maxReps} repetições`
+      : "";
+    text += ` ${sets} série${sets > 1 ? "s" : ""}${reps ? ` de ${reps}` : ""}.`;
+  }
+  speakCoach(text);
+}
+
+/** Callout do tempo restante do descanso. Ex.: "Faltam 30 segundos." */
+export function announceRestRemaining(seconds: number): void {
+  speakCoach(`Faltam ${seconds} segundos.`, 1.05);
+}
+
 /** Anúncio falado ao zerar o timer do aquecimento. */
 export function announceWarmupOver(): void {
   if (isSfxMuted()) return;
