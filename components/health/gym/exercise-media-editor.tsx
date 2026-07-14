@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import {
   getAllMedia, persistMedia, setImageFor, setVideoFor,
-  parseYouTubeId, youtubeThumb, youtubeEmbed,
+  parseYouTubeId, youtubeThumb,
 } from "./session/exercise-media";
 import { ExerciseThumb } from "./session/exercise-thumb";
 import { MUSCLE_META, groupOfExercise } from "./exercise-db";
@@ -252,7 +252,7 @@ export function ExerciseMediaEditor({
                   <div className="flex items-center gap-2 text-sm font-semibold text-emerald-600">
                     <Check className="h-4 w-4" /> Vídeo adicionado!
                   </div>
-                  <p className="text-xs text-muted-foreground">ID: <code className="bg-background/60 px-1.5 py-0.5 rounded text-[10px] font-mono">{media.youtubeId}</code></p>
+                  <p className="text-xs text-muted-foreground">ID: <code className="bg-background/60 px-1.5 py-0.5 rounded text-[10px] font-mono">&quot;{media.youtubeId}&quot;</code></p>
                   <div className="flex gap-2">
                     <Button
                       type="button"
@@ -280,7 +280,7 @@ export function ExerciseMediaEditor({
                 <p className="font-semibold text-foreground flex items-center gap-1.5">
                   <AlertCircle className="h-3.5 w-3.5" /> Dica
                 </p>
-                <p>Procure por "como fazer [exercício]" no YouTube e cole o link aqui.</p>
+                <p>Procure por &quot;como fazer [exercício]&quot; no YouTube e cole o link aqui.</p>
                 <p>A thumbnail do vídeo será usada como capa se você não tiver uma foto.</p>
               </div>
             </TabsContent>

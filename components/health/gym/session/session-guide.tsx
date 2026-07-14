@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import {
-  AlertCircle, CheckCircle2, Dumbbell, Zap, Clock, Target,
+  AlertCircle, Dumbbell, Zap, Clock, Target,
   ChevronDown, ChevronUp, HelpCircle, Lightbulb,
 } from "lucide-react";
 import { cn } from "@/lib/utils";

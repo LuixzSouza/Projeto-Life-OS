@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, CheckCircle2, Zap, TrendingUp, Info, ArrowRight } from "lucide-react";
+import { AlertCircle, CheckCircle2, Zap, Info, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
