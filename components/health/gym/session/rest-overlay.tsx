@@ -68,6 +68,8 @@ export function RestOverlay({
   onDone,
   onSuperset,
   onMinimize,
+  rpe,
+  onRate,
 }: {
   total: number;        // segundos do descanso programado
   remaining: number;    // segundos restantes (negativo = excedente)
@@ -79,6 +81,10 @@ export function RestOverlay({
   onDone: () => void;   // começar a próxima / pular
   onSuperset?: () => void;
   onMinimize?: () => void;   // recolhe mantendo o cronômetro rodando (pílula)
+  /** RPE atual da série recém-feita (undefined = ainda não avaliada). */
+  rpe?: number;
+  /** Avalia o esforço da série recém-feita (RPE 6–10); mesmo valor desfaz. */
+  onRate?: (rpe: number) => void;
 }) {
   const over = remaining <= 0;
   const frac = over ? 1 : Math.min(1, Math.max(0, remaining / Math.max(1, total)));
@@ -202,6 +208,32 @@ export function RestOverlay({
               </button>
             </div>
             <p className="text-[10px] text-muted-foreground/60">Digite os segundos para mudar o descanso padrão</p>
+            {/* RPE da série recém-feita — opcional, 1 toque; tocar de novo desfaz. */}
+            {onRate && (
+              <div className="mt-2 flex flex-col items-center gap-1.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Esforço da série (RPE)
+                </p>
+                <div className="flex items-center gap-1.5">
+                  {[6, 7, 8, 9, 10].map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => { onRate(v); playClick(); }}
+                      className={cn(
+                        "flex h-9 w-9 items-center justify-center rounded-full border text-sm font-bold tabular-nums transition-colors",
+                        rpe === v
+                          ? "border-violet-500 bg-violet-500 text-white"
+                          : "border-border/60 bg-card text-muted-foreground hover:border-violet-400/60 hover:text-foreground",
+                      )}
+                      aria-label={`Esforço ${v} de 10${rpe === v ? " (tocar de novo desfaz)" : ""}`}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <button
               type="button"
               onClick={() => { setPlaying(true); playClick(); }}

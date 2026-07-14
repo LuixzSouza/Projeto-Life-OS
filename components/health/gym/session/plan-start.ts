@@ -30,6 +30,7 @@ export function divisionToStart(plan: WorkoutPlan, div: PlanDivision): StartOpti
       name: e.name,
       group: e.group,
       equipment: e.equipment,
+      timed: e.timed,
       sets: e.target.sets,
       reps: e.target.minReps === e.target.maxReps ? String(e.target.minReps) : "",
       weight: "",

@@ -42,6 +42,7 @@ export function epley1RM(weight: number, reps: number, mult: number): number {
 
 /** Melhor 1RM estimado das séries de trabalho de um exercício. */
 export function bestOneRm(ex: Exercise): number {
+  if (ex.timed) return 0; // reps = segundos → Epley não se aplica
   let best = 0;
   for (const s of workingSets(ex)) best = Math.max(best, epley1RM(s.weight, s.reps, s.mult));
   return Math.round(best);
@@ -49,6 +50,7 @@ export function bestOneRm(ex: Exercise): number {
 
 /** Volume (kg movidos) das séries de trabalho de um exercício. */
 export function exerciseVolume(ex: Exercise): number {
+  if (ex.timed) return 0; // exercício por tempo: kg × segundos não é volume
   let vol = 0;
   for (const s of workingSets(ex)) vol += s.weight * s.reps * s.mult;
   return vol;

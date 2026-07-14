@@ -84,20 +84,24 @@ export function SessionSummary({
       .filter((e) => e.name.trim() && e.sets.some((s) => s.done))
       .map((ex) => {
         const mult = loadMultiplier(ex.equipment);
+        const timed = !!ex.timed; // por tempo: reps = segundos → sem volume/kg
         const working = ex.sets.filter((s) => s.done && isWorkingSet(s));
         let topW = 0, topR = 0, volume = 0;
         for (const s of working) {
           const w = num(s.weight), r = num(s.reps);
-          volume += w * mult * r;
+          if (!timed) volume += w * mult * r;
           if (w > topW || (w === topW && r > topR)) { topW = w; topR = r; }
         }
+        // Esforço médio avaliado nas séries (RPE opcional dos chips do descanso).
+        const rpes = working.map((s) => s.rpe).filter((r): r is number => typeof r === "number");
+        const avgRpe = rpes.length ? Math.round((rpes.reduce((a, b) => a + b, 0) / rpes.length) * 10) / 10 : 0;
         return {
           id: ex.id,
           name: ex.name.trim(),
           group: ex.group,
           doneCount: ex.sets.filter((s) => s.done).length,
           total: ex.sets.length,
-          topW, topR,
+          topW, topR, timed, avgRpe,
           volume: Math.round(volume),
           perHand: ex.equipment === "dumbbell",
           note: ex.note?.trim() || "",
@@ -287,8 +291,11 @@ export function SessionSummary({
                   </div>
                   <p className="text-[11px] text-muted-foreground">
                     {r.doneCount}/{r.total} séries
-                    {r.topW > 0 && <> · melhor {r.topW}{r.perHand ? "kg/mão" : "kg"} × {r.topR}</>}
+                    {r.timed
+                      ? r.topR > 0 && <> · melhor {r.topR}s{r.topW > 0 ? ` com ${r.topW}kg` : ""}</>
+                      : r.topW > 0 && <> · melhor {r.topW}{r.perHand ? "kg/mão" : "kg"} × {r.topR}</>}
                     {r.volume > 0 && <> · {r.volume.toLocaleString("pt-BR")} kg</>}
+                    {r.avgRpe > 0 && <> · RPE ~{r.avgRpe}</>}
                   </p>
                   {r.note && (
                     <p className="mt-0.5 flex items-start gap-1 text-[10px] italic leading-snug text-muted-foreground/80">

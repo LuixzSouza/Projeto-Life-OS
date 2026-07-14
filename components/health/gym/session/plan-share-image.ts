@@ -132,7 +132,7 @@ function buildCanvas(plan: WorkoutPlan): HTMLCanvasElement | null {
       ctx.textAlign = "left";
 
       // Meta (direita) — mede primeiro para reservar espaço.
-      const target = formatTarget(ex.target);
+      const target = formatTarget(ex.target, ex.timed);
       ctx.font = "700 28px system-ui, sans-serif";
       const targetW = ctx.measureText(target).width;
       // Nome (esquerda, truncado).

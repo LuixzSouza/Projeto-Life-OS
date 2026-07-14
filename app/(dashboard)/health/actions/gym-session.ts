@@ -53,6 +53,71 @@ export async function saveGymSession(input: SaveGymSessionInput): Promise<Action
   }
 }
 
+// ---- Edição das séries de um treino salvo (setLog) ----
+// O detalhe do treino permite corrigir carga/reps/tipo/feita de cada série DEPOIS
+// de salvar. O resumo legado (sets/reps/weight) é RECOMPUTADO a partir do setLog
+// para os gráficos e a "última vez" continuarem coerentes com a edição.
+
+interface EditedSet { reps: string; weight: string; done: boolean; type?: string; doneAt?: number; rpe?: number }
+export interface EditedExercise {
+  name: string;
+  equipment?: string;
+  group?: string;
+  timed?: boolean;
+  note?: string;
+  setLog: EditedSet[];
+}
+
+function summarizeEdited(ex: EditedExercise): Record<string, unknown> {
+  const setLog = ex.setLog.map((s) => ({
+    reps: String(s.reps || "0"),
+    weight: String(s.weight || "0"),
+    done: Boolean(s.done),
+    type: typeof s.type === "string" ? s.type : "normal",
+    ...(typeof s.doneAt === "number" ? { doneAt: s.doneAt } : {}),
+    ...(typeof s.rpe === "number" ? { rpe: s.rpe } : {}),
+  }));
+  const done = setLog.filter((s) => s.done);
+  const working = done.filter((s) => s.type !== "warmup");
+  const top = working.reduce<EditedSet | null>((best, s) => (!best || toNum(s.weight) > toNum(best.weight) ? s : best), null);
+  return {
+    name: ex.name.trim(),
+    sets: String(working.length || done.length || setLog.length),
+    reps: top?.reps ?? (setLog[0]?.reps || "0"),
+    weight: top?.weight ?? "0",
+    setLog,
+    isCompleted: done.length > 0 && done.length === setLog.length,
+    ...(ex.equipment ? { equipment: ex.equipment } : {}),
+    ...(ex.group ? { group: ex.group } : {}),
+    ...(ex.timed ? { timed: true } : {}),
+    ...(ex.note?.trim() ? { note: ex.note.trim() } : {}),
+  };
+}
+
+/** Substitui as séries detalhadas de um treino (edição pós-salvamento). */
+export async function updateWorkoutExercises(workoutId: string, exercises: EditedExercise[]): Promise<ActionResponse> {
+  try {
+    const userId = await requireUserId();
+    const valid = exercises.filter((ex) => ex.name.trim() && Array.isArray(ex.setLog) && ex.setLog.length > 0);
+    if (valid.length === 0) {
+      return { success: false, message: "O treino precisa de ao menos um exercício com séries." };
+    }
+    const payload = JSON.stringify(valid.map(summarizeEdited));
+    // updateMany: id + userId juntos sem exigir chave composta (regra do projeto).
+    const res = await prisma.workout.updateMany({
+      where: { id: workoutId, userId },
+      data: { exercises: payload },
+    });
+    if (res.count === 0) return { success: false, message: "Treino não encontrado." };
+    revalidatePath("/health");
+    revalidatePath("/health/gym");
+    return { success: true, message: "Séries atualizadas! ✏️" };
+  } catch (error) {
+    console.error("Erro ao editar séries do treino:", error);
+    return { success: false, message: "Falha ao salvar a edição." };
+  }
+}
+
 // Extrai, de forma segura, a "melhor série" (maior carga) de um exercício salvo,
 // lidando tanto com o novo formato (setLog) quanto com o resumo legado.
 function topSetOf(item: unknown): { weight: string; reps: string; sets: string } | null {
@@ -82,6 +147,7 @@ function topSetOf(item: unknown): { weight: string; reps: string; sets: string }
 
 // Volume (kg) de um exercício salvo: séries de TRABALHO concluídas × fator do equip.
 function storedExerciseVolume(rec: Record<string, unknown>): number {
+  if (rec.timed === true) return 0; // por tempo (reps = segundos): não é volume
   const equipment = typeof rec.equipment === "string" ? (rec.equipment as Equipment) : undefined;
   const mult = loadMultiplier(equipment);
   if (Array.isArray(rec.setLog) && rec.setLog.length > 0) {
@@ -133,7 +199,14 @@ export async function getRecentExercisePerformance(): Promise<LastPerf[]> {
         if (byName.has(key)) continue; // já temos o mais recente (rows vêm desc)
         const top = topSetOf(item);
         if (!top || top.weight === "0") continue;
-        byName.set(key, { name, date: row.date.toISOString(), weight: top.weight, reps: top.reps, sets: top.sets });
+        // Séries de trabalho FEITAS na última execução, em ordem — vira o fantasma
+        // série-a-série da sessão (cada linha mostra o que foi feito naquela série).
+        let lastSets: { weight: string; reps: string }[] | undefined;
+        if (Array.isArray(rec.setLog)) {
+          const done = (rec.setLog as Record<string, unknown>[]).filter((s) => Boolean(s.done) && !isWarmup(s));
+          if (done.length > 0) lastSets = done.map((s) => ({ weight: String(s.weight ?? "0"), reps: String(s.reps ?? "0") }));
+        }
+        byName.set(key, { name, date: row.date.toISOString(), weight: top.weight, reps: top.reps, sets: top.sets, ...(lastSets ? { lastSets } : {}) });
       }
     }
 

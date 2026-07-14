@@ -4,17 +4,32 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Play } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MUSCLE_META, groupOfExercise } from "../exercise-db";
-import { youtubeThumb } from "./exercise-media";
+import { getAllMedia, mediaFor, youtubeThumb, MEDIA_EVENT } from "./exercise-media";
+import { customArtFor } from "./custom-art";
 import { useExerciseImages } from "./exercise-images";
 
 // Capa do exercício, em ordem de prioridade:
-//  1) vídeo do YouTube salvo → thumbnail;
-//  2) demonstração animada (free-exercise-db, alterna 2 frames como app de 30 dias);
-//  3) capa em gradiente na cor do grupo + inicial (fallback offline/sem match).
+//  1) FOTO própria do usuário (localStorage) — escolha explícita vence tudo;
+//  2) vídeo do YouTube salvo → thumbnail;
+//  3) arte EMBUTIDA (/public/exercises, recortes das fichas do personal);
+//  4) demonstração animada (free-exercise-db, alterna 2 frames);
+//  5) capa em gradiente na cor do grupo + inicial (fallback offline/sem match).
 
 function initial(name: string): string {
   const m = name.trim().match(/[\p{L}\p{N}]/u);
   return (m?.[0] ?? "?").toUpperCase();
+}
+
+// Foto própria do usuário para o exercício (pós-hidratação, sem mismatch de SSR).
+function useUserImage(name?: string): string | undefined {
+  const [img, setImg] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    const read = () => setImg(name?.trim() ? mediaFor(getAllMedia(), name)?.image : undefined);
+    read();
+    window.addEventListener(MEDIA_EVENT, read);
+    return () => window.removeEventListener(MEDIA_EVENT, read);
+  }, [name]);
+  return img;
 }
 
 export function ExerciseThumb({
@@ -38,8 +53,11 @@ export function ExerciseThumb({
   const color = (g && MUSCLE_META[g]?.color) || "#6366f1";
   const interactive = !!onClick;
 
-  // Demonstração animada (pula a busca se já houver vídeo do YouTube).
-  const imgs = useExerciseImages(youtubeId ? undefined : name);
+  const userImage = useUserImage(name);
+  const art = customArtFor(name);
+
+  // Demonstração animada (pula a busca se já houver vídeo/arte embutida).
+  const imgs = useExerciseImages(youtubeId || art ? undefined : name);
   const [frame, setFrame] = useState(0);
   const [failed, setFailed] = useState(false);
   const animated = !youtubeId && imgs && imgs.length > 0 && !failed;
@@ -51,10 +69,20 @@ export function ExerciseThumb({
   }, [imgs, failed]);
 
   let inner: ReactNode;
-  if (youtubeId) {
+  if (userImage) {
+    inner = (
+      // eslint-disable-next-line @next/next/no-img-element -- dataURL local do usuário
+      <img src={userImage} alt="" className="h-full w-full object-cover" />
+    );
+  } else if (youtubeId) {
     inner = (
       // eslint-disable-next-line @next/next/no-img-element -- thumbnail externa do YouTube
       <img src={youtubeThumb(youtubeId)} alt="" className="h-full w-full object-cover" />
+    );
+  } else if (art) {
+    inner = (
+      // eslint-disable-next-line @next/next/no-img-element -- arte local em /public
+      <img src={art} alt="" loading="lazy" className="h-full w-full bg-white object-contain" />
     );
   } else if (animated && imgs) {
     inner = (

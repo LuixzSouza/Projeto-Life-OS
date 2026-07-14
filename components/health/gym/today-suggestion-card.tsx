@@ -9,7 +9,7 @@ import { recommendToday, type TodayRec } from "./gym-analytics";
 import { listWorkoutPlans } from "@/app/(dashboard)/health/actions";
 import { savePendingStart } from "./session/session-storage";
 import { divisionToStart } from "./session/plan-start";
-import type { WorkoutPlan, PlanDivision } from "./session/plan-types";
+import { isScheduledToday, type WorkoutPlan, type PlanDivision } from "./session/plan-types";
 import type { MuscleRecovery } from "./session/session-types";
 import type { GymWorkout } from "./gym-types";
 
@@ -33,7 +33,9 @@ function bestDivision(plans: WorkoutPlan[], recs: TodayRec[]): Match | null {
         ? div.muscleGroups
         : Array.from(new Set(div.exercises.map((e) => e.group ?? groupOfExercise(e.name)).filter((g): g is string => !!g)));
       if (groups.length === 0) continue;
-      const s = groups.reduce((acc, g) => acc + (scoreOf.get(g) ?? 0), 0) / groups.length;
+      // Divisão agendada pro dia da semana de hoje ganha prioridade (o usuário planejou).
+      const bonus = isScheduledToday(div) ? 0.4 : 0;
+      const s = groups.reduce((acc, g) => acc + (scoreOf.get(g) ?? 0), 0) / groups.length + bonus;
       if (!best || s > best.score) best = { plan, div, score: s };
     }
   }

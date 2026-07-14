@@ -14,10 +14,13 @@ export function ConsistencyCard({ workouts }: { workouts: GymWorkout[] }) {
   const c = useMemo(() => consistency(workouts), [workouts]);
   const [goal, setGoal] = useState(4);
 
+  // Sincroniza a meta salva (store externo) só na montagem — ler no initializer
+  // causaria mismatch de hidratação no SSR (mesmo padrão da sessão ao vivo).
   useEffect(() => {
     try {
       const raw = window.localStorage.getItem(GOAL_KEY);
       const n = raw ? parseInt(raw, 10) : NaN;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (Number.isFinite(n) && n >= 1 && n <= 14) setGoal(n);
     } catch { /* ignore */ }
   }, []);

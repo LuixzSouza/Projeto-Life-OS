@@ -59,6 +59,8 @@ export function GymForm({ onSuccess, initialData }: GymFormProps) {
   })();
 
   const [exercises, setExercises] = useState<Exercise[]>(initialExercises);
+  // Editando um treino da sessão ao vivo? (tem setLog → avisar que o detalhe edita série a série)
+  const hasDetailedSets = initialExercises.some((e) => Array.isArray((e as { setLog?: unknown }).setLog));
   const initialMuscles = initialData?.muscleGroup ? initialData.muscleGroup.split(", ") : [];
   const [selectedMuscles, setSelectedMuscles] = useState<string[]>(initialMuscles);
 
@@ -215,6 +217,14 @@ export function GymForm({ onSuccess, initialData }: GymFormProps) {
 
       {/* SEÇÃO 3: EXERCÍCIOS */}
       <div className="space-y-3">
+        {/* Treino da sessão ao vivo: o resumo abaixo NÃO altera as séries detalhadas
+            (setLog) — os gráficos leem delas. A edição série a série fica no detalhe. */}
+        {hasDetailedSets && (
+          <p className="rounded-lg bg-amber-400/10 px-2.5 py-2 text-[11px] font-medium leading-relaxed text-amber-600">
+            Este treino tem séries detalhadas da sessão ao vivo. Para corrigir carga/reps
+            série a série (o que os gráficos usam), toque no treino e use <span className="font-semibold">“Editar séries”</span>.
+          </p>
+        )}
         <div className="flex items-center justify-between px-1">
           <Label className={labelCls}>Exercícios</Label>
           <Badge variant="secondary" className="font-mono text-[10px] bg-muted/60 text-muted-foreground border-none">

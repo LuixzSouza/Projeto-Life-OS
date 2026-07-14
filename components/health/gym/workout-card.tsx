@@ -6,20 +6,24 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Calendar, Timer, Flame, Pencil, Trash2, StickyNote } from "lucide-react";
+import { Calendar, Timer, Flame, Pencil, Trash2, StickyNote, Repeat2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { deleteWorkout } from "@/app/(dashboard)/health/actions";
 import { GymForm } from "./gym-form";
+import { startOptionsFromWorkout } from "./workout-detail";
+import { savePendingStart } from "./session/session-storage";
 import type { GymWorkout } from "./gym-types";
 
 interface WorkoutCardProps {
   workout: GymWorkout;
+  /** Abre o detalhe completo (modal único do dashboard). */
+  onOpenDetail?: () => void;
 }
 
-export function WorkoutCard({ workout: w }: WorkoutCardProps) {
+export function WorkoutCard({ workout: w, onOpenDetail }: WorkoutCardProps) {
   const router = useRouter();
   const [isEditOpen, setIsEditOpen] = useState(false);
 
@@ -29,8 +33,20 @@ export function WorkoutCard({ workout: w }: WorkoutCardProps) {
     else toast.error(res.message);
   };
 
+  // Repetir: inicia uma sessão ao vivo com os mesmos exercícios (pending-start).
+  const handleRepeat = () => {
+    savePendingStart(startOptionsFromWorkout(w));
+    router.push("/health/gym/session");
+  };
+
   return (
-    <Card className="group overflow-hidden border-border/40 shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-200">
+    <Card
+      onClick={onOpenDetail}
+      className={cn(
+        "group overflow-hidden border-border/40 shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-200",
+        onOpenDetail && "cursor-pointer",
+      )}
+    >
       <CardContent className="p-5">
         <div className="flex flex-col lg:flex-row gap-5">
 
@@ -38,7 +54,20 @@ export function WorkoutCard({ workout: w }: WorkoutCardProps) {
           <div className="flex-1 space-y-3 min-w-0">
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-1 min-w-0">
-                <h3 className="font-semibold text-base text-foreground truncate">{w.title}</h3>
+                {/* Título é um botão de verdade (teclado/leitor de tela abrem o detalhe;
+                    o clique no card é atalho de mouse — sem role=button com filhos). */}
+                {onOpenDetail ? (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onOpenDetail(); }}
+                    className="block max-w-full truncate text-left font-semibold text-base text-foreground hover:text-primary transition-colors"
+                    title="Ver treino completo"
+                  >
+                    {w.title}
+                  </button>
+                ) : (
+                  <h3 className="font-semibold text-base text-foreground truncate">{w.title}</h3>
+                )}
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1.5">
                     <Calendar className="h-3.5 w-3.5" />
@@ -51,14 +80,17 @@ export function WorkoutCard({ workout: w }: WorkoutCardProps) {
                 </div>
               </div>
 
-              {/* Ações (editar / excluir) */}
+              {/* Ações (repetir / editar / excluir) */}
               <div className="flex items-center gap-1 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 shrink-0">
-                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10" onClick={() => setIsEditOpen(true)} title="Editar">
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10" onClick={(e) => { e.stopPropagation(); handleRepeat(); }} title="Repetir este treino" aria-label="Repetir este treino">
+                  <Repeat2 className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10" onClick={(e) => { e.stopPropagation(); setIsEditOpen(true); }} title="Editar" aria-label="Editar treino">
                   <Pencil className="h-4 w-4" />
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10" title="Excluir">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10" onClick={(e) => e.stopPropagation()} title="Excluir" aria-label="Excluir treino">
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </AlertDialogTrigger>

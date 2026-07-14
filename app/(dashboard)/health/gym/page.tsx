@@ -25,6 +25,7 @@ interface GymSet {
   weight: string;
   done: boolean;
   type?: string;
+  rpe?: number;
 }
 
 interface GymExercise {
@@ -36,6 +37,7 @@ interface GymExercise {
   setLog?: GymSet[];
   equipment?: string;
   group?: string;
+  timed?: boolean;
   note?: string;
 }
 
@@ -76,6 +78,7 @@ function parseGymExercises(jsonString: string | null): GymExercise[] {
               weight: String(sr.weight ?? "0"),
               done: Boolean(sr.done),
               ...(typeof sr.type === "string" ? { type: sr.type } : {}),
+              ...(typeof sr.rpe === "number" ? { rpe: sr.rpe } : {}),
             };
           })
         : undefined;
@@ -83,6 +86,7 @@ function parseGymExercises(jsonString: string | null): GymExercise[] {
       const note = typeof record.note === "string" && record.note.trim() ? record.note.trim() : undefined;
       const equipment = typeof record.equipment === "string" ? record.equipment : undefined;
       const group = typeof record.group === "string" && record.group.trim() ? record.group.trim() : undefined;
+      const timed = record.timed === true;
 
       return {
         name: String(record.name || "Exercício"),
@@ -93,6 +97,7 @@ function parseGymExercises(jsonString: string | null): GymExercise[] {
         ...(setLog ? { setLog } : {}),
         ...(equipment ? { equipment } : {}),
         ...(group ? { group } : {}),
+        ...(timed ? { timed } : {}),
         ...(note ? { note } : {}),
       };
     });

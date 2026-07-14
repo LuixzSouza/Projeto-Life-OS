@@ -32,6 +32,12 @@ export function guessEquipment(name: string): Equipment {
   return "barbell";
 }
 
+/** Palpite de exercício medido por TEMPO (prancha, cardio, isometria): o campo
+ *  de reps passa a guardar segundos. O usuário pode alternar na sessão. */
+export function guessTimed(name: string): boolean {
+  return /(prancha|isometr|esteira|bicicleta erg|el[ií]ptico|escada|corrida|caminhada|hiit|pular corda|corda naval|battle rope|remo \(erg|farmer)/i.test(name);
+}
+
 /** Tipo da série — aquecimento NÃO conta para volume/recorde/1RM (só séries de
  *  trabalho refletem evolução). "failure" = série levada à falha; "drop" = série
  *  com carga REDUZIDA por não aguentar o peso planejado (drop set / continuação). */
@@ -56,6 +62,8 @@ export interface LiveSet {
   done: boolean;
   type?: SetType;        // default: "normal"
   doneAt?: number;       // epoch ms de quando foi concluída (prova de execução real)
+  /** Esforço percebido REAL da série (RPE 6–10), avaliado no descanso. Opcional. */
+  rpe?: number;
 }
 
 /** Meta vinda de uma Ficha, carregada na sessão (fantasma de reps + coloração). */
@@ -74,6 +82,9 @@ export interface LiveExercise {
   target?: LiveTarget;
   sets: LiveSet[];
   note?: string;
+  /** Exercício medido por TEMPO (prancha, esteira, HIIT): o campo de reps guarda
+   *  SEGUNDOS e a carga vira opcional. Não entra em volume/1RM. */
+  timed?: boolean;
   /** "Fazer depois": foi adiado pro fim (máquina ocupada). Some do lembrete quando
    *  concluído ou quando você volta a fazê-lo. */
   postponed?: boolean;
@@ -88,6 +99,7 @@ export interface StartExerciseInput {
   reps?: string;
   weight?: string;
   target?: LiveTarget;
+  timed?: boolean;
 }
 export interface StartOptions {
   title: string;
@@ -98,6 +110,15 @@ export interface StartOptions {
   warmupMinutes?: number;
 }
 
+/** Descanso entre séries EM ANDAMENTO — vive na sessão (persistido) para
+ *  sobreviver a refresh/troca de app (navegador mobile mata a aba com frequência). */
+export interface LiveRest {
+  exId: string;        // exercício cujo descanso está rodando
+  endsAt: number;      // epoch ms do fim previsto
+  total: number;       // duração programada (s) — base do anel de progresso
+  minimized?: boolean; // bi-set: cronômetro rodando em pílula, tela liberada
+}
+
 export interface LiveSession {
   startedAt: number;          // epoch ms — base do cronômetro
   updatedAt?: number;         // epoch ms — última modificação (detecta sessão obsoleta)
@@ -105,6 +126,7 @@ export interface LiveSession {
   muscleGroups: string[];
   exercises: LiveExercise[];
   restSeconds: number;        // descanso padrão entre séries
+  rest?: LiveRest;            // descanso em andamento (persiste junto da sessão)
   finishedAt?: number;        // marca a fase de resumo
   // --- Pausa real do cronômetro: tempo decorrido = now - startedAt - pausedMs
   // (- pausa em andamento). Pausar NÃO encerra nada — só congela o relógio.
@@ -138,12 +160,15 @@ export interface LastPerf {
   weight: string;
   reps: string;
   sets: string;
+  /** Séries de TRABALHO feitas na última execução, na ordem — vira o "fantasma"
+   *  série-a-série da sessão (cada linha mostra o que você fez naquela série). */
+  lastSets?: { weight: string; reps: string }[];
 }
 
 // ---- Formato persistido dentro de Workout.exercises (JSON) ----
 // Mantém os campos-resumo legados (sets/reps/weight) para os gráficos e o card de
 // histórico continuarem funcionando, e adiciona `setLog` com as séries detalhadas.
-export interface StoredSet { reps: string; weight: string; done: boolean; type?: SetType; doneAt?: number }
+export interface StoredSet { reps: string; weight: string; done: boolean; type?: SetType; doneAt?: number; rpe?: number }
 export interface StoredExercise {
   name: string;
   sets: string;
@@ -152,6 +177,8 @@ export interface StoredExercise {
   equipment?: Equipment;
   setLog: StoredSet[];
   isCompleted: boolean;
+  /** Medido por tempo (reps = segundos) — preserva a semântica no histórico. */
+  timed?: boolean;
   /** Anotação da sessão (ex.: reduções de carga no meio do treino). */
   note?: string;
 }
@@ -204,7 +231,8 @@ export function sessionStats(exercises: LiveExercise[]): { doneSets: number; tot
     for (const s of ex.sets) {
       if (s.done) {
         doneSets += 1;
-        if (isWorkingSet(s)) volume += setVolume(s, ex.equipment);
+        // Exercício por tempo: reps = segundos → não vira volume (kg × s não é carga).
+        if (isWorkingSet(s) && !ex.timed) volume += setVolume(s, ex.equipment);
       }
     }
   }
@@ -231,6 +259,7 @@ export function isExercisePR(ex: LiveExercise, last?: LastPerf): boolean {
 export function volumeByGroup(exercises: LiveExercise[]): { group: string; volume: number }[] {
   const map = new Map<string, number>();
   for (const ex of exercises) {
+    if (ex.timed) continue; // tempo não é volume
     const vol = ex.sets.filter((s) => s.done && isWorkingSet(s)).reduce((acc, s) => acc + setVolume(s, ex.equipment), 0);
     if (vol <= 0) continue;
     const g = ex.group?.trim() || "Outros";
@@ -274,6 +303,7 @@ export function averageSetGapSeconds(exercises: LiveExercise[]): number | null {
 
 /** Estimativa de 1RM (Epley) da MELHOR série de trabalho concluída. 0 se não houver. */
 export function estimatedOneRepMax(ex: LiveExercise): number {
+  if (ex.timed) return 0; // reps = segundos → Epley não se aplica
   let best = 0;
   for (const s of ex.sets) {
     if (!s.done || !isWorkingSet(s)) continue;
@@ -291,7 +321,7 @@ export function toStoredExercises(exercises: LiveExercise[]): StoredExercise[] {
   return exercises
     .filter((ex) => ex.name.trim())
     .map((ex) => {
-      const setLog: StoredSet[] = ex.sets.map((s) => ({ reps: s.reps || "0", weight: s.weight || "0", done: s.done, type: s.type ?? "normal", ...(s.doneAt ? { doneAt: s.doneAt } : {}) }));
+      const setLog: StoredSet[] = ex.sets.map((s) => ({ reps: s.reps || "0", weight: s.weight || "0", done: s.done, type: s.type ?? "normal", ...(s.doneAt ? { doneAt: s.doneAt } : {}), ...(typeof s.rpe === "number" ? { rpe: s.rpe } : {}) }));
       const done = setLog.filter((s) => s.done);
       // Resumo de evolução vem só das séries de TRABALHO feitas (ignora aquecimento).
       const working = done.filter(isWorkingSet);
@@ -304,6 +334,7 @@ export function toStoredExercises(exercises: LiveExercise[]): StoredExercise[] {
         equipment: ex.equipment,
         setLog,
         isCompleted: done.length > 0 && done.length === ex.sets.length,
+        ...(ex.timed ? { timed: true } : {}),
         ...(ex.note?.trim() ? { note: ex.note.trim() } : {}),
       };
     });

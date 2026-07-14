@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { BarChart3, Info } from "lucide-react";
+import { BarChart3, BatteryLow, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MUSCLE_META } from "./exercise-db";
 import { weeklyMuscleVolume, type VolumeStatus, type MuscleVolume } from "./gym-analytics";
@@ -79,6 +79,17 @@ export function WeeklyVolumeCard({ workouts }: { workouts: GymWorkout[] }) {
           <ul className="space-y-2.5">
             {data.map((mv) => <VolumeRow key={mv.group} mv={mv} />)}
           </ul>
+          {/* Sugestão de deload: algum grupo passou do MRV → hora de aliviar */}
+          {(() => {
+            const over = data.filter((mv) => mv.status === "over").map((mv) => MUSCLE_META[mv.group]?.label ?? mv.group);
+            if (over.length === 0) return null;
+            return (
+              <p className="mt-3 flex items-start gap-1.5 rounded-lg bg-red-500/10 px-2.5 py-2 text-[11px] font-medium leading-relaxed text-red-600 dark:text-red-400">
+                <BatteryLow className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                {over.join(", ")} acima do volume máximo recuperável — considere uma semana mais leve (deload) ou cortar séries para continuar progredindo.
+              </p>
+            );
+          })()}
           <p className="mt-3 flex items-start gap-1.5 border-t border-border/30 pt-2.5 text-[10px] leading-relaxed text-muted-foreground">
             <Info className="mt-0.5 h-3 w-3 shrink-0" />
             Séries de trabalho por grupo. A faixa verde é a zona ótima de hipertrofia (MEV→MAV); acima do máximo (MRV) tende ao excesso.

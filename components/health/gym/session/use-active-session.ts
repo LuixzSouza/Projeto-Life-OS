@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { type Equipment, type LiveExercise, type LiveSession, type LiveSet, type SetType, type StartOptions, guessEquipment, uid } from "./session-types";
+import { type Equipment, type LiveExercise, type LiveRest, type LiveSession, type LiveSet, type SetType, type StartOptions, guessEquipment, guessTimed, uid } from "./session-types";
 import { clearActiveSession, loadActiveSession, saveActiveSession } from "./session-storage";
 
 export type { StartOptions } from "./session-types";
@@ -42,6 +42,7 @@ export function useActiveSession() {
       group: e.group,
       equipment: e.equipment,
       target: e.target,
+      ...(e.timed ?? guessTimed(e.name) ? { timed: true } : {}),
       sets: Array.from({ length: Math.max(1, e.sets) }, () => ({
         id: uid("set"), reps: e.reps ?? "", weight: e.weight ?? "", done: false,
       })),
@@ -66,7 +67,8 @@ export function useActiveSession() {
   }, []);
 
   const finish = useCallback(() => {
-    setSession((s) => (s ? { ...s, finishedAt: Date.now() } : s));
+    // Finalizar encerra qualquer descanso em andamento (não faz sentido no resumo).
+    setSession((s) => (s ? { ...s, finishedAt: Date.now(), rest: undefined } : s));
   }, []);
 
   const reopen = useCallback(() => {
@@ -115,8 +117,19 @@ export function useActiveSession() {
   const setTitle = useCallback((title: string) => setSession((s) => (s ? { ...s, title } : s)), []);
   const setRestSeconds = useCallback((restSeconds: number) => setSession((s) => (s ? { ...s, restSeconds } : s)), []);
 
+  // Descanso em andamento VIVE NA SESSÃO (persistido): sobrevive a refresh e à
+  // troca de app no celular (navegador mobile recarrega a aba com frequência).
+  const setRestState = useCallback((rest: LiveRest | undefined) => {
+    setSession((s) => (s ? { ...s, rest } : s));
+  }, []);
+
   const addExercise = useCallback((name: string, group?: string) => {
-    mutate((exs) => [...exs, { id: uid("ex"), name, group, equipment: name ? guessEquipment(name) : undefined, sets: [emptySet()] }]);
+    mutate((exs) => [...exs, {
+      id: uid("ex"), name, group,
+      equipment: name ? guessEquipment(name) : undefined,
+      ...(name && guessTimed(name) ? { timed: true } : {}),
+      sets: [emptySet()],
+    }]);
   }, [mutate]);
 
   const removeExercise = useCallback((exId: string) => {
@@ -162,6 +175,7 @@ export function useActiveSession() {
             name,
             group: group ?? e.group,
             equipment: equipment ?? e.equipment,
+            timed: guessTimed(name) || undefined,
             sets: e.sets.map(() => ({ id: uid("set"), reps: "", weight: "", done: false })),
           }
         : e,
@@ -174,6 +188,11 @@ export function useActiveSession() {
 
   const setExerciseNote = useCallback((exId: string, note: string) => {
     mutate((exs) => exs.map((e) => (e.id === exId ? { ...e, note } : e)));
+  }, [mutate]);
+
+  // Alterna a medida do exercício: repetições ↔ tempo (segundos no campo de reps).
+  const setExerciseTimed = useCallback((exId: string, timed: boolean) => {
+    mutate((exs) => exs.map((e) => (e.id === exId ? { ...e, timed: timed || undefined } : e)));
   }, [mutate]);
 
   const addSet = useCallback((exId: string) => {
@@ -240,12 +259,19 @@ export function useActiveSession() {
     ));
   }, [mutate]);
 
+  // Esforço percebido (RPE 6–10) da série recém-feita — avaliado na tela de descanso.
+  const setSetRpe = useCallback((exId: string, setId: string, rpe: number | undefined) => {
+    mutate((exs) => exs.map((e) =>
+      e.id === exId ? { ...e, sets: e.sets.map((s) => (s.id === setId ? { ...s, rpe } : s)) } : e,
+    ));
+  }, [mutate]);
+
   return {
     session, hydrated,
     start, cancel, finish, reopen, touch,
     togglePause, endWarmup, extendWarmup, setLocation,
-    setTitle, setRestSeconds,
-    addExercise, removeExercise, moveExercise, skipExercise, renameExercise, replaceExercise, setExerciseEquipment, setExerciseNote,
-    addSet, dropSet, addWarmupSets, removeSet, updateSet, toggleSetDone, setSetType,
+    setTitle, setRestSeconds, setRestState,
+    addExercise, removeExercise, moveExercise, skipExercise, renameExercise, replaceExercise, setExerciseEquipment, setExerciseNote, setExerciseTimed,
+    addSet, dropSet, addWarmupSets, removeSet, updateSet, toggleSetDone, setSetType, setSetRpe,
   };
 }

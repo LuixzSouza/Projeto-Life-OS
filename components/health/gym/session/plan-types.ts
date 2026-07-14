@@ -2,7 +2,7 @@
 // Exercícios + Metas tipadas). Sem DOM/localStorage — importável por client e server.
 
 import type { Equipment } from "./session-types";
-import { uid } from "./session-types";
+import { guessTimed, uid } from "./session-types";
 
 export type PlanGoal = "hypertrophy" | "strength" | "endurance" | "general";
 
@@ -34,6 +34,8 @@ export interface PlanExercise {
   name: string;
   group?: string;
   equipment?: Equipment;
+  /** Medido por TEMPO (esteira, prancha, isometria): minReps/maxReps = SEGUNDOS. */
+  timed?: boolean;
   target: ExerciseTarget;
   note?: string;
 }
@@ -43,7 +45,17 @@ export interface PlanDivision {           // Treino A / B / C
   label: string;                          // "A — Peito/Tríceps"
   muscleGroups: string[];
   defaultRestSeconds: number;
+  /** Dias da semana agendados (0=domingo … 6=sábado). Vazio/ausente = sem agenda. */
+  weekdays?: number[];
   exercises: PlanExercise[];
+}
+
+/** Rótulos curtos dos dias (índice = getDay()). */
+export const WEEKDAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"] as const;
+
+/** A divisão está agendada para hoje? */
+export function isScheduledToday(div: PlanDivision, now: Date = new Date()): boolean {
+  return !!div.weekdays && div.weekdays.includes(now.getDay());
 }
 
 /** Conteúdo serializado no JSON da coluna `WorkoutPlan.content`. */
@@ -67,7 +79,13 @@ export function newTarget(): ExerciseTarget {
   return { sets: 3, minReps: 8, maxReps: 12 };
 }
 export function newPlanExercise(name: string, group?: string, equipment?: Equipment): PlanExercise {
-  return { id: uid("pex"), name: name.trim(), group, equipment, target: newTarget() };
+  const timed = guessTimed(name);
+  return {
+    id: uid("pex"), name: name.trim(), group, equipment,
+    ...(timed ? { timed: true } : {}),
+    // Por tempo, a "faixa" nasce em segundos úteis (30–60s) em vez de 8–12 reps.
+    target: timed ? { sets: 3, minReps: 30, maxReps: 60 } : newTarget(),
+  };
 }
 export function newDivision(label: string): PlanDivision {
   return { id: uid("div"), label, muscleGroups: [], defaultRestSeconds: 90, exercises: [] };
@@ -77,9 +95,18 @@ export function newPlan(name: string, goal: PlanGoal = "hypertrophy"): WorkoutPl
 }
 
 // ---- Apresentação ----
-/** "3 × 8-12 · RIR 2" */
-export function formatTarget(t: ExerciseTarget): string {
-  const reps = t.minReps === t.maxReps ? `${t.minReps}` : `${t.minReps}-${t.maxReps}`;
+/** Segundos legíveis: 40 → "40s"; 600 → "10 min"; 90 → "1min30". */
+export function fmtSeconds(n: number): string {
+  if (n >= 60 && n % 60 === 0) return `${n / 60} min`;
+  if (n > 60) return `${Math.floor(n / 60)}min${String(n % 60).padStart(2, "0")}`;
+  return `${n}s`;
+}
+
+/** "3 × 8-12 · RIR 2" — por tempo: "3 × 40-60s" / "1 × 10 min". */
+export function formatTarget(t: ExerciseTarget, timed = false): string {
+  const reps = timed
+    ? t.minReps === t.maxReps ? fmtSeconds(t.minReps) : `${t.minReps}-${t.maxReps}s`
+    : t.minReps === t.maxReps ? `${t.minReps}` : `${t.minReps}-${t.maxReps}`;
   const base = `${t.sets} × ${reps}`;
   return t.intensity ? `${base} · ${t.intensity.type} ${t.intensity.value}` : base;
 }
@@ -102,8 +129,9 @@ export function coerceGoal(v: unknown): PlanGoal {
 function sanitizeTarget(v: unknown): ExerciseTarget {
   const r = (typeof v === "object" && v ? v : {}) as Record<string, unknown>;
   const sets = Math.max(1, Math.min(20, Math.round(num(r.sets, 3))));
-  let minReps = Math.max(1, Math.min(100, Math.round(num(r.minReps, 8))));
-  let maxReps = Math.max(1, Math.min(100, Math.round(num(r.maxReps, 12))));
+  // Teto 3600: metas por TEMPO guardam segundos aqui (ex.: esteira 600s).
+  let minReps = Math.max(1, Math.min(3600, Math.round(num(r.minReps, 8))));
+  let maxReps = Math.max(1, Math.min(3600, Math.round(num(r.maxReps, 12))));
   if (maxReps < minReps) [minReps, maxReps] = [maxReps, minReps];
   let intensity: Intensity | undefined;
   if (r.intensity && typeof r.intensity === "object") {
@@ -128,6 +156,7 @@ function sanitizeExercise(v: unknown): PlanExercise | null {
     name,
     group: typeof r.group === "string" ? r.group : undefined,
     equipment: typeof r.equipment === "string" ? (r.equipment as Equipment) : undefined,
+    ...(r.timed === true ? { timed: true } : {}),
     target: sanitizeTarget(r.target),
     note: typeof r.note === "string" && r.note.trim() ? r.note.trim() : undefined,
   };
@@ -140,11 +169,18 @@ function sanitizeDivision(v: unknown): PlanDivision | null {
   const exercises = Array.isArray(r.exercises)
     ? r.exercises.map(sanitizeExercise).filter((x): x is PlanExercise => x !== null)
     : [];
+  const weekdays = Array.isArray(r.weekdays)
+    ? Array.from(new Set(r.weekdays
+        .map((d) => Math.round(num(d, -1)))
+        .filter((d) => d >= 0 && d <= 6)))
+        .sort((a, b) => a - b)
+    : undefined;
   return {
     id: typeof r.id === "string" ? r.id : uid("div"),
     label,
     muscleGroups: Array.isArray(r.muscleGroups) ? r.muscleGroups.filter((g): g is string => typeof g === "string") : [],
     defaultRestSeconds: Math.max(0, Math.round(num(r.defaultRestSeconds, 90))),
+    ...(weekdays && weekdays.length ? { weekdays } : {}),
     exercises,
   };
 }

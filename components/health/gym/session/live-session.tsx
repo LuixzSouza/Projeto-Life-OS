@@ -77,7 +77,9 @@ export function LiveSession({
     replaceExercise: s.replaceExercise,
     setExerciseEquipment: s.setExerciseEquipment,
     setExerciseNote: s.setExerciseNote,
+    setExerciseTimed: s.setExerciseTimed,
     setRestSeconds: s.setRestSeconds,
+    setRestState: s.setRestState,
     addExercise: s.addExercise,
     removeExercise: s.removeExercise,
     moveExercise: s.moveExercise,
@@ -89,7 +91,8 @@ export function LiveSession({
     updateSet: s.updateSet,
     toggleSetDone: s.toggleSetDone,
     setSetType: s.setSetType,
-  }), [s.renameExercise, s.replaceExercise, s.setExerciseEquipment, s.setExerciseNote, s.setRestSeconds, s.addExercise, s.removeExercise, s.moveExercise, s.skipExercise, s.addSet, s.dropSet, s.addWarmupSets, s.removeSet, s.updateSet, s.toggleSetDone, s.setSetType]);
+    setSetRpe: s.setSetRpe,
+  }), [s.renameExercise, s.replaceExercise, s.setExerciseEquipment, s.setExerciseNote, s.setExerciseTimed, s.setRestSeconds, s.setRestState, s.addExercise, s.removeExercise, s.moveExercise, s.skipExercise, s.addSet, s.dropSet, s.addWarmupSets, s.removeSet, s.updateSet, s.toggleSetDone, s.setSetType, s.setSetRpe]);
 
   // "Iniciar" a partir de uma Ficha (builder) deixa a divisão escolhida no
   // pending-start; ao abrir a sessão sem treino ativo, dispara automaticamente.

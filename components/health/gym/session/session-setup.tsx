@@ -15,7 +15,7 @@ import { playClick, primeAudio } from "./sfx";
 import { RoutineShareButton, ImportRoutineButton } from "./routine-share-ui";
 import { divisionToStart, planToStart } from "./plan-start";
 import type { SharedPlan } from "./plan-share";
-import type { PlanDivision, WorkoutPlan } from "./plan-types";
+import { isScheduledToday, type PlanDivision, type WorkoutPlan } from "./plan-types";
 import type { StartOptions } from "./use-active-session";
 
 type StartMode = "planned" | "free";
@@ -704,17 +704,21 @@ function recommendDivision(plans: WorkoutPlan[], recovery: MuscleRecovery[]): { 
     const r = recMap.get(g);
     return r && r.lastTrainedAt ? r.recovery : 1;
   };
-  let best: { plan: WorkoutPlan; div: PlanDivision; score: number; groups: string[] } | null = null;
+  let best: { plan: WorkoutPlan; div: PlanDivision; score: number; groups: string[]; scheduled: boolean } | null = null;
   for (const plan of plans) {
     for (const div of plan.divisions) {
       if (div.exercises.length === 0) continue;
       const groups = divisionGroups(div);
       if (!groups.length) continue;
-      const score = groups.reduce((a, g) => a + recoveryOf(g), 0) / groups.length;
-      if (!best || score > best.score) best = { plan, div, score, groups };
+      // Agenda semanal manda: divisão marcada pro dia de hoje ganha prioridade
+      // forte sobre a heurística de recuperação (o usuário PLANEJOU treinar isso).
+      const scheduled = isScheduledToday(div);
+      const score = groups.reduce((a, g) => a + recoveryOf(g), 0) / groups.length + (scheduled ? 0.5 : 0);
+      if (!best || score > best.score) best = { plan, div, score, groups, scheduled };
     }
   }
   if (!best || best.score < 0.6) return null; // tudo cansado → não força
+  if (best.scheduled) return { plan: best.plan, div: best.div, reason: "agendado pra hoje" };
   const fresh = [...best.groups]
     .sort((a, b) => recoveryOf(b) - recoveryOf(a))
     .slice(0, 2)

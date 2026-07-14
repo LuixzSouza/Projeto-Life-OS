@@ -1,46 +1,73 @@
 "use client";
 
-// Biblioteca local de mídia por exercício: o usuário cola um link do YouTube uma
-// vez e fica salvo no projeto (localStorage). A capa vira a thumbnail do vídeo.
-// Sem dependência de DB nem de IDs chumbados (que poderiam apontar pro vídeo errado).
+// Biblioteca local de mídia por exercício: o usuário cola um link do YouTube
+// e/ou envia uma FOTO própria uma vez e fica salvo no projeto (localStorage).
+// A capa vira a foto (prioridade) ou a thumbnail do vídeo. Sem dependência de
+// DB nem de IDs chumbados (que poderiam apontar pro vídeo errado).
 
 const KEY = "lifeos:gym:exercise-media";
 
 export interface ExerciseMedia {
   youtubeId?: string;
+  /** Imagem própria do usuário (dataURL comprimida) — vence qualquer outra capa. */
+  image?: string;
 }
 export type MediaMap = Record<string, ExerciseMedia>;
 
 const norm = (name: string) => name.trim().toLowerCase();
 
+// Cache do parse (o mapa pode carregar imagens base64 — parsear por thumb pesa).
+let cached: MediaMap | null = null;
+
 export function getAllMedia(): MediaMap {
   if (typeof window === "undefined") return {};
+  if (cached) return cached;
   try {
     const raw = window.localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as MediaMap) : {};
+    cached = raw ? (JSON.parse(raw) as MediaMap) : {};
   } catch {
-    return {};
+    cached = {};
   }
+  return cached;
 }
 
+/** Evento disparado quando a mídia por exercício muda (as capas re-renderizam). */
+export const MEDIA_EVENT = "lifeos:gym:exercise-media";
+
 export function persistMedia(map: MediaMap): void {
+  cached = map;
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(KEY, JSON.stringify(map));
   } catch {
     /* ignora quota */
   }
+  window.dispatchEvent(new Event(MEDIA_EVENT));
 }
 
 export function mediaFor(map: MediaMap, name: string): ExerciseMedia | undefined {
   return map[norm(name)];
 }
 
-export function setVideoFor(map: MediaMap, name: string, youtubeId: string | null): MediaMap {
+// Atualiza um campo preservando o outro (vídeo e imagem coexistem); entrada
+// vazia é removida do mapa.
+function patchMedia(map: MediaMap, name: string, patch: Partial<ExerciseMedia>): MediaMap {
   const next = { ...map };
-  if (youtubeId) next[norm(name)] = { ...next[norm(name)], youtubeId };
-  else delete next[norm(name)];
+  const key = norm(name);
+  const cur: ExerciseMedia = { ...next[key], ...patch };
+  if (!cur.youtubeId) delete cur.youtubeId;
+  if (!cur.image) delete cur.image;
+  if (cur.youtubeId || cur.image) next[key] = cur;
+  else delete next[key];
   return next;
+}
+
+export function setVideoFor(map: MediaMap, name: string, youtubeId: string | null): MediaMap {
+  return patchMedia(map, name, { youtubeId: youtubeId ?? undefined });
+}
+
+export function setImageFor(map: MediaMap, name: string, image: string | null): MediaMap {
+  return patchMedia(map, name, { image: image ?? undefined });
 }
 
 /** Extrai o ID de várias formas de URL do YouTube (watch, youtu.be, shorts, embed) ou ID puro. */

@@ -4,7 +4,8 @@ import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogBody } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dumbbell, Plus, LayoutList, LineChart as LineChartIcon, Images } from "lucide-react";
+import { Dumbbell, Plus, LayoutList, LineChart as LineChartIcon, Images, Download } from "lucide-react";
+import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,8 @@ import { TodaySuggestionCard } from "./today-suggestion-card";
 import { FrequencyHeatmapCard } from "./frequency-heatmap-card";
 import { MuscleBalanceCard } from "./muscle-balance-card";
 import { WorkoutCard } from "./workout-card";
+import { WorkoutDetailModal } from "./workout-detail";
+import { downloadWorkoutsCsv } from "./export-csv";
 import type { GymWorkout, VolumePoint, MuscleCount } from "./gym-types";
 import { loadMultiplier, type MuscleRecovery, type Equipment } from "./session/session-types";
 
@@ -31,6 +34,8 @@ export type { Exercise, GymWorkout } from "./gym-types";
 export function GymDashboard({ workouts, recovery = [] }: { workouts: GymWorkout[]; recovery?: MuscleRecovery[] }) {
   const [selectedMuscle, setSelectedMuscle] = useState<string | 'ALL'>('ALL');
   const [isAddOpen, setIsAddOpen] = useState(false);
+  // Detalhe completo de um treino do histórico (modal ÚNICO, nunca no .map()).
+  const [detailWorkout, setDetailWorkout] = useState<GymWorkout | null>(null);
   // Abre direto na aba "Fichas" quando chega um link de importação (?planimport=),
   // garantindo que o PlanBuilder monte e dispare a importação.
   const [tab, setTab] = useState<string>(() =>
@@ -44,6 +49,7 @@ export function GymDashboard({ workouts, recovery = [] }: { workouts: GymWorkout
     return workouts.slice(0, 10).reverse().map(w => {
       let totalLoad = 0;
       w.exercises.forEach(ex => {
+        if (ex.timed) return; // por tempo (reps = segundos): não entra no volume
         // Halter = carga por mão → volume conta ×2 (mesma regra da sessão ao vivo
         // e do mapa de recuperação, via loadMultiplier).
         const mult = loadMultiplier(ex.equipment as Equipment | undefined);
@@ -110,8 +116,19 @@ export function GymDashboard({ workouts, recovery = [] }: { workouts: GymWorkout
             </TabsList>
           </div>
 
-          {/* Ação: registrar sessão manual (o "Treinar agora" agora é o hero no topo). */}
+          {/* Ações: exportar histórico + registrar sessão manual. */}
           <div className="flex items-center gap-2 self-stretch sm:self-auto">
+          {workouts.length > 0 && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-9 gap-2 rounded-lg text-muted-foreground hover:text-foreground"
+              onClick={() => { downloadWorkoutsCsv(workouts); toast.success("CSV gerado — 1 linha por série. 📊"); }}
+              title="Exportar histórico em CSV (1 linha por série)"
+            >
+              <Download className="h-4 w-4" /> <span className="hidden sm:inline">CSV</span>
+            </Button>
+          )}
           <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
             <DialogTrigger asChild>
               <Button size="sm" variant="outline" className="h-9 w-full gap-2 font-medium rounded-lg shadow-sm sm:w-auto">
@@ -195,7 +212,7 @@ export function GymDashboard({ workouts, recovery = [] }: { workouts: GymWorkout
                   </div>
                 ) : (
                   filteredWorkouts.map((w) => (
-                    <WorkoutCard key={w.id} workout={w} />
+                    <WorkoutCard key={w.id} workout={w} onOpenDetail={() => setDetailWorkout(w)} />
                   ))
                 )}
               </div>
@@ -214,6 +231,9 @@ export function GymDashboard({ workouts, recovery = [] }: { workouts: GymWorkout
         </TabsContent>
 
       </Tabs>
+
+      {/* Detalhe completo do treino (séries reais, notas) + repetir treino */}
+      <WorkoutDetailModal workout={detailWorkout} onClose={() => setDetailWorkout(null)} />
     </div>
   );
 }

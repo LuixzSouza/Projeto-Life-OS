@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useWakeLock } from "./use-wake-lock";
-import { sessionStats, estimatedOneRepMax, elapsedSeconds, isExercisePR, isWorkingSet, guessEquipment, EQUIPMENT_META, SET_TYPE_META, type Equipment, type SetType, type LiveSession, type LastPerf, type ExerciseHistoryPoint, type LiveTarget } from "./session-types";
+import { sessionStats, estimatedOneRepMax, elapsedSeconds, isExercisePR, isWorkingSet, guessEquipment, EQUIPMENT_META, SET_TYPE_META, type Equipment, type SetType, type LiveRest, type LiveSession, type LastPerf, type ExerciseHistoryPoint, type LiveTarget } from "./session-types";
 import { ExercisePicker } from "./exercise-picker";
 import { RestOverlay } from "./rest-overlay";
 import { WarmupOverlay } from "./warmup-overlay";
@@ -29,8 +29,8 @@ import { PlateHint } from "./plate-hint";
 import { buildWarmupRamp } from "./warmup-sets";
 import { overloadHint } from "../gym-analytics";
 import { MusicButton } from "./music-button";
-import { getAllMedia, persistMedia, mediaFor, setVideoFor, type MediaMap } from "./exercise-media";
-import { isNotifyEnabled, isNotifySupported, setNotifyEnabled, showSessionNotification } from "./session-notify";
+import { getAllMedia, persistMedia, mediaFor, setVideoFor, setImageFor, type MediaMap } from "./exercise-media";
+import { isNotifyEnabled, isNotifySupported, setNotifyEnabled, showRestEndNotification, showSessionNotification } from "./session-notify";
 import { isSfxMuted, setSfxMuted, playSuccess, playRestEnd, playFinish, playCountdown, playWaterReminder, announceRestOver, announceWarmupOver, announceExercise, announceRestRemaining, isCoachEnabled, setCoachEnabled, primeAudio, hapticTick, hapticExerciseDone, hapticRestEnd, vibrate } from "./sfx";
 
 // Preferência do modo de visão da sessão (list | focus), persistida localmente.
@@ -129,8 +129,10 @@ const isPR = isExercisePR;
 
 const allDone = (ex: Ex) => ex.sets.length > 0 && ex.sets.every((s) => s.done);
 
-// Carga é obrigatória para concluir a série, salvo equipamento de peso corporal.
+// Carga é obrigatória para concluir a série, salvo peso corporal ou exercício
+// medido por tempo (prancha/cardio: a carga é opcional).
 function requiresWeight(ex: Ex): boolean {
+  if (ex.timed) return false;
   const meta = ex.equipment ? EQUIPMENT_META[ex.equipment] : null;
   return !(meta?.allowsZero ?? false);
 }
@@ -140,7 +142,9 @@ export interface SessionControls {
   replaceExercise: (exId: string, name: string, group?: string, equipment?: Equipment) => void;
   setExerciseEquipment: (exId: string, equipment: Equipment) => void;
   setExerciseNote: (exId: string, note: string) => void;
+  setExerciseTimed: (exId: string, timed: boolean) => void;
   setRestSeconds: (seconds: number) => void;
+  setRestState: (rest: LiveRest | undefined) => void;
   addExercise: (name: string, group?: string) => void;
   removeExercise: (exId: string) => void;
   moveExercise: (exId: string, dir: -1 | 1) => void;
@@ -152,6 +156,7 @@ export interface SessionControls {
   updateSet: (exId: string, setId: string, field: "reps" | "weight", value: string) => void;
   toggleSetDone: (exId: string, setId: string) => void;
   setSetType: (exId: string, setId: string, type: SetType) => void;
+  setSetRpe: (exId: string, setId: string, rpe: number | undefined) => void;
 }
 
 // Descanso mínimo obrigatório (s) antes de liberar "pular" — induz a respeitar ao
@@ -215,17 +220,28 @@ export function SessionActive({
     setMedia(next);
     persistMedia(next);
   };
+  // Foto própria do exercício (capa em todo o app) — null remove.
+  const saveImage = (name: string, dataUrl: string | null) => {
+    const next = setImageFor(media, name, dataUrl);
+    setMedia(next);
+    persistMedia(next);
+  };
 
-  // Cronômetro de descanso: o fim fica num ref para o tick checar sem stale closure.
+  // Cronômetro de descanso: vive em session.rest (PERSISTIDO — sobrevive a
+  // refresh/troca de app; navegador mobile mata a aba com frequência na academia).
   // NÃO zera ao chegar a 0 — passa a contar o excedente (overtime) até o usuário seguir.
-  const [restEndsAt, setRestEndsAt] = useState<number | null>(null);
-  const [restExId, setRestExId] = useState<string | null>(null);
+  const rest = session.rest ?? null;
+  const restEndsAt = rest?.endsAt ?? null;
+  const restExId = rest?.exId ?? null;
   // Duração do descanso ATUAL (pode ser o override do exercício, ex.: 120s no
   // agachamento) — base do anel de progresso, independente do padrão da sessão.
-  const [restTotal, setRestTotal] = useState(session.restSeconds);
+  const restTotal = rest?.total ?? session.restSeconds;
   // Bi-set: descanso "minimizado" — o cronômetro de A continua rodando em background
   // (vira uma pílula) enquanto a tela mostra o exercício B.
-  const [restMinimized, setRestMinimized] = useState(false);
+  const restMinimized = rest?.minimized ?? false;
+  const setRestMinimized = (minimized: boolean) => {
+    if (session.rest) controls.setRestState({ ...session.rest, minimized });
+  };
   const restEndsRef = useRef<number | null>(null);
   const buzzed = useRef(false);
   // Callouts de tempo já falados neste descanso (ex.: 30, 10) — sem repetir.
@@ -234,12 +250,19 @@ export function SessionActive({
   // exercício (o "Bora! Agora: X" do fim do descanso já cobre). Timestamp (não
   // booleano) pra expirar sozinho e não suprimir uma navegação manual posterior.
   const restEndedAtRef = useRef(0);
-  const setRest = (end: number | null) => {
-    restEndsRef.current = end;
-    buzzed.current = false;
-    restCalloutRef.current = new Set();
-    setRestEndsAt(end);
-  };
+  // Espelha o fim do descanso no ref do tick e re-arma beep/callouts quando o fim
+  // MUDA (novo descanso ou ajuste). Também cobre a rehidratação pós-reload: um
+  // descanso que estourou enquanto o app esteve fora dispara o aviso ao voltar.
+  const prevRestEndRef = useRef<number | null>(null);
+  useEffect(() => {
+    restEndsRef.current = restEndsAt;
+    if (restEndsAt !== prevRestEndRef.current) {
+      prevRestEndRef.current = restEndsAt;
+      buzzed.current = false;
+      restCalloutRef.current = new Set();
+      countedRef.current = null; // novo fim → reanuncia o 3-2-1
+    }
+  }, [restEndsAt]);
 
   // Contagem regressiva falada: lembra o último segundo anunciado (sem repetir).
   const countedRef = useRef<number | null>(null);
@@ -252,6 +275,8 @@ export function SessionActive({
   const warmupAnnouncedRef = useRef(false);
   // Recordes já comemorados nesta sessão (1 destaque por exercício, sem repetir).
   const prCelebratedRef = useRef<Set<string>>(new Set());
+  // Última série CONCLUÍDA (alvo do RPE avaliado na tela de descanso).
+  const [lastDone, setLastDone] = useState<{ exId: string; setId: string } | null>(null);
   // Lembrete de água: minutos entre avisos (0 = desligado) e o último aviso.
   const [waterMinutes, setWaterMinutes] = useState(20);
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -333,20 +358,41 @@ export function SessionActive({
   const sessionRef = useRef(session);
   useEffect(() => { sessionRef.current = session; }, [session]);
   useEffect(() => {
+    // Alarme do fim do descanso agendado enquanto o app está escondido (best-effort:
+    // o navegador pode estrangular o timer, mas na maioria dos casos dispara).
+    let restAlarm: number | undefined;
+    const clearAlarm = () => {
+      if (restAlarm !== undefined) { window.clearTimeout(restAlarm); restAlarm = undefined; }
+    };
     const onVisibility = () => {
-      if (document.visibilityState !== "hidden") return;
+      if (document.visibilityState !== "hidden") {
+        // Voltou pro app: o tick de 1s reassume o aviso; cancela o alarme agendado.
+        clearAlarm();
+        return;
+      }
       const s = sessionRef.current;
       if (s.finishedAt) return;
       const stats = sessionStats(s.exercises);
+      const restEnd = s.rest?.endsAt;
       showSessionNotification({
         title: s.title,
         elapsed: clock(elapsedSeconds(s, Date.now())),
         doneSets: stats.doneSets,
         totalSets: stats.totalSets,
+        restEndsAt: restEnd,
       });
+      // Descanso rodando e ainda não estourou → agenda o alarme pro instante do fim.
+      if (restEnd && restEnd > Date.now() && !buzzed.current) {
+        restAlarm = window.setTimeout(() => {
+          showRestEndNotification(nextNameRef.current);
+        }, restEnd - Date.now());
+      }
     };
     document.addEventListener("visibilitychange", onVisibility);
-    return () => document.removeEventListener("visibilitychange", onVisibility);
+    return () => {
+      clearAlarm();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
   }, []);
   const toggleNotify = async () => {
     const on = await setNotifyEnabled(!notifyOn);
@@ -384,26 +430,22 @@ export function SessionActive({
   };
 
   const startRest = (exId: string) => {
-    countedRef.current = null; // novo descanso → reanuncia o 3-2-1
-    setRestExId(exId);
-    setRestMinimized(false);
     // Descanso do exercício, se a ficha definiu um; senão, o padrão da sessão.
     const secs = exercises.find((e) => e.id === exId)?.target?.restSeconds ?? session.restSeconds;
-    setRestTotal(secs);
-    setRest(Date.now() + secs * 1000);
+    controls.setRestState({ exId, endsAt: Date.now() + secs * 1000, total: secs });
   };
   const adjustRest = (deltaSeconds: number) => {
-    const base = restRemaining > 0 ? (restEndsRef.current ?? Date.now()) : Date.now();
+    if (!session.rest) return;
+    const base = restRemaining > 0 ? session.rest.endsAt : Date.now();
     const end = Math.max(Date.now() - 2000, base + deltaSeconds * 1000);
     // Mantém o anel coerente quando o usuário estende além da duração programada.
-    setRestTotal((t) => Math.max(t, Math.round((end - Date.now()) / 1000)));
-    setRest(end);
+    const total = Math.max(session.rest.total, Math.round((end - Date.now()) / 1000));
+    controls.setRestState({ ...session.rest, endsAt: end, total });
   };
   // Define o tempo de descanso exato (e adota como novo padrão da sessão).
   const setRestExact = (seconds: number) => {
     controls.setRestSeconds(seconds);
-    setRestTotal(seconds);
-    setRest(Date.now() + seconds * 1000);
+    if (session.rest) controls.setRestState({ ...session.rest, endsAt: Date.now() + seconds * 1000, total: seconds });
   };
 
   // Conclui/desmarca uma série. Ao concluir: valida carga (peso 0 bloqueia, salvo
@@ -420,6 +462,8 @@ export function SessionActive({
       }
       controls.toggleSetDone(exId, setId);
       playSuccess();
+      // Série de trabalho concluída vira o alvo do RPE na tela de descanso.
+      if (ex && set && isWorkingSet(set)) setLastDone({ exId, setId });
       // Comemora recorde EM TEMPO REAL: se concluir esta série de trabalho criou um
       // PR que ainda não existia, destaca uma vez por exercício na sessão.
       if (ex && set && isWorkingSet(set)) {
@@ -449,8 +493,7 @@ export function SessionActive({
   // se ele ainda tem séries (ex.: fez outro no meio — bi-set/desvio); senão avança
   // pro próximo incompleto (pulando os já concluídos).
   const handleRestDone = () => {
-    setRest(null);
-    setRestMinimized(false);
+    controls.setRestState(undefined);
     restEndedAtRef.current = Date.now(); // o anúncio do fim do descanso já diz o próximo
     if (mode === "focus") {
       const restIdx = restExId ? exercises.findIndex((e) => e.id === restExId) : -1;
@@ -487,6 +530,21 @@ export function SessionActive({
 
   // Nome do exercício cujo descanso está rodando (rótulo da pílula).
   const restExName = restExId ? exercises.find((e) => e.id === restExId)?.name : undefined;
+
+  // RPE da série recém-feita (chips na tela de descanso). Só séries de trabalho
+  // do exercício cujo descanso está rodando — evita avaliar a série errada.
+  const rpeTarget = (() => {
+    if (!lastDone || lastDone.exId !== restExId) return null;
+    const set = exercises.find((e) => e.id === lastDone.exId)?.sets.find((s) => s.id === lastDone.setId);
+    return set && set.done ? { ...lastDone, rpe: set.rpe } : null;
+  })();
+  const rateRpe = (rpe: number) => {
+    if (!lastDone) return;
+    // Tocar no mesmo valor desfaz (RPE é opcional, sem fricção).
+    const current = exercises.find((e) => e.id === lastDone.exId)?.sets.find((s) => s.id === lastDone.setId)?.rpe;
+    controls.setSetRpe(lastDone.exId, lastDone.setId, current === rpe ? undefined : rpe);
+    hapticTick();
+  };
 
   const handleFinish = () => { playFinish(); onFinish(); };
 
@@ -580,7 +638,8 @@ export function SessionActive({
     }
     if (lastAnnouncedRef.current === ex.id) return;
     lastAnnouncedRef.current = ex.id;
-    announceExercise(ex.name, ex.sets.length, ex.target?.minReps, ex.target?.maxReps);
+    // Por tempo, min/max são SEGUNDOS — não falar "de 40 a 60 repetições".
+    announceExercise(ex.name, ex.sets.length, ex.timed ? undefined : ex.target?.minReps, ex.timed ? undefined : ex.target?.maxReps);
   }, [mode, idx, exercises, inWarmup]);
 
   return (
@@ -816,6 +875,8 @@ export function SessionActive({
             onDone={handleRestDone}
             onSuperset={partner ? goSuperset : undefined}
             onMinimize={() => setRestMinimized(true)}
+            rpe={rpeTarget?.rpe}
+            onRate={rpeTarget ? rateRpe : undefined}
           />
         )}
       </AnimatePresence>
@@ -829,9 +890,16 @@ export function SessionActive({
         />
       )}
 
-      {/* Demonstração em vídeo */}
+      {/* Demonstração em vídeo + foto própria como capa */}
       {demoFor && (
-        <ExerciseDemoModal name={demoFor} youtubeId={demoId} onClose={() => setDemoFor(null)} onSave={(id) => saveVideo(demoFor, id)} />
+        <ExerciseDemoModal
+          name={demoFor}
+          youtubeId={demoId}
+          image={mediaFor(media, demoFor)?.image}
+          onClose={() => setDemoFor(null)}
+          onSave={(id) => saveVideo(demoFor, id)}
+          onSaveImage={(dataUrl) => saveImage(demoFor, dataUrl)}
+        />
       )}
 
       {/* Confirmação de cancelamento (único, controlado por estado). Com séries já
@@ -962,10 +1030,13 @@ function SetRows({ ex, controls, onToggle, big = false, last }: {
   // Peso corporal: a carga vira "extra opcional" (colete/anilha) — não faz sentido
   // exigir peso; a coluna muda de rótulo e o fantasma fica vazio.
   const bodyweight = ex.equipment === "bodyweight";
+  // Exercício por TEMPO (prancha/cardio): a coluna de reps guarda segundos e a
+  // carga é opcional. O cabeçalho "Reps/Seg" alterna o modo com um toque.
+  const timed = !!ex.timed;
   const target = ex.target;
   const targetReps = target ? (target.minReps === target.maxReps ? `${target.minReps}` : `${target.minReps}-${target.maxReps}`) : null;
   // Alvo-fantasma: última execução; sem histórico, cai pra meta da ficha.
-  const ghostW = bodyweight ? "—" : last?.weight && last.weight !== "0" ? last.weight : "0";
+  const ghostW = bodyweight || timed ? "—" : last?.weight && last.weight !== "0" ? last.weight : "0";
   const ghostR = last?.reps && last.reps !== "0" ? last.reps : targetReps ?? "0";
   // Série ATUAL = primeira não-concluída. Só ela é editável (foco numa série por vez):
   // as anteriores ficam travadas mas podem ser reabertas pelo "Ok"; as próximas ficam
@@ -975,18 +1046,18 @@ function SetRows({ ex, controls, onToggle, big = false, last }: {
   // Só aparece enquanto nenhuma série foi concluída (depois vira ruído).
   // Dupla progressão: só enquanto nenhuma série foi feita (depois vira ruído).
   // "up" = subir carga (bateu o teto de reps); "rep" = mesma carga, +1 rep.
-  const hint = !ex.sets.some((s) => s.done) ? overloadHint(last, target, { bodyweight, perHand }) : null;
+  const hint = !timed && !ex.sets.some((s) => s.done) ? overloadHint(last, target, { bodyweight, perHand }) : null;
   // Drop set: alvo é a série atual ou, se tudo concluído, a última — desde que seja
   // de trabalho (não aquecimento) e tenha carga (não faz sentido em peso corporal puro).
   const dropBase = activeIdx !== -1 ? ex.sets[activeIdx] : ex.sets[ex.sets.length - 1];
-  const dropTargetId = !bodyweight && dropBase && dropBase.type !== "warmup" && numOf(dropBase.weight) > 0 ? dropBase.id : null;
+  const dropTargetId = !bodyweight && !timed && dropBase && dropBase.type !== "warmup" && numOf(dropBase.weight) > 0 ? dropBase.id : null;
   // Calculadora de anilhas: só faz sentido com BARRA (halter/máquina/cabo têm
   // semântica diferente). Lê a carga da série ativa (ou da última, se tudo feito).
   const plateWeight = ex.equipment === "barbell" ? numOf(dropBase?.weight ?? "") : 0;
   // Aquecimento automático: carga de trabalho = 1ª série com carga (ou última vez).
   // Oferece rampa só quando há referência de peso e ainda não há série de aquecimento.
   const hasWarmup = ex.sets.some((s) => s.type === "warmup");
-  const workWeight = bodyweight ? 0 : numOf(ex.sets.find((s) => s.type !== "warmup" && numOf(s.weight) > 0)?.weight ?? last?.weight ?? "");
+  const workWeight = bodyweight || timed ? 0 : numOf(ex.sets.find((s) => s.type !== "warmup" && numOf(s.weight) > 0)?.weight ?? last?.weight ?? "");
   const warmupRamp = !hasWarmup && workWeight > 0 ? buildWarmupRamp(workWeight, ex.equipment) : [];
   const addWarmup = () => {
     controls.addWarmupSets(ex.id, warmupRamp);
@@ -998,7 +1069,7 @@ function SetRows({ ex, controls, onToggle, big = false, last }: {
     <>
       {target && (
         <div className="mb-1.5 flex items-center gap-1.5 rounded-lg bg-primary/5 px-2 py-1 text-[11px] font-medium text-primary">
-          <Target className="h-3 w-3" /> Meta: {ex.sets.length} × {targetReps} reps
+          <Target className="h-3 w-3" /> Meta: {ex.sets.length} × {targetReps}{timed ? "s" : " reps"}
           {target.intensity && <span className="text-primary/70">· {target.intensity.type} {target.intensity.value}</span>}
         </div>
       )}
@@ -1014,8 +1085,20 @@ function SetRows({ ex, controls, onToggle, big = false, last }: {
       {plateWeight > 0 && <PlateHint total={plateWeight} />}
       <div className="grid grid-cols-[1.75rem_1.4fr_1fr_2.5rem_1.75rem] items-center gap-1.5 px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
         <span className="text-center">Tipo</span>
-        <span className="text-center">{perHand ? "Carga/mão" : bodyweight ? "+kg (opcional)" : "Carga (kg)"}</span>
-        <span className="text-center">Reps</span>
+        <span className="text-center">{timed || bodyweight ? "+kg (opcional)" : perHand ? "Carga/mão" : "Carga (kg)"}</span>
+        {/* Cabeçalho tocável: alterna a medida do exercício (repetições ↔ segundos). */}
+        <button
+          type="button"
+          onClick={() => controls.setExerciseTimed(ex.id, !timed)}
+          className={cn(
+            "text-center font-semibold uppercase tracking-wider underline decoration-dotted underline-offset-2 transition-colors hover:text-primary",
+            timed && "text-primary",
+          )}
+          title={timed ? "Medindo por TEMPO (segundos) — toque para voltar a repetições" : "Medindo por repetições — toque para medir por tempo (segundos)"}
+          aria-label={timed ? "Mudar medida para repetições" : "Mudar medida para segundos"}
+        >
+          {timed ? "Seg ⏱" : "Reps"}
+        </button>
         <span className="text-center">Ok</span>
         <span />
       </div>
@@ -1029,6 +1112,12 @@ function SetRows({ ex, controls, onToggle, big = false, last }: {
           // reabre (corrigir erro). Futuras: tudo bloqueado até chegar a vez.
           const inputsLocked = !isActive;
           const checkDisabled = isFuture;
+          // Fantasma série-a-série: a i-ésima série de TRABALHO mostra o que você fez
+          // na série correspondente da última execução; sem par, cai no top set geral.
+          const wIdx = type === "warmup" ? -1 : ex.sets.slice(0, i + 1).filter((x) => (x.type ?? "normal") !== "warmup").length - 1;
+          const ghost = wIdx >= 0 ? last?.lastSets?.[wIdx] : undefined;
+          const gW = bodyweight || timed ? ghostW : ghost?.weight && ghost.weight !== "0" ? ghost.weight : ghostW;
+          const gR = ghost?.reps && ghost.reps !== "0" ? ghost.reps : ghostR;
           return (
             <div
               key={s.id}
@@ -1049,8 +1138,8 @@ function SetRows({ ex, controls, onToggle, big = false, last }: {
               >
                 {type === "normal" ? i + 1 : meta.short}
               </button>
-              <WeightStepper value={s.weight} onChange={(v) => controls.updateSet(ex.id, s.id, "weight", v)} big={big} placeholder={ghostW} disabled={inputsLocked} />
-              <Input inputMode="numeric" value={s.reps} disabled={inputsLocked} onChange={(e) => controls.updateSet(ex.id, s.id, "reps", e.target.value)} placeholder={ghostR} className={cn("text-center font-mono font-semibold placeholder:font-normal placeholder:text-muted-foreground/40 disabled:opacity-50", repTone(s.reps, type, target), big ? "h-12 text-lg" : "h-10 text-base")} />
+              <WeightStepper value={s.weight} onChange={(v) => controls.updateSet(ex.id, s.id, "weight", v)} big={big} placeholder={gW} disabled={inputsLocked} />
+              <Input inputMode="numeric" value={s.reps} disabled={inputsLocked} onChange={(e) => controls.updateSet(ex.id, s.id, "reps", e.target.value)} placeholder={gR} className={cn("text-center font-mono font-semibold placeholder:font-normal placeholder:text-muted-foreground/40 disabled:opacity-50", timed ? "" : repTone(s.reps, type, target), big ? "h-12 text-lg" : "h-10 text-base")} />
               <button
                 type="button"
                 disabled={checkDisabled}
