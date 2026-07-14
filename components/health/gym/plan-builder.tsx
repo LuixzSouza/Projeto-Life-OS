@@ -22,10 +22,12 @@ import { PlanPhotoImport } from "./plan-photo-import";
 import { sharePlanImage } from "./session/plan-share-image";
 import { groupOfExercise } from "./exercise-db";
 import { guessEquipment, EQUIPMENT_META, uid } from "./session/session-types";
+import { ExerciseThumb } from "./session/exercise-thumb";
+import { ExerciseMediaEditor } from "./exercise-media-editor";
 import { savePendingStart } from "./session/session-storage";
 import { divisionToStart } from "./session/plan-start";
 import {
-  PLAN_GOAL_META, formatTarget, totalExercises, newPlan, newDivision, newPlanExercise,
+  PLAN_GOAL_META, WEEKDAY_LABELS, formatTarget, totalExercises, newPlan, newDivision, newPlanExercise,
   type WorkoutPlan, type PlanGoal, type PlanDivision, type PlanExercise, type ExerciseTarget, type IntensityType,
 } from "./session/plan-types";
 
@@ -506,6 +508,35 @@ function DivisionEditor({ division, canDelete, onPatch, onPatchExercise, onDelet
         )}
       </div>
 
+      {/* Agenda semanal: em quais dias esta divisão é o treino do dia (opcional).
+          A recomendação de "hoje" prioriza a divisão agendada pro dia da semana. */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="mr-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Dias</span>
+        {WEEKDAY_LABELS.map((label, day) => {
+          const active = division.weekdays?.includes(day) ?? false;
+          return (
+            <button
+              key={day}
+              type="button"
+              onClick={() => onPatch((d) => {
+                const cur = new Set(d.weekdays ?? []);
+                if (cur.has(day)) cur.delete(day); else cur.add(day);
+                const weekdays = Array.from(cur).sort((a, b) => a - b);
+                return { ...d, weekdays: weekdays.length ? weekdays : undefined };
+              })}
+              className={cn(
+                "rounded-full border px-2 py-1 text-[11px] font-semibold transition-colors",
+                active ? "border-primary bg-primary/10 text-primary" : "border-border/50 text-muted-foreground hover:border-primary/40",
+              )}
+              aria-pressed={active}
+              aria-label={`${active ? "Remover de" : "Agendar para"} ${label}`}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Exercícios */}
       {division.exercises.length === 0 ? (
         <p className="rounded-lg border border-dashed border-border/50 bg-muted/10 px-3 py-6 text-center text-xs text-muted-foreground">Nenhum exercício. Adicione abaixo.</p>
@@ -543,66 +574,185 @@ function ExerciseRow({ ex, first, last, onMove, onPatch, onRemove }: {
   onPatch: (fn: (e: PlanExercise) => PlanExercise) => void;
   onRemove: () => void;
 }) {
+  const [showIntensityHelp, setShowIntensityHelp] = useState(false);
+  const [mediaEditorOpen, setMediaEditorOpen] = useState(false);
   const t = ex.target;
   const setTarget = (patch: Partial<ExerciseTarget>) => onPatch((e) => ({ ...e, target: { ...e.target, ...patch } }));
   const stepSets = (delta: number) => setTarget({ sets: Math.max(1, Math.min(20, t.sets + delta)) });
   const setIntensity = (type: IntensityType | null) =>
     setTarget({ intensity: type === null ? undefined : { type, value: ex.target.intensity?.value ?? (type === "RPE" ? 8 : 2) } });
 
+  const intensityInfo = {
+    RIR: {
+      label: "Repetições em Reserva",
+      description: "Quanto MAIS você consegue fazer antes de parar?",
+      example: "Se você faz 8 reps e ainda conseguiria fazer 2 mais: RIR = 2",
+      tooltip: "0 = até o limite | 1-2 = bem intenso | 3-4 = moderado | 5+ = tranquilo"
+    },
+    RPE: {
+      label: "Esforço Percebido",
+      description: "Quão CANSATIVA foi a série de 1 a 10?",
+      example: "Escala: 1 (muito fácil) até 10 (no limite máximo)",
+      tooltip: "6-7 = tranquilo | 7-8 = bom | 8-9 = intenso | 9-10 = máximo"
+    }
+  };
+
   return (
-    <div className="rounded-xl border border-border/50 bg-card p-2.5">
-      <div className="flex items-center gap-2">
-        <div className="flex flex-col">
-          <button type="button" onClick={() => onMove(-1)} disabled={first} className="text-muted-foreground/60 hover:text-foreground disabled:opacity-30" aria-label="Subir"><ArrowUp className="h-3.5 w-3.5" /></button>
-          <button type="button" onClick={() => onMove(1)} disabled={last} className="text-muted-foreground/60 hover:text-foreground disabled:opacity-30" aria-label="Descer"><ArrowDown className="h-3.5 w-3.5" /></button>
+    <div className="rounded-xl border border-border/50 bg-card p-3 space-y-3">
+      {/* Header: imagem + nome + controles */}
+      <div className="flex items-start gap-3">
+        {/* Thumbnail do exercício — clicável para editar mídia */}
+        <button
+          type="button"
+          onClick={() => setMediaEditorOpen(true)}
+          className="relative group h-12 w-12 rounded-lg shrink-0 hover:ring-2 hover:ring-primary/50 transition-all"
+          title="Clique para editar imagem/vídeo"
+        >
+          <ExerciseThumb
+            name={ex.name}
+            group={ex.group}
+            size="sm"
+            showPlay={false}
+            className="h-12 w-12 rounded-lg"
+          />
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 rounded-lg transition-colors flex items-center justify-center">
+            <span className="text-white/0 group-hover:text-white/70 text-xs font-bold transition-colors">✎</span>
+          </div>
+        </button>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-0.5">
+              <button type="button" onClick={() => onMove(-1)} disabled={first} className="text-muted-foreground/60 hover:text-foreground disabled:opacity-30" aria-label="Subir"><ArrowUp className="h-3 w-3" /></button>
+              <button type="button" onClick={() => onMove(1)} disabled={last} className="text-muted-foreground/60 hover:text-foreground disabled:opacity-30" aria-label="Descer"><ArrowDown className="h-3 w-3" /></button>
+            </div>
+            <Input value={ex.name} onChange={(e) => onPatch((x) => ({ ...x, name: e.target.value }))} className="h-9 min-w-0 flex-1 text-sm font-medium" />
+            {ex.equipment && <span className="hidden shrink-0 rounded-full border border-border/50 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground sm:inline">{EQUIPMENT_META[ex.equipment].short}</span>}
+            <button type="button" onClick={onRemove} className="shrink-0 text-muted-foreground/60 hover:text-destructive" aria-label="Remover"><Trash2 className="h-4 w-4" /></button>
+          </div>
         </div>
-        <Input value={ex.name} onChange={(e) => onPatch((x) => ({ ...x, name: e.target.value }))} className="h-9 min-w-0 flex-1 text-sm font-medium" />
-        {ex.equipment && <span className="hidden shrink-0 rounded-full border border-border/50 px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground sm:inline">{EQUIPMENT_META[ex.equipment].short}</span>}
-        <button type="button" onClick={onRemove} className="shrink-0 text-muted-foreground/60 hover:text-destructive" aria-label="Remover"><Trash2 className="h-4 w-4" /></button>
       </div>
 
       {/* Meta tipada: séries · faixa de reps · intensidade */}
-      <div className="mt-2 flex flex-wrap items-center gap-2 pl-7 text-xs">
-        {/* Séries */}
-        <div className="inline-flex items-center gap-1 rounded-lg border border-border/50 bg-background">
-          <button type="button" onClick={() => stepSets(-1)} className="px-1.5 text-muted-foreground hover:text-foreground">−</button>
-          <span className="min-w-[2.5rem] text-center font-mono tabular-nums">{t.sets} séries</span>
-          <button type="button" onClick={() => stepSets(1)} className="px-1.5 text-muted-foreground hover:text-foreground">+</button>
+      <div className="space-y-3">
+        {/* Linha 1: Séries */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-col gap-1 flex-1 min-w-0">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Séries</span>
+            <div className="inline-flex items-center gap-1 rounded-lg border border-border/50 bg-background w-fit">
+              <button type="button" onClick={() => stepSets(-1)} className="px-2 py-1 text-muted-foreground hover:text-foreground">−</button>
+              <span className="min-w-10 text-center font-mono tabular-nums text-sm font-semibold">{t.sets}</span>
+              <button type="button" onClick={() => stepSets(1)} className="px-2 py-1 text-muted-foreground hover:text-foreground">+</button>
+            </div>
+          </div>
+
+          {/* Faixa de reps/tempo */}
+          <div className="flex flex-col gap-1 flex-1 min-w-0">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {ex.timed ? "Tempo ⏱" : "Repetições"}
+            </span>
+            <div className="inline-flex items-center gap-1 rounded-lg border border-border/50 bg-background px-1.5 py-1 w-fit">
+              <input inputMode="numeric" value={String(t.minReps)} onChange={(e) => setTarget({ minReps: Math.max(1, parseInt(e.target.value) || 1) })} className={cn("bg-transparent text-center font-mono outline-none font-semibold", ex.timed ? "w-10" : "w-7")} aria-label={ex.timed ? "Segundos mínimos" : "Reps mínimas"} />
+              <span className="text-muted-foreground/60 font-semibold">−</span>
+              <input inputMode="numeric" value={String(t.maxReps)} onChange={(e) => setTarget({ maxReps: Math.max(1, parseInt(e.target.value) || 1) })} className={cn("bg-transparent text-center font-mono outline-none font-semibold", ex.timed ? "w-10" : "w-7")} aria-label={ex.timed ? "Segundos máximos" : "Reps máximas"} />
+              <button
+                type="button"
+                onClick={() => onPatch((x) => ({ ...x, timed: x.timed ? undefined : true }))}
+                className={cn(
+                  "ml-1 px-1 py-0.5 text-[10px] font-bold rounded transition-colors",
+                  ex.timed ? "bg-primary/20 text-primary" : "text-muted-foreground/70 hover:text-foreground",
+                )}
+                title={ex.timed ? "Medindo por TEMPO — toque para repetições" : "Medindo por REPS — toque para tempo"}
+              >
+                {ex.timed ? "seg" : "reps"}
+              </button>
+            </div>
+          </div>
         </div>
-        {/* Faixa de reps */}
-        <div className="inline-flex items-center gap-1 rounded-lg border border-border/50 bg-background px-1.5 py-1">
-          <input inputMode="numeric" value={String(t.minReps)} onChange={(e) => setTarget({ minReps: Math.max(1, parseInt(e.target.value) || 1) })} className="w-7 bg-transparent text-center font-mono outline-none" aria-label="Reps mínimas" />
-          <span className="text-muted-foreground/60">–</span>
-          <input inputMode="numeric" value={String(t.maxReps)} onChange={(e) => setTarget({ maxReps: Math.max(1, parseInt(e.target.value) || 1) })} className="w-7 bg-transparent text-center font-mono outline-none" aria-label="Reps máximas" />
-          <span className="text-muted-foreground/70">reps</span>
-        </div>
-        {/* Intensidade RIR/RPE */}
-        <div className="inline-flex items-center overflow-hidden rounded-lg border border-border/50 bg-background">
-          {(["RIR", "RPE"] as IntensityType[]).map((type) => (
+
+        {/* Linha 2: Intensidade com explicação */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Intensidade</span>
             <button
-              key={type}
               type="button"
-              onClick={() => setIntensity(t.intensity?.type === type ? null : type)}
-              className={cn("px-2 py-1 font-semibold transition-colors", t.intensity?.type === type ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+              onClick={() => setShowIntensityHelp(!showIntensityHelp)}
+              className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary hover:bg-primary/20 transition-colors font-medium"
+              title="Ver explicação das opções de intensidade"
             >
-              {type}
+              {t.intensity ? "? Ajustar" : "? Entender"}
             </button>
-          ))}
-          {t.intensity && (
-            <input
-              inputMode="numeric"
-              value={String(t.intensity.value)}
-              onChange={(e) => setTarget({ intensity: { type: t.intensity!.type, value: Math.max(0, Math.min(10, parseInt(e.target.value) || 0)) } })}
-              className="w-8 border-l border-border/50 bg-transparent py-1 text-center font-mono outline-none"
-              aria-label="Valor da intensidade"
-            />
+          </div>
+
+          {/* Botões RIR/RPE */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="inline-flex items-center overflow-hidden rounded-lg border border-border/50 bg-background">
+              {(["RIR", "RPE"] as IntensityType[]).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setIntensity(t.intensity?.type === type ? null : type)}
+                  className={cn(
+                    "px-3 py-1.5 font-semibold text-sm transition-colors border-r border-border/50 last:border-r-0",
+                    t.intensity?.type === type ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                  )}
+                  title={type === "RIR" ? "Repetições que você AINDA consegue fazer" : "Nota de cansaço de 1 a 10"}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+
+            {t.intensity && (
+              <div className="inline-flex items-center gap-2">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Valor:</span>
+                <input
+                  inputMode="numeric"
+                  value={String(t.intensity.value)}
+                  onChange={(e) => setTarget({ intensity: { type: t.intensity!.type, value: Math.max(0, Math.min(10, parseInt(e.target.value) || 0)) } })}
+                  className="w-12 h-8 border border-primary/30 bg-primary/5 rounded-lg py-1 text-center font-mono font-bold outline-none focus:border-primary/60 focus:bg-primary/10"
+                  aria-label={t.intensity.type === "RIR" ? "Repetições em reserva" : "Esforço percebido"}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Help box com explicação */}
+          {showIntensityHelp && (
+            <div className="mt-2 p-3 rounded-lg bg-primary/5 border border-primary/20 space-y-2.5">
+              <div className="space-y-2">
+                <div>
+                  <h4 className="font-semibold text-sm text-foreground mb-1">🎯 RIR - Repetições em Reserva</h4>
+                  <p className="text-xs text-foreground/80 leading-relaxed">{intensityInfo.RIR.description}</p>
+                  <p className="text-xs text-muted-foreground mt-1.5 italic">Ex: {intensityInfo.RIR.example}</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">📊 {intensityInfo.RIR.tooltip}</p>
+                </div>
+                <div className="border-t border-primary/10 pt-2">
+                  <h4 className="font-semibold text-sm text-foreground mb-1">💪 RPE - Esforço Percebido</h4>
+                  <p className="text-xs text-foreground/80 leading-relaxed">{intensityInfo.RPE.description}</p>
+                  <p className="text-xs text-muted-foreground mt-1.5 italic">Ex: {intensityInfo.RPE.example}</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">📊 {intensityInfo.RPE.tooltip}</p>
+                </div>
+              </div>
+              <div className="text-[10px] text-muted-foreground/60 pt-1 border-t border-primary/10">
+                💡 Escolha <strong>uma</strong> - use aquela que mais faz sentido pra você!
+              </div>
+            </div>
           )}
         </div>
+
+        {/* Resumo da meta */}
+        <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 pt-1 border-t border-border/30">
+          <TargetIcon className="h-3.5 w-3.5 text-primary" /> <span className="font-medium">{formatTarget(ex.target, ex.timed)}</span>
+        </p>
       </div>
 
-      <p className="mt-1.5 flex items-center gap-1 pl-7 text-[10px] text-muted-foreground">
-        <TargetIcon className="h-3 w-3" /> {formatTarget(ex.target)}
-      </p>
+      {/* Modal de edição de mídia */}
+      <ExerciseMediaEditor
+        exerciseName={ex.name}
+        open={mediaEditorOpen}
+        onOpenChange={setMediaEditorOpen}
+      />
     </div>
   );
 }
