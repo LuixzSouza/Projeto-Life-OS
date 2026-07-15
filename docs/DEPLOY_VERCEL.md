@@ -11,7 +11,7 @@
 
 ## 1. Variáveis de ambiente (Project → Settings → Environment Variables)
 
-Configure **estas 4** na Vercel. Os valores você copia do seu `.env` local.
+Configure **estas 5** na Vercel. Os valores você copia do seu `.env` local.
 
 | Variável na Vercel | De onde copiar (seu `.env` local) | Observação |
 |---|---|---|
@@ -19,6 +19,7 @@ Configure **estas 4** na Vercel. Os valores você copia do seu `.env` local.
 | `TURSO_AUTH_TOKEN` | valor de **`TURSO_TOKEN_REF`** | o token `eyJ…` |
 | `ENCRYPTION_KEY` | valor de **`ENCRYPTION_KEY`** | **PRECISA ser idêntico ao local** (ver aviso abaixo) |
 | `JWT_SECRET` | valor de **`JWT_SECRET`** | pode reusar o local ou gerar um novo forte |
+| `DATABASE_URL` | `file:./prisma/life_os.db` (placeholder) | só para o `prisma generate` do build validar o schema; em runtime é ignorado (o `TURSO_DATABASE_URL` tem prioridade) |
 
 > 🔑 **Por que `ENCRYPTION_KEY` tem que bater:** o PC e a Vercel compartilham o
 > mesmo banco Turso. Os dados sensíveis (Cofre de Acessos, chaves de API salvas
@@ -39,8 +40,11 @@ Configure **estas 4** na Vercel. Os valores você copia do seu `.env` local.
 | `TMDB_API_KEY` / `RAWG_API_KEY` | capas de filmes/jogos (entretenimento) |
 | `LIFEOS_REGISTRATION` | `off` para travar novos cadastros na instância pública |
 
-> **NÃO** defina `DATABASE_URL` na Vercel. Lá o destino vem do `TURSO_DATABASE_URL`.
-> O `DATABASE_URL=file:…` do `.env` é só para o CLI do Prisma rodar localmente.
+> ⚠️ **`DATABASE_URL` é obrigatório na Vercel** — mas apenas como *placeholder*
+> (`file:./prisma/life_os.db`). O `prisma generate` do build falha sem ele
+> (`Environment variable not found: DATABASE_URL`). Em **runtime** ele é ignorado:
+> o `getEnvProfile()` prioriza `TURSO_DATABASE_URL` (`libsql://…`) e só olha o
+> `DATABASE_URL` se for um esquema remoto — `file:` nunca vira destino na nuvem.
 
 ---
 
@@ -48,8 +52,9 @@ Configure **estas 4** na Vercel. Os valores você copia do seu `.env` local.
 
 1. Faça _push_ do repositório para o GitHub (o branch que quiser publicar).
 2. Em [vercel.com](https://vercel.com) → **Add New → Project** → importe o repositório.
-3. Framework: **Next.js** (detectado automaticamente). O `build` do projeto já roda
-   `prisma generate && prisma db push` (compatível com o ambiente serverless).
+3. Framework: **Next.js** (detectado automaticamente). O `build` do projeto roda
+   `prisma generate && next build` (o `prisma generate` exige `DATABASE_URL` no
+   ambiente — por isso o placeholder da seção 1; nenhum `db push` roda no deploy).
 4. Cole as variáveis da seção 1 → **Deploy**.
 
 ---
