@@ -5,6 +5,7 @@ import { requireUserId } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/activity";
 import { runOneShotAi } from "@/app/(dashboard)/ai/actions/oneshot";
+import { GOAL_STATUSES, coerceEnum, type GoalStatus } from "@/lib/enums";
 
 export interface GoalTaskData {
   id: string;
@@ -92,11 +93,15 @@ export async function getGoalSubjects(): Promise<GoalSubject[]> {
   });
 }
 
-/** Concluir/reabrir a meta em 1 clique, direto do card (sem abrir o diálogo). */
-export async function setGoalStatus(id: string, status: "IN_PROGRESS" | "DONE"): Promise<{ success: boolean }> {
+/**
+ * Muda a coluna/estado da meta em 1 clique — usado tanto pelo botão de concluir
+ * do card (Lista) quanto pelo arrastar do Quadro (Kanban).
+ */
+export async function setGoalStatus(id: string, status: GoalStatus): Promise<{ success: boolean }> {
   try {
     const userId = await requireUserId();
-    await prisma.learningGoal.updateMany({ where: { id, userId, deletedAt: null }, data: { status } });
+    const safe = coerceEnum(status, GOAL_STATUSES, "IN_PROGRESS");
+    await prisma.learningGoal.updateMany({ where: { id, userId, deletedAt: null }, data: { status: safe } });
     if (status === "DONE") {
       const goal = await prisma.learningGoal.findFirst({ where: { id, userId }, select: { title: true } });
       await logActivity({
@@ -128,7 +133,7 @@ export async function createGoal(formData: FormData): Promise<{ success: boolean
         userId,
         title,
         description: field(formData, "description"),
-        status: field(formData, "status") ?? "IN_PROGRESS",
+        status: coerceEnum(field(formData, "status"), GOAL_STATUSES, "IN_PROGRESS"),
         priority,
         targetDate: parseDate(field(formData, "targetDate")),
         subjectId,
@@ -166,7 +171,7 @@ export async function updateGoal(formData: FormData): Promise<{ success: boolean
       data: {
         title,
         description: field(formData, "description"),
-        status: field(formData, "status") ?? "IN_PROGRESS",
+        status: coerceEnum(field(formData, "status"), GOAL_STATUSES, "IN_PROGRESS"),
         priority,
         targetDate: parseDate(field(formData, "targetDate")),
         subjectId,

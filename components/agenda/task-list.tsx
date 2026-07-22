@@ -177,7 +177,7 @@ function QuickAddTask() {
           <option value="LOW">Baixa</option>
         </select>
         <Input name="dueDate" type="date" aria-label="Vencimento" className="h-9 w-[150px] text-xs" />
-        <Button type="submit" disabled={isPending} size="icon" className="h-9 w-9 shrink-0 rounded-lg" title="Adicionar tarefa">
+        <Button type="submit" disabled={isPending} size="icon" className="h-9 w-9 shrink-0 rounded-lg" title="Adicionar tarefa" aria-label="Adicionar tarefa">
           {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
         </Button>
       </div>

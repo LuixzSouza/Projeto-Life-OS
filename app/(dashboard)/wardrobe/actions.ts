@@ -5,6 +5,52 @@ import { revalidatePath } from "next/cache";
 import { getCurrentUserId, requireUserId } from "@/lib/auth";
 import { getProductPreview, inlineImageAsBase64 } from "@/lib/product-preview";
 import { logActivity } from "@/lib/activity";
+import { splitDataUrl, imageRefHelpers } from "@/lib/image-store";
+import { createHash } from "crypto";
+
+const wardrobeRefs = imageRefHelpers("/api/wardrobe-image/");
+
+// Externaliza a foto da peça: um data URL base64 vira linha em WardrobeImage (base64
+// fora da linha do WardrobeItem) e devolve a ref /api/wardrobe-image/<id>. Ref já
+// existente ou URL externa → devolve como está. Vazio → remove a foto. Idempotente
+// por sha256 (o form reenvia imageUrl a cada save; sem dedup, duplicaria linhas).
+// A ref usa o id da IMAGEM (não do item), então trocar a foto gera nova ref
+// (cache-safe). Pré-condição: `itemId` pertence a `userId`.
+async function externalizeWardrobeImage(
+  itemId: string,
+  userId: string,
+  src: string | null,
+): Promise<string | null> {
+  if (!src) {
+    await prisma.wardrobeImage.deleteMany({ where: { itemId, userId } });
+    return null;
+  }
+  const parsed = splitDataUrl(src);
+  if (!parsed) {
+    // Já é ref existente ou URL externa → mantém; limpa quaisquer linhas restantes.
+    const keepId = wardrobeRefs.idFromRef(src);
+    await prisma.wardrobeImage.deleteMany({
+      where: { itemId, userId, ...(keepId ? { id: { not: keepId } } : {}) },
+    });
+    return src;
+  }
+  const hash = createHash("sha256").update(parsed.data).digest("hex");
+  const existing = await prisma.wardrobeImage.findFirst({
+    where: { itemId, userId, hash },
+    select: { id: true },
+  });
+  const id =
+    existing?.id ??
+    (
+      await prisma.wardrobeImage.create({
+        data: { itemId, userId, mime: parsed.mime, data: parsed.data, hash },
+        select: { id: true },
+      })
+    ).id;
+  // 1:1 — remove fotos antigas do item (libera espaço).
+  await prisma.wardrobeImage.deleteMany({ where: { itemId, userId, id: { not: id } } });
+  return wardrobeRefs.ref(id);
+}
 
 // --- TIPOS ---
 type WardrobeStatus = "IN_CLOSET" | "LAUNDRY" | "REPAIR" | "DONATED" | "WISH_LIST";
@@ -70,7 +116,8 @@ export async function createWardrobeItem(formData: FormData) {
         size: getValue(formData, "size"),
         color: getValue(formData, "color"),
         season: getValue(formData, "season"),
-        imageUrl: getValue(formData, "imageUrl"),
+        // imageUrl entra depois: a foto base64 é externalizada (precisa do id do item).
+        imageUrl: null,
 
         // Numéricos, Booleanos e Enums
         price: parsePrice(formData.get("price")),
@@ -78,6 +125,13 @@ export async function createWardrobeItem(formData: FormData) {
         isFavorite: formData.get("isFavorite") === "true",
       }
     });
+
+    // Externaliza a foto (base64 → WardrobeImage) e grava só a ref na peça.
+    const rawImage = getValue(formData, "imageUrl");
+    if (rawImage) {
+      const imageUrl = await externalizeWardrobeImage(created.id, userId, rawImage);
+      await prisma.wardrobeItem.update({ where: { id: created.id, userId }, data: { imageUrl } });
+    }
 
     await logActivity({
       action: "CREATE",
@@ -105,21 +159,28 @@ export async function updateWardrobeItem(formData: FormData) {
     const id = formData.get("id") as string;
     if (!id) return { success: false, message: "ID do item não encontrado." };
 
+    // Posse antes de externalizar (o externalize grava linhas atreladas ao item).
+    const owns = await prisma.wardrobeItem.findFirst({ where: { id, userId }, select: { id: true } });
+    if (!owns) return { success: false, message: "Peça não encontrada." };
+
+    // Externaliza a foto (base64 → WardrobeImage) e grava só a ref na peça.
+    const imageUrl = await externalizeWardrobeImage(id, userId, getValue(formData, "imageUrl"));
+
     await prisma.wardrobeItem.update({
-      where: { 
+      where: {
         id: id,
         userId: userId // Proteção: garante que o item pertence ao usuário logado
       },
       data: {
         name: formData.get("name") as string,
         category: formData.get("category") as string,
-        
+
         brand: getValue(formData, "brand"),
         size: getValue(formData, "size"),
         color: getValue(formData, "color"),
         season: getValue(formData, "season"),
-        imageUrl: getValue(formData, "imageUrl"),
-        
+        imageUrl,
+
         price: parsePrice(formData.get("price")),
         status: parseStatus(formData.get("status")), // ✅ Validação segura
       }

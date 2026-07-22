@@ -135,16 +135,107 @@ export const calculateWHR = (waist: number, hip: number, gender: string) => {
     return { ratio: ratio.toFixed(2), risk };
 };
 
+// Índice de Adonis / "Golden Ratio" (V-Shape): razão ombros ÷ cintura. O ideal
+// estético clássico é ~1,618. IMPORTANTE: usa a CIRCUNFERÊNCIA dos ombros (fita
+// ao redor da parte mais larga dos deltoides), não a LARGURA. Muita gente mede a
+// largura (~45 cm) por engano — aí a razão fica < 1 e o card sumia. Agora sempre
+// devolvemos um resultado quando os dois valores existem, sinalizando o provável
+// erro de medida (likelyWidth) em vez de esconder o card.
 export const calculateAdonisIndex = (shoulders: number, waist: number) => {
-    if (!shoulders || !waist || shoulders <= waist) return null;
+    if (!shoulders || !waist) return null;
     const ratio = shoulders / waist;
+    const likelyWidth = ratio < 1; // ombros "menores" que a cintura → mediu largura
     const diff = Math.abs(1.618 - ratio);
-    let status = "Distante";
+    let status = "Em progresso";
+    if (ratio < 1.2) status = "Inicial";
     if (diff < 0.2) status = "Bom";
     if (diff < 0.1) status = "Ótimo";
     if (diff < 0.05) status = "Golden";
-    return { ratio: ratio.toFixed(2), status };
+    if (likelyWidth) status = "Confira a medida";
+    // Progresso rumo ao alvo 1,618 (limitado a 100%).
+    const score = Math.min((ratio / 1.618) * 100, 100);
+    return { ratio: ratio.toFixed(2), status, score, likelyWidth };
 };
+
+// Relative Fat Mass (RFM, 2018): estimativa de % de gordura mais precisa que o
+// IMC para a maioria das pessoas, exigindo apenas ALTURA e CINTURA (uma fita
+// métrica basta — sem balança de bioimpedância). Fórmula validada:
+//   Homens:   64 − 20 × (altura / cintura)
+//   Mulheres: 76 − 20 × (altura / cintura)
+export const calculateRFM = (heightCm: number, waistCm: number, gender: Gender) => {
+    if (!heightCm || !waistCm) return null;
+    const base = gender === "MALE" ? 64 : 76;
+    const rfm = base - 20 * (heightCm / waistCm);
+    return Math.max(0, Math.round(rfm * 10) / 10);
+};
+
+// Razão Cintura-Altura (WHtR): um dos melhores previsores de risco à saúde e
+// muito simples de entender — a regra de ouro é "mantenha a cintura abaixo de
+// metade da sua altura" (ratio < 0,5). Precisa só de cintura e altura.
+export const calculateWHtR = (waistCm: number, heightCm: number) => {
+    if (!waistCm || !heightCm) return null;
+    const ratio = waistCm / heightCm;
+    let status = "Saudável";
+    let risk: "Baixo" | "Moderado" | "Alto" = "Baixo";
+    if (ratio >= 0.6) { status = "Elevado"; risk = "Alto"; }
+    else if (ratio >= 0.5) { status = "Atenção"; risk = "Moderado"; }
+    return { ratio: ratio.toFixed(2), status, risk };
+};
+
+// =========================================================
+// MEDIÇÕES POR APARELHO (adipômetro / balança de bioimpedância)
+// =========================================================
+
+// % de gordura por DOBRAS CUTÂNEAS (adipômetro) — protocolo Jackson & Pollock 3
+// dobras + equação de Siri. As 3 dobras variam por sexo:
+//   Homens:   peitoral + abdômen + coxa
+//   Mulheres: tríceps + supra-ilíaca + coxa
+// Bem medido, é mais preciso que estimativas por circunferência.
+export const bodyFatFromSkinfolds = (sumMm: number, age: number, gender: Gender): number => {
+    if (!sumMm || sumMm <= 0 || !age) return 0;
+    const density = gender === "MALE"
+        ? 1.10938 - 0.0008267 * sumMm + 0.0000016 * sumMm * sumMm - 0.0002574 * age
+        : 1.0994921 - 0.0009929 * sumMm + 0.0000023 * sumMm * sumMm - 0.0001392 * age;
+    const bf = 495 / density - 450;
+    return bf > 0 && bf < 70 ? Math.round(bf * 10) / 10 : 0;
+};
+
+// Rótulos das 3 dobras conforme o sexo (para a UI do adipômetro).
+export const skinfoldSites = (gender: Gender): [string, string, string] =>
+    gender === "MALE"
+        ? ["Peitoral", "Abdômen", "Coxa"]
+        : ["Tríceps", "Supra-ilíaca", "Coxa"];
+
+/**
+ * Métricas que vêm de aparelhos (balança de bioimpedância ou adipômetro). São
+ * guardadas como linhas de HealthMetric (type/value) — sem exigir colunas novas.
+ * Todas opcionais: a pessoa preenche só o que o aparelho dela mostra.
+ */
+export interface DeviceMetrics {
+    bodyFatMeasured: number | null; // % de gordura medida (balança/adipômetro)
+    muscleMass: number | null;      // massa muscular (kg)
+    bodyWater: number | null;       // água corporal (%)
+    visceralFat: number | null;     // gordura visceral (nível)
+    boneMass: number | null;        // massa óssea (kg)
+    metabolicAge: number | null;    // idade metabólica (anos)
+}
+
+/**
+ * Especificação das métricas de aparelho: mapeia a chave do formulário para o
+ * `type` guardado em HealthMetric e a faixa válida. Fica aqui (fora de qualquer
+ * arquivo "use server") para ser compartilhada pela action e pela leitura da
+ * página sem violar a regra do Next (arquivo "use server" só exporta actions).
+ */
+export const DEVICE_METRIC_SPEC: { key: keyof DeviceMetrics; type: string; min: number; max: number }[] = [
+    { key: "bodyFatMeasured", type: "BODY_FAT_MEASURED", min: 1, max: 70 },
+    { key: "muscleMass", type: "MUSCLE_MASS", min: 1, max: 120 },
+    { key: "bodyWater", type: "BODY_WATER", min: 20, max: 80 },
+    { key: "visceralFat", type: "VISCERAL_FAT", min: 1, max: 60 },
+    { key: "boneMass", type: "BONE_MASS", min: 0.5, max: 10 },
+    { key: "metabolicAge", type: "METABOLIC_AGE", min: 5, max: 120 },
+];
+
+export const DEVICE_METRIC_TYPES = DEVICE_METRIC_SPEC.map((m) => m.type);
 
 // =========================================================
 // MÉTRICAS SEM EQUIPAMENTO (só peso, altura, idade e gênero)

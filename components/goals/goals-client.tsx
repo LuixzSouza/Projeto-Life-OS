@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   Plus, Search, Target, Pencil, Trash2, GraduationCap, Loader2, CheckCircle2,
   Circle, CalendarDays, X, Flag, AlertTriangle, Trophy, ChevronDown, Sparkles, ArrowRight,
+  LayoutGrid, List,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -28,44 +29,14 @@ import {
   addGoalTask, toggleGoalTask, deleteGoalTask, suggestGoalSteps,
   type GoalData, type GoalSubject, type GoalTaskData,
 } from "@/app/(dashboard)/goals/actions";
+import { GoalsBoard } from "./goals-board";
+import {
+  GOAL_COLUMNS, daysUntil, deadlineChip, normalizeGoalStatus, priorityMeta,
+  type GoalStatus,
+} from "./goal-helpers";
 
-const PRIORITY_META: Record<number, { label: string; className: string }> = {
-  1: { label: "Baixa", className: "bg-muted text-muted-foreground" },
-  3: { label: "Média", className: "bg-amber-500/10 text-amber-600" },
-  5: { label: "Alta", className: "bg-rose-500/10 text-rose-600" },
-};
-
-function priorityMeta(p: number) {
-  if (p >= 5) return PRIORITY_META[5];
-  if (p <= 1) return PRIORITY_META[1];
-  return PRIORITY_META[3];
-}
-
-function fmtDate(iso: string | null): string | null {
-  if (!iso) return null;
-  return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
-}
-
-/** Dias entre hoje e o prazo (negativo = atrasada). Prazos gravados ao meio-dia UTC. */
-function daysUntil(iso: string): number {
-  const target = new Date(iso);
-  const today = new Date();
-  const t = Date.UTC(target.getUTCFullYear(), target.getUTCMonth(), target.getUTCDate());
-  const n = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
-  return Math.round((t - n) / 864e5);
-}
-
-/** Chip de prazo: atrasada (rosa) · vence hoje/em breve (âmbar) · futuro (neutro). */
-function deadlineChip(iso: string | null, isDone: boolean): { label: string; className: string; urgent: boolean } | null {
-  if (!iso) return null;
-  const formatted = fmtDate(iso)!;
-  if (isDone) return { label: formatted, className: "text-muted-foreground", urgent: false };
-  const d = daysUntil(iso);
-  if (d < 0) return { label: `atrasada há ${Math.abs(d)}d`, className: "rounded-md bg-rose-500/10 px-1.5 py-0.5 font-bold text-rose-500", urgent: true };
-  if (d === 0) return { label: "vence hoje", className: "rounded-md bg-amber-500/10 px-1.5 py-0.5 font-bold text-amber-600", urgent: true };
-  if (d <= 7) return { label: `faltam ${d}d`, className: "rounded-md bg-amber-500/10 px-1.5 py-0.5 font-bold text-amber-600", urgent: false };
-  return { label: formatted, className: "text-muted-foreground", urgent: false };
-}
+/** Chave da preferência Lista/Quadro (só UI — não vale uma coluna no banco). */
+const VIEW_KEY = "lifeos:goals:view";
 
 export function GoalsClient({
   initialGoals, subjects, initialOpenId,
@@ -81,8 +52,22 @@ export function GoalsClient({
   const [editing, setEditing] = useState<GoalData | "new" | null>(
     () => (initialOpenId ? initialGoals.find((g) => g.id === initialOpenId) ?? null : null),
   );
+  /** Coluna de destino ao criar do Quadro ("+" no cabeçalho da coluna). */
+  const [newStatus, setNewStatus] = useState<GoalStatus>("IN_PROGRESS");
   const [deleting, setDeleting] = useState<GoalData | null>(null);
+  const [view, setView] = useState<"list" | "board">("list");
   const [, startTransition] = useTransition();
+
+  // Preferência de visão: lida depois da montagem para não divergir do HTML do servidor.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.localStorage.getItem(VIEW_KEY) === "board") setView("board");
+  }, []);
+
+  const switchView = (next: "list" | "board") => {
+    setView(next);
+    try { window.localStorage.setItem(VIEW_KEY, next); } catch { /* modo privado: só não lembra */ }
+  };
 
   const refresh = async () => setGoals(await getGoals());
 
@@ -98,7 +83,7 @@ export function GoalsClient({
 
   const [showDone, setShowDone] = useState(false);
 
-  const { open, done, overdueCount } = useMemo(() => {
+  const { open, done, overdueCount, visible } = useMemo(() => {
     const q = search.trim().toLowerCase();
     const filtered = goals.filter((g) => {
       if (onlyOpen && g.status === "DONE") return false;
@@ -122,22 +107,34 @@ export function GoalsClient({
       return b.priority - a.priority;
     });
     const overdueCount = goals.filter((g) => g.status !== "DONE" && g.targetDate && daysUntil(g.targetDate) < 0).length;
-    return { open, done, overdueCount };
+    return { open, done, overdueCount, visible: filtered };
   }, [goals, search, onlyOpen]);
 
-  // Concluir/reabrir direto do card (otimista — sem abrir o diálogo).
-  const quickToggle = (goal: GoalData) => {
-    const next = goal.status === "DONE" ? "IN_PROGRESS" : "DONE";
+  // Move a meta de coluna (otimista, com rollback). Serve ao Quadro e ao botão de concluir.
+  const moveGoal = (goal: GoalData, next: GoalStatus) => {
+    const previous = goal.status;
+    if (previous === next) return;
     setGoals((prev) => prev.map((g) => (g.id === goal.id ? { ...g, status: next } : g)));
     startTransition(async () => {
       const res = await setGoalStatus(goal.id, next);
       if (!res.success) {
-        setGoals((prev) => prev.map((g) => (g.id === goal.id ? { ...g, status: goal.status } : g)));
+        setGoals((prev) => prev.map((g) => (g.id === goal.id ? { ...g, status: previous } : g)));
         toast.error("Não consegui atualizar a meta.");
       } else if (next === "DONE") {
-        toast.success("Meta concluída! 🏆");
+        toast.success("Meta dominada! 🏆");
       }
     });
+  };
+
+  // Concluir/reabrir direto do card (a lista só distingue feito vs. em aberto).
+  const quickToggle = (goal: GoalData) => {
+    moveGoal(goal, goal.status === "DONE" ? "IN_PROGRESS" : "DONE");
+  };
+
+  // "+" no cabeçalho de uma coluna: abre o diálogo já com aquela coluna escolhida.
+  const createInColumn = (status: GoalStatus) => {
+    setNewStatus(status);
+    setEditing("new");
   };
 
   const handleDelete = () => {
@@ -239,7 +236,7 @@ export function GoalsClient({
         </div>
 
         <div className="mt-3 flex justify-end gap-1 border-t border-border/40 pt-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditing(goal); }} title="Editar">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setEditing(goal); }} title="Editar" aria-label="Editar meta">
             <Pencil className="h-3.5 w-3.5" />
           </Button>
           <Button
@@ -247,6 +244,7 @@ export function GoalsClient({
             className="h-7 w-7 text-muted-foreground hover:text-destructive"
             onClick={(e) => { e.stopPropagation(); setDeleting(goal); }}
             title="Mover para a lixeira"
+            aria-label="Mover meta para a lixeira"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </Button>
@@ -275,17 +273,51 @@ export function GoalsClient({
               {overdueCount} atrasada{overdueCount > 1 ? "s" : ""}
             </Badge>
           )}
-          <Button variant={onlyOpen ? "default" : "outline"} size="sm" className="gap-2" onClick={() => setOnlyOpen((v) => !v)}>
-            <Circle className="h-4 w-4" /> Em aberto
-          </Button>
-          <Button className="gap-2" onClick={() => setEditing("new")}>
+          {/* Lista (foco no que fazer agora) · Quadro (visão do fluxo de domínio) */}
+          <div className="flex shrink-0 items-center rounded-lg border border-border/60 p-0.5">
+            <Button
+              variant={view === "list" ? "secondary" : "ghost"}
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => switchView("list")}
+              title="Ver em lista"
+              aria-label="Ver em lista"
+              aria-pressed={view === "list"}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={view === "board" ? "secondary" : "ghost"}
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => switchView("board")}
+              title="Ver em quadro"
+              aria-label="Ver em quadro"
+              aria-pressed={view === "board"}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+          </div>
+          {view === "list" && (
+            <Button variant={onlyOpen ? "default" : "outline"} size="sm" className="gap-2" onClick={() => setOnlyOpen((v) => !v)}>
+              <Circle className="h-4 w-4" /> Em aberto
+            </Button>
+          )}
+          <Button className="gap-2" onClick={() => createInColumn("IN_PROGRESS")}>
             <Plus className="h-4 w-4" /> Nova meta
           </Button>
         </div>
       </div>
 
-      {/* Em aberto */}
-      {open.length === 0 && done.length === 0 ? (
+      {/* QUADRO DE ESTUDO: Para estudar → Estudando → Revisar → Dominado */}
+      {view === "board" ? (
+        <GoalsBoard
+          goals={visible}
+          onOpen={setEditing}
+          onMove={moveGoal}
+          onCreate={createInColumn}
+        />
+      ) : open.length === 0 && done.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border/60 py-20 text-center">
           <Target className="h-10 w-10 text-muted-foreground/30" />
           <p className="text-sm text-muted-foreground">
@@ -327,8 +359,9 @@ export function GoalsClient({
       )}
 
       <GoalDialog
-        key={editing === "new" ? "new" : editing?.id ?? "closed"}
+        key={editing === "new" ? `new-${newStatus}` : editing?.id ?? "closed"}
         state={editing}
+        defaultStatus={newStatus}
         subjects={subjects}
         onClose={() => setEditing(null)}
         onSaved={async () => { await refresh(); setEditing(null); }}
@@ -356,10 +389,12 @@ export function GoalsClient({
 }
 
 function GoalDialog({
-  state, subjects, onClose, onSaved, onTasksChanged,
+  state, subjects, defaultStatus, onClose, onSaved, onTasksChanged,
 }: {
   state: GoalData | "new" | null;
   subjects: GoalSubject[];
+  /** Coluna sugerida ao criar (vem do "+" do Quadro). */
+  defaultStatus: GoalStatus;
   onClose: () => void;
   onSaved: () => Promise<void>;
   onTasksChanged: () => Promise<void>;
@@ -370,7 +405,9 @@ function GoalDialog({
   const [title, setTitle] = useState(goal?.title ?? "");
   const [description, setDescription] = useState(goal?.description ?? "");
   const [subjectId, setSubjectId] = useState(goal?.subjectId ?? "none");
-  const [status, setStatus] = useState(goal?.status ?? "IN_PROGRESS");
+  const [status, setStatus] = useState<GoalStatus>(
+    goal ? normalizeGoalStatus(goal.status) : defaultStatus,
+  );
   const [priority, setPriority] = useState(String(goal?.priority ?? 3));
   const [targetDate, setTargetDate] = useState(goal?.targetDate ? goal.targetDate.slice(0, 10) : "");
   const [pending, runTransition] = useTransition();
@@ -507,11 +544,12 @@ function GoalDialog({
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Status</label>
-              <Select value={status} onValueChange={setStatus}>
+              <Select value={status} onValueChange={(v) => setStatus(normalizeGoalStatus(v))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="IN_PROGRESS">Em progresso</SelectItem>
-                  <SelectItem value="DONE">Concluída</SelectItem>
+                  {GOAL_COLUMNS.map((c) => (
+                    <SelectItem key={c.key} value={c.key}>{c.formLabel}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

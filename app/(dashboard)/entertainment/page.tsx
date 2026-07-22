@@ -39,13 +39,16 @@ export default async function EntertainmentPage() {
     updatedAt: item.updatedAt.toISOString(),
   }));
 
+  // IDs externos já na coleção → o diálogo de busca marca o que você já tem.
+  const ownedExternalIds = items.map((i) => i.externalId).filter((x): x is string => Boolean(x));
+
   return (
     <PageShell>
       <PageHeader
         icon={<Star className="h-6 w-6 fill-current" />}
         title="Entretenimento"
         description="Seu catálogo pessoal de filmes, séries, jogos, álbuns e livros."
-        actions={<AddMediaDialog />}
+        actions={<AddMediaDialog ownedExternalIds={ownedExternalIds} />}
       />
 
       <PageContainer>

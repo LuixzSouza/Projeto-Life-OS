@@ -18,6 +18,7 @@ export type SearchResult = {
   type: MediaType;
   releaseYear: string | null;
   creator: string | null;
+  genres: string | null;
 };
 
 // Interfaces para as respostas das APIs
@@ -27,6 +28,7 @@ interface ItunesItem {
   artistName: string;
   artworkUrl100: string;
   releaseDate?: string;
+  primaryGenreName?: string;
 }
 
 interface TmdbItem {
@@ -38,6 +40,7 @@ interface TmdbItem {
   release_date?: string;
   first_air_date?: string;
   poster_path?: string;
+  genre_ids?: number[];
 }
 
 interface RawgItem {
@@ -45,6 +48,7 @@ interface RawgItem {
   name: string;
   released?: string;
   background_image?: string;
+  genres?: { name: string }[];
 }
 
 // 🟢 ADICIONADO: Interface do Google Books
@@ -55,11 +59,22 @@ interface GoogleBooksItem {
     authors?: string[];
     description?: string;
     publishedDate?: string;
+    categories?: string[];
     imageLinks?: {
       thumbnail?: string;
     };
   };
 }
+
+// IDs de gênero do TMDB (filmes + séries) → rótulo em pt-BR. Lista fixa e estável.
+const TMDB_GENRES: Record<number, string> = {
+  28: "Ação", 12: "Aventura", 16: "Animação", 35: "Comédia", 80: "Crime",
+  99: "Documentário", 18: "Drama", 10751: "Família", 14: "Fantasia", 36: "História",
+  27: "Terror", 10402: "Música", 9648: "Mistério", 10749: "Romance", 878: "Ficção científica",
+  10770: "Cinema TV", 53: "Suspense", 10752: "Guerra", 37: "Faroeste",
+  10759: "Ação & Aventura", 10762: "Infantil", 10763: "Notícias", 10764: "Reality",
+  10765: "Sci-Fi & Fantasia", 10766: "Novela", 10767: "Talk Show", 10768: "Guerra & Política",
+};
 
 // Helper para pegar o ID do usuário autenticado (sessão JWT)
 async function getAuthenticatedUserId() {
@@ -69,6 +84,7 @@ async function getAuthenticatedUserId() {
 // --- MAPEADORES (raw da API -> SearchResult) ---
 function mapTmdb(item: TmdbItem, forcedType?: 'MOVIE' | 'TV_SHOW'): SearchResult {
   const type: MediaType = forcedType || (item.media_type === 'tv' ? 'TV_SHOW' : 'MOVIE');
+  const genres = item.genre_ids?.map((id) => TMDB_GENRES[id]).filter(Boolean).join(', ') || null;
   return {
     id: String(item.id),
     title: item.title || item.name || 'Sem Título',
@@ -77,6 +93,7 @@ function mapTmdb(item: TmdbItem, forcedType?: 'MOVIE' | 'TV_SHOW'): SearchResult
     creator: null,
     coverUrl: item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : null,
     type,
+    genres,
   };
 }
 
@@ -89,6 +106,7 @@ function mapRawg(item: RawgItem): SearchResult {
     releaseYear: item.released ? item.released.split('-')[0] : null,
     coverUrl: item.background_image || null,
     type: 'GAME',
+    genres: item.genres?.map((g) => g.name).filter(Boolean).join(', ') || null,
   };
 }
 
@@ -101,6 +119,7 @@ function mapItunes(item: ItunesItem): SearchResult {
     releaseYear: item.releaseDate ? item.releaseDate.split('-')[0] : null,
     coverUrl: item.artworkUrl100?.replace('100x100bb', '500x500bb') || null,
     type: 'ALBUM',
+    genres: item.primaryGenreName || null,
   };
 }
 
@@ -114,6 +133,7 @@ function mapGoogleBook(book: GoogleBooksItem): SearchResult {
     releaseYear: info.publishedDate ? info.publishedDate.split('-')[0] : null,
     coverUrl: info.imageLinks?.thumbnail ? info.imageLinks.thumbnail.replace('http:', 'https:') : null,
     type: 'BOOK',
+    genres: info.categories?.filter(Boolean).join(', ') || null,
   };
 }
 
@@ -307,10 +327,23 @@ export async function discoverRandomMedia(
 export async function addMediaItem(item: SearchResult) {
   try {
     const userId = await getAuthenticatedUserId();
-    
+    if (!userId) return { success: false, message: "Não autenticado." };
+
+    // Dedup: a mesma obra (externalId + tipo) já está na coleção ativa? Evita a
+    // duplicata silenciosa de clicar duas vezes ou re-buscar e adicionar de novo.
+    if (item.id) {
+      const existing = await prisma.mediaItem.findFirst({
+        where: { userId, externalId: item.id, type: item.type, deletedAt: null },
+        select: { id: true },
+      });
+      if (existing) {
+        return { success: false, alreadyExists: true, message: "Já está na sua coleção." };
+      }
+    }
+
     await prisma.mediaItem.create({
       data: {
-        userId: userId || null,
+        userId,
         title: item.title,
         type: item.type,
         status: "PLAN_TO_WATCH",
@@ -319,9 +352,10 @@ export async function addMediaItem(item: SearchResult) {
         externalId: item.id,
         creator: item.creator,
         releaseYear: item.releaseYear,
+        genres: item.genres,
       }
     });
-    
+
     revalidatePath("/entertainment");
     return { success: true };
   } catch (error) {

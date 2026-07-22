@@ -8,7 +8,13 @@ import type { StudyAggregationItem, StudySubjectItem } from "@/components/dashbo
 // Usamos cache do React para deduplicar chamadas caso o mesmo dado seja requisitado em múltiplos componentes
 export const getUserSettings = cache(async (userId: string) => {
   const [user, settings] = await Promise.all([
-    prisma.user.findUnique({ where: { id: userId } }),
+    // Só a identidade que o dashboard usa: nunca puxa o hash `password` nem os base64
+    // `avatarUrl`/`coverUrl` (que podem ser enormes) sem necessidade. Um consumidor
+    // que precise do avatar deve adicioná-lo ao select explicitamente.
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true, email: true, role: true, createdAt: true },
+    }),
     prisma.settings.findUnique({ where: { userId } })
   ]);
   return { user, settings };
@@ -25,9 +31,9 @@ export const getFinancialData = cache(async (userId: string) => {
     prisma.transaction.aggregate({ where: { type: 'EXPENSE', userId, deletedAt: null, date: { gte: monthStart } }, _sum: { amount: true } }),
     prisma.transaction.findMany({ 
       where: { userId, deletedAt: null }, 
-      take: 6, 
-      orderBy: { date: 'desc' }, 
-      include: { account: true } 
+      take: 6,
+      orderBy: { date: 'desc' },
+      include: { account: { select: { name: true } } }
     })
   ]);
 
@@ -77,7 +83,7 @@ export const getProductivityData = cache(async (userId: string) => {
     prisma.task.count({ where: { isDone: false, userId, deletedAt: null } }),
     prisma.task.count({ where: { isDone: true, userId, deletedAt: null } }),
     prisma.studySession.groupBy({ by: ['subjectId'], where: { userId }, _sum: { durationMinutes: true }, _count: true }),
-    prisma.project.findMany({ where: { userId, deletedAt: null }, take: 4, orderBy: { updatedAt: 'desc' } }),
+    prisma.project.findMany({ where: { userId, deletedAt: null }, take: 4, orderBy: { updatedAt: 'desc' }, select: { id: true, title: true, description: true } }),
     prisma.studySubject.findMany({ where: { userId }, select: { id: true, title: true } })
   ]);
 
@@ -110,12 +116,12 @@ export const getPersonalData = cache(async (userId: string) => {
 
   const [nextEvent, activeMedia, friends, waterStats, mealStats, aiMessages, recentLinks, favoriteClothesCount] = await Promise.all([
     prisma.event.findFirst({ where: { startTime: { gte: exactNow }, userId, deletedAt: null }, orderBy: { startTime: 'asc' } }),
-    prisma.mediaItem.findMany({ where: { status: 'IN_PROGRESS', userId, deletedAt: null }, take: 4 }),
+    prisma.mediaItem.findMany({ where: { status: 'IN_PROGRESS', userId, deletedAt: null }, take: 4, select: { id: true, title: true, type: true, coverUrl: true } }),
     prisma.friend.findMany({ where: { birthday: { not: null }, userId, deletedAt: null }, select: { id: true, name: true, birthday: true, imageUrl: true } }),
     prisma.healthMetric.aggregate({ where: { type: "WATER", date: { gte: today }, userId }, _sum: { value: true } }),
     prisma.meal.aggregate({ where: { date: { gte: today }, userId }, _sum: { calories: true } }),
     prisma.aiMessage.count({ where: { createdAt: { gte: today }, userId } }),
-    prisma.savedLink.findMany({ where: { userId, deletedAt: null }, take: 4, orderBy: { createdAt: 'desc' } }),
+    prisma.savedLink.findMany({ where: { userId, deletedAt: null }, take: 4, orderBy: { createdAt: 'desc' }, select: { id: true, url: true, title: true } }),
     prisma.wardrobeItem.count({ where: { userId, deletedAt: null, isFavorite: true } })
   ]);
 

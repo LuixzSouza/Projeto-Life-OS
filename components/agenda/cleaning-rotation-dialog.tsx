@@ -101,7 +101,7 @@ export function CleaningRotationDialog({ open, onClose }: CleaningRotationDialog
                 maxLength={40}
                 className="h-9 text-sm"
               />
-              <Button type="button" onClick={addRoom} size="icon" variant="outline" className="h-9 w-9 shrink-0 rounded-lg" title="Adicionar cômodo">
+              <Button type="button" onClick={addRoom} size="icon" variant="outline" className="h-9 w-9 shrink-0 rounded-lg" title="Adicionar cômodo" aria-label="Adicionar cômodo">
                 <Plus className="h-4 w-4" />
               </Button>
             </div>

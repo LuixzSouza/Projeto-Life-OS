@@ -13,7 +13,7 @@ import { TaskTimeline } from "@/components/projects/task-timeline";
 import { ProjectNotes } from "@/components/projects/project-notes";
 import { ProjectLinkedNotes } from "@/components/projects/project-linked-notes";
 import { TaskDeepLink } from "@/components/projects/task-deep-link";
-import { getNotesForProject, getProjectBacklinks, getNotes, getNoteProjects } from "@/app/(dashboard)/notes/actions";
+import { getNotesForProject, getProjectBacklinks, getNoteTitles, getNoteProjects } from "@/app/(dashboard)/notes/actions";
 import { getPaletteTasks } from "@/app/(dashboard)/palette-actions";
 import type { Mentionables } from "@/components/notes/use-mention-menu";
 import { MeetingBoard } from "@/components/projects/meeting-board";
@@ -110,22 +110,28 @@ export default async function ProjectDetailPage(props: ProjectDetailPageProps) {
     sortBy === "dueDate" ? [{ dueDate: { sort: "asc", nulls: "last" } }] :
     sortBy === "order" ? [{ order: "asc" }, { createdAt: "desc" }] : [{ createdAt: "desc" }];
 
-  const [tasks, allStats, rawMeetings] = await Promise.all([
+  const [tasks, allStats] = await Promise.all([
     prisma.task.findMany({ where: { ...where, deletedAt: null }, orderBy }),
     prisma.task.groupBy({
         by: ['isDone'],
         where: { projectId: dbProjectId, userId, deletedAt: null },
         _count: { isDone: true }
     }),
-    prisma.meeting.findMany({
+  ]);
+
+  // Reuniões só quando a aba está ativa: elas carregam galerias base64
+  // (image/images) que pesariam à toa nas abas Tarefas/Notas. Mesmo padrão
+  // lazy da aba de Notas — a aba "Reuniões" não exibe contagem no header.
+  const rawMeetings = activeTab === "meetings"
+    ? await prisma.meeting.findMany({
         where: { projectId: dbProjectId, userId },
         orderBy: { createdAt: 'desc' },
         select: {
           id: true, title: true, rawNotes: true, summary: true, image: true, images: true, createdAt: true,
           participants: true, tags: true, decisions: true,
         },
-    })
-  ]);
+      })
+    : [];
 
   const meetings = rawMeetings.map(({ image, images, createdAt, participants, tags, decisions, ...m }) => ({
     ...m,
@@ -142,7 +148,7 @@ export default async function ProjectDetailPage(props: ProjectDetailPageProps) {
   const [linkedNotes, mentionNotes, mentionProjects, mentionTasks, projectBacklinks] = notesTabActive
     ? await Promise.all([
         getNotesForProject(dbProjectId!),
-        getNotes(),
+        getNoteTitles(),
         getNoteProjects(),
         getPaletteTasks(),
         getProjectBacklinks(slug),

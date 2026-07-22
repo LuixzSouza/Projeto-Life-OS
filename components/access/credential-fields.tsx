@@ -144,7 +144,7 @@ export function CredentialFields({ item }: { item: AccessItem }) {
               {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </Button>
             <div className="w-px h-5 bg-border/60 mx-1" />
-            <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg hover:bg-emerald-500/10 hover:text-emerald-500 text-muted-foreground" onClick={handleCopyPassword} disabled={copying} title="Copiar senha (sem exibir)">
+            <Button size="icon" variant="ghost" className="h-8 w-8 rounded-lg hover:bg-emerald-500/10 hover:text-emerald-500 text-muted-foreground" onClick={handleCopyPassword} disabled={copying} title="Copiar senha (sem exibir)" aria-label="Copiar senha">
               {copying ? <Loader2 className="h-4 w-4 animate-spin" /> : copiedPass ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
             </Button>
           </div>

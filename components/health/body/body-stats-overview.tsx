@@ -6,15 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
     Scale, Activity, Droplets, Flame,
-    Utensils, Edit3, Ruler, Shirt, Footprints,
+    Utensils, Edit3, Ruler, Shirt, Footprints, Gauge,
 } from "lucide-react";
 import {
     calculateBMI, calculateBMR, calculateTDEE, calculateBodyFat,
-    calculateComposition, calculateWater, BodyStats,
+    calculateComposition, calculateWater, BodyStats, type DeviceMetrics,
 } from "@/lib/body-math";
 import { cn } from "@/lib/utils";
 import { AdvancedInsights } from "./advanced-insights";
 import { MeasureRow } from "./body-measure-fields";
+import { MetricExplainer } from "./metric-explainer";
 
 // Faixas da régua de gordura corporal (escala até 40%).
 const FAT_SCALE_MAX = 40;
@@ -25,11 +26,24 @@ const FAT_SEGMENTS = [
     { label: "Acima", to: FAT_SCALE_MAX, tone: "bg-rose-500/40", badge: "bg-rose-500/10 text-rose-600 dark:text-rose-400" },
 ];
 
-export function BodyStatsOverview({ stats, onEdit }: { stats: BodyStats; onEdit: () => void }) {
+export function BodyStatsOverview({ stats, deviceMetrics = null, onEdit }: { stats: BodyStats; deviceMetrics?: DeviceMetrics | null; onEdit: () => void }) {
     // --- CÁLCULOS PRINCIPAIS ---
     const bmi = calculateBMI(stats.weight, stats.height);
-    const bodyFat = calculateBodyFat(stats);
+    const estimatedFat = calculateBodyFat(stats);
+    // Se a pessoa mediu a gordura num aparelho (balança/adipômetro), esse valor
+    // é mais confiável que a estimativa por fita — então ele vira o número
+    // principal, e a estimativa Naval fica como comparação ("se conversam").
+    const measuredFat = deviceMetrics?.bodyFatMeasured ?? null;
+    const bodyFat = measuredFat ?? estimatedFat;
     const { fatMass, leanMass } = calculateComposition(stats.weight, bodyFat);
+    const deviceList = deviceMetrics ? [
+        { label: "Gordura medida", value: deviceMetrics.bodyFatMeasured, unit: "%", tone: "text-orange-600 dark:text-orange-400", bg: "bg-orange-500/10" },
+        { label: "Massa muscular", value: deviceMetrics.muscleMass, unit: "kg", tone: "text-blue-600 dark:text-blue-400", bg: "bg-blue-500/10" },
+        { label: "Água corporal", value: deviceMetrics.bodyWater, unit: "%", tone: "text-sky-600 dark:text-sky-400", bg: "bg-sky-500/10" },
+        { label: "Gordura visceral", value: deviceMetrics.visceralFat, unit: "", tone: "text-rose-600 dark:text-rose-400", bg: "bg-rose-500/10" },
+        { label: "Massa óssea", value: deviceMetrics.boneMass, unit: "kg", tone: "text-violet-600 dark:text-violet-400", bg: "bg-violet-500/10" },
+        { label: "Idade metabólica", value: deviceMetrics.metabolicAge, unit: "anos", tone: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10" },
+    ].filter((d) => d.value != null && d.value > 0) : [];
     const bmr = calculateBMR(stats);
     const tdee = calculateTDEE(bmr, stats.activityFactor);
     const waterGoal = calculateWater(stats.weight);
@@ -49,6 +63,13 @@ export function BodyStatsOverview({ stats, onEdit }: { stats: BodyStats; onEdit:
                         <CardTitle className="flex items-center gap-2 text-sm font-semibold">
                             <div className="rounded-lg bg-primary/10 p-1.5 text-primary"><Scale className="h-4 w-4" /></div>
                             Composição Corporal
+                            <MetricExplainer
+                                title="% de Gordura Corporal (fórmula Naval)"
+                                whatItIs="A fatia do seu peso que é gordura. É calculada a partir das medidas de pescoço, cintura e quadril (o método usado pela Marinha dos EUA)."
+                                whatItMeans="Diz muito mais sobre sua forma física do que só o peso na balança — dá para pesar 'igual' e ter composições bem diferentes. 'Massa magra' é tudo que não é gordura (músculo, osso, água)."
+                                howToImprove="Déficit calórico leve + treino de força para preservar músculo. Medir sempre no mesmo horário (de manhã, em jejum) deixa a comparação mais justa."
+                                reference="Homens: atleta ~6–13% · fitness ~14–17% · Mulheres somam ~8%"
+                            />
                         </CardTitle>
                         <p className="mt-1 text-xs text-muted-foreground">Estimada pelas suas medidas e idade (fórmula Naval).</p>
                     </div>
@@ -72,7 +93,16 @@ export function BodyStatsOverview({ stats, onEdit }: { stats: BodyStats; onEdit:
                                         </Badge>
                                     )}
                                 </div>
-                                <p className="mt-0.5 text-sm text-muted-foreground">Gordura corporal estimada</p>
+                                <p className="mt-0.5 text-sm text-muted-foreground">
+                                    {measuredFat != null ? "Gordura corporal (medida por aparelho)" : "Gordura corporal estimada"}
+                                </p>
+                                {/* Aparelho e fórmula conversando: mostra a estimativa Naval ao lado da medida real. */}
+                                {measuredFat != null && estimatedFat > 0 && (
+                                    <p className="mt-1 text-[11px] text-muted-foreground">
+                                        Estimativa pela fita (Naval): <span className="font-semibold">{estimatedFat.toFixed(1)}%</span>
+                                        {" · "}diferença {Math.abs(measuredFat - estimatedFat).toFixed(1)} pts
+                                    </p>
+                                )}
                             </div>
                             <div className="flex flex-wrap gap-2">
                                 <Badge variant="outline" className="border-none bg-amber-500/10 px-2.5 py-1 text-amber-600 dark:text-amber-400">
@@ -126,6 +156,13 @@ export function BodyStatsOverview({ stats, onEdit }: { stats: BodyStats; onEdit:
                     <CardTitle className="flex items-center gap-2 text-sm font-semibold">
                         <div className="rounded-lg bg-indigo-500/10 p-1.5 text-indigo-500"><Activity className="h-4 w-4" /></div>
                         IMC
+                        <MetricExplainer
+                            title="IMC — Índice de Massa Corporal"
+                            whatItIs="Seu peso dividido pela altura ao quadrado. Uma referência rápida e mundial para faixa de peso."
+                            whatItMeans="É só um ponto de partida: não distingue músculo de gordura. Quem treina pesado pode aparecer como 'sobrepeso' sem ter excesso de gordura — por isso olhe também a % de gordura e a cintura."
+                            howToImprove="Ajuste peso pela alimentação e atividade, mas confie mais nas medidas e no espelho do que só neste número."
+                            reference="Abaixo 18,5 · Normal 18,5–24,9 · Sobrepeso 25–29,9"
+                        />
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-5">
@@ -145,11 +182,55 @@ export function BodyStatsOverview({ stats, onEdit }: { stats: BodyStats; onEdit:
                 <AdvancedInsights stats={stats} />
             </div>
 
+            {/* 3b. MEDIÇÕES POR APARELHO (só aparece se houver dados de balança/adipômetro) */}
+            {deviceList.length > 0 && (
+                <Card className="md:col-span-12 border-border/40 bg-card shadow-sm">
+                    <CardHeader className="flex flex-row items-center justify-between border-b border-border/40 pb-4">
+                        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                            <div className="rounded-lg bg-primary/10 p-1.5 text-primary"><Gauge className="h-4 w-4" /></div>
+                            Medições por aparelho
+                            <MetricExplainer
+                                title="Dados da sua balança / adipômetro"
+                                whatItIs="Valores que vêm de aparelhos: balança de bioimpedância (gordura, músculo, água, gordura visceral, massa óssea, idade metabólica) ou adipômetro (dobras cutâneas)."
+                                whatItMeans="São medições diretas — quando você as informa, o Life OS passa a usar a sua % de gordura real no lugar da estimativa por fita, deixando todos os cálculos (massa magra, proteína, etc.) mais precisos."
+                                howToImprove="Meça sempre no mesmo horário e condição (de manhã, em jejum, bem hidratado) para os números serem comparáveis entre semanas."
+                                reference="Atualize pelo botão “Atualizar” → aba “Aparelhos & Dobras”"
+                            />
+                        </CardTitle>
+                        <Button variant="ghost" size="sm" onClick={onEdit} className="h-8 gap-1.5 rounded-lg text-xs text-muted-foreground">
+                            <Edit3 className="h-3.5 w-3.5" /> Editar
+                        </Button>
+                    </CardHeader>
+                    <CardContent className="pt-5">
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                            {deviceList.map((d) => (
+                                <div key={d.label} className={cn("rounded-xl border border-border/40 p-3", d.bg)}>
+                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{d.label}</p>
+                                    <p className="mt-1 flex items-baseline gap-1">
+                                        <span className={cn("text-xl font-bold tabular-nums", d.tone)}>{d.value}</span>
+                                        {d.unit && <span className="text-[10px] text-muted-foreground">{d.unit}</span>}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* 4. METABOLISMO & PLANO */}
             <Card className="md:col-span-12 grid divide-y divide-border/40 border-border/40 bg-card shadow-sm md:grid-cols-3 md:divide-x md:divide-y-0">
                 <div className="space-y-3 p-5">
                     <div className="flex items-center gap-2 text-xs font-semibold text-orange-600 dark:text-orange-400">
                         <Flame className="h-4 w-4" /> Gasto calórico (dia)
+                        <span className="ml-auto text-muted-foreground">
+                            <MetricExplainer
+                                title="TDEE — Gasto calórico diário"
+                                whatItIs="Quantas calorias seu corpo queima por dia no total: o mínimo para existir (respirar, coração, cérebro) somado ao seu nível de atividade."
+                                whatItMeans="É a sua 'linha de equilíbrio'. Comer nesse valor mantém o peso; comer menos emagrece; comer mais ganha peso. Os cartões ao lado já mostram o alvo para perder ou ganhar."
+                                howToImprove="Mais massa muscular e mais atividade aumentam esse gasto — você passa a queimar mais mesmo parado."
+                                reference="Perder ≈ −20% · Ganhar ≈ +10%"
+                            />
+                        </span>
                     </div>
                     <div className="flex items-baseline gap-1">
                         <span className="text-3xl font-bold tabular-nums">{Math.round(tdee)}</span>
@@ -183,6 +264,15 @@ export function BodyStatsOverview({ stats, onEdit }: { stats: BodyStats; onEdit:
                 <div className="space-y-3 p-5">
                     <div className="flex items-center gap-2 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
                         <Utensils className="h-4 w-4" /> Proteína diária
+                        <span className="ml-auto text-muted-foreground">
+                            <MetricExplainer
+                                title="Proteína diária recomendada"
+                                whatItIs="A quantidade de proteína (em gramas) que ajuda a manter e construir músculo, calculada a partir da sua massa magra."
+                                whatItMeans="Comer proteína suficiente é o que evita perder músculo quando você emagrece e o que permite ganhar músculo quando treina. Também dá mais saciedade."
+                                howToImprove="Distribua ao longo do dia (ex.: ovos, frango, carne, peixe, feijão, whey). O registro de refeições já soma sua proteína — compare com esta meta."
+                                reference="≈ 2 g por kg de massa magra"
+                            />
+                        </span>
                     </div>
                     <div className="flex items-baseline gap-1">
                         <span className="text-3xl font-bold tabular-nums">~{(leanMass * 2).toFixed(0)}</span>

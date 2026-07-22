@@ -15,11 +15,11 @@ import { calculateStrength } from "./access-helpers";
 import { toast } from "sonner";
 import {
   Loader2, Globe, User, Key, Eye, EyeOff, ShieldCheck,
-  Wand2, Briefcase, Building2, UserCircle, CheckCircle, SlidersHorizontal
+  Wand2, Briefcase, Building2, UserCircle, CheckCircle, SlidersHorizontal, StickyNote
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type AccessType = "PERSONAL" | "CLIENT";
+type AccessType = "PERSONAL" | "CLIENT" | "NOTE";
 
 export interface AccessData {
   id?: string;
@@ -85,7 +85,11 @@ export function AccessForm({ item, onClose }: AccessFormProps) {
   // Em edição NÃO pré-preenchemos a senha (o valor salvo é cifrado/ilegível).
   // Campo vazio = manter a senha atual.
   const [password, setPassword] = useState("");
-  const [accessType, setAccessType] = useState<AccessType>(item?.client ? "CLIENT" : "PERSONAL");
+  // Nota = item sem senha (password vazio). Senão, Cliente (tem client) ou Pessoal.
+  const [accessType, setAccessType] = useState<AccessType>(
+    item ? (!item.password ? "NOTE" : item.client ? "CLIENT" : "PERSONAL") : "PERSONAL",
+  );
+  const isNote = accessType === "NOTE";
 
   // Opções do gerador de senhas.
   const [genOptions, setGenOptions] = useState<GenOptions>({ length: 20, numbers: true, symbols: true });
@@ -104,13 +108,13 @@ export function AccessForm({ item, onClose }: AccessFormProps) {
         return;
     }
 
-    if (!item?.id && !currentPassword) {
+    if (!item?.id && !currentPassword && !isNote) {
         toast.warning("Senha obrigatória para novos registros.");
         return;
     }
 
     setIsLoading(true);
-    if (accessType === "PERSONAL") formData.delete("client");
+    if (accessType !== "CLIENT") formData.delete("client");
 
     try {
       let breachCount = 0;
@@ -133,7 +137,7 @@ export function AccessForm({ item, onClose }: AccessFormProps) {
       }
       onClose();
     } catch (error) {
-      toast.error("Erro na sincronização.");
+      toast.error(error instanceof Error && error.message ? error.message : "Erro na sincronização.");
     } finally {
       setIsLoading(false);
     }
@@ -154,18 +158,23 @@ export function AccessForm({ item, onClose }: AccessFormProps) {
         
         {/* TABS TÁTICAS */}
         <Tabs value={accessType} onValueChange={(v) => setAccessType(v as AccessType)} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 p-1 bg-muted/20 border border-border/40 h-12 rounded-2xl">
+            <TabsList className="grid w-full grid-cols-3 p-1 bg-muted/20 border border-border/40 h-12 rounded-2xl">
               <TabsTrigger value="PERSONAL" className="gap-2 h-full rounded-xl font-black uppercase tracking-widest text-[10px] data-[state=active]:bg-background data-[state=active]:shadow-lg">
                   <UserCircle className="h-4 w-4 opacity-70" /> Pessoal
               </TabsTrigger>
               <TabsTrigger value="CLIENT" className="gap-2 h-full rounded-xl font-black uppercase tracking-widest text-[10px] data-[state=active]:bg-background data-[state=active]:shadow-lg">
                   <Briefcase className="h-4 w-4 opacity-70" /> Cliente
               </TabsTrigger>
+              <TabsTrigger value="NOTE" className="gap-2 h-full rounded-xl font-black uppercase tracking-widest text-[10px] data-[state=active]:bg-background data-[state=active]:shadow-lg">
+                  <StickyNote className="h-4 w-4 opacity-70" /> Nota
+              </TabsTrigger>
             </TabsList>
         </Tabs>
 
         <form action={handleSubmit} className="space-y-6">
-            
+            {/* Discrimina nota (sem senha) de credencial no servidor. */}
+            <input type="hidden" name="kind" value={isNote ? "NOTE" : "CREDENTIAL"} />
+
             {/* CAMPO CONDICIONAL: CLIENTE */}
             {accessType === "CLIENT" && (
                 <div className="space-y-2 animate-in slide-in-from-top-4 duration-300">
@@ -187,14 +196,14 @@ export function AccessForm({ item, onClose }: AccessFormProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                   <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">
-                      {accessType === "CLIENT" ? "Serviço / Instância" : "Plataforma"}
+                      {isNote ? "Título" : accessType === "CLIENT" ? "Serviço / Instância" : "Plataforma"}
                   </Label>
                   <div className="relative group">
                     <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors z-10" />
                     <Input
                         name="title"
                         defaultValue={item?.title}
-                        placeholder={accessType === "CLIENT" ? "Ex: WP Admin" : "Ex: Netflix"}
+                        placeholder={isNote ? "Ex: Wi-Fi do escritório" : accessType === "CLIENT" ? "Ex: WP Admin" : "Ex: Netflix"}
                         className="pl-10 h-12 bg-muted/10 border-border/40 focus-visible:ring-primary/20 rounded-xl font-bold text-sm"
                         required
                     />
@@ -217,6 +226,8 @@ export function AccessForm({ item, onClose }: AccessFormProps) {
               </div>
             </div>
 
+            {!isNote && (
+            <>
             {/* USUÁRIO */}
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">ID de Usuário / Email</Label>
@@ -269,7 +280,7 @@ export function AccessForm({ item, onClose }: AccessFormProps) {
                   {/* Opções do gerador (comprimento, números, símbolos) */}
                   <Popover>
                     <PopoverTrigger asChild>
-                      <Button type="button" variant="outline" size="icon" title="Opções do gerador" className="h-11 w-11 shrink-0 rounded-xl border-border/40 hover:bg-muted">
+                      <Button type="button" variant="outline" size="icon" title="Opções do gerador" aria-label="Opções do gerador de senha" className="h-11 w-11 shrink-0 rounded-xl border-border/40 hover:bg-muted">
                         <SlidersHorizontal className="h-4 w-4" />
                       </Button>
                     </PopoverTrigger>
@@ -322,6 +333,8 @@ export function AccessForm({ item, onClose }: AccessFormProps) {
                 </div>
               )}
             </div>
+            </>
+            )}
 
             {/* URL */}
             <div className="space-y-2">
@@ -332,14 +345,16 @@ export function AccessForm({ item, onClose }: AccessFormProps) {
               </div>
             </div>
 
-            {/* NOTAS */}
+            {/* NOTAS / CONTEÚDO */}
             <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Registros de Auditoria / Notas</Label>
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">
+                {isNote ? "Conteúdo da anotação" : "Registros de Auditoria / Notas"}
+              </Label>
               <Textarea
                   name="notes"
                   defaultValue={item?.notes ?? ""}
-                  placeholder="Instruções de segurança, backups ou chaves secundárias..."
-                  rows={3}
+                  placeholder={isNote ? "O que você quer lembrar? Ex: senha do Wi-Fi, código do portão, observações do cliente..." : "Instruções de segurança, backups ou chaves secundárias..."}
+                  rows={isNote ? 6 : 3}
                   className="bg-muted/10 border-border/40 focus-visible:ring-primary/20 rounded-2xl resize-none text-sm font-medium p-4 leading-relaxed"
               />
             </div>
@@ -363,7 +378,7 @@ export function AccessForm({ item, onClose }: AccessFormProps) {
                 ) : (
                   <span className="flex items-center gap-2">
                     <CheckCircle className="h-4 w-4 stroke-[3]" />
-                    {item ? "Atualizar Credencial" : "Sincronizar no Cofre"}
+                    {isNote ? (item ? "Atualizar nota" : "Salvar nota") : item ? "Atualizar Credencial" : "Sincronizar no Cofre"}
                   </span>
                 )}
               </Button>

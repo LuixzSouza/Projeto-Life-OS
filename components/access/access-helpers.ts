@@ -9,6 +9,10 @@ export const CATEGORY_CONFIG: Record<CategoryKey, { icon: React.ElementType; col
   OTHERS: { icon: Key, color: "text-orange-500", bg: "bg-orange-500/10", label: "Outros" },
 };
 
+// Um item é "nota" (texto pra lembrar, sem credencial) quando não tem senha.
+// Sentinela: notas guardam password === "" (nenhuma credencial real é vazia).
+export const isNoteItem = (item: { password?: string | null }): boolean => !item.password;
+
 export const getDomain = (url?: string | null): string | null => {
   if (!url) return null;
   try {

@@ -108,13 +108,13 @@ export function DigitalRotCard() {
                 <div className={cn("flex shrink-0 items-center gap-1 opacity-0 transition-opacity",
                   "group-hover:opacity-100 focus-within:opacity-100 max-sm:opacity-100")}>
                   <Button
-                    variant="ghost" size="icon" onClick={() => revive(item)} title="Ainda importa — reviver"
+                    variant="ghost" size="icon" onClick={() => revive(item)} title="Ainda importa — reviver" aria-label="Reviver item"
                     className="h-7 w-7 rounded-lg text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-500"
                   >
                     <RotateCcw className="h-3.5 w-3.5" />
                   </Button>
                   <Button
-                    variant="ghost" size="icon" onClick={() => archive(item)} title="Arquivar na Lixeira"
+                    variant="ghost" size="icon" onClick={() => archive(item)} title="Arquivar na Lixeira" aria-label="Arquivar na lixeira"
                     className="h-7 w-7 rounded-lg text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500"
                   >
                     <Archive className="h-3.5 w-3.5" />

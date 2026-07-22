@@ -2,7 +2,9 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaLibSQL } from "@prisma/adapter-libsql";
 import { createClient as createWebClient } from "@libsql/client/web";
 import type { Client as LibsqlClient } from "@libsql/client";
+import { existsSync, rmSync } from "fs";
 import { getDbProfile, isEphemeralServerless, maskDbUrl, type DbProfile } from "./db-config";
+import { withDbRetry } from "./db-errors";
 
 // Perfil de fallback quando o sistema ainda não foi instalado (/setup).
 // Mantém o build/start do Next.js de pé sem um banco real configurado.
@@ -83,6 +85,55 @@ export function loadNodeLibsql(): typeof import("@libsql/client") {
   // a nuvem usa `@libsql/client/web` e nunca chega aqui.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   return require("@libsql/client") as typeof import("@libsql/client");
+}
+
+/** Sidecars que o libSQL cria ao lado do arquivo da réplica embarcada. */
+const REPLICA_SIDECARS = ["", "-wal", "-shm", "-journal", "-info", "-client_wal_index"];
+
+/**
+ * Cria o cliente libSQL da réplica embarcada, auto-curando o "invalid local state:
+ * db file exists but metadata file does not". Esse erro acontece quando o arquivo
+ * `.db` local existe mas o metadata da réplica sumiu (delete parcial, ou um SQLite
+ * comum foi reaproveitado como réplica) — e sem tratamento derruba o app inteiro,
+ * pois o Proxy do prisma constrói o cliente já na importação de módulos.
+ *
+ * Recuperação segura: no modo réplica o arquivo local é só um CACHE do primário
+ * Turso (as escritas locais já vão ao primário na hora), então apagar o cache
+ * órfão e deixar o libSQL re-bootstrapar a partir do `syncUrl` não perde dados.
+ */
+function createReplicaClient(
+  createClient: typeof import("@libsql/client").createClient,
+  profile: Extract<DbProfile, { mode: "replica" }>,
+): LibsqlClient {
+  const config = {
+    url: `file:${profile.databasePath}`,
+    syncUrl: profile.syncUrl,
+    authToken: profile.authToken,
+    // Pull periódico em background: traz para o arquivo local o que foi escrito
+    // por OUTRO dispositivo (ex.: o celular via instância na nuvem).
+    syncInterval: profile.syncInterval ?? DEFAULT_SYNC_INTERVAL,
+  };
+  try {
+    return createClient(config);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (!/invalid local state|metadata file/i.test(msg)) throw error;
+
+    console.warn(
+      `⚠️ [PRISMA] Réplica em estado inválido (${msg}). Descartando o cache local ` +
+      `órfão e re-sincronizando do primário…`,
+    );
+    for (const suffix of REPLICA_SIDECARS) {
+      const path = `${profile.databasePath}${suffix}`;
+      try {
+        if (existsSync(path)) rmSync(path, { force: true });
+      } catch {
+        /* arquivo travado/ausente: segue — o retry dirá se ainda falta limpar */
+      }
+    }
+    // Uma nova tentativa com o diretório limpo: o libSQL recria a réplica do zero.
+    return createClient(config);
+  }
 }
 
 interface BuiltClient {
@@ -190,14 +241,7 @@ export function buildAdapterClient(profile: DbProfile): BuiltClient {
 
   if (profile.mode === "replica") {
     const { createClient } = loadNodeLibsql();
-    const libsql = createClient({
-      url: `file:${profile.databasePath}`,
-      syncUrl: profile.syncUrl,
-      authToken: profile.authToken,
-      // Pull periódico em background: traz para o arquivo local o que foi escrito
-      // por OUTRO dispositivo (ex.: o celular via instância na nuvem).
-      syncInterval: profile.syncInterval ?? DEFAULT_SYNC_INTERVAL,
-    });
+    const libsql = createReplicaClient(createClient, profile);
     const adapter = new PrismaLibSQL(libsql);
     return { client: new PrismaClient({ adapter, log: logLevels }), libsql };
   }
@@ -298,8 +342,12 @@ export async function syncReplica(): Promise<{ synced: boolean }> {
   // Garante que o cliente (e o libsql bruto) estejam vivos para o perfil atual.
   getClient();
   if (!state.libsql) return { synced: false };
+  const libsql = state.libsql;
   try {
-    await state.libsql.sync();
+    // O pull da réplica pode falhar com um 500 momentâneo do Turso
+    // (Sync(... "Internal Server Error")) — 1 retry com backoff resolve o
+    // hiccup sem incomodar o usuário. Erros persistentes ainda propagam.
+    await withDbRetry(() => libsql.sync());
     state.lastSyncAt = Date.now();
     state.lastSyncError = null;
     return { synced: true };

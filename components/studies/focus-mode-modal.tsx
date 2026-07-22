@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import {
   Play, Pause, CheckCircle2, BrainCircuit, Coffee,
   ChevronRight, Clock, X, PenTool, EyeOff, Eye, AlertTriangle,
+  Maximize, Minimize,
 } from "lucide-react";
 import { StudySubject } from "@prisma/client";
 import { cn } from "@/lib/utils";
@@ -33,9 +34,34 @@ export function FocusModeModal({ isOpen, subject, settings, preferences, onFinis
   const [liveNotes, setLiveNotes] = useState("");
 
   const [isTimerHidden, setIsTimerHidden] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   // 🟢 A grande mudança: A confirmação de saída é um Estado da View, não um modal sobreposto!
   const [viewMode, setViewMode] = useState<"FOCUS" | "CONFIRM_EXIT">("FOCUS");
+
+  // Tela cheia REAL (Fullscreen API): esconde abas/barra do navegador e o SO —
+  // imersão total. Escuta o evento para refletir mudanças (ex.: Esc do browser)
+  // e sai da tela cheia ao desmontar o modal.
+  useEffect(() => {
+    const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    };
+  }, []);
+
+  const toggleFullscreen = () => {
+    try {
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      } else {
+        document.documentElement.requestFullscreen().catch(() => {});
+      }
+    } catch {
+      /* navegador sem suporte ou bloqueado: ignora silenciosamente */
+    }
+  };
 
   const isLongBreak = completedCycles > 0 && completedCycles % settings.cycles === 0;
   const currentTargetTime = isBreak ? (isLongBreak ? settings.longBreak : settings.shortBreak) : settings.focus;
@@ -166,9 +192,14 @@ export function FocusModeModal({ isOpen, subject, settings, preferences, onFinis
                             <h3 className="mt-3 text-lg md:text-xl font-bold line-clamp-1">{subject?.title}</h3>
                             <p className="text-xs md:text-sm text-muted-foreground">Ciclo: {completedCycles % settings.cycles || settings.cycles} de {settings.cycles}</p>
                         </div>
-                        <Button variant="ghost" size="icon" aria-label="Sair do modo foco" onClick={handleAttemptExit} className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors shrink-0">
-                            <X className="h-5 w-5" />
-                        </Button>
+                        <div className="flex shrink-0 items-center gap-1">
+                            <Button variant="ghost" size="icon" aria-label={isFullscreen ? "Sair da tela cheia" : "Entrar em tela cheia"} onClick={toggleFullscreen} className="text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors" title={isFullscreen ? "Sair da tela cheia" : "Tela cheia (imersão total)"}>
+                                {isFullscreen ? <Minimize className="h-5 w-5" /> : <Maximize className="h-5 w-5" />}
+                            </Button>
+                            <Button variant="ghost" size="icon" aria-label="Sair do modo foco" onClick={handleAttemptExit} className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors">
+                                <X className="h-5 w-5" />
+                            </Button>
+                        </div>
                     </div>
 
                     {/* Container fixo para o relógio (evita que a tela pule) */}

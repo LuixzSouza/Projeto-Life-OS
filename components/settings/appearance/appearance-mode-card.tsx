@@ -19,10 +19,17 @@ export function AppearanceModeCard({ theme, setTheme }: AppearanceModeCardProps)
       <CardHeader><CardTitle>Aparência</CardTitle><CardDescription>Modo claro, escuro ou automático.</CardDescription></CardHeader>
       <CardContent className="flex gap-2">
         {MODES.map((mode) => (
-          <div key={mode.id} onClick={() => setTheme(mode.id)} className={cn("flex-1 p-3 rounded-lg border-2 cursor-pointer flex flex-col items-center gap-2 transition-all hover:bg-muted", theme === mode.id ? "border-primary bg-primary/5 text-primary" : "border-transparent text-muted-foreground")}>
+          <button
+            type="button"
+            key={mode.id}
+            onClick={() => setTheme(mode.id)}
+            aria-pressed={theme === mode.id}
+            aria-label={`Tema ${mode.label}`}
+            className={cn("flex-1 p-3 rounded-lg border-2 cursor-pointer flex flex-col items-center gap-2 transition-all hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", theme === mode.id ? "border-primary bg-primary/5 text-primary" : "border-transparent text-muted-foreground")}
+          >
             <mode.icon className={cn("h-5 w-5", theme === mode.id && "fill-primary/20")} />
             <span className="text-xs font-medium">{mode.label}</span>
-          </div>
+          </button>
         ))}
       </CardContent>
     </Card>

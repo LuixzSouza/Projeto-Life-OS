@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { onActivate } from "@/lib/a11y";
 import { calculateAge, getBirthdayInfo, getProximityBadge, safelyParseDate, openWhatsApp } from "./friend-helpers";
 import type { FriendData } from "./add-friend-dialog";
 
@@ -171,7 +172,14 @@ export function FriendDetailModal({ friend, onOpenChange, onEdit }: FriendDetail
                   </div>
 
                   {friend.pixKey && (
-                    <div onClick={() => copyToClipboard(friend.pixKey, "Chave Pix")} className="group flex items-center justify-between p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 cursor-pointer hover:bg-emerald-500/10 transition-colors">
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      aria-label="Copiar chave Pix"
+                      onClick={() => copyToClipboard(friend.pixKey, "Chave Pix")}
+                      onKeyDown={onActivate(() => copyToClipboard(friend.pixKey, "Chave Pix"))}
+                      className="group flex items-center justify-between p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 cursor-pointer hover:bg-emerald-500/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40"
+                    >
                       <div className="flex items-center gap-3">
                         <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-600"><LinkIcon className="h-4 w-4" /></div>
                         <div>

@@ -16,7 +16,11 @@ import { DailyReviewBanner } from "@/components/studies/daily-review-banner";
 import { CreateSubjectButton } from "@/components/studies/create-subject-button";
 import { StudyHeatmap } from "@/components/studies/study-heatmap";
 import { StudyPlanCard, type PlanSubject } from "@/components/studies/study-plan-card";
+import { FocusSounds } from "@/components/studies/focus-sounds";
+import { ExamCountdown } from "@/components/studies/exam-countdown";
+import { MasteryTracks, type MasteryTrack } from "@/components/studies/mastery-tracks";
 import { formatHours } from "@/components/studies/studies-helpers";
+import { computeMastery, MATURE_INTERVAL_DAYS } from "@/lib/study-mastery";
 import { buildDailyActivity, computeStudyStats, type SessionLite, type DailyPoint, type StudyStats } from "@/lib/studies-math";
 import { computeElo, sessionsToDays, type EloResult } from "@/lib/studies-elo";
 
@@ -24,7 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { PageShell, PageHeader, PageContainer } from "@/components/layout/page-shell";
 
-import { History, AlertCircle, BookOpen } from "lucide-react";
+import { History, AlertCircle, BookOpen, PenLine, LayoutGrid, ListChecks, Timer } from "lucide-react";
 
 // Tipos Prisma corretos
 import { StudySubject, Prisma } from "@prisma/client";
@@ -76,6 +80,11 @@ export default async function StudiesPage() {
   // Notas por matéria (ponte Estudos -> Notas direto no card da matéria).
   const notesBySubject = new Map<string, number>();
 
+  // Sinais das Trilhas de domínio (D1): cartões maduros e metas por matéria.
+  const cardsBySubject = new Map<string, { total: number; mature: number }>();
+  const goalsBySubject = new Map<string, { total: number; done: number }>();
+  let masteryTracks: MasteryTrack[] = [];
+
   // Heatmap de constância: minutos por dia (reusa o histórico do ELO).
   const heatmapData: Record<string, number> = {};
 
@@ -101,7 +110,7 @@ export default async function StudiesPage() {
     // "Agora" para a fila de revisão (cartões vencidos = nextReview nula ou no passado).
     const reviewNow = new Date();
 
-    const [subjectsData, recentSessionsData, statsData, aggregatedTimeData, lastStudiedData, activitySessions, eloSessions, dueFlashcardsCount, totalFlashcardsCount, decksWithDueData, notesBySubjectData] =
+    const [subjectsData, recentSessionsData, statsData, aggregatedTimeData, lastStudiedData, activitySessions, eloSessions, dueFlashcardsCount, totalFlashcardsCount, decksWithDueData, notesBySubjectData, goalsBySubjectData] =
       await Promise.all([
         prisma.studySubject.findMany({
           where: { userId },
@@ -141,10 +150,11 @@ export default async function StudiesPage() {
           select: { subjectId: true, date: true },
         }),
 
-        // Sessões recentes (30 dias) para analytics.
+        // Sessões recentes (30 dias) para analytics E para a constância por matéria
+        // (pilar das Trilhas de domínio) — mesma janela, uma query só.
         prisma.studySession.findMany({
           where: { userId, date: { gte: activityWindowStart } },
-          select: { date: true, durationMinutes: true, focusLevel: true },
+          select: { date: true, durationMinutes: true, focusLevel: true, subjectId: true },
         }),
 
         // Histórico COMPLETO (2 campos) p/ o ELO: o decaimento precisa replay
@@ -165,16 +175,15 @@ export default async function StudiesPage() {
         // Total de cartões — distingue "tudo em dia" de "ainda não tem flashcard".
         prisma.flashcard.count({ where: { userId } }),
 
-        // Vencidos POR matéria: baralhos ligados a uma matéria + seus cartões
-        // devidos. Escala pessoal (poucos baralhos) → carregar os ids é barato.
+        // Cartões POR matéria: baralhos ligados a uma matéria + o mínimo de cada
+        // cartão (2 colunas). Serve a DOIS consumidores — os vencidos do card da
+        // matéria e a maturidade do pilar "Memória" das Trilhas de domínio — sem
+        // pagar duas viagens ao banco.
         prisma.flashcardDeck.findMany({
           where: { userId, studySubjectId: { not: null } },
           select: {
             studySubjectId: true,
-            cards: {
-              where: { OR: [{ nextReview: null }, { nextReview: { lte: reviewNow } }] },
-              select: { id: true },
-            },
+            cards: { select: { nextReview: true, interval: true } },
           },
         }),
 
@@ -185,15 +194,56 @@ export default async function StudiesPage() {
           where: { userId, deletedAt: null, subjectId: { not: null } },
           _count: { id: true },
         }),
+
+        // Metas por matéria e status: pilar "Objetivos" das Trilhas de domínio.
+        // Só _count de id (nenhum DateTime) — seguro no adapter libSQL.
+        prisma.learningGoal.groupBy({
+          by: ["subjectId", "status"],
+          where: { userId, deletedAt: null, subjectId: { not: null } },
+          _count: { id: true },
+        }),
       ]);
 
     dueFlashcards = dueFlashcardsCount ?? 0;
     totalFlashcards = totalFlashcardsCount ?? 0;
 
-    // Mapa matéria → nº de cartões vencidos (soma de todos os baralhos da matéria).
+    // Mapa matéria → cartões vencidos e cartões maduros (uma passada só).
+    // Vencido = nextReview nula (novo) ou no passado — mesma regra de /flashcards/review.
+    // Maduro = intervalo do SM-2 já longo o bastante para valer memória de verdade.
     for (const d of decksWithDueData ?? []) {
       if (!d.studySubjectId) continue;
-      dueBySubject.set(d.studySubjectId, (dueBySubject.get(d.studySubjectId) ?? 0) + d.cards.length);
+      let due = 0;
+      let mature = 0;
+      for (const c of d.cards) {
+        if (c.nextReview === null || c.nextReview <= reviewNow) due++;
+        if (c.interval >= MATURE_INTERVAL_DAYS) mature++;
+      }
+      dueBySubject.set(d.studySubjectId, (dueBySubject.get(d.studySubjectId) ?? 0) + due);
+      cardsBySubject.set(d.studySubjectId, {
+        total: (cardsBySubject.get(d.studySubjectId)?.total ?? 0) + d.cards.length,
+        mature: (cardsBySubject.get(d.studySubjectId)?.mature ?? 0) + mature,
+      });
+    }
+
+    // Mapa matéria → metas totais/concluídas (pilar "Objetivos").
+    for (const g of goalsBySubjectData ?? []) {
+      if (!g.subjectId) continue;
+      const n = g._count?.id ?? 0;
+      const cur = goalsBySubject.get(g.subjectId) ?? { total: 0, done: 0 };
+      goalsBySubject.set(g.subjectId, {
+        total: cur.total + n,
+        done: cur.done + (g.status === "DONE" ? n : 0),
+      });
+    }
+
+    // Mapa matéria → dias DISTINTOS com sessão nos últimos 30 (pilar "Constância").
+    const activeDaysBySubject = new Map<string, Set<string>>();
+    for (const s of activitySessions ?? []) {
+      const d = new Date(s.date);
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      const set = activeDaysBySubject.get(s.subjectId) ?? new Set<string>();
+      set.add(key);
+      activeDaysBySubject.set(s.subjectId, set);
     }
 
     // Mapa matéria → nº de notas vinculadas.
@@ -253,6 +303,30 @@ export default async function StudiesPage() {
     // Ordena por tempo (decrescente) para dar prioridade visual às mais estudadas
     subjectsWithStats.sort((a, b) => b.totalMinutes - a.totalMinutes);
 
+    // TRILHAS DE DOMÍNIO: nota 0-100 por matéria a partir dos sinais acima.
+    // Menor domínio primeiro — a trilha existe para mostrar onde falta terreno.
+    masteryTracks = subjectsWithStats
+      .map((s) => {
+        const cards = cardsBySubject.get(s.id) ?? { total: 0, mature: 0 };
+        const goals = goalsBySubject.get(s.id) ?? { total: 0, done: 0 };
+        return {
+          id: s.id,
+          title: s.title,
+          icon: s.icon,
+          color: s.color,
+          mastery: computeMastery({
+            totalMinutes: s.totalMinutes,
+            goalMinutes: s.goalMinutes,
+            activeDays30: activeDaysBySubject.get(s.id)?.size ?? 0,
+            cardsTotal: cards.total,
+            cardsMature: cards.mature,
+            goalsTotal: goals.total,
+            goalsDone: goals.done,
+          }),
+        };
+      })
+      .sort((a, b) => a.mastery.score - b.mastery.score);
+
     // Sugestões do "Plano de hoje": matérias abaixo da meta, mais esquecidas
     // (menos recentemente estudadas / nunca) primeiro. Até 3.
     planSuggestions = subjectsWithStats
@@ -311,11 +385,40 @@ export default async function StudiesPage() {
         icon={<BookOpen className="h-6 w-6" />}
         title="Estudos"
         description="Entre no foco, registre suas sessões e acompanhe sua evolução."
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Quadro de estudo: Para estudar → Estudando → Revisar → Dominado */}
+            <Link href="/goals">
+              <Button variant="outline" className="gap-2">
+                <LayoutGrid className="h-4 w-4" /> Quadro de estudo
+              </Button>
+            </Link>
+            {/* Preparação ENEM: banco de questões → simulado cronometrado */}
+            <Link href="/studies/questoes">
+              <Button variant="outline" className="gap-2">
+                <ListChecks className="h-4 w-4" /> Questões
+              </Button>
+            </Link>
+            <Link href="/studies/simulados">
+              <Button variant="outline" className="gap-2">
+                <Timer className="h-4 w-4" /> Simulados
+              </Button>
+            </Link>
+            <Link href="/studies/redacao">
+              <Button variant="outline" className="gap-2">
+                <PenLine className="h-4 w-4" /> Redação ENEM
+              </Button>
+            </Link>
+          </div>
+        }
       />
 
       <PageContainer className="space-y-8">
         {/* REVISÃO DO DIA: gatilho do hábito — cartões vencidos em 1 clique. */}
         <DailyReviewBanner due={dueFlashcards} totalCards={totalFlashcards} />
+
+        {/* CONTAGEM REGRESSIVA: dias até ENEM/vestibular/concurso (localStorage). */}
+        <ExamCountdown />
 
         {/* PLANO DE HOJE: meta diária + ofensiva + matérias a atacar agora. */}
         {subjects.length > 0 && (
@@ -355,6 +458,9 @@ export default async function StudiesPage() {
               <StudyTimer subjects={subjectsWithStats} />
             )}
 
+            {/* AMBIENTE SONORO: mixer de sons de foco (offline, sintetizado) */}
+            <FocusSounds />
+
             {/* GRADE DE MATÉRIAS (com estatísticas) */}
             <SubjectGrid subjects={subjectsWithStats} />
           </div>
@@ -377,6 +483,9 @@ export default async function StudiesPage() {
             </CardContent>
           </Card>
         </section>
+
+        {/* DOMÍNIO: o quanto cada matéria já é sua (tempo + memória + constância + metas) */}
+        <MasteryTracks tracks={masteryTracks} />
 
         {/* CONSTÂNCIA: heatmap dos últimos meses (regularidade > intensidade) */}
         {hasActivity && <StudyHeatmap data={heatmapData} streak={studyStats.streak} />}

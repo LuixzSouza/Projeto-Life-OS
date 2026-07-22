@@ -4,8 +4,14 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus, Search, Star, Pencil, Trash2, Loader2, NotebookPen, GraduationCap,
-  Inbox, Zap, Settings2, Library, Briefcase,
+  Inbox, Zap, Settings2, Library, Briefcase, LayoutTemplate, ChevronDown,
+  Columns3, Baby, BookOpen, Network, ListChecks,
 } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { NOTE_TEMPLATES } from "@/components/notes/note-templates";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +35,11 @@ import { useMentionMenu, type Mentionables } from "@/components/notes/use-mentio
 function parseTags(tags: string | null): string[] {
   return tags ? tags.split(",").map((t) => t.trim()).filter(Boolean) : [];
 }
+
+// Ícone de cada modelo de nota (resolvido pelo nome guardado no template).
+const TEMPLATE_ICONS: Record<string, React.ElementType> = {
+  Columns3, Baby, BookOpen, Network, ListChecks,
+};
 
 // Filtro ativo: todas, favoritas ou um caderno específico (id).
 type ActiveFilter = "all" | "favorites" | string;
@@ -111,11 +122,14 @@ export function NotesClient({
   // Caderno padrão para novas notas/capturas: o filtro ativo, se for um caderno real.
   const defaultNotebookId = active !== "all" && active !== "favorites" ? active : (inboxId ?? "inbox");
 
-  const handleNew = () => {
+  const handleNew = (template?: { title: string; content: string }) => {
     startCreate(async () => {
       const res = await createBlankNote({
         notebookId: defaultNotebookId,
         projectId: projectFilter !== "all" ? projectFilter : undefined,
+        subjectId: subjectFilter !== "all" ? subjectFilter : undefined,
+        title: template?.title,
+        content: template?.content,
       });
       if (res.success && res.id) {
         router.push(`/notes/${res.id}`);
@@ -229,9 +243,41 @@ export function NotesClient({
               ))}
             </SelectContent>
           </Select>
-          <Button className="gap-2" onClick={handleNew} disabled={creating}>
-            {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Nova nota
-          </Button>
+          {/* Botão combinado: "Nova nota" (em branco) + seta com MODELOS de estudo. */}
+          <div className="flex">
+            <Button className="gap-2 rounded-r-none" onClick={() => handleNew()} disabled={creating}>
+              {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Nova nota
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button className="rounded-l-none border-l border-primary-foreground/20 px-2" disabled={creating} aria-label="Escolher um modelo de nota">
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel className="flex items-center gap-1.5 text-xs">
+                  <LayoutTemplate className="h-3.5 w-3.5" /> Começar de um modelo
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {NOTE_TEMPLATES.map((tpl) => {
+                  const Icon = TEMPLATE_ICONS[tpl.icon] ?? NotebookPen;
+                  return (
+                    <DropdownMenuItem
+                      key={tpl.id}
+                      onClick={() => handleNew({ title: tpl.title, content: tpl.content })}
+                      className="flex items-start gap-2.5 py-2"
+                    >
+                      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium">{tpl.label}</span>
+                        <span className="block text-[11px] leading-tight text-muted-foreground">{tpl.description}</span>
+                      </span>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
 
@@ -360,7 +406,7 @@ export function NotesClient({
 
                 {/* Ações no hover */}
                 <div className="mt-3 flex justify-end gap-1 border-t border-border/40 pt-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); open(note.id); }} title="Editar">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); open(note.id); }} title="Editar" aria-label="Editar nota">
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
                   <Button
@@ -368,6 +414,7 @@ export function NotesClient({
                     className="h-7 w-7 text-muted-foreground hover:text-destructive"
                     onClick={(e) => { e.stopPropagation(); setDeleting(note); }}
                     title="Mover para a lixeira"
+                    aria-label="Mover nota para a lixeira"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>

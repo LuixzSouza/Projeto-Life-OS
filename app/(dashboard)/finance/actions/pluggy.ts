@@ -105,39 +105,49 @@ export async function syncBankAccount(localAccountId: string) {
 
     const externalTrans = await fetchPluggyTransactions(account.externalId);
 
-    let count = 0;
-    for (const t of externalTrans) {
-      const date = new Date(t.date);
-      date.setHours(0,0,0,0);
+    // Dedup SEM N+1: em vez de 1 SELECT por transação externa (centenas numa
+    // sync), buscamos de uma vez as transações já existentes da conta no
+    // intervalo de datas importado e comparamos por "impressão digital" em
+    // memória — mesma regra de antes: descrição + dia-calendário LOCAL + valor
+    // absoluto. Os inserts viram um único createMany. Usa o índice [userId, date].
+    const dayKey = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x.getTime(); };
+    const fingerprint = (desc: string, when: Date, amount: number) => `${desc}\u0000${dayKey(when)}\u0000${amount}`;
 
-      const exists = await prisma.transaction.findFirst({
-        where: {
-            accountId: localAccountId,
-            userId,
-            description: t.description,
-            date: {
-                gte: date,
-                lte: new Date(date.getTime() + 24 * 60 * 60 * 1000)
-            },
-            amount: Math.abs(t.amount)
-        }
+    const seen = new Set<string>();
+    const importDays = externalTrans.map((t) => dayKey(new Date(t.date)));
+    if (importDays.length > 0) {
+      const rangeStart = new Date(Math.min(...importDays));
+      const rangeEnd = new Date(Math.max(...importDays) + 24 * 60 * 60 * 1000);
+      const existing = await prisma.transaction.findMany({
+        where: { accountId: localAccountId, userId, date: { gte: rangeStart, lt: rangeEnd } },
+        select: { description: true, date: true, amount: true },
       });
-
-      if (!exists) {
-        await prisma.transaction.create({
-          data: {
-            accountId: localAccountId,
-            description: t.description,
-            amount: Math.abs(t.amount),
-            type: t.amount < 0 ? 'EXPENSE' : 'INCOME',
-            date: new Date(t.date),
-            category: t.category || "Geral",
-            userId
-          }
-        });
-        count++;
-      }
+      for (const e of existing) seen.add(fingerprint(e.description, e.date, Number(e.amount)));
     }
+
+    // filter roda em ordem: o seen.add também descarta duplicatas DENTRO do lote
+    // (comportamento que o create-por-linha antigo tinha via re-consulta).
+    const toCreate = externalTrans
+      .filter((t) => {
+        const fp = fingerprint(t.description, new Date(t.date), Math.abs(t.amount));
+        if (seen.has(fp)) return false;
+        seen.add(fp);
+        return true;
+      })
+      .map((t) => ({
+        accountId: localAccountId,
+        description: t.description,
+        amount: Math.abs(t.amount),
+        type: t.amount < 0 ? "EXPENSE" : "INCOME",
+        date: new Date(t.date),
+        category: t.category || "Geral",
+        userId,
+      }));
+
+    if (toCreate.length > 0) {
+      await prisma.transaction.createMany({ data: toCreate });
+    }
+    const count = toCreate.length;
 
     // CORREÇÃO DO ANY: Usamos a interface PluggyAccount para o find
     const pluggyAccounts = await fetchPluggyAccounts(account.externalId) as PluggyAccount[];

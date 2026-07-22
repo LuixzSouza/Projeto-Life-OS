@@ -90,7 +90,7 @@ export function TodayPanel({ items, inRange }: { items: AgendaItem[]; inRange: b
   }
 
   return (
-    <ScrollArea className="flex-1">
+    <ScrollArea className="flex-1 min-h-0">
       <div className="mx-auto w-full max-w-2xl space-y-4 p-4 sm:p-6">
         {/* Cabeçalho do dia */}
         <div className="flex items-center justify-between">

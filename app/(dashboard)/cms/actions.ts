@@ -6,8 +6,10 @@ import { requireUserId } from "@/lib/auth";
 
 // Criar Site (Container)
 export async function createSite(formData: FormData) {
-  const name = formData.get("name") as string;
-  const url = formData.get("url") as string;
+  const name = (formData.get("name") as string | null)?.trim();
+  const url = (formData.get("url") as string | null)?.trim() || null;
+
+  if (!name) throw new Error("O nome do site é obrigatório.");
 
   const userId = await requireUserId();
 
@@ -103,8 +105,10 @@ export async function createPage(formData: FormData) {
 // Deletar Página/Rota
 export async function deletePage(pageId: string) {
   const userId = await requireUserId();
+  const page = await prisma.sitePage.findFirst({ where: { id: pageId, userId }, select: { siteId: true } });
   await prisma.sitePage.deleteMany({ where: { id: pageId, userId } });
   revalidatePath("/cms");
+  if (page) revalidatePath(`/cms/${page.siteId}`);
 }
 
 // Salvar Conteúdo (Validação Estrita de JSON)
@@ -114,18 +118,32 @@ export async function savePageContent(formData: FormData) {
 
   const userId = await requireUserId();
 
-  await prisma.sitePage.updateMany({
+  // Um endpoint do CMS entrega JSON. Barrar conteúdo inválido aqui garante que a
+  // API pública nunca responda com erro de parse (o editor também bloqueia o Deploy).
+  const trimmed = (content ?? "").trim();
+  if (!trimmed) throw new Error("O conteúdo não pode estar vazio.");
+  try {
+    JSON.parse(trimmed);
+  } catch {
+    throw new Error("JSON inválido — corrija a sintaxe antes de publicar.");
+  }
+
+  const res = await prisma.sitePage.updateMany({
     where: { id: pageId, userId },
     data: { content }
   });
+  if (res.count === 0) throw new Error("Endpoint não encontrado.");
 
+  // Revalida a lista E a página do editor do container.
+  const page = await prisma.sitePage.findFirst({ where: { id: pageId, userId }, select: { siteId: true } });
   revalidatePath("/cms");
+  if (page) revalidatePath(`/cms/${page.siteId}`);
 }
 
 export async function updateSite(formData: FormData) {
   const id = formData.get("id") as string;
-  const name = formData.get("name") as string;
-  const url = formData.get("url") as string;
+  const name = (formData.get("name") as string | null)?.trim();
+  const url = (formData.get("url") as string | null)?.trim() || null;
 
   if (!id || !name) throw new Error("ID e Nome são obrigatórios.");
 

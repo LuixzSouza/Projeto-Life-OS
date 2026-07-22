@@ -46,8 +46,10 @@ export type VaultAudit = {
 
 export async function getVaultSecurityAudit(): Promise<VaultAudit> {
   const userId = await requireUserId();
+  // Só credenciais entram na auditoria — notas (password vazio) não têm senha
+  // para medir força/reuso, senão contariam como "frágeis" falsamente.
   const items = await prisma.accessItem.findMany({
-    where: { userId },
+    where: { userId, password: { not: "" } },
     select: { id: true, password: true },
   });
 
@@ -105,8 +107,9 @@ export type BreachScan = {
 
 export async function scanPasswordBreaches(): Promise<BreachScan> {
   const userId = await requireUserId();
+  // Notas (password vazio) não têm senha para checar em vazamentos.
   const items = await prisma.accessItem.findMany({
-    where: { userId },
+    where: { userId, password: { not: "" } },
     select: { id: true, password: true },
   });
 
@@ -167,39 +170,39 @@ export async function scanPasswordBreaches(): Promise<BreachScan> {
 // --- CRIAR ACESSO ---
 export async function createAccess(formData: FormData) {
   try {
-    const title = formData.get("title") as string;
-    const password = formData.get("password") as string;
-    
-    if (!title || !password) {
-      throw new Error("Título e Senha são obrigatórios.");
-    }
+    const title = (formData.get("title") as string)?.trim();
+    const isNote = formData.get("kind") === "NOTE";
+    const password = ((formData.get("password") as string) || "").trim();
 
-    const encryptedPassword = encrypt(password);
+    if (!title) throw new Error("O título é obrigatório.");
+    if (!isNote && !password) throw new Error("A senha é obrigatória para credenciais.");
+
+    // Nota (só texto pra lembrar): guarda password === "" como sentinela — sem
+    // criptografia de senha, sem checagem HIBP, sem username/cliente.
+    const storedPassword = isNote || !password ? "" : encrypt(password);
 
     const userId = await requireUserId();
 
     await prisma.accessItem.create({
       data: {
         title,
-        username: (formData.get("username") as string) || null,
-        password: encryptedPassword,
+        username: isNote ? null : (formData.get("username") as string) || null,
+        password: storedPassword,
         url: (formData.get("url") as string) || null,
         category: (formData.get("category") as string) || "OTHERS",
-        // ✅ AQUI: Garantindo que as notas sejam salvas
         notes: (formData.get("notes") as string) || null,
-        // ✅ AQUI: Garantindo que o cliente seja salvo
-        client: (formData.get("client") as string) || null,
+        client: isNote ? null : (formData.get("client") as string) || null,
         userId,
       },
     });
 
     revalidatePath("/access");
     // Aviso pós-salvamento: a senha nova já aparece em vazamentos públicos?
-    return { success: true, breachCount: await pwnedCount(password) };
+    return { success: true, breachCount: storedPassword ? await pwnedCount(password) : 0 };
 
   } catch (error) {
     console.error("Erro ao criar:", error);
-    throw new Error("Falha ao salvar no cofre.");
+    throw error instanceof Error ? error : new Error("Falha ao salvar no cofre.");
   }
 }
 
@@ -207,36 +210,41 @@ export async function createAccess(formData: FormData) {
 export async function updateAccess(formData: FormData) {
   try {
     const id = formData.get("id") as string;
-    const title = formData.get("title") as string;
-    const submittedPassword = formData.get("password") as string;
+    const title = (formData.get("title") as string)?.trim();
+    const isNote = formData.get("kind") === "NOTE";
+    const submittedPassword = ((formData.get("password") as string) || "").trim();
 
     if (!id || !title) throw new Error("Dados inválidos.");
 
     const userId = await requireUserId();
 
-    // Busca item atual para não quebrar a senha se ela não mudou
-    const currentItem = await prisma.accessItem.findFirst({ where: { id, userId } });
+    // Busca o item atual para não quebrar a senha se ela não mudou.
+    const currentItem = await prisma.accessItem.findFirst({ where: { id, userId }, select: { password: true } });
     if (!currentItem) throw new Error("Item não encontrado");
 
-    // Verifica se precisa re-criptografar a senha
+    // Nota → sem senha. Credencial → re-cifra só quando uma nova senha é digitada
+    // (campo vazio na edição = manter a atual, que é cifrada/ilegível no form).
     let finalPassword = currentItem.password;
-    const passwordChanged = !!submittedPassword && submittedPassword !== currentItem.password;
-    if (passwordChanged) {
-        finalPassword = encrypt(submittedPassword);
+    let passwordChanged = false;
+    if (isNote) {
+      finalPassword = "";
+    } else if (submittedPassword) {
+      finalPassword = encrypt(submittedPassword);
+      passwordChanged = true;
+    } else if (!currentItem.password) {
+      throw new Error("A senha é obrigatória para credenciais.");
     }
 
     await prisma.accessItem.updateMany({
       where: { id, userId },
       data: {
         title,
-        username: (formData.get("username") as string) || null,
+        username: isNote ? null : (formData.get("username") as string) || null,
         password: finalPassword,
         url: (formData.get("url") as string) || null,
         category: (formData.get("category") as string) || "OTHERS",
-        // ✅ AQUI: Atualizando as notas
         notes: (formData.get("notes") as string) || null,
-        // ✅ AQUI: Atualizando o cliente
-        client: (formData.get("client") as string) || null,
+        client: isNote ? null : (formData.get("client") as string) || null,
       },
     });
 
@@ -246,7 +254,7 @@ export async function updateAccess(formData: FormData) {
 
   } catch (error) {
     console.error("Erro ao atualizar:", error);
-    throw new Error("Falha ao atualizar.");
+    throw error instanceof Error ? error : new Error("Falha ao atualizar.");
   }
 }
 

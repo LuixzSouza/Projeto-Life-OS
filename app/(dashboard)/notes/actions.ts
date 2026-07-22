@@ -126,6 +126,18 @@ export async function getNotes(): Promise<NoteData[]> {
   return rows.map(mapNote);
 }
 
+/** Só `id` + `title` das notas vivas — para menus de menção "@" e pickers, sem
+ *  carregar o corpo (`content`) de cada nota. Evita puxar todo o markdown/base64
+ *  de todas as anotações quando a tela só precisa da lista de títulos. */
+export async function getNoteTitles(): Promise<{ id: string; title: string }[]> {
+  const userId = await requireUserId();
+  return prisma.studyNote.findMany({
+    where: { userId, deletedAt: null },
+    orderBy: [{ isFavorite: "desc" }, { updatedAt: "desc" }],
+    select: { id: true, title: true },
+  });
+}
+
 /** Busca uma única nota (para a edição em tela cheia). */
 export async function getNote(id: string): Promise<NoteData | null> {
   const userId = await requireUserId();
@@ -203,7 +215,7 @@ export async function getNoteProjects(): Promise<NoteProject[]> {
  * navega direto para a edição em tela cheia (/notes/[id]).
  */
 export async function createBlankNote(
-  opts?: { notebookId?: string; projectId?: string; subjectId?: string },
+  opts?: { notebookId?: string; projectId?: string; subjectId?: string; title?: string; content?: string },
 ): Promise<{ success: boolean; id?: string; message: string }> {
   try {
     const userId = await requireUserId();
@@ -225,8 +237,12 @@ export async function createBlankNote(
       const owned = await prisma.studySubject.findFirst({ where: { id: opts.subjectId, userId }, select: { id: true } });
       subjectId = owned ? owned.id : null;
     }
+    // Título/conteúdo opcionais permitem criar a nota já a partir de um MODELO
+    // (Cornell, Feynman, etc.). Sem eles, mantém o comportamento "em branco".
+    const title = opts?.title?.trim() ? opts.title.trim().slice(0, 120) : "Nova nota";
+    const content = typeof opts?.content === "string" ? opts.content : "";
     const created = await prisma.studyNote.create({
-      data: { userId, title: "Nova nota", content: "", notebookId, projectId, subjectId },
+      data: { userId, title, content, notebookId, projectId, subjectId },
     });
     revalidatePath("/notes");
     return { success: true, id: created.id, message: "Nota criada." };
@@ -348,6 +364,63 @@ export async function generateNoteFlashcards(noteId: string): Promise<NoteFlashc
   } catch (error) {
     console.error("Erro ao gerar flashcards da nota:", error);
     return { success: false, message: "Falha ao gerar os flashcards.", deckId: null, created: 0 };
+  }
+}
+
+export interface NoteQuestionsResult {
+  success: boolean;
+  message: string;
+  created: number;
+}
+
+/**
+ * Gera QUESTÕES de múltipla escolha desta nota e as manda para o Banco de
+ * Questões — o mesmo caminho que a nota já tem para virar flashcard, mas para o
+ * outro lado da memória: o flashcard treina recordar, a questão treina escolher
+ * sob pressão de prova. A nota entra como `sourceText` para a IA não inventar
+ * fora do conteúdo estudado. Ver [[connected-by-design]].
+ */
+export async function generateNoteQuestions(noteId: string, count = 5): Promise<NoteQuestionsResult> {
+  try {
+    const userId = await requireUserId();
+
+    const note = await prisma.studyNote.findFirst({
+      where: { id: noteId, userId, deletedAt: null },
+      select: { title: true, content: true, subjectId: true },
+    });
+    if (!note) return { success: false, message: "Nota não encontrada.", created: 0 };
+
+    const body = (note.content ?? "").trim();
+    if (body.length < 100) {
+      return { success: false, message: "A nota está curta demais para virar questões. Escreva um pouco mais.", created: 0 };
+    }
+
+    const { generateQuestions } = await import("@/app/(dashboard)/studies/actions/questions");
+    const res = await generateQuestions({
+      topic: note.title?.trim() || "conteúdo da nota",
+      sourceText: body,
+      count,
+      subjectId: note.subjectId,
+      // A área sai da matéria quando houver; sem matéria, "OUTRA" é honesto —
+      // o aluno reclassifica no banco em um clique.
+      area: null,
+    });
+
+    if (!res.success) return { success: false, message: res.message, created: 0 };
+
+    await logActivity({
+      action: "CREATE",
+      module: "studies",
+      entityType: "question",
+      entityId: noteId,
+      summary: `Gerou ${res.created ?? 0} questões a partir de uma nota`,
+    });
+
+    revalidatePath("/studies/questoes");
+    return { success: true, message: res.message, created: res.created ?? 0 };
+  } catch (error) {
+    console.error("Erro ao gerar questões da nota:", error);
+    return { success: false, message: "Falha ao gerar as questões.", created: 0 };
   }
 }
 

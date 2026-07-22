@@ -9,7 +9,6 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger, DropdownMenuRadioGroup, DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Trash2, MoreVertical, Star, Calendar, User, AlignLeft, Loader2, ImageOff, Eye, Tag } from "lucide-react";
 import { deleteMediaItem, updateMediaStatus, updateMediaDetails } from "@/app/(dashboard)/entertainment/actions";
 import { toast } from "sonner";
@@ -39,10 +38,18 @@ export function MediaCard({ item }: { item: MediaItemData }) {
   const genreList = item.genres ? item.genres.split(",").map(g => g.trim()).filter(Boolean) : [];
 
   const handleStatusChange = (newStatus: string) => {
-    setStatus(newStatus);
-    updateMediaStatus(item.id, newStatus).then((r) =>
-      r.success ? toast.success("Status atualizado!") : toast.error("Erro ao atualizar")
-    );
+    const previous = status;
+    setStatus(newStatus); // otimista
+    updateMediaStatus(item.id, newStatus).then((r) => {
+      if (r.success) toast.success("Status atualizado!");
+      else { setStatus(previous); toast.error("Erro ao atualizar"); } // reverte na falha
+    });
+  };
+
+  const handleDelete = async () => {
+    const res = await deleteMediaItem(item.id);
+    if (res.success) toast.success(res.message || "Movido para a lixeira.");
+    else toast.error(res.message || "Erro ao remover.");
   };
 
   const handleSaveDetails = async (e: React.FormEvent) => {
@@ -126,7 +133,7 @@ export function MediaCard({ item }: { item: MediaItemData }) {
                   ))}
                 </DropdownMenuRadioGroup>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive focus:bg-destructive/10 cursor-pointer text-xs font-medium" onClick={() => deleteMediaItem(item.id)}>
+                <DropdownMenuItem className="text-destructive focus:bg-destructive/10 cursor-pointer text-xs font-medium" onClick={handleDelete}>
                   <Trash2 className="h-3.5 w-3.5 mr-2" /> Remover da Biblioteca
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -190,7 +197,10 @@ export function MediaCard({ item }: { item: MediaItemData }) {
             </div>
           </div>
 
-          <ScrollArea className="flex-1">
+          {/* Scroll nativo: rola o próprio elemento (flex-1 + min-h-0). Evita a
+              cadeia de height:100% do Radix ScrollArea, que não recebe altura
+              dentro de um DialogContent com max-height (e cortava o conteúdo). */}
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
             <div className="p-6 pt-4 space-y-6">
 
               {/* Troca rápida de status */}
@@ -263,7 +273,7 @@ export function MediaCard({ item }: { item: MediaItemData }) {
                 <EntityConnections entityType="media" entityId={item.id} />
               </div>
             </div>
-          </ScrollArea>
+          </div>
 
           {/* Rodapé Fixo */}
           <div className="p-4 md:p-5 bg-muted/10 border-t border-border/40 flex justify-end gap-3 shrink-0">

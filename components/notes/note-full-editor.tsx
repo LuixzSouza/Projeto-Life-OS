@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft, Star, History, Save, Loader2, Trash2, Check, Briefcase,
-  FileDown, FileText, MoreVertical, Search, ExternalLink, Link2, Sparkles, Atom, Layers, BrainCircuit,
+  FileDown, FileText, MoreVertical, Search, ExternalLink, Link2, Sparkles, Atom, Layers, BrainCircuit, ListChecks,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -24,7 +24,7 @@ import {
 import { NoteEditor } from "@/components/notes/note-editor";
 import { NoteHistoryDialog } from "@/components/notes/note-history-dialog";
 import { EntityConnections } from "@/components/connect/entity-connections";
-import { updateNote, deleteNote, uploadNoteImage, inlineNoteImages, generateNoteFlashcards, type NoteData, type NoteSubject, type NoteProject } from "@/app/(dashboard)/notes/actions";
+import { updateNote, deleteNote, uploadNoteImage, inlineNoteImages, generateNoteFlashcards, generateNoteQuestions, type NoteData, type NoteSubject, type NoteProject } from "@/app/(dashboard)/notes/actions";
 import { assessAtomicity, isAtomicityExempt } from "@/lib/note-atomicity";
 import type { NotebookData } from "@/app/(dashboard)/notes/notebook-actions";
 
@@ -197,24 +197,48 @@ export function NoteFullEditor({
 
   // Gera flashcards desta nota com a IA. Salva antes se houver edição pendente,
   // para os cards refletirem o texto que está na tela (a action lê do banco).
+  // A IA lê a nota do BANCO, não da tela: sem este flush, gerar cards/questões
+  // logo depois de digitar usaria a versão antiga do texto.
+  const flushPendingEdits = async () => {
+    if (!dirty || !title.trim()) return;
+    const snap = snapshot;
+    const fd = new FormData();
+    fd.set("id", note.id);
+    fd.set("title", title);
+    fd.set("content", content);
+    fd.set("notebookId", notebookId);
+    fd.set("subjectId", subjectId);
+    fd.set("projectId", projectId);
+    fd.set("tags", tags);
+    fd.set("isFavorite", String(isFavorite));
+    const saved = await updateNote(fd);
+    if (saved.success) setSavedSnapshot(snap);
+  };
+
+  const [generatingQuestions, setGeneratingQuestions] = useState(false);
+  const generateQuestionsFromNote = async () => {
+    setGeneratingQuestions(true);
+    try {
+      await flushPendingEdits();
+      const res = await generateNoteQuestions(note.id);
+      if (!res.success) {
+        toast.error(res.message);
+        return;
+      }
+      toast.success(res.message, {
+        action: { label: "Ver no banco", onClick: () => router.push("/studies/questoes") },
+        duration: 8000,
+      });
+    } finally {
+      setGeneratingQuestions(false);
+    }
+  };
+
   const [generatingCards, setGeneratingCards] = useState(false);
   const generateCards = async () => {
     setGeneratingCards(true);
     try {
-      if (dirty && title.trim()) {
-        const snap = snapshot;
-        const fd = new FormData();
-        fd.set("id", note.id);
-        fd.set("title", title);
-        fd.set("content", content);
-        fd.set("notebookId", notebookId);
-        fd.set("subjectId", subjectId);
-        fd.set("projectId", projectId);
-        fd.set("tags", tags);
-        fd.set("isFavorite", String(isFavorite));
-        const saved = await updateNote(fd);
-        if (saved.success) setSavedSnapshot(snap);
-      }
+      await flushPendingEdits();
       const res = await generateNoteFlashcards(note.id);
       if (!res.success) {
         toast.error(res.message);
@@ -303,6 +327,13 @@ export function NoteFullEditor({
                 className="gap-2"
               >
                 {generatingCards ? <Loader2 className="h-4 w-4 animate-spin" /> : <Layers className="h-4 w-4" />} Gerar flashcards (IA)
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={(e) => { e.preventDefault(); void generateQuestionsFromNote(); }}
+                disabled={generatingQuestions}
+                className="gap-2"
+              >
+                {generatingQuestions ? <Loader2 className="h-4 w-4 animate-spin" /> : <ListChecks className="h-4 w-4" />} Gerar questões (IA)
               </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => router.push(`/ai?q=${encodeURIComponent(`Leia minha nota "${title}" e resuma os pontos-chave; depois me faça 3 perguntas de revisão sobre ela.`)}`)}

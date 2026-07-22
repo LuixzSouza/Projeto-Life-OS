@@ -160,6 +160,7 @@ export function BillingReminders({ clients, onCharge, onCopyCharge }: BillingRem
                   size="icon"
                   className="h-8 w-8 text-blue-500 hover:bg-blue-500/10"
                   title="Copiar mensagem de cobrança"
+                  aria-label="Copiar mensagem de cobrança"
                   onClick={() => onCopyCharge(client.name, billing)}
                 >
                   <Copy size={14} />

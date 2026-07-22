@@ -249,7 +249,7 @@ export function PlanBuilder() {
             <ChevronLeft className="h-4 w-4" /> Minhas fichas
           </button>
           <div className="flex items-center gap-2">
-            <Button onClick={() => sharePlanAsImage(draft)} variant="outline" size="icon" className="h-9 w-9 shrink-0" title="Compartilhar como imagem"><ImageDown className="h-4 w-4" /></Button>
+            <Button onClick={() => sharePlanAsImage(draft)} variant="outline" size="icon" className="h-9 w-9 shrink-0" title="Compartilhar como imagem" aria-label="Compartilhar ficha como imagem"><ImageDown className="h-4 w-4" /></Button>
             <Button onClick={handleSave} disabled={saving} className="h-9 gap-1.5 font-semibold">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar ficha
             </Button>
@@ -398,12 +398,12 @@ export function PlanBuilder() {
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => sharePlanAsImage(plan)} title="Compartilhar como imagem"><ImageDown className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => sharePlan(plan)} title="Compartilhar link"><Share2 className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => openEditor(plan)} title="Editar"><Pencil className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => sharePlanAsImage(plan)} title="Compartilhar como imagem" aria-label="Compartilhar ficha como imagem"><ImageDown className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => sharePlan(plan)} title="Compartilhar link" aria-label="Compartilhar ficha por link"><Share2 className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => openEditor(plan)} title="Editar" aria-label="Editar ficha"><Pencil className="h-4 w-4" /></Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" title="Excluir"><Trash2 className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" title="Excluir" aria-label="Excluir ficha"><Trash2 className="h-4 w-4" /></Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent className="rounded-2xl">
                       <AlertDialogHeader>
@@ -504,7 +504,7 @@ function DivisionEditor({ division, canDelete, onPatch, onPatchExercise, onDelet
         <Input value={division.label} onChange={(e) => onPatch((d) => ({ ...d, label: e.target.value }))} placeholder="Nome da divisão (ex: A — Peito/Tríceps)" className="h-9 min-w-0 flex-1 text-sm font-semibold" />
         <Button type="button" size="sm" className="h-9 gap-1.5" onClick={onStart}><Play className="h-4 w-4" /> Iniciar</Button>
         {canDelete && (
-          <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-destructive" onClick={onDelete} title="Excluir divisão"><Trash2 className="h-4 w-4" /></Button>
+          <Button type="button" variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-destructive" onClick={onDelete} title="Excluir divisão" aria-label="Excluir divisão"><Trash2 className="h-4 w-4" /></Button>
         )}
       </div>
 

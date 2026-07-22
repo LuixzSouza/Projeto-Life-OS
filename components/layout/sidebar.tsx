@@ -95,6 +95,7 @@ export function Sidebar({ user, inbox }: { user?: UserData | null; inbox: Notifi
                 onClick={() => setIsCollapsed(true)}
                 className="h-8 w-8 text-muted-foreground hover:text-foreground"
                 title="Recolher menu"
+                aria-label="Recolher menu"
               >
                 <PanelLeftClose size={18} />
               </Button>
@@ -111,6 +112,7 @@ export function Sidebar({ user, inbox }: { user?: UserData | null; inbox: Notifi
               onClick={() => setIsCollapsed(false)}
               className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground"
               title="Expandir menu"
+              aria-label="Expandir menu"
             >
               <PanelLeftOpen size={18} />
             </Button>

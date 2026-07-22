@@ -224,6 +224,68 @@ CREATE TABLE "Flashcard" (
 );
 
 -- CreateTable
+CREATE TABLE "Question" (
+    "id" TEXT NOT NULL,
+    "statement" TEXT NOT NULL,
+    "explanation" TEXT,
+    "area" TEXT NOT NULL DEFAULT 'OUTRA',
+    "difficulty" INTEGER NOT NULL DEFAULT 3,
+    "source" TEXT,
+    "imageUrl" TEXT,
+    "timesAnswered" INTEGER NOT NULL DEFAULT 0,
+    "timesCorrect" INTEGER NOT NULL DEFAULT 0,
+    "subjectId" TEXT,
+    "userId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Question_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "QuestionOption" (
+    "id" TEXT NOT NULL,
+    "text" TEXT NOT NULL,
+    "isCorrect" BOOLEAN NOT NULL DEFAULT false,
+    "position" INTEGER NOT NULL DEFAULT 0,
+    "questionId" TEXT NOT NULL,
+    "userId" TEXT,
+
+    CONSTRAINT "QuestionOption_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Exam" (
+    "id" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "description" TEXT,
+    "area" TEXT,
+    "durationMinutes" INTEGER NOT NULL DEFAULT 0,
+    "questionIds" TEXT NOT NULL DEFAULT '[]',
+    "userId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Exam_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ExamAttempt" (
+    "id" TEXT NOT NULL,
+    "examId" TEXT NOT NULL,
+    "answers" TEXT NOT NULL DEFAULT '{}',
+    "correctCount" INTEGER NOT NULL DEFAULT 0,
+    "totalCount" INTEGER NOT NULL DEFAULT 0,
+    "score" DOUBLE PRECISION NOT NULL DEFAULT 0,
+    "secondsSpent" INTEGER NOT NULL DEFAULT 0,
+    "startedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "finishedAt" TIMESTAMP(3),
+    "userId" TEXT,
+
+    CONSTRAINT "ExamAttempt_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "Account" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
@@ -384,6 +446,19 @@ CREATE TABLE "Meeting" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Meeting_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "MeetingImage" (
+    "id" TEXT NOT NULL,
+    "mime" TEXT NOT NULL,
+    "data" TEXT NOT NULL,
+    "hash" TEXT NOT NULL,
+    "meetingId" TEXT NOT NULL,
+    "userId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "MeetingImage_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -1020,6 +1095,19 @@ CREATE TABLE "WardrobeItem" (
 );
 
 -- CreateTable
+CREATE TABLE "WardrobeImage" (
+    "id" TEXT NOT NULL,
+    "mime" TEXT NOT NULL,
+    "data" TEXT NOT NULL,
+    "hash" TEXT NOT NULL,
+    "itemId" TEXT NOT NULL,
+    "userId" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "WardrobeImage_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "Client" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
@@ -1206,16 +1294,10 @@ CREATE INDEX "StudyContent_subjectId_idx" ON "StudyContent"("subjectId");
 CREATE INDEX "StudyContent_typeId_idx" ON "StudyContent"("typeId");
 
 -- CreateIndex
-CREATE INDEX "StudySession_userId_idx" ON "StudySession"("userId");
-
--- CreateIndex
 CREATE INDEX "StudySession_subjectId_idx" ON "StudySession"("subjectId");
 
 -- CreateIndex
 CREATE INDEX "StudySession_userId_date_idx" ON "StudySession"("userId", "date");
-
--- CreateIndex
-CREATE INDEX "StudyNote_userId_idx" ON "StudyNote"("userId");
 
 -- CreateIndex
 CREATE INDEX "StudyNote_subjectId_idx" ON "StudyNote"("subjectId");
@@ -1228,6 +1310,12 @@ CREATE INDEX "StudyNote_projectId_idx" ON "StudyNote"("projectId");
 
 -- CreateIndex
 CREATE INDEX "StudyNote_userId_deletedAt_idx" ON "StudyNote"("userId", "deletedAt");
+
+-- CreateIndex
+CREATE INDEX "StudyNote_contentId_idx" ON "StudyNote"("contentId");
+
+-- CreateIndex
+CREATE INDEX "StudyNote_sessionId_idx" ON "StudyNote"("sessionId");
 
 -- CreateIndex
 CREATE INDEX "NoteImage_noteId_idx" ON "NoteImage"("noteId");
@@ -1243,9 +1331,6 @@ CREATE INDEX "StudyNoteVersion_noteId_createdAt_idx" ON "StudyNoteVersion"("note
 
 -- CreateIndex
 CREATE INDEX "StudyNoteVersion_userId_idx" ON "StudyNoteVersion"("userId");
-
--- CreateIndex
-CREATE INDEX "LearningGoal_userId_idx" ON "LearningGoal"("userId");
 
 -- CreateIndex
 CREATE INDEX "LearningGoal_subjectId_idx" ON "LearningGoal"("subjectId");
@@ -1269,19 +1354,34 @@ CREATE INDEX "FlashcardDeck_userId_idx" ON "FlashcardDeck"("userId");
 CREATE INDEX "FlashcardDeck_studySubjectId_idx" ON "FlashcardDeck"("studySubjectId");
 
 -- CreateIndex
-CREATE INDEX "Flashcard_userId_idx" ON "Flashcard"("userId");
-
--- CreateIndex
 CREATE INDEX "Flashcard_deckId_idx" ON "Flashcard"("deckId");
 
 -- CreateIndex
 CREATE INDEX "Flashcard_userId_nextReview_idx" ON "Flashcard"("userId", "nextReview");
 
 -- CreateIndex
-CREATE INDEX "Account_userId_idx" ON "Account"("userId");
+CREATE INDEX "Question_userId_area_idx" ON "Question"("userId", "area");
 
 -- CreateIndex
-CREATE INDEX "Transaction_userId_idx" ON "Transaction"("userId");
+CREATE INDEX "Question_subjectId_idx" ON "Question"("subjectId");
+
+-- CreateIndex
+CREATE INDEX "QuestionOption_questionId_idx" ON "QuestionOption"("questionId");
+
+-- CreateIndex
+CREATE INDEX "QuestionOption_userId_idx" ON "QuestionOption"("userId");
+
+-- CreateIndex
+CREATE INDEX "Exam_userId_idx" ON "Exam"("userId");
+
+-- CreateIndex
+CREATE INDEX "ExamAttempt_examId_idx" ON "ExamAttempt"("examId");
+
+-- CreateIndex
+CREATE INDEX "ExamAttempt_userId_idx" ON "ExamAttempt"("userId");
+
+-- CreateIndex
+CREATE INDEX "Account_userId_idx" ON "Account"("userId");
 
 -- CreateIndex
 CREATE INDEX "Transaction_accountId_idx" ON "Transaction"("accountId");
@@ -1308,13 +1408,7 @@ CREATE UNIQUE INDEX "RecurringExpensePayment_transactionId_key" ON "RecurringExp
 CREATE INDEX "RecurringExpensePayment_userId_idx" ON "RecurringExpensePayment"("userId");
 
 -- CreateIndex
-CREATE INDEX "RecurringExpensePayment_recurringExpenseId_idx" ON "RecurringExpensePayment"("recurringExpenseId");
-
--- CreateIndex
 CREATE UNIQUE INDEX "RecurringExpensePayment_recurringExpenseId_dueDate_key" ON "RecurringExpensePayment"("recurringExpenseId", "dueDate");
-
--- CreateIndex
-CREATE INDEX "RecurringCharge_userId_idx" ON "RecurringCharge"("userId");
 
 -- CreateIndex
 CREATE INDEX "RecurringCharge_userId_active_idx" ON "RecurringCharge"("userId", "active");
@@ -1326,13 +1420,7 @@ CREATE INDEX "RecurringCharge_clientId_idx" ON "RecurringCharge"("clientId");
 CREATE INDEX "RecurringCharge_billingId_idx" ON "RecurringCharge"("billingId");
 
 -- CreateIndex
-CREATE INDEX "WishlistItem_userId_idx" ON "WishlistItem"("userId");
-
--- CreateIndex
 CREATE INDEX "WishlistItem_userId_deletedAt_idx" ON "WishlistItem"("userId", "deletedAt");
-
--- CreateIndex
-CREATE INDEX "Category_userId_idx" ON "Category"("userId");
 
 -- CreateIndex
 CREATE INDEX "Category_parentId_idx" ON "Category"("parentId");
@@ -1342,9 +1430,6 @@ CREATE UNIQUE INDEX "Category_userId_name_type_key" ON "Category"("userId", "nam
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Project_slug_key" ON "Project"("slug");
-
--- CreateIndex
-CREATE INDEX "Project_userId_idx" ON "Project"("userId");
 
 -- CreateIndex
 CREATE INDEX "Project_clientId_idx" ON "Project"("clientId");
@@ -1359,7 +1444,10 @@ CREATE INDEX "Meeting_userId_idx" ON "Meeting"("userId");
 CREATE INDEX "Meeting_projectId_idx" ON "Meeting"("projectId");
 
 -- CreateIndex
-CREATE INDEX "Task_userId_idx" ON "Task"("userId");
+CREATE INDEX "MeetingImage_userId_idx" ON "MeetingImage"("userId");
+
+-- CreateIndex
+CREATE INDEX "MeetingImage_meetingId_hash_idx" ON "MeetingImage"("meetingId", "hash");
 
 -- CreateIndex
 CREATE INDEX "Task_projectId_idx" ON "Task"("projectId");
@@ -1401,25 +1489,13 @@ CREATE INDEX "ChallengeCheckin_userId_idx" ON "ChallengeCheckin"("userId");
 CREATE UNIQUE INDEX "ChallengeCheckin_challengeId_dayIndex_key" ON "ChallengeCheckin"("challengeId", "dayIndex");
 
 -- CreateIndex
-CREATE INDEX "Workout_userId_idx" ON "Workout"("userId");
-
--- CreateIndex
 CREATE INDEX "Workout_userId_date_idx" ON "Workout"("userId", "date");
-
--- CreateIndex
-CREATE INDEX "Shoe_userId_idx" ON "Shoe"("userId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Shoe_userId_name_key" ON "Shoe"("userId", "name");
 
 -- CreateIndex
-CREATE INDEX "WorkoutPlan_userId_idx" ON "WorkoutPlan"("userId");
-
--- CreateIndex
 CREATE INDEX "WorkoutPlan_userId_updatedAt_idx" ON "WorkoutPlan"("userId", "updatedAt");
-
--- CreateIndex
-CREATE INDEX "WorkoutPhoto_userId_idx" ON "WorkoutPhoto"("userId");
 
 -- CreateIndex
 CREATE INDEX "WorkoutPhoto_userId_date_idx" ON "WorkoutPhoto"("userId", "date");
@@ -1437,13 +1513,7 @@ CREATE INDEX "Habit_userId_idx" ON "Habit"("userId");
 CREATE INDEX "HabitLog_userId_date_idx" ON "HabitLog"("userId", "date");
 
 -- CreateIndex
-CREATE INDEX "HabitLog_habitId_idx" ON "HabitLog"("habitId");
-
--- CreateIndex
 CREATE UNIQUE INDEX "HabitLog_habitId_date_key" ON "HabitLog"("habitId", "date");
-
--- CreateIndex
-CREATE INDEX "HealthMetric_userId_idx" ON "HealthMetric"("userId");
 
 -- CreateIndex
 CREATE INDEX "HealthMetric_userId_type_date_idx" ON "HealthMetric"("userId", "type", "date");
@@ -1455,16 +1525,10 @@ CREATE INDEX "BodyMeasurement_userId_idx" ON "BodyMeasurement"("userId");
 CREATE INDEX "BodyMeasurement_date_idx" ON "BodyMeasurement"("date");
 
 -- CreateIndex
-CREATE INDEX "Meal_userId_idx" ON "Meal"("userId");
-
--- CreateIndex
 CREATE INDEX "Meal_userId_date_idx" ON "Meal"("userId", "date");
 
 -- CreateIndex
 CREATE INDEX "MealPlan_userId_dayOfWeek_idx" ON "MealPlan"("userId", "dayOfWeek");
-
--- CreateIndex
-CREATE INDEX "Event_userId_idx" ON "Event"("userId");
 
 -- CreateIndex
 CREATE INDEX "Event_projectId_idx" ON "Event"("projectId");
@@ -1482,13 +1546,7 @@ CREATE INDEX "Event_userId_deletedAt_startTime_idx" ON "Event"("userId", "delete
 CREATE INDEX "RoutineItem_userId_idx" ON "RoutineItem"("userId");
 
 -- CreateIndex
-CREATE INDEX "ThemedDay_userId_idx" ON "ThemedDay"("userId");
-
--- CreateIndex
 CREATE UNIQUE INDEX "ThemedDay_userId_weekday_key" ON "ThemedDay"("userId", "weekday");
-
--- CreateIndex
-CREATE INDEX "FocusSession_userId_idx" ON "FocusSession"("userId");
 
 -- CreateIndex
 CREATE INDEX "FocusSession_userId_endedAt_idx" ON "FocusSession"("userId", "endedAt");
@@ -1524,22 +1582,13 @@ CREATE INDEX "AiMemory_userId_idx" ON "AiMemory"("userId");
 CREATE INDEX "AiAutomation_userId_idx" ON "AiAutomation"("userId");
 
 -- CreateIndex
-CREATE INDEX "AiEmbedding_userId_entityType_idx" ON "AiEmbedding"("userId", "entityType");
-
--- CreateIndex
 CREATE UNIQUE INDEX "AiEmbedding_userId_entityType_entityId_key" ON "AiEmbedding"("userId", "entityType", "entityId");
 
 -- CreateIndex
 CREATE INDEX "AccessItem_userId_idx" ON "AccessItem"("userId");
 
 -- CreateIndex
-CREATE INDEX "SavedLink_userId_idx" ON "SavedLink"("userId");
-
--- CreateIndex
 CREATE INDEX "SavedLink_userId_deletedAt_idx" ON "SavedLink"("userId", "deletedAt");
-
--- CreateIndex
-CREATE INDEX "MediaItem_userId_idx" ON "MediaItem"("userId");
 
 -- CreateIndex
 CREATE INDEX "MediaItem_userId_status_idx" ON "MediaItem"("userId", "status");
@@ -1548,19 +1597,16 @@ CREATE INDEX "MediaItem_userId_status_idx" ON "MediaItem"("userId", "status");
 CREATE INDEX "MediaItem_userId_deletedAt_idx" ON "MediaItem"("userId", "deletedAt");
 
 -- CreateIndex
-CREATE INDEX "Friend_userId_idx" ON "Friend"("userId");
-
--- CreateIndex
 CREATE INDEX "Friend_userId_deletedAt_idx" ON "Friend"("userId", "deletedAt");
-
--- CreateIndex
-CREATE INDEX "WardrobeItem_userId_idx" ON "WardrobeItem"("userId");
 
 -- CreateIndex
 CREATE INDEX "WardrobeItem_userId_deletedAt_idx" ON "WardrobeItem"("userId", "deletedAt");
 
 -- CreateIndex
-CREATE INDEX "Client_userId_idx" ON "Client"("userId");
+CREATE INDEX "WardrobeImage_userId_idx" ON "WardrobeImage"("userId");
+
+-- CreateIndex
+CREATE INDEX "WardrobeImage_itemId_hash_idx" ON "WardrobeImage"("itemId", "hash");
 
 -- CreateIndex
 CREATE INDEX "Client_friendId_idx" ON "Client"("friendId");
@@ -1578,9 +1624,6 @@ CREATE INDEX "Billing_clientId_idx" ON "Billing"("clientId");
 CREATE UNIQUE INDEX "Invoice_transactionId_key" ON "Invoice"("transactionId");
 
 -- CreateIndex
-CREATE INDEX "Invoice_userId_idx" ON "Invoice"("userId");
-
--- CreateIndex
 CREATE INDEX "Invoice_billingId_idx" ON "Invoice"("billingId");
 
 -- CreateIndex
@@ -1594,9 +1637,6 @@ CREATE INDEX "Invoice_userId_status_dueDate_idx" ON "Invoice"("userId", "status"
 
 -- CreateIndex
 CREATE INDEX "BackupLog_userId_idx" ON "BackupLog"("userId");
-
--- CreateIndex
-CREATE INDEX "Tag_userId_idx" ON "Tag"("userId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Tag_userId_name_key" ON "Tag"("userId", "name");
@@ -1627,9 +1667,6 @@ CREATE INDEX "Attachment_entityType_entityId_idx" ON "Attachment"("entityType", 
 
 -- CreateIndex
 CREATE INDEX "Attachment_userId_idx" ON "Attachment"("userId");
-
--- CreateIndex
-CREATE INDEX "EntityLink_fromType_fromId_idx" ON "EntityLink"("fromType", "fromId");
 
 -- CreateIndex
 CREATE INDEX "EntityLink_toType_toId_idx" ON "EntityLink"("toType", "toId");
@@ -1722,6 +1759,27 @@ ALTER TABLE "Flashcard" ADD CONSTRAINT "Flashcard_deckId_fkey" FOREIGN KEY ("dec
 ALTER TABLE "Flashcard" ADD CONSTRAINT "Flashcard_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "Question" ADD CONSTRAINT "Question_subjectId_fkey" FOREIGN KEY ("subjectId") REFERENCES "StudySubject"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Question" ADD CONSTRAINT "Question_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "QuestionOption" ADD CONSTRAINT "QuestionOption_questionId_fkey" FOREIGN KEY ("questionId") REFERENCES "Question"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "QuestionOption" ADD CONSTRAINT "QuestionOption_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "Exam" ADD CONSTRAINT "Exam_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ExamAttempt" ADD CONSTRAINT "ExamAttempt_examId_fkey" FOREIGN KEY ("examId") REFERENCES "Exam"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ExamAttempt" ADD CONSTRAINT "ExamAttempt_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "Account" ADD CONSTRAINT "Account_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -1777,6 +1835,12 @@ ALTER TABLE "Meeting" ADD CONSTRAINT "Meeting_projectId_fkey" FOREIGN KEY ("proj
 
 -- AddForeignKey
 ALTER TABLE "Meeting" ADD CONSTRAINT "Meeting_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "MeetingImage" ADD CONSTRAINT "MeetingImage_meetingId_fkey" FOREIGN KEY ("meetingId") REFERENCES "Meeting"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "MeetingImage" ADD CONSTRAINT "MeetingImage_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Task" ADD CONSTRAINT "Task_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -1912,6 +1976,12 @@ ALTER TABLE "Friend" ADD CONSTRAINT "Friend_userId_fkey" FOREIGN KEY ("userId") 
 
 -- AddForeignKey
 ALTER TABLE "WardrobeItem" ADD CONSTRAINT "WardrobeItem_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "WardrobeImage" ADD CONSTRAINT "WardrobeImage_itemId_fkey" FOREIGN KEY ("itemId") REFERENCES "WardrobeItem"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "WardrobeImage" ADD CONSTRAINT "WardrobeImage_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "Client" ADD CONSTRAINT "Client_friendId_fkey" FOREIGN KEY ("friendId") REFERENCES "Friend"("id") ON DELETE SET NULL ON UPDATE CASCADE;

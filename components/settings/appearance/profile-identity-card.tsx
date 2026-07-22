@@ -141,7 +141,19 @@ export function ProfileIdentityCard({
       <CardContent className="relative px-8 pb-10">
         <div className="flex flex-col md:flex-row gap-8 -mt-20 items-start">
           <div className="flex flex-col items-center gap-3 shrink-0 relative z-10">
-            <div className="relative group/avatar cursor-pointer" onClick={() => avatarInputRef.current?.click()}>
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label="Trocar foto de perfil"
+              onClick={() => avatarInputRef.current?.click()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  avatarInputRef.current?.click();
+                }
+              }}
+              className="relative group/avatar cursor-pointer rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
               <Avatar className="h-36 w-36 border-[6px] border-card shadow-xl bg-muted">
                 <AvatarImage src={avatarUrl || ""} className="object-cover" />
                 <AvatarFallback className="text-4xl font-bold bg-muted text-muted-foreground">

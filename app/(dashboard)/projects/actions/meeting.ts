@@ -3,7 +3,15 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireUserId } from "@/lib/auth";
-import { parseMeetingImages, serializeMeetingImages, type MeetingImage } from "@/lib/meeting-images";
+import {
+  parseMeetingImages,
+  serializeMeetingImages,
+  splitMeetingDataUrl,
+  meetingImageRef,
+  meetingImageIdFromRef,
+  type MeetingImage,
+} from "@/lib/meeting-images";
+import { createHash } from "crypto";
 import { parseActionItems } from "@/lib/meeting-summary";
 import { parseStringList, serializeStringList } from "@/lib/meeting-meta";
 import { callAIProvider } from "@/app/(dashboard)/ai/actions/providers";
@@ -14,6 +22,58 @@ async function resolveProjectId(projectId: string | null | undefined, userId: st
   if (!projectId || projectId === "inbox") return null;
   const owned = await prisma.project.findFirst({ where: { id: projectId, userId, deletedAt: null }, select: { id: true } });
   return owned ? projectId : null;
+}
+
+// Externaliza a galeria de uma reunião: base64 inline (data URLs) viram linhas em
+// MeetingImage e o JSON guarda só a REFERÊNCIA (/api/meeting-image/[id]) — linha do
+// Meeting enxuta e imagens servidas com cache. Idempotente: dedup por sha256 do
+// conteúdo, então o reenvio do autosave não cria duplicatas. Imagens sumidas da
+// galeria têm a linha apagada (libera espaço). Data URLs de reuniões antigas
+// migram de forma preguiçosa no 1º save. Pré-condição: o meeting é do userId.
+async function reconcileMeetingImages(
+  meetingId: string,
+  userId: string,
+  incoming: MeetingImage[],
+): Promise<MeetingImage[]> {
+  const existing = await prisma.meetingImage.findMany({
+    where: { meetingId, userId },
+    select: { id: true, hash: true },
+  });
+  const idByHash = new Map(existing.map((r) => [r.hash, r.id]));
+  const existingIds = new Set(existing.map((r) => r.id));
+  const keptIds = new Set<string>();
+  const result: MeetingImage[] = [];
+
+  for (const img of incoming) {
+    const parsed = splitMeetingDataUrl(img.src);
+    if (parsed) {
+      // Nova imagem base64 → externaliza (ou reusa linha idêntica por hash).
+      const hash = createHash("sha256").update(parsed.data).digest("hex");
+      let id = idByHash.get(hash);
+      if (!id) {
+        const row = await prisma.meetingImage.create({
+          data: { meetingId, userId, mime: parsed.mime, data: parsed.data, hash },
+          select: { id: true },
+        });
+        id = row.id;
+        idByHash.set(hash, id);
+      }
+      keptIds.add(id);
+      result.push({ src: meetingImageRef(id), caption: img.caption });
+    } else {
+      // Referência a uma linha existente (mantém) ou URL externa/legado (preserva).
+      const refId = meetingImageIdFromRef(img.src);
+      if (refId && existingIds.has(refId)) keptIds.add(refId);
+      result.push({ src: img.src, caption: img.caption });
+    }
+  }
+
+  const toDelete = existing.filter((r) => !keptIds.has(r.id)).map((r) => r.id);
+  if (toDelete.length > 0) {
+    await prisma.meetingImage.deleteMany({ where: { id: { in: toDelete }, userId } });
+  }
+
+  return result;
 }
 
 export async function createMeeting(input: { title: string; rawNotes?: string; projectId?: string | null }) {
@@ -50,16 +110,24 @@ export async function updateMeeting(input: {
     if (!input.id) return { success: false, message: "ID inválido." };
     const userId = await requireUserId();
 
+    // Galeria: externaliza base64 → MeetingImage e guarda só as referências.
+    // Checa posse ANTES (o reconcile grava linhas atreladas a este meeting).
+    let imagesData: { images: string; image: string | null } | null = null;
+    if (input.images !== undefined) {
+      const owns = await prisma.meeting.findFirst({ where: { id: input.id, userId }, select: { id: true } });
+      if (!owns) return { success: false, message: "Reunião não encontrada." };
+      const reconciled = await reconcileMeetingImages(input.id, userId, input.images);
+      imagesData = { images: serializeMeetingImages(reconciled), image: reconciled[0]?.src ?? null };
+    }
+
     await prisma.meeting.updateMany({
       where: { id: input.id, userId },
       data: {
         ...(input.title !== undefined ? { title: input.title.trim() } : {}),
         ...(input.rawNotes !== undefined ? { rawNotes: input.rawNotes } : {}),
         ...(input.image !== undefined ? { image: input.image || null } : {}),
-        // Galeria: grava o array em `images` e espelha a 1ª em `image` (compat).
-        ...(input.images !== undefined
-          ? { images: serializeMeetingImages(input.images), image: input.images[0]?.src ?? null }
-          : {}),
+        // Galeria: refs em `images` (base64 externalizado) + espelho da 1ª em `image`.
+        ...(imagesData ?? {}),
         ...(input.participants !== undefined ? { participants: serializeStringList(input.participants) } : {}),
         ...(input.tags !== undefined ? { tags: serializeStringList(input.tags) } : {}),
         ...(input.decisions !== undefined ? { decisions: serializeStringList(input.decisions) } : {}),
@@ -98,7 +166,7 @@ export async function getConnectionNames(): Promise<string[]> {
 export async function polishMeetingTranscript(id: string) {
   try {
     const userId = await requireUserId();
-    const meeting = await prisma.meeting.findFirst({ where: { id, userId } });
+    const meeting = await prisma.meeting.findFirst({ where: { id, userId }, select: { rawNotes: true, participants: true } });
     if (!meeting) return { success: false as const, message: "Reunião não encontrada." };
     const notes = meeting.rawNotes.trim();
     if (!notes) return { success: false as const, message: "Não há notas para polir." };
@@ -199,7 +267,7 @@ export async function getMeetingNotes(id: string) {
 export async function summarizeMeeting(id: string) {
   try {
     const userId = await requireUserId();
-    const meeting = await prisma.meeting.findFirst({ where: { id, userId } });
+    const meeting = await prisma.meeting.findFirst({ where: { id, userId }, select: { rawNotes: true, title: true } });
     if (!meeting) return { success: false, message: "Reunião não encontrada." };
     if (!meeting.rawNotes.trim()) return { success: false, message: "Escreva as notas antes de resumir." };
 
@@ -249,7 +317,7 @@ Não invente informações que não estejam nas notas. Não use ferramentas.`;
 export async function createTasksFromMeeting(id: string) {
   try {
     const userId = await requireUserId();
-    const meeting = await prisma.meeting.findFirst({ where: { id, userId } });
+    const meeting = await prisma.meeting.findFirst({ where: { id, userId }, select: { summary: true, projectId: true } });
     if (!meeting) return { success: false, message: "Reunião não encontrada." };
     if (!meeting.summary) return { success: false, message: "Gere o resumo primeiro." };
 

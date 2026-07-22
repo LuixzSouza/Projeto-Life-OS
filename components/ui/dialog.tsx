@@ -241,7 +241,10 @@ const DialogBody = ({
   <div
     data-slot="dialog-body"
     className={cn(
-      "flex-1 overflow-y-auto px-5 py-5 sm:px-8 sm:py-6",
+      // min-h-0: num DialogContent (flex-col + max-h), o filho rolável precisa poder
+      // encolher abaixo do conteúdo — senão o overflow-hidden do modal corta em vez
+      // de rolar. Sem isto o corpo do modal "não dá scroll".
+      "flex-1 min-h-0 overflow-y-auto px-5 py-5 sm:px-8 sm:py-6",
       className
     )}
     {...props}

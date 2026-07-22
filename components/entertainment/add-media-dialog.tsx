@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ type ApiSearchType = "VIDEO" | "MUSIC" | "GAME" | "BOOK";
 const apiTypeFor = (t: MediaType): ApiSearchType =>
   t === "ALBUM" ? "MUSIC" : t === "GAME" ? "GAME" : t === "BOOK" ? "BOOK" : "VIDEO";
 
-export function AddMediaDialog() {
+export function AddMediaDialog({ ownedExternalIds = [] }: { ownedExternalIds?: string[] }) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -29,8 +29,14 @@ export function AddMediaDialog() {
   const [activeTab, setActiveTab] = useState<MediaType>("MOVIE");
   const [providers, setProviders] = useState<{ tmdb: boolean; rawg: boolean; googleBooks: boolean } | null>(null);
   const [discovered, setDiscovered] = useState(false);
+  // Itens adicionados nesta sessão do modal (marca ✓ na hora, sem esperar reload).
+  const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
 
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Já na coleção: veio do banco (prop) OU acabou de ser adicionado no modal.
+  const ownedSet = useMemo(() => new Set(ownedExternalIds), [ownedExternalIds]);
+  const isOwned = (id: string) => ownedSet.has(id) || addedIds.has(id);
 
   // Provedor que exige chave e está faltando para a aba atual (conexão com Settings).
   const missingProvider: "TMDB" | "RAWG" | null =
@@ -47,6 +53,7 @@ export function AddMediaDialog() {
         setResults([]);
         setQuery("");
         setDiscovered(false);
+        setAddedIds(new Set());
       }, 300);
     }
   };
@@ -123,20 +130,31 @@ export function AddMediaDialog() {
   async function handleSave(item: SearchResult) {
     // Trava para evitar cliques duplos rápidos
     if (isSavingId) return;
-    
+
+    // Já está na coleção → não duplica; só avisa.
+    if (isOwned(item.id)) {
+      toast.info(`"${item.title}" já está na sua coleção.`);
+      return;
+    }
+
     setIsSavingId(item.id);
 
     try {
       const result = await addMediaItem(item);
-      
+      const alreadyExists = !result.success && (result as { alreadyExists?: boolean }).alreadyExists;
+
       if (result.success) {
+        setAddedIds((prev) => new Set(prev).add(item.id));
         toast.success(
           <div className="flex items-center gap-2">
             <Check className="h-4 w-4 text-emerald-500" />
             <span><span className="font-bold">{item.title}</span> adicionado!</span>
           </div>
         );
-        handleOpenChange(false);
+        // Mantém o modal aberto: dá pra adicionar vários numa mesma navegada.
+      } else if (alreadyExists) {
+        setAddedIds((prev) => new Set(prev).add(item.id));
+        toast.info(result.message || "Já está na sua coleção.");
       } else {
         toast.error(result?.message || "Não foi possível salvar a obra.");
       }
@@ -172,9 +190,10 @@ export function AddMediaDialog() {
         </Button>
       </DialogTrigger>
 
-      <DialogContent size="xl" className="p-0 gap-0">
-        <div className="p-6 pb-4 bg-muted/10 border-b border-border/40">
-          <DialogHeader>
+      <DialogContent size="xl" className="flex flex-col gap-0 p-0">
+        {/* CABEÇALHO fixo (título + abas + busca) — um único bloco, sem borda dupla. */}
+        <div className="shrink-0 border-b border-border/40 bg-muted/10 px-6 pt-6 pb-4">
+          <DialogHeader className="border-0 bg-transparent p-0">
             <DialogTitle className="text-xl">Explorar Catálogo</DialogTitle>
             <DialogDescription>Busque na base global (TMDB, RAWG, Google Books, iTunes).</DialogDescription>
           </DialogHeader>
@@ -231,9 +250,10 @@ export function AddMediaDialog() {
           )}
         </div>
 
-        {/* ÁREA DE RESULTADOS */}
-        <ScrollArea className="h-[450px] bg-background p-6">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-5 pr-4">
+        {/* ÁREA DE RESULTADOS (rola; altura responsiva em vez de fixa) */}
+        <ScrollArea className="h-[clamp(300px,52dvh,480px)] bg-background">
+          {(isLoadingSearch || results.length > 0) && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-5 p-6">
             
             {/* Skeletons (Carregamento Seguro) */}
             {isLoadingSearch && Array.from({ length: 8 }).map((_, i) => (
@@ -247,18 +267,20 @@ export function AddMediaDialog() {
             {/* Renderização da Lista */}
             {!isLoadingSearch && results.map((item) => {
                 const isSavingThis = isSavingId === item.id;
+                const owned = isOwned(item.id);
                 const aspectRatioClass = item.type === "GAME" ? "aspect-video" : item.type === "ALBUM" ? "aspect-square" : "aspect-[2/3]";
 
                 return (
-                  <div 
-                    key={`result-${item.id}`} 
-                    onClick={() => handleSave(item)} 
+                  <div
+                    key={`result-${item.id}`}
+                    onClick={() => handleSave(item)}
                     className={cn(
-                        "group relative rounded-xl overflow-hidden border border-border/40 cursor-pointer transition-all hover:shadow-lg hover:border-primary/40 hover:-translate-y-1 flex flex-col bg-card", 
+                        "group relative rounded-xl overflow-hidden border cursor-pointer transition-all hover:shadow-lg hover:-translate-y-1 flex flex-col bg-card",
+                        owned ? "border-emerald-500/40" : "border-border/40 hover:border-primary/40",
                         isSavingThis && "opacity-50 pointer-events-none"
                     )}
                   >
-                    
+
                     <div className={cn("relative bg-muted/40 shrink-0 border-b border-border/20", aspectRatioClass)}>
                       {item.coverUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -269,9 +291,20 @@ export function AddMediaDialog() {
                         </div>
                       )}
 
-                      <div className={cn("absolute inset-0 flex items-center justify-center bg-background/40 backdrop-blur-[2px] transition-all duration-300", isSavingThis ? "opacity-100" : "opacity-0 group-hover:opacity-100")}>
+                      {/* Selo "Na coleção" (sempre visível quando já possuído). */}
+                      {owned && !isSavingThis && (
+                        <div className="absolute top-2 left-2 z-10 flex items-center gap-1 rounded-md bg-emerald-500/90 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur-sm">
+                          <Check className="h-3 w-3" /> Na coleção
+                        </div>
+                      )}
+
+                      <div className={cn("absolute inset-0 flex items-center justify-center bg-background/40 backdrop-blur-[2px] transition-all duration-300", (isSavingThis || owned) ? "opacity-100" : "opacity-0 group-hover:opacity-100")}>
                         {isSavingThis ? (
                           <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                        ) : owned ? (
+                          <div className="rounded-full bg-emerald-500 p-2.5 text-white shadow-xl">
+                            <Check className="h-5 w-5" />
+                          </div>
                         ) : (
                           <div className="bg-primary text-primary-foreground rounded-full p-2.5 shadow-xl transform scale-90 group-hover:scale-100 transition-transform">
                             <Plus className="h-5 w-5" />
@@ -294,10 +327,11 @@ export function AddMediaDialog() {
                 );
             })}
           </div>
+          )}
 
           {/* ESTADOS VAZIOS */}
           {!isLoadingSearch && results.length === 0 && (query || discovered) && (
-            <div className="h-full flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
+            <div className="h-full flex flex-col items-center justify-center px-6 py-20 text-center text-muted-foreground">
               <Search className="h-12 w-12 mb-4 opacity-20" />
               <p className="font-semibold text-foreground">Nenhum resultado encontrado.</p>
               <p className="text-sm mt-1 max-w-xs">Verifique a ortografia, tente o nome original (em inglês) ou descubra algo novo.</p>
@@ -320,7 +354,7 @@ export function AddMediaDialog() {
           )}
 
           {!isLoadingSearch && results.length === 0 && !query && !discovered && (
-            <div className="h-full flex flex-col items-center justify-center py-24 text-center">
+            <div className="h-full flex flex-col items-center justify-center px-6 py-24 text-center">
               <Dices className="h-12 w-12 mb-4 text-muted-foreground/30" />
               <p className="text-sm font-medium text-foreground">Busque pelo nome ou descubra algo novo.</p>
               <p className="text-xs text-muted-foreground mt-1 max-w-xs">Sem ideias do que assistir, jogar, ouvir ou ler? Deixe o sistema sugerir.</p>

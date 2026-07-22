@@ -489,7 +489,7 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
         <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
                 <Link href="/flashcards">
-                    <Button variant="outline" size="icon" className="h-12 w-12 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shadow-sm" title="Sair">
+                    <Button variant="outline" size="icon" className="h-12 w-12 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shadow-sm" title="Sair" aria-label="Sair da sessão de estudo">
                         <X className="h-6 w-6" />
                     </Button>
                 </Link>
@@ -516,6 +516,7 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
                 <Button
                     variant="outline" size="icon" onClick={shuffleRemaining}
                     title="Embaralhar os próximos cartões"
+                    aria-label="Embaralhar os próximos cartões"
                     className={cn(
                         "h-12 w-12 rounded-xl shadow-sm transition-colors hover:text-primary hover:bg-primary/10",
                         shuffling ? "text-primary bg-primary/10" : "text-muted-foreground",
@@ -526,6 +527,7 @@ export function StudySession({ deck, cards: initialCards, mode = "flip" }: Study
                 <Button
                     variant="outline" size="icon" onClick={toggleReverse}
                     title={reverse ? "Voltar ao normal (termo → definição)" : "Inverter (definição → termo)"}
+                    aria-label="Inverter frente e verso dos cartões"
                     className={cn(
                         "h-12 w-12 rounded-xl shadow-sm transition-colors",
                         reverse ? "border-primary/40 bg-primary/10 text-primary" : "text-muted-foreground hover:text-primary hover:bg-primary/10",

@@ -74,7 +74,11 @@ export default async function NutritionPage(props: PageProps) {
     const dateParam = typeof params.date === 'string' ? params.date : undefined;
     
     if (dateParam) {
-      const parsed = new Date(dateParam);
+      // Param date-only (yyyy-MM-dd) parseado cru vira meia-noite UTC e, com os
+      // setHours() locais abaixo, desloca para o dia anterior em fusos negativos
+      // (Brasil). Ancora ao meio-dia (convenção do projeto) para fixar o dia certo.
+      const iso = /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? `${dateParam}T12:00:00Z` : dateParam;
+      const parsed = new Date(iso);
       if (!isNaN(parsed.getTime())) selectedDate = parsed;
     }
 

@@ -104,6 +104,7 @@ export function ProjectsForm({ data, onChange }: ProjectsFormProps) {
                 className="h-8 w-8 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                 onClick={() => removeProject(proj.id)}
                 title="Excluir Projeto"
+                aria-label="Excluir projeto"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>

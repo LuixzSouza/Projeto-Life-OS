@@ -33,7 +33,7 @@ export function SleepHistoryCard({ data, onDelete }: SleepHistoryCardProps) {
           Histórico Recente
         </CardTitle>
       </CardHeader>
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         <div className="divide-y divide-border/40">
           {data.slice().reverse().map((entry) => {
             const parsedDate = parseISO(entry.date);

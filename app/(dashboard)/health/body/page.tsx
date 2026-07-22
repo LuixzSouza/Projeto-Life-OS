@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { BodyDashboard } from "@/components/health/body/body-dashboard";
 import { User } from "lucide-react";
 import { Metadata } from "next";
-import { BodyStats, calculateBodyFat, Gender } from "@/lib/body-math";
+import { BodyStats, calculateBodyFat, Gender, DEVICE_METRIC_TYPES, DEVICE_METRIC_SPEC, type DeviceMetrics } from "@/lib/body-math";
 import type { BodyEvolutionPoint } from "@/components/health/body/body-evolution-chart";
 import type { BodyDeltaItem, BodyProgressInfo } from "@/components/health/body/body-progress-card";
 import { HealthActions } from "@/components/health/health-actions";
@@ -125,10 +125,32 @@ function buildProgress(rows: SnapshotRow[]): BodyProgressInfo | null {
   };
 }
 
+// Métrica de aparelho mais recente por tipo. Evita _max/_min de DateTime em
+// aggregate/groupBy (quebra no modo réplica/Turso — ver libsql-datetime-aggregate):
+// busca as linhas ordenadas e fica com a 1ª de cada type.
+function latestDeviceMetrics(rows: { type: string; value: number }[]): DeviceMetrics {
+  const seen = new Map<string, number>();
+  for (const r of rows) if (!seen.has(r.type)) seen.set(r.type, r.value);
+  const val = (t: string) => seen.get(t) ?? null;
+  const byKey = (key: keyof DeviceMetrics) => {
+    const spec = DEVICE_METRIC_SPEC.find((m) => m.key === key);
+    return spec ? val(spec.type) : null;
+  };
+  return {
+    bodyFatMeasured: byKey("bodyFatMeasured"),
+    muscleMass: byKey("muscleMass"),
+    bodyWater: byKey("bodyWater"),
+    visceralFat: byKey("visceralFat"),
+    boneMass: byKey("boneMass"),
+    metabolicAge: byKey("metabolicAge"),
+  };
+}
+
 export default async function BodyPage() {
   let currentStats: BodyStats | null = null;
   let evolution: BodyEvolutionPoint[] = [];
   let progress: BodyProgressInfo | null = null;
+  let deviceMetrics: DeviceMetrics | null = null;
   let degenerateCount = 0;
   let hasError = false;
 
@@ -136,7 +158,7 @@ export default async function BodyPage() {
     const userId = await getCurrentUserId();
     // Snapshots recentes (coalesce + comparativo) + histórico (peso via
     // HealthMetric, leve; % gordura via snapshots).
-    const [recentSnapshots, weightHistory, measurements, degenerates] = await Promise.all([
+    const [recentSnapshots, weightHistory, measurements, degenerates, deviceRows] = await Promise.all([
       prisma.bodyMeasurement.findMany({ where: { userId }, orderBy: { date: "desc" }, take: 12 }),
       prisma.healthMetric.findMany({
         where: { userId, type: "WEIGHT" },
@@ -151,6 +173,13 @@ export default async function BodyPage() {
       // Snapshots degenerados (peso via IA antiga: height=0 / gender "N/A") → banner de correção
       prisma.bodyMeasurement.count({
         where: { userId, OR: [{ height: { lte: 0 } }, { gender: { notIn: ["MALE", "FEMALE"] } }] },
+      }),
+      // Medições por aparelho (bioimpedância/adipômetro) — últimas de cada tipo.
+      prisma.healthMetric.findMany({
+        where: { userId, type: { in: DEVICE_METRIC_TYPES } },
+        orderBy: { date: "desc" },
+        take: 120,
+        select: { type: true, value: true },
       }),
     ]);
 
@@ -183,6 +212,7 @@ export default async function BodyPage() {
       gender: 'MALE', activityFactor: 1.2
     };
     progress = buildProgress(recentSnapshots);
+    deviceMetrics = latestDeviceMetrics(deviceRows);
     degenerateCount = degenerates;
 
   } catch (error) {
@@ -220,7 +250,7 @@ export default async function BodyPage() {
 
       <PageContainer>
         <BodyBackfillBanner count={degenerateCount} />
-        <BodyDashboard stats={currentStats!} evolution={evolution} progress={progress} />
+        <BodyDashboard stats={currentStats!} evolution={evolution} progress={progress} deviceMetrics={deviceMetrics} />
       </PageContainer>
     </PageShell>
   );

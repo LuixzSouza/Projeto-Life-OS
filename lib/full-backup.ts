@@ -289,6 +289,9 @@ const BACKUP_ENTRIES: BackupEntry[] = [
   std("meetings", "Meeting", "tasks", prisma.meeting, {
     fks: [{ field: "projectId", target: "projects" }],
   }),
+  std("meetingImages", "MeetingImage", "tasks", prisma.meetingImage, {
+    fks: [{ field: "meetingId", target: "meetings", required: true }],
+  }),
   // Antes de jobApplications: na Fase 3 a vaga ganha FK para o currículo enviado.
   std("resumes", "Resume", "tasks", prisma.resume),
   std("jobApplications", "JobApplication", "tasks", prisma.jobApplication, {
@@ -350,6 +353,18 @@ const BACKUP_ENTRIES: BackupEntry[] = [
   std("flashcards", "Flashcard", "studies", prisma.flashcard, {
     fks: [{ field: "deckId", target: "flashcardDecks", required: true }],
   }),
+  std("questions", "Question", "studies", prisma.question, {
+    fks: [{ field: "subjectId", target: "studySubjects" }],
+  }),
+  std("questionOptions", "QuestionOption", "studies", prisma.questionOption, {
+    fks: [{ field: "questionId", target: "questions", required: true }],
+  }),
+  // Exam.questionIds é JSON de ids: sobrevive ao round-trip porque o backup
+  // PRESERVA os ids das questões (mesma garantia dos outros models).
+  std("exams", "Exam", "studies", prisma.exam),
+  std("examAttempts", "ExamAttempt", "studies", prisma.examAttempt, {
+    fks: [{ field: "examId", target: "exams", required: true }],
+  }),
 
   // Saúde & treinos
   std("workouts", "Workout", "health", prisma.workout),
@@ -390,6 +405,9 @@ const BACKUP_ENTRIES: BackupEntry[] = [
   std("savedLinks", "SavedLink", "links", prisma.savedLink),
   std("mediaItems", "MediaItem", "entertainment", prisma.mediaItem),
   std("wardrobeItems", "WardrobeItem", "wardrobe", prisma.wardrobeItem),
+  std("wardrobeImages", "WardrobeImage", "wardrobe", prisma.wardrobeImage, {
+    fks: [{ field: "itemId", target: "wardrobeItems", required: true }],
+  }),
 
   // Tecido conectivo dependente + sistema
   std("taggables", "Taggable", "system", prisma.taggable, {

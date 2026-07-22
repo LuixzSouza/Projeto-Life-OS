@@ -84,6 +84,7 @@ export function ContractsList({
                           className="h-7 w-7 text-blue-500 hover:text-blue-600 hover:bg-blue-500/10 opacity-0 group-hover/billing:opacity-100 transition-opacity"
                           onClick={() => onCopyCharge(client.name, billing)}
                           title="Copiar Resumo da Cobrança"
+                          aria-label="Copiar resumo da cobrança"
                         >
                           <Copy size={13} />
                         </Button>
@@ -95,6 +96,7 @@ export function ContractsList({
                           className="h-7 w-7 text-primary hover:text-primary hover:bg-primary/10 opacity-0 group-hover/billing:opacity-100 transition-opacity disabled:opacity-100"
                           onClick={() => onPdf(billing)}
                           title="Baixar PDF da cobrança (enviar ao cliente)"
+                          aria-label="Baixar PDF da cobrança"
                         >
                           {pdfBusyId === billing.id ? <Loader2 size={13} className="animate-spin" /> : <FileDown size={13} />}
                         </Button>
@@ -163,6 +165,7 @@ export function ContractsList({
                                   variant="ghost"
                                   className="h-7 w-7 text-primary hover:bg-primary/10"
                                   title="Abrir link de pagamento (boleto/checkout)"
+                                  aria-label="Abrir link de pagamento"
                                   onClick={() => window.open(invoice.linkUrl!.startsWith("http") ? invoice.linkUrl! : `https://${invoice.linkUrl}`, "_blank", "noopener,noreferrer")}
                                 >
                                   <ExternalLink size={14} />
@@ -174,6 +177,7 @@ export function ContractsList({
                                   variant="ghost"
                                   className="h-7 w-7 text-emerald-600 hover:bg-emerald-50"
                                   title="Enviar no WhatsApp"
+                                  aria-label="Enviar cobrança no WhatsApp"
                                   onClick={() => onWhatsapp(client.phone!, client.name, billing)}
                                 >
                                   <Phone size={14} />
@@ -194,6 +198,7 @@ export function ContractsList({
                                 variant="ghost"
                                 className="h-7 w-7 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10"
                                 title={isPaid ? "Excluir fatura (estorna a receita lançada)" : "Excluir fatura"}
+                                aria-label="Excluir fatura"
                                 onClick={() => onDeleteTarget({ type: 'INVOICE', id: invoice.id, name: `${billing.title} · ${invoice.title}` })}
                               >
                                 <Trash2 size={13} />

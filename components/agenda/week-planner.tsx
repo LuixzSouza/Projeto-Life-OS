@@ -185,7 +185,7 @@ function DayQuickAdd({ day }: { day: Date }) {
         placeholder="Anotar…"
         className="h-7 flex-1 border-none bg-transparent px-1 text-xs shadow-none focus-visible:ring-0"
       />
-      <Button type="submit" disabled={isPending} size="icon" variant="ghost" className="h-9 w-9 md:h-7 md:w-7 shrink-0 rounded-md" title="Adicionar">
+      <Button type="submit" disabled={isPending} size="icon" variant="ghost" className="h-9 w-9 md:h-7 md:w-7 shrink-0 rounded-md" title="Adicionar" aria-label="Adicionar anotação">
         {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
       </Button>
     </form>

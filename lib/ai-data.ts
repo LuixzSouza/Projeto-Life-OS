@@ -10,8 +10,9 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { encrypt } from "@/lib/crypto";
-import { asEnum, coerceEnum, TASK_STATUSES, TASK_PRIORITIES, CLIENT_STATUSES } from "@/lib/enums";
+import { asEnum, coerceEnum, TASK_STATUSES, TASK_PRIORITIES, CLIENT_STATUSES, GOAL_STATUSES } from "@/lib/enums";
 import { containsInsensitive } from "@/lib/db-text";
+import { withDbRetry } from "@/lib/db-errors";
 import type { AIModule, ToolArgs, MutationResult, AnalysisMetric } from "@/app/(dashboard)/ai/actions/types";
 
 /* ----------------------------------------------------------------------------
@@ -1153,7 +1154,7 @@ async function handleCreate(userId: string, args: ToolArgs): Promise<MutationRes
         return { ok: true, id: twin.id, summary: `Refeição "${title}" de hoje COMPLETADA com os novos valores (id ${twin.id}) — nada foi duplicado. Não chame CREATE de novo para esta refeição.` };
       }
 
-      const m = await prisma.meal.create({
+      const m = await withDbRetry(() => prisma.meal.create({
         data: {
           title,
           items: description ?? "",
@@ -1165,7 +1166,7 @@ async function handleCreate(userId: string, args: ToolArgs): Promise<MutationRes
           date: when,
           userId,
         },
-      });
+      }));
       const macros = [m.protein != null ? `${m.protein}g prot` : null, m.carbs != null ? `${m.carbs}g carb` : null, m.fat != null ? `${m.fat}g gord` : null].filter(Boolean).join(" · ");
       const aviso = m.calories == null ? ` ATENÇÃO: kcal ficou vazio — estime as calorias e corrija ESTA refeição com UPDATE (module NUTRITION, id ${m.id}). NUNCA chame CREATE de novo para isso.` : "";
       return { ok: true, id: m.id, summary: `Refeição "${m.title}" registrada (${m.calories ?? "?"} kcal${macros ? ` · ${macros}` : ""}).${aviso}` };
@@ -1280,7 +1281,8 @@ async function handleUpdate(userId: string, args: ToolArgs): Promise<MutationRes
       const data: { title?: string; description?: string; status?: string; targetDate?: Date } = {};
       if (title) data.title = title;
       if (description != null) data.description = description;
-      const gs = asEnum(status, ["IN_PROGRESS", "DONE"] as const);
+      // 4 colunas do Quadro de estudo (Para estudar / Estudando / Revisar / Dominado).
+      const gs = asEnum(status, GOAL_STATUSES);
       if (gs) data.status = gs;
       if (due) data.targetDate = due;
       const r = await prisma.learningGoal.updateMany({ where: { id, userId, deletedAt: null }, data });

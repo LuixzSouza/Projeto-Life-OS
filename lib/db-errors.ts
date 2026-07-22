@@ -79,6 +79,9 @@ export function friendlyDbError(error: unknown, profile?: DbProfile | null): str
     if (low.includes("400") || low.includes("server_error")) {
       return "O Turso rejeitou a conexão (HTTP 400). Quase sempre é o TURSO_AUTH_TOKEN errado — confirme que é o token JWT (começa com 'eyJ…'), NÃO a URL do banco. Gere com: turso db tokens create <nome-do-banco>.";
     }
+    if (low.includes("internal server error") || low.includes("sync(") || low.includes("500")) {
+      return "O Turso teve um erro momentâneo (500) ao sincronizar. Não é o seu token nem seus dados — o app segue funcionando com a réplica local. Tente sincronizar de novo em alguns segundos.";
+    }
     if (low.includes("enotfound") || low.includes("getaddrinfo") || low.includes("fetch failed") || low.includes("econnrefused") || low.includes("url")) {
       return "Não foi possível conectar ao banco Turso. Confira o TURSO_DATABASE_URL (formato libsql://...) e sua conexão.";
     }
@@ -93,6 +96,12 @@ export function friendlyDbError(error: unknown, profile?: DbProfile | null): str
   }
   if (low.includes("disk") && (low.includes("full") || low.includes("quota"))) {
     return "O banco recusou a escrita por falta de espaço/cota (disco cheio ou limite do plano grátis atingido). Leituras seguem funcionando — libere espaço ou faça upgrade antes de continuar gravando.";
+  }
+  // SQLITE_NOMEM na réplica/nuvem = o primário Turso ficou sem memória ao
+  // preparar a query (pico momentâneo). É transitório: o Life OS já tenta de
+  // novo sozinho; se insistir, aguarde alguns segundos e repita.
+  if (low.includes("sqlite_nomem") || low.includes("out of memory") || low.includes("init_step")) {
+    return "O banco ficou momentaneamente sem memória ao processar a gravação (pico no servidor). Nada foi salvo — tente de novo em alguns segundos.";
   }
 
   if (low.includes("baseline")) {
@@ -119,7 +128,20 @@ export function isTransientDbError(error: unknown): boolean {
     low.includes("fetch failed") ||
     low.includes("socket hang up") ||
     low.includes("enotfound") ||
-    low.includes("getaddrinfo")
+    low.includes("getaddrinfo") ||
+    // Turso/libSQL (réplica ou nuvem): o primário fica sem memória ao preparar a
+    // query num pico momentâneo. A falha é no init_step (ANTES de executar), então
+    // nada foi gravado — repetir é seguro e costuma passar na 2ª tentativa.
+    low.includes("sqlite_nomem") ||
+    low.includes("out of memory") ||
+    low.includes("init_step") ||
+    // Falha genérica do stream Hrana (conexão remota do libSQL piscou).
+    low.includes("hrana") ||
+    low.includes("stream error") ||
+    // Turso devolveu 500 no pull da réplica (Sync(... "Internal Server Error")):
+    // hiccup momentâneo do primário — repetir o sync costuma resolver.
+    low.includes("internal server error") ||
+    low.includes("sync(")
   );
 }
 

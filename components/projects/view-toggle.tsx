@@ -26,10 +26,12 @@ export function ViewToggle({ currentView, buildUrl }: ViewToggleProps) {
         {views.map(({ value, icon, label }) => (
           <Link key={value} href={buildUrl({ view: value })}>
             <Button 
-              size="icon" 
+              size="icon"
               variant={currentView === value ? "default" : "outline"}
               className="h-10 w-10"
               title={label}
+              aria-label={`Visualização em ${label}`}
+              aria-pressed={currentView === value}
             >
               {icon}
             </Button>

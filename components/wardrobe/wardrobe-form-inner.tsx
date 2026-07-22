@@ -94,7 +94,7 @@ export function WardrobeFormInner({ mode, initialData, onSuccess, onCancel }: { 
 
             {/* LADO DIREITO: FORMULÁRIO DE DADOS */}
             <div className="w-full md:flex-1 bg-background flex flex-col flex-1 min-h-0">
-                <ScrollArea className="flex-1">
+                <ScrollArea className="flex-1 min-h-0">
                     <div className="p-6 md:p-10 space-y-8">
 
                         {/* Header do Form */}

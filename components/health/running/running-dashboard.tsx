@@ -475,8 +475,8 @@ function RunCard({ run, onEdit, onDelete }: { run: RunWorkout; onEdit: () => voi
                         </div>
                         {/* Editar / Excluir (revela no hover; sempre visível no mobile) */}
                         <div className="flex items-center gap-1 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={onEdit} title="Editar"><Pencil className="h-4 w-4" /></Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={onDelete} title="Excluir"><Trash2 className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={onEdit} title="Editar" aria-label="Editar corrida"><Pencil className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={onDelete} title="Excluir" aria-label="Excluir corrida"><Trash2 className="h-4 w-4" /></Button>
                         </div>
                     </div>
 

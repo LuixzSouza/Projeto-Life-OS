@@ -337,6 +337,7 @@ export function LinkGrid({ links }: { links: SavedLink[] }) {
                         variant="secondary"
                         onClick={() => handleToggleFavorite(link)}
                         title={isFav(link) ? "Desfavoritar" : "Favoritar"}
+                        aria-label={isFav(link) ? "Desfavoritar link" : "Favoritar link"}
                         className="h-8 w-8 rounded-full bg-background/90 backdrop-blur shadow-sm hover:bg-background"
                     >
                         <Star className={cn("h-4 w-4", isFav(link) ? "fill-amber-400 text-amber-500" : "text-muted-foreground")} />

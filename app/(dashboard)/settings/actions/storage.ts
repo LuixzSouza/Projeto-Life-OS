@@ -8,6 +8,7 @@ import { getDatabasePath, getDbProfile, setDatabasePath, setDbProfile } from "@/
 import { getDialect } from "@/lib/db-dialect";
 import { ensureSchema } from "@/lib/db-bootstrap";
 import { mergeSqliteIntoTurso } from "@/lib/db-migrate";
+import { friendlyDbError } from "@/lib/db-errors";
 import { requireUserId } from "@/lib/auth";
 import { formatBytes } from "./helpers";
 
@@ -37,6 +38,12 @@ export async function getStorageStats() {
     { label: "Tarefas", color: "bg-emerald-500", fetch: () => prisma.task.findMany({ where }) },
     { label: "Projetos", color: "bg-indigo-500", fetch: () => prisma.project.findMany({ where }) },
     {
+      // Reuniões + seus anexos (MeetingImage, base64 externalizado). Antes ausente
+      // do balanço; agora que as imagens moram fora da linha, contam aqui.
+      label: "Reuniões", color: "bg-sky-500",
+      fetch: () => join(prisma.meeting.findMany({ where }), prisma.meetingImage.findMany({ where })),
+    },
+    {
       label: "Finanças", color: "bg-blue-500",
       fetch: () => join(
         prisma.transaction.findMany({ where }),
@@ -47,6 +54,12 @@ export async function getStorageStats() {
     },
     { label: "Vagas", color: "bg-amber-500", fetch: () => prisma.jobApplication.findMany({ where }) },
     {
+      // Career OS: currículos versionados (Resume.data) + Portfolio.data — JSON que
+      // pode crescer e antes não aparecia em nenhuma categoria do balanço.
+      label: "Currículo", color: "bg-yellow-600",
+      fetch: () => join(prisma.portfolio.findMany({ where }), prisma.resume.findMany({ where })),
+    },
+    {
       label: "Agenda", color: "bg-rose-500",
       fetch: () => join(prisma.event.findMany({ where }), prisma.routineItem.findMany({ where })),
     },
@@ -54,6 +67,7 @@ export async function getStorageStats() {
       label: "Estudos", color: "bg-purple-500",
       fetch: () => join(
         prisma.studyNote.findMany({ where }),
+        prisma.noteImage.findMany({ where }), // fotos coladas nas notas (base64 fora da linha)
         prisma.studyContent.findMany({ where }),
         prisma.studySession.findMany({ where }),
         prisma.flashcard.findMany({ where }),
@@ -86,7 +100,12 @@ export async function getStorageStats() {
       label: "Entretenimento", color: "bg-fuchsia-500",
       fetch: () => join(prisma.mediaItem.findMany({ where }), prisma.wishlistItem.findMany({ where })),
     },
-    { label: "Closet", color: "bg-orange-500", fetch: () => prisma.wardrobeItem.findMany({ where }) },
+    {
+      // Inclui WardrobeImage: a foto (base64) vive fora da linha do item desde a
+      // externalização — sem ela o Closet sub-reportaria o espaço real das peças.
+      label: "Closet", color: "bg-orange-500",
+      fetch: () => join(prisma.wardrobeItem.findMany({ where }), prisma.wardrobeImage.findMany({ where })),
+    },
     { label: "Links", color: "bg-cyan-500", fetch: () => prisma.savedLink.findMany({ where }) },
     {
       label: "IA Chat", color: "bg-zinc-500",
@@ -260,10 +279,7 @@ export async function syncDatabaseNow(): Promise<{ success: boolean; message: st
       : { success: false, message: "Nada para sincronizar." };
   } catch (error) {
     console.error("Erro ao sincronizar réplica:", error);
-    return {
-      success: false,
-      message: "Falha ao sincronizar. Verifique a conexão e o token do Turso.",
-    };
+    return { success: false, message: friendlyDbError(error) };
   }
 }
 

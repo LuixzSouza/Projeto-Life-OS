@@ -15,14 +15,15 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   Pencil, Trash2, Briefcase, ExternalLink, MoreHorizontal, CalendarClock,
-  ShieldAlert, Repeat2, ShieldX, History, Share2,
+  ShieldAlert, Repeat2, ShieldX, History, Share2, Copy, Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { deleteAccess } from "@/app/(dashboard)/access/actions";
 import { type AccessData } from "./access-form";
 import { cn } from "@/lib/utils";
+import { copyToClipboard } from "@/lib/clipboard";
 
-import { CATEGORY_CONFIG, getDomain, formatDate, type CategoryKey } from "./access-helpers";
+import { CATEGORY_CONFIG, getDomain, formatDate, isNoteItem, type CategoryKey } from "./access-helpers";
 import { CredentialFields } from "./credential-fields";
 import { AccessEditDialog } from "./access-edit-dialog";
 import { AccessDeleteDialog } from "./access-delete-dialog";
@@ -34,11 +35,14 @@ export function AccessCard({ item, strength, reused = false, breachCount }: { it
   const [deleteAlertOpen, setDeleteAlertOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Nota = item sem senha (só texto pra lembrar). Não tem credencial/selos de risco.
+  const isNote = isNoteItem(item);
+
   // Flags de segurança vindas da auditoria do servidor (sem revelar a senha).
-  const isWeak = typeof strength === "number" && strength < 50;
-  const isBreached = typeof breachCount === "number" && breachCount > 0;
+  const isWeak = !isNote && typeof strength === "number" && strength < 50;
+  const isBreached = !isNote && typeof breachCount === "number" && breachCount > 0;
   // Sem alteração há +1 ano: lembrete de rotação (updatedAt é a melhor proxy sem schema novo).
-  const isStale = Date.now() - new Date(item.updatedAt).getTime() > 365 * 864e5;
+  const isStale = !isNote && Date.now() - new Date(item.updatedAt).getTime() > 365 * 864e5;
 
   // --- Configs de Categoria ---
   const categoryKey = (Object.keys(CATEGORY_CONFIG).includes(item.category)
@@ -117,9 +121,11 @@ export function AccessCard({ item, strength, reused = false, breachCount }: { it
                   <DropdownMenuItem onClick={() => setEditOpen(true)} className="gap-2 text-sm font-medium cursor-pointer">
                     <Pencil className="h-3.5 w-3.5" /> Editar
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setShareOpen(true)} className="gap-2 text-sm font-medium cursor-pointer">
-                    <Share2 className="h-3.5 w-3.5" /> Compartilhar
-                  </DropdownMenuItem>
+                  {!isNote && (
+                    <DropdownMenuItem onClick={() => setShareOpen(true)} className="gap-2 text-sm font-medium cursor-pointer">
+                      <Share2 className="h-3.5 w-3.5" /> Compartilhar
+                    </DropdownMenuItem>
+                  )}
                   {item.url && (
                     <DropdownMenuItem onClick={() => window.open(item.url?.startsWith("http") ? item.url : `https://${item.url}`, "_blank")} className="gap-2 text-sm font-medium cursor-pointer">
                       <ExternalLink className="h-3.5 w-3.5" /> Acessar
@@ -141,7 +147,7 @@ export function AccessCard({ item, strength, reused = false, breachCount }: { it
 
         {/* --- CORPO DO CARD (Inputs) --- */}
         <CardContent className="p-6 flex flex-col gap-4 flex-1">
-          <CredentialFields item={item} />
+          {isNote ? <NoteContent notes={item.notes} /> : <CredentialFields item={item} />}
         </CardContent>
 
         {/* --- FOOTER DE METADADOS --- */}
@@ -184,7 +190,7 @@ export function AccessCard({ item, strength, reused = false, breachCount }: { it
               </span>
             )}
 
-            {item.notes && (
+            {item.notes && !isNote && (
               <span className="flex items-center gap-1.5 bg-muted text-muted-foreground px-2 py-0.5 rounded-md border border-border/40" title="Possui notas">
                 <span className="block w-1.5 h-1.5 rounded-full bg-muted-foreground/60" />
                 <span className="text-[10px] font-semibold uppercase tracking-wide">Anotado</span>
@@ -195,8 +201,44 @@ export function AccessCard({ item, strength, reused = false, breachCount }: { it
       </Card>
 
       <AccessEditDialog open={editOpen} onOpenChange={setEditOpen} item={formData} />
-      <ShareAccessDialog open={shareOpen} onOpenChange={setShareOpen} item={formData} />
+      {!isNote && <ShareAccessDialog open={shareOpen} onOpenChange={setShareOpen} item={formData} />}
       <AccessDeleteDialog open={deleteAlertOpen} onOpenChange={setDeleteAlertOpen} isDeleting={isDeleting} onConfirm={handleDelete} />
     </>
+  );
+}
+
+// Corpo de um item do tipo NOTA: mostra o texto pra lembrar (com cópia rápida),
+// no lugar dos campos de credencial (usuário/senha).
+function NoteContent({ notes }: { notes: string | null }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    if (!notes) return;
+    if (await copyToClipboard(notes)) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      toast.success("Copiado!", { duration: 1500 });
+    } else {
+      toast.error("Falha ao copiar.");
+    }
+  };
+  return (
+    <div className="group/note relative flex-1">
+      <div className="h-full min-h-[92px] rounded-xl border border-border/40 bg-muted/20 p-4">
+        <p className="select-text whitespace-pre-wrap text-sm leading-relaxed text-foreground/80 line-clamp-6">
+          {notes || "Sem conteúdo."}
+        </p>
+      </div>
+      {notes && (
+        <Button
+          size="icon"
+          variant="ghost"
+          aria-label="Copiar anotação"
+          onClick={handleCopy}
+          className="absolute right-1.5 top-1.5 h-8 w-8 rounded-lg text-muted-foreground opacity-0 transition-all hover:bg-primary/10 hover:text-primary group-hover/note:opacity-100"
+        >
+          {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+        </Button>
+      )}
+    </div>
   );
 }

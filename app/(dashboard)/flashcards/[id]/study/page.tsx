@@ -4,6 +4,8 @@ export const dynamic = "force-dynamic";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUserId } from "@/lib/auth";
 import { StudySession } from "@/components/flashcards/study-session";
+import { MatchGame } from "@/components/flashcards/match-game";
+import { TestMode } from "@/components/flashcards/test-mode";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ArrowLeft, Layers, Plus, SearchX, BrainCircuit } from "lucide-react";
@@ -150,10 +152,30 @@ export default async function StudyPage({ params, searchParams }: StudyPageProps
   /* ----------------------------- STUDY MODE ------------------------------- */
 
   // Modo Inteligente (smart): só cartões vencidos (curva de esquecimento).
-  // Modo Prova (cram), Escrita (written) ou padrão: todo o baralho.
+  // Modo Prova (cram), Escrita (written), Combinar (match) ou padrão: todo o baralho.
   const isSmart = mode === "smart";
   const isWritten = mode === "written";
+  const isMatch = mode === "match";
+  const isTest = mode === "test";
   const cards = isSmart ? filterDue(deck.cards) : deck.cards;
+
+  // Modo Combinar (jogo): grade de pares termo↔definição — não usa a SRS.
+  if (isMatch) {
+    return (
+      <div className="min-h-screen bg-background animate-in fade-in duration-700">
+        <MatchGame deck={deck} cards={cards} />
+      </div>
+    );
+  }
+
+  // Modo Teste: múltipla escolha gerada dos cartões — não usa a SRS.
+  if (isTest) {
+    return (
+      <div className="min-h-screen bg-background animate-in fade-in duration-700">
+        <TestMode deck={deck} cards={cards} />
+      </div>
+    );
+  }
 
   // Modo Inteligente sem cartões devidos: nada a revisar hoje.
   if (isSmart && cards.length === 0) {

@@ -98,7 +98,6 @@ CREATE TABLE `StudySession` (
     `userId` VARCHAR(191) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    INDEX `StudySession_userId_idx`(`userId`),
     INDEX `StudySession_subjectId_idx`(`subjectId`),
     INDEX `StudySession_userId_date_idx`(`userId`, `date`),
     PRIMARY KEY (`id`)
@@ -124,11 +123,12 @@ CREATE TABLE `StudyNote` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
-    INDEX `StudyNote_userId_idx`(`userId`),
     INDEX `StudyNote_subjectId_idx`(`subjectId`),
     INDEX `StudyNote_notebookId_idx`(`notebookId`),
     INDEX `StudyNote_projectId_idx`(`projectId`),
     INDEX `StudyNote_userId_deletedAt_idx`(`userId`, `deletedAt`),
+    INDEX `StudyNote_contentId_idx`(`contentId`),
+    INDEX `StudyNote_sessionId_idx`(`sessionId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -191,7 +191,6 @@ CREATE TABLE `LearningGoal` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
-    INDEX `LearningGoal_userId_idx`(`userId`),
     INDEX `LearningGoal_subjectId_idx`(`subjectId`),
     INDEX `LearningGoal_userId_deletedAt_idx`(`userId`, `deletedAt`),
     PRIMARY KEY (`id`)
@@ -249,9 +248,77 @@ CREATE TABLE `Flashcard` (
     `userId` VARCHAR(191) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    INDEX `Flashcard_userId_idx`(`userId`),
     INDEX `Flashcard_deckId_idx`(`deckId`),
     INDEX `Flashcard_userId_nextReview_idx`(`userId`, `nextReview`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `Question` (
+    `id` VARCHAR(191) NOT NULL,
+    `statement` LONGTEXT NOT NULL,
+    `explanation` LONGTEXT NULL,
+    `area` VARCHAR(191) NOT NULL DEFAULT 'OUTRA',
+    `difficulty` INTEGER NOT NULL DEFAULT 3,
+    `source` LONGTEXT NULL,
+    `imageUrl` LONGTEXT NULL,
+    `timesAnswered` INTEGER NOT NULL DEFAULT 0,
+    `timesCorrect` INTEGER NOT NULL DEFAULT 0,
+    `subjectId` VARCHAR(191) NULL,
+    `userId` VARCHAR(191) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+
+    INDEX `Question_userId_area_idx`(`userId`, `area`),
+    INDEX `Question_subjectId_idx`(`subjectId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `QuestionOption` (
+    `id` VARCHAR(191) NOT NULL,
+    `text` LONGTEXT NOT NULL,
+    `isCorrect` BOOLEAN NOT NULL DEFAULT false,
+    `position` INTEGER NOT NULL DEFAULT 0,
+    `questionId` VARCHAR(191) NOT NULL,
+    `userId` VARCHAR(191) NULL,
+
+    INDEX `QuestionOption_questionId_idx`(`questionId`),
+    INDEX `QuestionOption_userId_idx`(`userId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `Exam` (
+    `id` VARCHAR(191) NOT NULL,
+    `title` LONGTEXT NOT NULL,
+    `description` LONGTEXT NULL,
+    `area` LONGTEXT NULL,
+    `durationMinutes` INTEGER NOT NULL DEFAULT 0,
+    `questionIds` VARCHAR(191) NOT NULL DEFAULT '[]',
+    `userId` VARCHAR(191) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+
+    INDEX `Exam_userId_idx`(`userId`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `ExamAttempt` (
+    `id` VARCHAR(191) NOT NULL,
+    `examId` VARCHAR(191) NOT NULL,
+    `answers` VARCHAR(191) NOT NULL DEFAULT '{}',
+    `correctCount` INTEGER NOT NULL DEFAULT 0,
+    `totalCount` INTEGER NOT NULL DEFAULT 0,
+    `score` DOUBLE NOT NULL DEFAULT 0,
+    `secondsSpent` INTEGER NOT NULL DEFAULT 0,
+    `startedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `finishedAt` DATETIME(3) NULL,
+    `userId` VARCHAR(191) NULL,
+
+    INDEX `ExamAttempt_examId_idx`(`examId`),
+    INDEX `ExamAttempt_userId_idx`(`userId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -287,7 +354,6 @@ CREATE TABLE `Transaction` (
     `deletedAt` DATETIME(3) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    INDEX `Transaction_userId_idx`(`userId`),
     INDEX `Transaction_accountId_idx`(`accountId`),
     INDEX `Transaction_categoryId_idx`(`categoryId`),
     INDEX `Transaction_userId_date_idx`(`userId`, `date`),
@@ -330,7 +396,6 @@ CREATE TABLE `RecurringExpensePayment` (
 
     UNIQUE INDEX `RecurringExpensePayment_transactionId_key`(`transactionId`),
     INDEX `RecurringExpensePayment_userId_idx`(`userId`),
-    INDEX `RecurringExpensePayment_recurringExpenseId_idx`(`recurringExpenseId`),
     UNIQUE INDEX `RecurringExpensePayment_recurringExpenseId_dueDate_key`(`recurringExpenseId`, `dueDate`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -355,7 +420,6 @@ CREATE TABLE `RecurringCharge` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
-    INDEX `RecurringCharge_userId_idx`(`userId`),
     INDEX `RecurringCharge_userId_active_idx`(`userId`, `active`),
     INDEX `RecurringCharge_clientId_idx`(`clientId`),
     INDEX `RecurringCharge_billingId_idx`(`billingId`),
@@ -376,7 +440,6 @@ CREATE TABLE `WishlistItem` (
     `deletedAt` DATETIME(3) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    INDEX `WishlistItem_userId_idx`(`userId`),
     INDEX `WishlistItem_userId_deletedAt_idx`(`userId`, `deletedAt`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -394,7 +457,6 @@ CREATE TABLE `Category` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
-    INDEX `Category_userId_idx`(`userId`),
     INDEX `Category_parentId_idx`(`parentId`),
     UNIQUE INDEX `Category_userId_name_type_key`(`userId`, `name`, `type`),
     PRIMARY KEY (`id`)
@@ -418,7 +480,6 @@ CREATE TABLE `Project` (
     `deletedAt` DATETIME(3) NULL,
 
     UNIQUE INDEX `Project_slug_key`(`slug`),
-    INDEX `Project_userId_idx`(`userId`),
     INDEX `Project_clientId_idx`(`clientId`),
     INDEX `Project_userId_deletedAt_idx`(`userId`, `deletedAt`),
     PRIMARY KEY (`id`)
@@ -446,6 +507,21 @@ CREATE TABLE `Meeting` (
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- CreateTable
+CREATE TABLE `MeetingImage` (
+    `id` VARCHAR(191) NOT NULL,
+    `mime` LONGTEXT NOT NULL,
+    `data` LONGTEXT NOT NULL,
+    `hash` VARCHAR(191) NOT NULL,
+    `meetingId` VARCHAR(191) NOT NULL,
+    `userId` VARCHAR(191) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    INDEX `MeetingImage_userId_idx`(`userId`),
+    INDEX `MeetingImage_meetingId_hash_idx`(`meetingId`, `hash`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
 CREATE TABLE `Task` (
     `id` VARCHAR(191) NOT NULL,
     `title` LONGTEXT NOT NULL,
@@ -468,7 +544,6 @@ CREATE TABLE `Task` (
     `userId` VARCHAR(191) NULL,
     `deletedAt` DATETIME(3) NULL,
 
-    INDEX `Task_userId_idx`(`userId`),
     INDEX `Task_projectId_idx`(`projectId`),
     INDEX `Task_userId_isDone_idx`(`userId`, `isDone`),
     INDEX `Task_userId_deletedAt_idx`(`userId`, `deletedAt`),
@@ -532,11 +607,11 @@ CREATE TABLE `Portfolio` (
 -- CreateTable
 CREATE TABLE `Resume` (
     `id` VARCHAR(191) NOT NULL,
-    `name` VARCHAR(191) NOT NULL,
+    `name` LONGTEXT NOT NULL,
     `locale` VARCHAR(191) NOT NULL DEFAULT 'pt-BR',
     `template` VARCHAR(191) NOT NULL DEFAULT 'MODERN',
     `isBase` BOOLEAN NOT NULL DEFAULT false,
-    `parentId` VARCHAR(191) NULL,
+    `parentId` LONGTEXT NULL,
     `data` LONGTEXT NOT NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
@@ -614,7 +689,6 @@ CREATE TABLE `Workout` (
     `date` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `userId` VARCHAR(191) NULL,
 
-    INDEX `Workout_userId_idx`(`userId`),
     INDEX `Workout_userId_date_idx`(`userId`, `date`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -629,7 +703,6 @@ CREATE TABLE `Shoe` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
-    INDEX `Shoe_userId_idx`(`userId`),
     UNIQUE INDEX `Shoe_userId_name_key`(`userId`, `name`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -644,7 +717,6 @@ CREATE TABLE `WorkoutPlan` (
     `updatedAt` DATETIME(3) NOT NULL,
     `userId` VARCHAR(191) NULL,
 
-    INDEX `WorkoutPlan_userId_idx`(`userId`),
     INDEX `WorkoutPlan_userId_updatedAt_idx`(`userId`, `updatedAt`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -662,7 +734,6 @@ CREATE TABLE `WorkoutPhoto` (
     `sets` INTEGER NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    INDEX `WorkoutPhoto_userId_idx`(`userId`),
     INDEX `WorkoutPhoto_userId_date_idx`(`userId`, `date`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -710,7 +781,6 @@ CREATE TABLE `HabitLog` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
     INDEX `HabitLog_userId_date_idx`(`userId`, `date`),
-    INDEX `HabitLog_habitId_idx`(`habitId`),
     UNIQUE INDEX `HabitLog_habitId_date_key`(`habitId`, `date`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -723,7 +793,6 @@ CREATE TABLE `HealthMetric` (
     `date` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `userId` VARCHAR(191) NULL,
 
-    INDEX `HealthMetric_userId_idx`(`userId`),
     INDEX `HealthMetric_userId_type_date_idx`(`userId`, `type`, `date`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -770,7 +839,6 @@ CREATE TABLE `Meal` (
     `date` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `userId` VARCHAR(191) NULL,
 
-    INDEX `Meal_userId_idx`(`userId`),
     INDEX `Meal_userId_date_idx`(`userId`, `date`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -813,7 +881,6 @@ CREATE TABLE `Event` (
     `deletedAt` DATETIME(3) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    INDEX `Event_userId_idx`(`userId`),
     INDEX `Event_projectId_idx`(`projectId`),
     INDEX `Event_taskId_idx`(`taskId`),
     INDEX `Event_userId_startTime_idx`(`userId`, `startTime`),
@@ -849,7 +916,6 @@ CREATE TABLE `ThemedDay` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
-    INDEX `ThemedDay_userId_idx`(`userId`),
     UNIQUE INDEX `ThemedDay_userId_weekday_key`(`userId`, `weekday`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -868,7 +934,6 @@ CREATE TABLE `FocusSession` (
     `endedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    INDEX `FocusSession_userId_idx`(`userId`),
     INDEX `FocusSession_userId_endedAt_idx`(`userId`, `endedAt`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -913,11 +978,11 @@ CREATE TABLE `Settings` (
     `sleepGoalHours` DOUBLE NULL,
     `calorieGoalOverride` INTEGER NULL,
     `notifyEmailEnabled` BOOLEAN NOT NULL DEFAULT false,
-    `notifyEmail` VARCHAR(191) NULL,
+    `notifyEmail` LONGTEXT NULL,
     `notifySmtpHost` VARCHAR(191) NULL DEFAULT 'smtp.gmail.com',
     `notifySmtpPort` INTEGER NULL DEFAULT 465,
-    `notifySmtpUser` VARCHAR(191) NULL,
-    `notifySmtpPass` VARCHAR(191) NULL,
+    `notifySmtpUser` LONGTEXT NULL,
+    `notifySmtpPass` LONGTEXT NULL,
     `notifyMinPriority` VARCHAR(191) NOT NULL DEFAULT 'HIGH',
     `storagePath` VARCHAR(191) NULL DEFAULT 'D:/LifeOS_Data',
     `updatedAt` DATETIME(3) NOT NULL,
@@ -1022,7 +1087,6 @@ CREATE TABLE `AiEmbedding` (
     `updatedAt` DATETIME(3) NOT NULL,
     `userId` VARCHAR(191) NOT NULL,
 
-    INDEX `AiEmbedding_userId_entityType_idx`(`userId`, `entityType`),
     UNIQUE INDEX `AiEmbedding_userId_entityType_entityId_key`(`userId`, `entityType`, `entityId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -1060,7 +1124,6 @@ CREATE TABLE `SavedLink` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
-    INDEX `SavedLink_userId_idx`(`userId`),
     INDEX `SavedLink_userId_deletedAt_idx`(`userId`, `deletedAt`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -1084,7 +1147,6 @@ CREATE TABLE `MediaItem` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
-    INDEX `MediaItem_userId_idx`(`userId`),
     INDEX `MediaItem_userId_status_idx`(`userId`, `status`),
     INDEX `MediaItem_userId_deletedAt_idx`(`userId`, `deletedAt`),
     PRIMARY KEY (`id`)
@@ -1115,7 +1177,6 @@ CREATE TABLE `Friend` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
-    INDEX `Friend_userId_idx`(`userId`),
     INDEX `Friend_userId_deletedAt_idx`(`userId`, `deletedAt`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -1140,8 +1201,22 @@ CREATE TABLE `WardrobeItem` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
-    INDEX `WardrobeItem_userId_idx`(`userId`),
     INDEX `WardrobeItem_userId_deletedAt_idx`(`userId`, `deletedAt`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `WardrobeImage` (
+    `id` VARCHAR(191) NOT NULL,
+    `mime` LONGTEXT NOT NULL,
+    `data` LONGTEXT NOT NULL,
+    `hash` VARCHAR(191) NOT NULL,
+    `itemId` VARCHAR(191) NOT NULL,
+    `userId` VARCHAR(191) NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    INDEX `WardrobeImage_userId_idx`(`userId`),
+    INDEX `WardrobeImage_itemId_hash_idx`(`itemId`, `hash`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -1164,7 +1239,6 @@ CREATE TABLE `Client` (
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
-    INDEX `Client_userId_idx`(`userId`),
     INDEX `Client_friendId_idx`(`friendId`),
     INDEX `Client_userId_deletedAt_idx`(`userId`, `deletedAt`),
     PRIMARY KEY (`id`)
@@ -1208,7 +1282,6 @@ CREATE TABLE `Invoice` (
     `updatedAt` DATETIME(3) NOT NULL,
 
     UNIQUE INDEX `Invoice_transactionId_key`(`transactionId`),
-    INDEX `Invoice_userId_idx`(`userId`),
     INDEX `Invoice_billingId_idx`(`billingId`),
     INDEX `Invoice_status_idx`(`status`),
     INDEX `Invoice_dueDate_idx`(`dueDate`),
@@ -1239,7 +1312,6 @@ CREATE TABLE `Tag` (
     `userId` VARCHAR(191) NOT NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    INDEX `Tag_userId_idx`(`userId`),
     UNIQUE INDEX `Tag_userId_name_key`(`userId`, `name`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -1327,7 +1399,6 @@ CREATE TABLE `EntityLink` (
     `userId` VARCHAR(191) NOT NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
-    INDEX `EntityLink_fromType_fromId_idx`(`fromType`, `fromId`),
     INDEX `EntityLink_toType_toId_idx`(`toType`, `toId`),
     INDEX `EntityLink_userId_idx`(`userId`),
     UNIQUE INDEX `EntityLink_fromType_fromId_toType_toId_kind_key`(`fromType`, `fromId`, `toType`, `toId`, `kind`),
@@ -1416,6 +1487,27 @@ ALTER TABLE `Flashcard` ADD CONSTRAINT `Flashcard_deckId_fkey` FOREIGN KEY (`dec
 ALTER TABLE `Flashcard` ADD CONSTRAINT `Flashcard_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE `Question` ADD CONSTRAINT `Question_subjectId_fkey` FOREIGN KEY (`subjectId`) REFERENCES `StudySubject`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `Question` ADD CONSTRAINT `Question_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `QuestionOption` ADD CONSTRAINT `QuestionOption_questionId_fkey` FOREIGN KEY (`questionId`) REFERENCES `Question`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `QuestionOption` ADD CONSTRAINT `QuestionOption_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `Exam` ADD CONSTRAINT `Exam_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `ExamAttempt` ADD CONSTRAINT `ExamAttempt_examId_fkey` FOREIGN KEY (`examId`) REFERENCES `Exam`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `ExamAttempt` ADD CONSTRAINT `ExamAttempt_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE `Account` ADD CONSTRAINT `Account_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -1471,6 +1563,12 @@ ALTER TABLE `Meeting` ADD CONSTRAINT `Meeting_projectId_fkey` FOREIGN KEY (`proj
 
 -- AddForeignKey
 ALTER TABLE `Meeting` ADD CONSTRAINT `Meeting_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `MeetingImage` ADD CONSTRAINT `MeetingImage_meetingId_fkey` FOREIGN KEY (`meetingId`) REFERENCES `Meeting`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `MeetingImage` ADD CONSTRAINT `MeetingImage_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `Task` ADD CONSTRAINT `Task_projectId_fkey` FOREIGN KEY (`projectId`) REFERENCES `Project`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
@@ -1606,6 +1704,12 @@ ALTER TABLE `Friend` ADD CONSTRAINT `Friend_userId_fkey` FOREIGN KEY (`userId`) 
 
 -- AddForeignKey
 ALTER TABLE `WardrobeItem` ADD CONSTRAINT `WardrobeItem_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `WardrobeImage` ADD CONSTRAINT `WardrobeImage_itemId_fkey` FOREIGN KEY (`itemId`) REFERENCES `WardrobeItem`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `WardrobeImage` ADD CONSTRAINT `WardrobeImage_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `Client` ADD CONSTRAINT `Client_friendId_fkey` FOREIGN KEY (`friendId`) REFERENCES `Friend`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Meal } from "@prisma/client";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,7 @@ import {
 } from "lucide-react";
 import {
     logMeal, updateMeal, deleteMeal, copyYesterdayMeals,
-    estimateMealNutrition, recalculateMealsWithoutCalories
+    estimateMealNutrition, recalculateMealsWithoutCalories, quickLogMeal
 } from "@/app/(dashboard)/health/actions";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +50,35 @@ const mealConfigs: Record<MealType, { color: string; bg: string; icon: React.Ele
 
 const fmtQty = (q: number) => (Number.isInteger(q) ? `${q}` : q.toFixed(2).replace(/\.?0+$/, ""));
 
+// Estágios do registro rápido: a chamada de IA leva ~10-15s, então em vez de um
+// spinner mudo mostramos o que está acontecendo — a espera vira progresso.
+const QUICK_PHRASES = [
+    "Interpretando o que você comeu…",
+    "Identificando alimentos e porções…",
+    "Estimando calorias e macros…",
+    "Finalizando o registro…",
+];
+
+// Se a unidade for métrica ("100g", "30 g", "100ml"), mostra a quantidade REAL
+// escalada pela porção (ex.: 1.5 × 100g = "150 g"). Senão devolve null.
+function scaledPortion(unit: string, qty: number): string | null {
+    const m = unit.match(/^(\d+(?:\.\d+)?)\s*(g|ml|kg|l)$/i);
+    if (!m) return null;
+    const amount = Math.round(parseFloat(m[1]) * qty * 10) / 10;
+    return `${fmtQty(amount)} ${m[2].toLowerCase()}`;
+}
+
+// Nome da refeição sugerido pelo horário atual — abre o modal já no slot certo.
+const MEAL_TITLES = ["Café da Manhã", "Almoço", "Lanche", "Jantar", "Ceia", "Pós-Treino"];
+function defaultMealTitle(): string {
+    const h = new Date().getHours();
+    if (h >= 5 && h < 11) return "Café da Manhã";
+    if (h >= 11 && h < 15) return "Almoço";
+    if (h >= 15 && h < 18) return "Lanche";
+    if (h >= 18 && h < 22) return "Jantar";
+    return "Ceia";
+}
+
 // --- DASHBOARD PRINCIPAL ---
 export function FoodLogger({ meals, dailyGoal = 2000, workoutBurn = 0, missingKcalCount = 0 }: { meals: Meal[]; dailyGoal?: number; workoutBurn?: number; missingKcalCount?: number }) {
     const router = useRouter();
@@ -59,6 +88,11 @@ export function FoodLogger({ meals, dailyGoal = 2000, workoutBurn = 0, missingKc
     const [mealToDelete, setMealToDelete] = useState<{ id: string; title: string } | null>(null);
     const [copying, setCopying] = useState(false);
     const [recalcing, setRecalcing] = useState(false);
+    // Registro rápido por linguagem natural (mata a preguiça: digita e Enter).
+    const [quickText, setQuickText] = useState("");
+    const [quickLoading, setQuickLoading] = useState(false);
+    // Frase atual do progresso (avança enquanto a IA processa).
+    const [quickPhase, setQuickPhase] = useState(0);
     // Some o aviso na hora após um recálculo bem-sucedido (o refresh confirma depois).
     const [recalcDone, setRecalcDone] = useState(false);
 
@@ -87,6 +121,35 @@ export function FoodLogger({ meals, dailyGoal = 2000, workoutBurn = 0, missingKc
             }
         } else {
             toast.error(res.message);
+        }
+    };
+
+    // Avança as frases de progresso enquanto a IA trabalha; reseta ao terminar.
+    useEffect(() => {
+        if (!quickLoading) { setQuickPhase(0); return; }
+        const id = setInterval(() => {
+            setQuickPhase((p) => Math.min(p + 1, QUICK_PHRASES.length - 1));
+        }, 2600);
+        return () => clearInterval(id);
+    }, [quickLoading]);
+
+    const handleQuickAdd = async () => {
+        const text = quickText.trim();
+        if (!text || quickLoading) return;
+        setQuickLoading(true);
+        try {
+            const res = await quickLogMeal(text);
+            if (res.success) {
+                setQuickText("");
+                toast.success(res.message);
+                router.refresh();
+            } else {
+                toast.error(res.message);
+            }
+        } catch {
+            toast.error("Erro ao registrar a refeição.");
+        } finally {
+            setQuickLoading(false);
         }
     };
 
@@ -142,6 +205,51 @@ export function FoodLogger({ meals, dailyGoal = 2000, workoutBurn = 0, missingKc
                     <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
                         <div className={cn("h-full transition-all duration-1000 ease-out", isOverLimit ? "bg-rose-500" : "bg-primary")} style={{ width: `${progress}%` }} />
                     </div>
+                </div>
+
+                {/* REGISTRO RÁPIDO: digite o que comeu em linguagem natural + Enter.
+                    A IA estima kcal/macros e grava na hora — sem abrir o modal. */}
+                <div className="pt-1">
+                    <div className={cn(
+                        "relative flex items-center gap-2 rounded-xl border p-1.5 transition-colors",
+                        quickLoading
+                            ? "border-primary/50 bg-primary/[0.08]"
+                            : "border-primary/25 bg-primary/[0.04] focus-within:border-primary/50",
+                    )}>
+                        <Sparkles className={cn("h-4 w-4 shrink-0 text-primary ml-1.5", quickLoading && "animate-pulse")} />
+                        {quickLoading ? (
+                            // Enquanto a IA processa: some com o input e mostra o progresso
+                            // no lugar — a espera longa (~12s) vira feedback vivo.
+                            <div className="h-9 flex-1 flex items-center min-w-0" aria-live="polite">
+                                <span className="text-sm font-medium text-foreground/80 truncate animate-pulse">
+                                    {QUICK_PHRASES[quickPhase]}
+                                </span>
+                            </div>
+                        ) : (
+                            <Input
+                                value={quickText}
+                                onChange={(e) => setQuickText(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleQuickAdd(); } }}
+                                placeholder="Fale naturalmente: 'acabei de comer uma banana' ou 'comi 2 pizzas no almoço'…"
+                                aria-label="Registro rápido de refeição por texto"
+                                className="h-9 flex-1 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0 text-sm"
+                            />
+                        )}
+                        <Button
+                            size="sm"
+                            onClick={handleQuickAdd}
+                            disabled={quickLoading || !quickText.trim()}
+                            className="h-9 gap-1.5 rounded-lg px-3 shrink-0 font-semibold min-w-[2.5rem]"
+                        >
+                            {quickLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                            <span className="hidden sm:inline">{quickLoading ? "Registrando…" : "Registrar"}</span>
+                        </Button>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground/70 mt-1.5 pl-1">
+                        {quickLoading
+                            ? "A IA está analisando sua refeição — isso leva alguns segundos."
+                            : "A IA calcula calorias e macros automaticamente. Para ajuste manual, use “Montar refeição”."}
+                    </p>
                 </div>
             </div>
 
@@ -232,7 +340,7 @@ function MealRow({ meal, onConnections, onDelete }: { meal: Meal; onConnections:
                     <MealFormDialog meal={meal}>
                         <Button variant="ghost" size="icon" aria-label="Editar refeição" className="h-8 w-8 text-muted-foreground hover:text-primary rounded-lg"><Pencil className="h-4 w-4" /></Button>
                     </MealFormDialog>
-                    <Button variant="ghost" size="icon" title="Tags & Anexos" onClick={() => onConnections(meal)} className="h-8 w-8 text-muted-foreground hover:text-primary rounded-lg"><Tags className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" title="Tags & Anexos" aria-label="Tags e anexos da refeição" onClick={() => onConnections(meal)} className="h-8 w-8 text-muted-foreground hover:text-primary rounded-lg"><Tags className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" aria-label="Excluir refeição" onClick={() => onDelete(meal)} className="h-8 w-8 text-muted-foreground hover:text-rose-500 rounded-lg"><Trash2 className="h-4 w-4" /></Button>
                 </div>
             </div>
@@ -247,8 +355,10 @@ function MealFormDialog({ meal, children }: { meal?: Meal; children?: React.Reac
     const [estimating, setEstimating] = useState(false);
     const [showSearchMobile, setShowSearchMobile] = useState(false);
 
-    const [title, setTitle] = useState(meal?.title || "Almoço");
+    const [title, setTitle] = useState(meal?.title || defaultMealTitle());
     const [type, setType] = useState<MealType>((meal?.type as MealType) || "HEALTHY");
+    // No modo prato a classificação é auto-detectada até o usuário escolher manualmente.
+    const [typeTouched, setTypeTouched] = useState(false);
     const [manualDesc, setManualDesc] = useState(meal?.items || "");
     const [manualCals, setManualCals] = useState<number>(meal?.calories || 0);
     // Macros em gramas (opcionais) — string vazia = não informado (vira null no banco).
@@ -289,12 +399,23 @@ function MealFormDialog({ meal, children }: { meal?: Meal; children?: React.Reac
         return "HEALTHY";
     }, [usingPlate, type, plateCals, plate.length]);
 
+    // Classificação efetiva: segue a auto-detecção do prato até o usuário sobrescrever
+    // (aí respeita a escolha dele). Fora do modo prato, sempre a escolha manual.
+    const effectiveType = usingPlate && !meal && !typeTouched ? detectedType : type;
+
     const finalCals = usingPlate ? plateCals : manualCals;
     const finalDesc = usingPlate ? plateDesc : manualDesc;
 
+    // Macros preenchidos (manual ou via IA) para prévia no rodapé.
+    const macros = useMemo(() => {
+        const num = (s: string) => parseFloat(s.replace(",", ".")) || 0;
+        const p = num(protein), c = num(carbs), f = num(fat);
+        return { p, c, f, any: p > 0 || c > 0 || f > 0 };
+    }, [protein, carbs, fat]);
+
     const reset = () => {
         setManualDesc(""); setManualCals(0); setPlate([]); setShowSearchMobile(false);
-        setProtein(""); setCarbs(""); setFat("");
+        setProtein(""); setCarbs(""); setFat(""); setTypeTouched(false);
     };
 
     // Estima kcal + macros pela descrição (one-shot IA) e preenche o formulário
@@ -326,7 +447,7 @@ function MealFormDialog({ meal, children }: { meal?: Meal; children?: React.Reac
         setIsLoading(true);
         const formData = new FormData();
         formData.append("title", title);
-        formData.append("type", (usingPlate && !meal) ? detectedType : type);
+        formData.append("type", effectiveType);
         formData.append("items", finalDesc);
         formData.append("calories", finalCals.toString());
         formData.append("protein", protein.trim());
@@ -355,8 +476,8 @@ function MealFormDialog({ meal, children }: { meal?: Meal; children?: React.Reac
         <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o && !meal) reset(); }}>
             <DialogTrigger asChild>
                 {children || (
-                    <Button size="sm" className="h-9 gap-1.5 font-bold rounded-lg px-4 shadow-sm">
-                        <Plus className="h-4 w-4" /> Registrar
+                    <Button variant="outline" size="sm" className="h-9 gap-1.5 rounded-lg px-3 text-xs" title="Montar refeição item a item, com busca de alimentos">
+                        <UtensilsCrossed className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Montar refeição</span>
                     </Button>
                 )}
             </DialogTrigger>
@@ -380,6 +501,15 @@ function MealFormDialog({ meal, children }: { meal?: Meal; children?: React.Reac
                     <div className="flex-1 min-h-0">
                         <FoodSelector onAdd={addFood} addedIds={addedIds} />
                     </div>
+                    {/* Mobile: confirma o que já entrou no prato e volta para os detalhes. */}
+                    {usingPlate && (
+                        <div className="md:hidden shrink-0 border-t border-border/40 bg-background p-3">
+                            <Button onClick={() => setShowSearchMobile(false)} className="w-full h-11 gap-2 rounded-xl font-bold">
+                                <UtensilsCrossed className="h-4 w-4" />
+                                Ver prato ({plate.length}) · {plateCals} kcal
+                            </Button>
+                        </div>
+                    )}
                 </div>
 
                 {/* --- DIREITA: PRATO + DETALHES --- */}
@@ -397,7 +527,18 @@ function MealFormDialog({ meal, children }: { meal?: Meal; children?: React.Reac
                         </DialogDescription>
                     </DialogHeader>
 
-                    <form id="meal-form" onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
+                    <form
+                        id="meal-form"
+                        onSubmit={handleSubmit}
+                        onKeyDown={(e) => {
+                            // Ctrl/Cmd+Enter salva de qualquer campo (inclusive da descrição, onde Enter quebra linha).
+                            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                                e.preventDefault();
+                                e.currentTarget.requestSubmit();
+                            }
+                        }}
+                        className="flex-1 flex flex-col min-h-0"
+                    >
                         <div className="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar">
 
                             {/* Nome + Classificação */}
@@ -407,15 +548,20 @@ function MealFormDialog({ meal, children }: { meal?: Meal; children?: React.Reac
                                     <Select value={title} onValueChange={setTitle}>
                                         <SelectTrigger className="h-11 rounded-xl bg-muted/30 border-border/40"><SelectValue /></SelectTrigger>
                                         <SelectContent className="rounded-xl">
-                                            {["Café da Manhã", "Almoço", "Lanche", "Jantar", "Ceia", "Pós-Treino"].map(t => (
+                                            {(MEAL_TITLES.includes(title) ? MEAL_TITLES : [title, ...MEAL_TITLES]).map(t => (
                                                 <SelectItem key={t} value={t}>{t}</SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
                                 </div>
                                 <div className="space-y-1.5">
-                                    <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Classificação</Label>
-                                    <Select value={usingPlate && !meal ? detectedType : type} onValueChange={(v) => setType(v as MealType)}>
+                                    <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                                        Classificação
+                                        {usingPlate && !meal && !typeTouched && (
+                                            <span className="normal-case tracking-normal text-[9px] font-bold text-primary bg-primary/10 rounded px-1.5 py-0.5">sugerido</span>
+                                        )}
+                                    </Label>
+                                    <Select value={effectiveType} onValueChange={(v) => { setType(v as MealType); setTypeTouched(true); }}>
                                         <SelectTrigger className="h-11 rounded-xl bg-muted/30 border-border/40"><SelectValue /></SelectTrigger>
                                         <SelectContent className="rounded-xl">
                                             <SelectItem value="HEALTHY">✅ Saudável</SelectItem>
@@ -452,7 +598,9 @@ function MealFormDialog({ meal, children }: { meal?: Meal; children?: React.Reac
                                                 </div>
                                                 <div className="min-w-0 flex-1">
                                                     <p className="text-sm font-semibold truncate">{food.name}</p>
-                                                    <p className="text-[11px] text-muted-foreground">{food.calories} kcal / {food.unit} · <span className="font-semibold text-foreground">{Math.round(food.calories * quantity)} kcal</span></p>
+                                                    <p className="text-[11px] text-muted-foreground">
+                                                        {scaledPortion(food.unit, quantity) ?? `${fmtQty(quantity)}× ${food.unit}`} · <span className="font-semibold text-foreground">{Math.round(food.calories * quantity)} kcal</span>
+                                                    </p>
                                                 </div>
                                                 {/* Stepper de quantidade */}
                                                 <div className="flex items-center gap-1 shrink-0">
@@ -478,7 +626,7 @@ function MealFormDialog({ meal, children }: { meal?: Meal; children?: React.Reac
                                 ) : (
                                     <div className="flex flex-col items-center justify-center gap-2 py-7 border border-dashed border-border/50 rounded-xl bg-muted/10 text-center px-4">
                                         <UtensilsCrossed className="h-6 w-6 text-muted-foreground/40" />
-                                        <p className="text-xs text-muted-foreground">Busque alimentos à esquerda para montar o prato — ou preencha manualmente abaixo.</p>
+                                        <p className="text-xs text-muted-foreground">Busque e toque nos alimentos para montar o prato — ou preencha manualmente abaixo.</p>
                                     </div>
                                 )}
                             </div>
@@ -497,7 +645,7 @@ function MealFormDialog({ meal, children }: { meal?: Meal; children?: React.Reac
                                     </div>
                                     <div className="space-y-1.5">
                                         <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Calorias (kcal)</Label>
-                                        <Input type="number" value={manualCals} onChange={(e) => setManualCals(Number(e.target.value))} className="h-12 text-lg font-bold font-mono rounded-xl bg-muted/20 border-border/40" />
+                                        <Input type="number" inputMode="numeric" value={manualCals || ""} placeholder="0" onChange={(e) => setManualCals(Number(e.target.value) || 0)} className="h-12 text-lg font-bold font-mono rounded-xl bg-muted/20 border-border/40" />
                                     </div>
                                 </>
                             )}
@@ -510,11 +658,11 @@ function MealFormDialog({ meal, children }: { meal?: Meal; children?: React.Reac
                                         type="button"
                                         onClick={handleEstimate}
                                         disabled={estimating}
-                                        className="flex items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary/80 disabled:opacity-50 transition-colors"
+                                        className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/20 disabled:opacity-50 transition-colors"
                                         title="A IA estima kcal e macros pela descrição da refeição"
                                     >
                                         {estimating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                                        Estimar com IA
+                                        {estimating ? "Estimando…" : "Estimar com IA"}
                                     </button>
                                 </div>
                                 <div className="grid grid-cols-3 gap-2">
@@ -539,10 +687,17 @@ function MealFormDialog({ meal, children }: { meal?: Meal; children?: React.Reac
                             <div className="min-w-0">
                                 <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Total</p>
                                 <p className="text-2xl font-bold tracking-tight leading-none">{finalCals} <span className="text-sm font-medium text-muted-foreground">kcal</span></p>
+                                {macros.any && (
+                                    <div className="flex items-center gap-2.5 mt-1.5 text-[11px] font-semibold">
+                                        {macros.p > 0 && <span className="text-blue-500">P {fmtQty(macros.p)}g</span>}
+                                        {macros.c > 0 && <span className="text-emerald-500">C {fmtQty(macros.c)}g</span>}
+                                        {macros.f > 0 && <span className="text-amber-500">G {fmtQty(macros.f)}g</span>}
+                                    </div>
+                                )}
                             </div>
                             <div className="flex gap-2 shrink-0">
                                 <Button type="button" variant="ghost" onClick={() => setOpen(false)} className="rounded-xl h-11 px-5">Cancelar</Button>
-                                <Button type="submit" disabled={isLoading} className="rounded-xl h-11 px-7 font-bold gap-2">
+                                <Button type="submit" disabled={isLoading} title="Ctrl/Cmd + Enter para salvar" className="rounded-xl h-11 px-7 font-bold gap-2">
                                     {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
                                     {meal ? "Salvar" : "Registrar"}
                                 </Button>

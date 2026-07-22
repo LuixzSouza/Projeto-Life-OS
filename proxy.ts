@@ -28,9 +28,13 @@ export async function proxy(request: NextRequest) {
   // (Google, iPhone) buscam sem cookie de sessão.
   // /celebrar/<token> é a página pública de aniversário: o amigo abre sem conta,
   // autenticada pelo token assinado na própria URL (lib/celebration.ts).
+  // /api/cms/<apiKey>/<slug> é a API pública do headless CMS: sites externos
+  // consomem via fetch/cURL sem sessão — a apiKey na URL é a credencial (a rota
+  // valida). Sem isto o proxy redireciona o consumo externo para /login.
   const isPublicRoute =
     publicRoutes.includes(path) ||
     path.startsWith("/api/calendar/") ||
+    path.startsWith("/api/cms/") ||
     path.startsWith("/celebrar/");
 
   // 2. Validação da Sessão

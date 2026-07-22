@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { requireUserId } from "@/lib/auth";
+import { DEVICE_METRIC_SPEC } from "@/lib/body-math";
 import { ActionResponse } from "./types";
 
 // =========================================================
@@ -82,6 +83,44 @@ export async function saveBodyMeasurements(formData: FormData): Promise<ActionRe
   } catch (error) {
     console.error("Erro ao salvar medidas:", error);
     return { success: false, message: "Erro ao salvar no banco de dados." };
+  }
+}
+
+// =========================================================
+// MEDIÇÕES POR APARELHO (bioimpedância / adipômetro)
+// =========================================================
+// Guardadas como linhas de HealthMetric (type/value) — a mesma tabela genérica
+// usada para o peso. Isso permite registrar % gordura medida, massa muscular,
+// água, gordura visceral, massa óssea e idade metabólica SEM colunas novas
+// (importante: o banco roda em modo réplica/Turso, onde migrar é arriscado).
+// Cada type também vira uma série histórica para gráficos futuros.
+
+export async function saveBodyDeviceMetrics(formData: FormData): Promise<ActionResponse> {
+  try {
+    const userId = await requireUserId();
+    const now = new Date();
+
+    const rows: { type: string; value: number; date: Date; userId: string }[] = [];
+    for (const m of DEVICE_METRIC_SPEC) {
+      const raw = formData.get(m.key);
+      if (raw == null || raw.toString().trim() === "") continue;
+      const v = parseFloat(raw.toString().replace(",", "."));
+      if (Number.isFinite(v) && v >= m.min && v <= m.max) {
+        rows.push({ type: m.type, value: v, date: now, userId });
+      }
+    }
+
+    if (rows.length === 0) {
+      return { success: false, message: "Preencha ao menos um valor do aparelho." };
+    }
+
+    await prisma.healthMetric.createMany({ data: rows });
+    revalidatePath("/health");
+    revalidatePath("/health/body");
+    return { success: true, message: `${rows.length} medição${rows.length > 1 ? "ões" : ""} do aparelho salva${rows.length > 1 ? "s" : ""}. ✅` };
+  } catch (error) {
+    console.error("Erro ao salvar métricas de aparelho:", error);
+    return { success: false, message: "Erro ao salvar as medições do aparelho." };
   }
 }
 

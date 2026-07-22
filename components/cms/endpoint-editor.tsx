@@ -8,7 +8,7 @@ import { savePageContent } from "@/app/(dashboard)/cms/actions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Save, Check, Terminal, Loader2 } from "lucide-react";
+import { Save, Check, Terminal, Loader2, AlertTriangle } from "lucide-react";
 
 // CodeMirror (~500KB) carregado SOB DEMANDA: só baixa quando o editor abre.
 import dynamic from "next/dynamic";
@@ -33,6 +33,11 @@ export function EndpointEditor({ page }: { page: SitePage }) {
   }, []);
 
   const handleSave = async () => {
+    // Trava de segurança: nunca publica JSON inválido (a API pública quebraria).
+    if (!isJsonValid) {
+      toast.error("JSON inválido — corrija a sintaxe antes de publicar.");
+      return;
+    }
     setIsSaving(true);
     const fd = new FormData();
     fd.append("pageId", page.id);
@@ -42,8 +47,8 @@ export function EndpointEditor({ page }: { page: SitePage }) {
       await savePageContent(fd);
       toast.success("Build completo: Conteúdo sincronizado");
       setIsDirty(false);
-    } catch {
-      toast.error("Falha na sincronização");
+    } catch (e) {
+      toast.error(e instanceof Error && e.message ? e.message : "Falha na sincronização");
     } finally {
       setIsSaving(false);
     }
@@ -72,8 +77,8 @@ export function EndpointEditor({ page }: { page: SitePage }) {
           )}
 
           {!isJsonValid && code.length > 0 && (
-            <span className="hidden md:inline text-[10px] font-mono text-muted-foreground/60 uppercase">
-              (Raw Text Mode)
+            <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-rose-500">
+              <AlertTriangle className="h-3 w-3" /> JSON inválido
             </span>
           )}
         </div>
@@ -82,7 +87,8 @@ export function EndpointEditor({ page }: { page: SitePage }) {
           <Button
             size="sm"
             onClick={handleSave}
-            disabled={!isDirty || isSaving}
+            disabled={!isDirty || isSaving || !isJsonValid}
+            title={!isJsonValid ? "Corrija o JSON antes de publicar" : undefined}
             className="h-8 gap-2 font-black uppercase tracking-widest text-[10px] rounded-lg shadow-lg"
           >
             {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}

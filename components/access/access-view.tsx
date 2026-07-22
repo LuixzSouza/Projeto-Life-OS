@@ -14,11 +14,12 @@ import {
   Zap,
   Filter,
   Radar,
-  Loader2
+  Loader2,
+  StickyNote
 } from "lucide-react";
 import { toast } from "sonner";
 import { type VaultAudit, type BreachScan, scanPasswordBreaches } from "@/app/(dashboard)/access/actions";
-import { CATEGORY_CONFIG, type CategoryKey } from "@/components/access/access-helpers";
+import { CATEGORY_CONFIG, isNoteItem, type CategoryKey } from "@/components/access/access-helpers";
 import { AccessList } from "@/components/access/access-list";
 import { AccessDialog } from "@/components/access/access-dialog";
 import { Input } from "@/components/ui/input";
@@ -47,9 +48,11 @@ export function AccessView({ initialItems, audit }: { initialItems: AccessItem[]
 
   const reusedSet = new Set(audit.reusedIds);
   const breachedSet = new Set(breach?.breachedIds ?? []);
-  const isAtRisk = (id: string) =>
-    (audit.strengthById[id] ?? 0) < 50 || reusedSet.has(id) || breachedSet.has(id);
-  const riskCount = initialItems.filter((i) => isAtRisk(i.id)).length;
+  // Notas não têm senha → nunca entram no cálculo de risco.
+  const isAtRisk = (item: AccessItem) =>
+    !isNoteItem(item) &&
+    ((audit.strengthById[item.id] ?? 0) < 50 || reusedSet.has(item.id) || breachedSet.has(item.id));
+  const riskCount = initialItems.filter(isAtRisk).length;
 
   const handleScanBreaches = async () => {
     setScanning(true);
@@ -77,14 +80,18 @@ export function AccessView({ initialItems, audit }: { initialItems: AccessItem[]
       (item.title?.toLowerCase() ?? "").includes(searchLower) ||
       (item.username?.toLowerCase() ?? "").includes(searchLower) ||
       (item.client?.toLowerCase() ?? "").includes(searchLower) ||
+      (item.notes?.toLowerCase() ?? "").includes(searchLower) ||
       (item.category?.toLowerCase() ?? "").includes(searchLower);
     const matchesCategory = categoryFilter === "all" || item.category === categoryFilter;
-    return matchesSearch && matchesCategory && (!riskOnly || isAtRisk(item.id));
+    return matchesSearch && matchesCategory && (!riskOnly || isAtRisk(item));
   });
 
-  const personalItems = filteredItems.filter((item) => !item.client);
-  const clientItems = filteredItems.filter((item) => item.client);
-  const currentList = activeTab === "PERSONAL" ? personalItems : clientItems;
+  // Notas (sem senha) têm aba própria; credenciais dividem em Pessoal e Clientes.
+  const noteItems = filteredItems.filter((item) => isNoteItem(item));
+  const personalItems = filteredItems.filter((item) => !isNoteItem(item) && !item.client);
+  const clientItems = filteredItems.filter((item) => !isNoteItem(item) && item.client);
+  const currentList =
+    activeTab === "PERSONAL" ? personalItems : activeTab === "CLIENTS" ? clientItems : noteItems;
 
   // 2. Paginação Tática
   const totalPages = Math.ceil(currentList.length / ITEMS_PER_PAGE) || 1;
@@ -205,6 +212,17 @@ export function AccessView({ initialItems, audit }: { initialItems: AccessItem[]
                 {clientItems.length}
               </span>
             </TabsTrigger>
+
+            <TabsTrigger
+              value="NOTES"
+              className="flex-1 gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold transition-all data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm sm:flex-none"
+            >
+              <StickyNote className="h-4 w-4 opacity-70" />
+              Notas
+              <span className="ml-1 rounded-md bg-primary/10 px-1.5 py-0.5 font-mono text-xs text-primary">
+                {noteItems.length}
+              </span>
+            </TabsTrigger>
           </TabsList>
 
           {search && (
@@ -245,6 +263,22 @@ export function AccessView({ initialItems, audit }: { initialItems: AccessItem[]
               </>
             ) : (
               <EmptyState isSearch={search.length > 0} type="CLIENTS" />
+            )}
+          </TabsContent>
+
+          <TabsContent value="NOTES" className="space-y-8 focus-visible:outline-none mt-0">
+            {noteItems.length > 0 ? (
+              <>
+                <AccessList items={paginatedItems} strengthById={audit.strengthById} reusedIds={audit.reusedIds} breachCounts={breach?.breachCounts} />
+                <PaginationFooter
+                  currentPage={safeCurrentPage}
+                  totalPages={totalPages}
+                  totalItems={noteItems.length}
+                  onPage={goToPage}
+                />
+              </>
+            ) : (
+              <EmptyState isSearch={search.length > 0} type="NOTES" />
             )}
           </TabsContent>
         </div>
@@ -344,7 +378,21 @@ function PaginationFooter({
 }
 
 // --- ESTADO VAZIO ---
-function EmptyState({ isSearch, type }: { isSearch: boolean; type: "PERSONAL" | "CLIENTS" }) {
+function EmptyState({ isSearch, type }: { isSearch: boolean; type: "PERSONAL" | "CLIENTS" | "NOTES" }) {
+  const title = isSearch
+    ? "Nada encontrado"
+    : type === "PERSONAL"
+      ? "Seu cofre está vazio"
+      : type === "CLIENTS"
+        ? "Nenhuma credencial de cliente"
+        : "Nenhuma anotação ainda";
+  const description = isSearch
+    ? "Nada corresponde à sua busca. Tente outro termo ou limpe os filtros."
+    : type === "PERSONAL"
+      ? "Guarde aqui seus logins, bancos e redes sociais — tudo criptografado e só seu."
+      : type === "CLIENTS"
+        ? "Cadastre as credenciais de servidores e painéis dos seus clientes."
+        : "Anote textos e lembretes rápidos — senha do Wi-Fi, códigos, observações. Sem senha, só pra lembrar.";
   return (
     <Card className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border/60 bg-muted/5 py-20 animate-in fade-in zoom-in-95 duration-500">
       <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-border/60 bg-background shadow-sm">
@@ -352,22 +400,16 @@ function EmptyState({ isSearch, type }: { isSearch: boolean; type: "PERSONAL" | 
           <Search className="h-7 w-7 text-muted-foreground" />
         ) : type === "PERSONAL" ? (
           <KeyRound className="h-7 w-7 text-primary" />
-        ) : (
+        ) : type === "CLIENTS" ? (
           <Briefcase className="h-7 w-7 text-primary" />
+        ) : (
+          <StickyNote className="h-7 w-7 text-primary" />
         )}
       </div>
 
-      <h3 className="mb-1.5 text-lg font-bold text-foreground">
-        {isSearch ? "Nada encontrado" : type === "PERSONAL" ? "Seu cofre está vazio" : "Nenhuma credencial de cliente"}
-      </h3>
+      <h3 className="mb-1.5 text-lg font-bold text-foreground">{title}</h3>
 
-      <p className="max-w-xs px-6 text-center text-sm leading-relaxed text-muted-foreground">
-        {isSearch
-          ? "Nenhuma credencial corresponde à sua busca. Tente outro termo ou limpe os filtros."
-          : type === "PERSONAL"
-            ? "Guarde aqui seus logins, bancos e redes sociais — tudo criptografado e só seu."
-            : "Cadastre as credenciais de servidores e painéis dos seus clientes."}
-      </p>
+      <p className="max-w-xs px-6 text-center text-sm leading-relaxed text-muted-foreground">{description}</p>
 
       {isSearch && (
         <Button variant="link" onClick={() => window.location.reload()} className="mt-4 gap-1.5 text-sm font-medium text-primary">

@@ -587,7 +587,7 @@ function MonthGrid({
         })}
       </div>
 
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         <div className="grid grid-cols-7 auto-rows-fr">
           {days.map((d) => {
             const items = byDay.get(dayKey(d)) ?? [];
@@ -909,6 +909,7 @@ function AgendaRow({ item, showTime, dim, eventById, onEditEvent, onDeleteEvent,
             variant="ghost"
             size="icon"
             title="Editar evento"
+            aria-label="Editar evento"
             onClick={() => onEditEvent(editable)}
             className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-primary/10 hover:text-primary"
           >
@@ -918,6 +919,7 @@ function AgendaRow({ item, showTime, dim, eventById, onEditEvent, onDeleteEvent,
             variant="ghost"
             size="icon"
             title="Excluir evento"
+            aria-label="Excluir evento"
             onClick={() => onDeleteEvent(editable)}
             className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-rose-500/10 hover:text-rose-500"
           >
@@ -936,6 +938,7 @@ function AgendaRow({ item, showTime, dim, eventById, onEditEvent, onDeleteEvent,
             variant="ghost"
             size="icon"
             title="Evento recorrente — editar/pular esta ocorrência ou a série"
+            aria-label="Opções do evento recorrente"
             onClick={() => onRecurring(occurrenceAnchor, format(parseISO(item.date), "yyyy-MM-dd"))}
             className="h-8 w-8 rounded-lg text-muted-foreground hover:bg-primary/10 hover:text-primary"
           >

@@ -128,7 +128,7 @@ export function FolderPicker({ onSelect, currentPath }: FolderPickerProps) {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline" size="icon" className="shrink-0 bg-secondary hover:bg-secondary/80 border-border" title="Navegar nas pastas">
+                <Button variant="outline" size="icon" className="shrink-0 bg-secondary hover:bg-secondary/80 border-border" title="Navegar nas pastas" aria-label="Navegar nas pastas">
                     <FolderOpen className="h-4 w-4 text-primary" />
                 </Button>
             </DialogTrigger>
@@ -143,13 +143,13 @@ export function FolderPicker({ onSelect, currentPath }: FolderPickerProps) {
                     {/* Barra de Navegação */}
                     <div className="flex gap-2 items-center">
                         <div className="flex gap-1">
-                            <Button variant="outline" size="icon" onClick={() => loadFolders("ROOT")} title="Este Computador" className="text-muted-foreground hover:text-foreground">
+                            <Button variant="outline" size="icon" onClick={() => loadFolders("ROOT")} title="Este Computador" aria-label="Este computador" className="text-muted-foreground hover:text-foreground">
                                 <Monitor className="h-4 w-4" />
                             </Button>
-                            <Button variant="outline" size="icon" onClick={() => loadFolders("")} title="Pasta do Usuário" className="text-muted-foreground hover:text-foreground">
+                            <Button variant="outline" size="icon" onClick={() => loadFolders("")} title="Pasta do Usuário" aria-label="Pasta do usuário" className="text-muted-foreground hover:text-foreground">
                                 <Home className="h-4 w-4" />
                             </Button>
-                            <Button variant="outline" size="icon" onClick={handleGoUp} title="Subir Nível" className="text-muted-foreground hover:text-foreground">
+                            <Button variant="outline" size="icon" onClick={handleGoUp} title="Subir Nível" aria-label="Subir um nível" className="text-muted-foreground hover:text-foreground">
                                 <ArrowUp className="h-4 w-4" />
                             </Button>
                         </div>
